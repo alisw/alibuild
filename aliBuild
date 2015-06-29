@@ -49,6 +49,8 @@ def updateReferenceRepos(referenceSources, buildOrder, specs):
       continue
     
     err, out = getstatusoutput("mkdir -p %s" % abspath(referenceSources))
+    if not "source" in spec:
+      continue
     if not exists(referenceRepo):
       cmd = ["git", "clone", "--bare", spec["source"], referenceRepo]
       debug(" ".join(cmd))
@@ -111,8 +113,9 @@ if __name__ == "__main__":
     h = sha1(spec["recipe"])
     h.update(spec["version"])
     h.update(spec["package"])
-    h.update(spec["source"])
-    h.update(spec["tag"])
+    h.update(spec.get("source", "none"))
+    if "source" in spec:
+      h.update(spec["tag"])
     h.update(str(spec.get("env", {})))
     h.update(str(spec.get("append_path", {})))
     h.update(str(spec.get("prepend_path", {})))
@@ -279,6 +282,7 @@ if __name__ == "__main__":
     if "reference" in spec:
       referenceStatement = "export GIT_REFERENCE=%s" % spec["reference"]
       
+    debug(spec)
     cmd = format("set -e\n"
                  "export WORK_DIR=%(workDir)s\n" + 
                  dependencies + ""
@@ -301,7 +305,11 @@ if __name__ == "__main__":
                  "rm -rf $BUILDROOT/log\n"
                  "export BUILDDIR=$BUILDROOT/$PKGNAME\n"
                  "%(referenceStatement)s\n"
-                 "git clone ${GIT_REFERENCE:+--reference $GIT_REFERENCE} -b ${GIT_TAG} $SOURCE0 $BUILDDIR\n"
+                 "if [ ! \"X$SOURCE0\" = X ]; then\n"
+                 "  git clone ${GIT_REFERENCE:+--reference $GIT_REFERENCE} -b ${GIT_TAG} $SOURCE0 $BUILDDIR;\n"
+                 "else\n"
+                 "  mkdir -p $BUILDDIR\n"
+                 "fi\n"
                  "cd $BUILDDIR\n"
                  "sh -ex $WORK_DIR/SPECS/$PKGNAME.sh 2>&1 >$BUILDROOT/log\n"
                  "pushd $WORK_DIR/INSTALLROOT/$PKGHASH\n"
@@ -331,8 +339,8 @@ if __name__ == "__main__":
                  revision=spec["revision"],
                  architecture=args.architecture,
                  jobs=args.jobs,
-                 source=spec["source"],
-                 tag=spec["tag"],
+                 source=spec.get("source", ""),
+                 tag=spec.get("tag", ""),
                  referenceStatement=referenceStatement)
     scriptName = "%s/BUILD/%s/%s/%s-%s/build.sh" % (workDir, args.architecture, spec["package"], spec["version"], spec["revision"])
     err, out = getstatusoutput("mkdir -p %s" % dirname(scriptName))
