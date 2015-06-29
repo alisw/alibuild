@@ -29,6 +29,39 @@ def execute(command, printer=debug):
   exitCode = popen.returncode
   return exitCode
 
+def updateReferenceRepos(referenceSources, buildOrder, specs):
+  # Update source reference area, if possible.
+  # If the area is already there and cannot be written, assume it maintained
+  # by someone else.
+  #
+  # If the area can be created, clone a bare repository with the sources.
+  debug("Updating references.")
+  for p in buildOrder:
+    spec = specs[p]
+    referenceRepo = "%s/%s" % (abspath(referenceSources), p) 
+    writeableReference = os.access(referenceSources, os.W_OK)
+    if not writeableReference and exists(referenceRepo):
+      debug("Using %s as reference for %s." % (referenceRepo, p))
+      spec["reference"] = referenceRepo
+      continue
+    if not writeableReference:
+      debug("Cannot create reference for %s in specified folder.", p)
+      continue
+    
+    err, out = getstatusoutput("mkdir -p %s" % abspath(referenceSources))
+    if not "source" in spec:
+      continue
+    if not exists(referenceRepo):
+      cmd = ["git", "clone", "--bare", spec["source"], referenceRepo]
+      debug(" ".join(cmd))
+      err = execute(cmd)
+    else:
+      err, out = getstatusoutput("cd %s && git fetch --tags" % (referenceRepo))
+    if err:
+      print "Error while updating reference repos %s." % spec["source"] 
+      sys.exit(1)
+    spec["reference"] = referenceRepo
+
 if __name__ == "__main__":
   parser = ArgumentParser()
   parser.add_argument("action")
@@ -80,8 +113,9 @@ if __name__ == "__main__":
     h = sha1(spec["recipe"])
     h.update(spec["version"])
     h.update(spec["package"])
-    h.update(spec["source"])
-    h.update(spec["tag"])
+    h.update(spec.get("source", "none"))
+    if "source" in spec:
+      h.update(spec["tag"])
     h.update(str(spec.get("env", {})))
     h.update(str(spec.get("append_path", {})))
     h.update(str(spec.get("prepend_path", {})))
@@ -96,6 +130,7 @@ if __name__ == "__main__":
   # available
   # FIXME: check in the repository as well and download tarball if already
   #        build
+  debug("Checking for packages already built.")
   newBuildOrder = []
   for p in buildOrder:
     spec = specs[p]
@@ -132,6 +167,7 @@ if __name__ == "__main__":
   
   # If the software already exists as a tarball and has the same hash, we reuse
   # it.
+  debug("Updating from tarballs")
   for p in buildOrder:
     spec = specs[p]
     tarballHashDir = format("%(workdir)s/TARS/%(architecture)s/store/%(prefix)s/%(hash)s",
@@ -176,23 +212,8 @@ if __name__ == "__main__":
       print out
       exit(1)
     buildOrder.remove(p)
-
-  # Update source reference area, if possible.
-  # FIXME: check for read / write since in docker we do the updates separately
-  err, out = getstatusoutput("mkdir -p %s" % abspath(args.referenceSources))
-  for p in buildOrder:
-    spec = specs[p]
-    referenceRepo = "%s/%s" % (abspath(args.referenceSources), p) 
-    err, out = (None, None)
-    if not exists(referenceRepo):
-      cmd = ["git", "clone", "--bare", spec["source"], referenceRepo]
-      debug(" ".join(cmd))
-      err = execute(cmd)
-    else:
-      err, out = getstatusoutput("cd %s && git fetch --tags" % (referenceRepo))
-    if err:
-      print "Error while updating reference repos %s." % spec["source"] 
-      sys.exit(1)
+    
+  updateReferenceRepos(args.referenceSources, buildOrder, specs)
   
   # Build everything, everytime
   for p in buildOrder:
@@ -257,6 +278,11 @@ if __name__ == "__main__":
                            )
 
     # The actual build script.
+    referenceStatement = ""
+    if "reference" in spec:
+      referenceStatement = "export GIT_REFERENCE=%s" % spec["reference"]
+      
+    debug(spec)
     cmd = format("set -e\n"
                  "export WORK_DIR=%(workDir)s\n" + 
                  dependencies + ""
@@ -278,8 +304,12 @@ if __name__ == "__main__":
                  "cd $BUILDROOT\n"
                  "rm -rf $BUILDROOT/log\n"
                  "export BUILDDIR=$BUILDROOT/$PKGNAME\n"
-                 "export GIT_REFERENCE=$SOURCEDIR/$PKGNAME\n"
-                 "git clone ${GIT_REFERENCE:+--reference $GIT_REFERENCE} -b ${GIT_TAG} $SOURCE0 $BUILDDIR\n"
+                 "%(referenceStatement)s\n"
+                 "if [ ! \"X$SOURCE0\" = X ]; then\n"
+                 "  git clone ${GIT_REFERENCE:+--reference $GIT_REFERENCE} -b ${GIT_TAG} $SOURCE0 $BUILDDIR;\n"
+                 "else\n"
+                 "  mkdir -p $BUILDDIR\n"
+                 "fi\n"
                  "cd $BUILDDIR\n"
                  "sh -ex $WORK_DIR/SPECS/$PKGNAME.sh 2>&1 >$BUILDROOT/log\n"
                  "pushd $WORK_DIR/INSTALLROOT/$PKGHASH\n"
@@ -309,8 +339,9 @@ if __name__ == "__main__":
                  revision=spec["revision"],
                  architecture=args.architecture,
                  jobs=args.jobs,
-                 source=spec["source"],
-                 tag=spec["tag"])
+                 source=spec.get("source", ""),
+                 tag=spec.get("tag", ""),
+                 referenceStatement=referenceStatement)
     scriptName = "%s/BUILD/%s/%s/%s-%s/build.sh" % (workDir, args.architecture, spec["package"], spec["version"], spec["revision"])
     err, out = getstatusoutput("mkdir -p %s" % dirname(scriptName))
     script = open(scriptName, "w") 
