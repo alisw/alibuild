@@ -44,5 +44,20 @@ The following entries are mandatory in the header:
 
   - `package`: the name of the package  
   - `version`: a mnemonic 
-  - `source`:
-  - tag:
+
+The following entries are optional in the header:
+
+  - `source`: url of a git repository from which the sources should be fetch
+    from.  Notice it's a good practice to make sure that they are already
+    patched, so that you can easily point to the actual sources used by the
+    software.
+  - `tag`: tag in the above mentioned repository which points to the software
+    to be built.
+  - `prepend_path`: list of one entry dictionaries whose key-value pairs are
+    an environment variable name and a path to be appended to it, like it
+    happens in `LD_LIBRARY_PATH`. E.g:
+
+        prepend_path:
+          - "PATH": "$FOO_ROOT/binexec/foobar"
+
+    will result in prepending `$FOO_ROOT/binexec/foobar` to $PATH
