@@ -121,6 +121,7 @@ if __name__ == "__main__":
     h.update(str(spec.get("prepend_path", {})))
     requires = spec.get("requires", [])
     for dep in requires:
+      debug(dep)
       h.update(specs[dep]["hash"])
     hash = h.hexdigest()
     spec["hash"] = hash
@@ -223,6 +224,7 @@ if __name__ == "__main__":
     # parts depending on it, but we do not guaranteed anything for the order in
     # which unrelated components are activated.
     dependencies = ""
+    dependenciesInit = ""
     for dep in spec.get("requires", []):
       depSpec = specs[dep]
       dependencies += format("source $WORK_DIR/%(architecture)s/%(package)s/%(version)s-%(revision)s/etc/profile.d/init.sh\n",
@@ -230,6 +232,12 @@ if __name__ == "__main__":
                              package=dep,
                              version=depSpec["version"],
                              revision=depSpec["revision"])
+      dependenciesInit += format('echo source $%(bigpackage)s_ROOT/etc/profile.d/init.sh >> $INSTALLROOT/etc/profile.d/init.sh\n',
+                                architecture=args.architecture,
+                                package=dep,
+                                version=depSpec["version"],
+                                revision=depSpec["revision"],
+                                bigpackage=dep.upper())
     # Generate the part which creates the environment for the package.
     # This can be either variable set via the "env" keyword in the metadata
     # or paths which get appended via the "append_path" one.
@@ -317,7 +325,9 @@ if __name__ == "__main__":
                  "echo $PKGHASH > $INSTALLROOT/.build-hash\n"
                  "mkdir -p $INSTALLROOT/etc/profile.d\n"
                  "BIGPKGNAME=`echo $PKGNAME | tr [:lower:] [:upper:]`\n"
-                 "echo \"export ${BIGPKGNAME}_ROOT=$INSTALLROOT\" > $INSTALLROOT/etc/profile.d/init.sh\n"
+                 "rm -f $INSTALLROOT/etc/profile.d/init.sh\n" +
+                 dependenciesInit +
+                 "echo \"export ${BIGPKGNAME}_ROOT=$INSTALLROOT\" >> $INSTALLROOT/etc/profile.d/init.sh\n"
                  "echo \"export ${BIGPKGNAME}_VERSION=$PKGVERSION\" >> $INSTALLROOT/etc/profile.d/init.sh\n"
                  "echo \"export ${BIGPKGNAME}_REVISION=$PKGREVISION\" >> $INSTALLROOT/etc/profile.d/init.sh\n"
                  "echo \"export ${BIGPKGNAME}_HASH=$PKGHASH\" >> $INSTALLROOT/etc/profile.d/init.sh\n" +
