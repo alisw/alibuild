@@ -1,15 +1,11 @@
-# \*Build
+# aliBuild
 
-A simple build tool for HEP experiment software.
-
-Depending on how you call it, the prefix is used to decide defaults. For
-example if you invoke it as "aliBuild" you will end up with ALICE defaults.
+A simple build tool for ALICE experiment software and its externals.
 
 # Format of the recipes
 
 The recipes are found in the a separate repository. The repository 
-can be specified via the `-c` option and defaults to \*dist where \* is the
-usual per experiment prefix.
+can be specified via the `-c` option and defaults to alidist.
 
 The recipes themselves are called `<package>.sh` where `<package>` is the name of
 the package whose build recipe is described, e.g. `root`.
@@ -53,6 +49,12 @@ The following entries are optional in the header:
     software.
   - `tag`: tag in the above mentioned repository which points to the software
     to be built.
+  - `env`: list of one entry dictionaries whose key-value pairs are
+    an environment variables name and value to be set. E.g.:
+
+        env:
+        - "$ROOTSYS": $ROOT_ROOT
+
   - `prepend_path`: list of one entry dictionaries whose key-value pairs are
     an environment variable name and a path to be appended to it, like it
     happens in `LD_LIBRARY_PATH`. E.g:
@@ -61,3 +63,5 @@ The following entries are optional in the header:
           - "PATH": "$FOO_ROOT/binexec/foobar"
 
     will result in prepending `$FOO_ROOT/binexec/foobar` to $PATH
+  - `append_path`: same as `prepend_path`, paths are appended rather than
+    prepended.
