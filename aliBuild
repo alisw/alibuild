@@ -99,11 +99,11 @@ if __name__ == "__main__":
     d = open("%s/%s.sh" % (args.configDir, p)).read()
     header, recipe = d.split("---", 1)
     spec = load(header)
-    spec["recipe"] = recipe
+    spec["recipe"] = recipe.strip("\n")
     specs[p] = spec 
     buildOrder.insert(0, p)
     packages += spec.get('requires', [])
-    open("%s/SPECS/%s.sh" % (workDir, p), "w").write(recipe)
+    open("%s/SPECS/%s.sh" % (workDir, p), "w").write(spec["recipe"])
   
   # Calculate the hashes. We do this in build order so that we can guarantee
   # that the hashes of the dependencies are calculated first.
