@@ -65,3 +65,27 @@ The following entries are optional in the header:
     will result in prepending `$FOO_ROOT/binexec/foobar` to $PATH
   - `append_path`: same as `prepend_path`, paths are appended rather than
     prepended.
+
+### The body
+
+The following variables can be expected to be defined and can be used in
+your evironment.
+
+- `<PACKAGE>_ROOT`: where <PACKAGE> is the upper name of the package, as
+  defined in the `name` field in the header.
+- `<PACKAGE>_VERSION`: the version of the package, as defined in the `version`
+  field.
+- `INSTALLROOT`: the path to use as installation path, e.g. what you pass via 
+  `--prefix` to configure or via `-DCMAKE_INSTALL_PREFIX` to cmake.
+- `JOBS`: the number of jobs specified via the command line option `-j`.
+
+moreover given the closure of all the dependencies of a package (i.e. direct
+and indirect ones) you will get `<DEPENDENCIES>_ROOT` and
+`<DEPENDENCIES>_VERSION` which you can use to drive the build.
+
+
+### The environment file
+
+In every package you can find an environment file in
+`$<PACKAGE>_ROOT/etc/profile.d/init.sh` which sets up the environment so that
+it the built software can be used.
