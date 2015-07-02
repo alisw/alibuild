@@ -19,6 +19,12 @@ def format(s, **kwds):
 def star():
   return basename(sys.argv[0]).replace("Build", "")
 
+def gzip():
+  err, out = getstatusoutput("which pigz")
+  if err:
+    return "gzip"
+  return "pigz"
+
 def execute(command, printer=debug):
   popen = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
   lines_iterator = iter(popen.stdout.readline, b"")
@@ -207,7 +213,7 @@ if __name__ == "__main__":
     # FIXME: check the checksum inside just to make sure.
     # FIXME: in case of error remove and rebuild?
     print "Unpacking %s from %s" % (p, tarballPath)
-    err, out = getstatusoutput("cd %s && tar xjvf %s" % (workDir, tarballPath))
+    err, out = getstatusoutput("cd %s && %s -dc | tar -x %s" % (workDir, gzip(), tarballPath))
     if err:
       print "Error while unpacking."
       print out
