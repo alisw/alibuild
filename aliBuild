@@ -244,14 +244,11 @@ if __name__ == "__main__":
     # By default we append LD_LIBRARY_PATH, PATH and DYLD_LIBRARY_PATH
     # FIXME: do not append variables for Mac on Linux.
     environment = ""
-    for (key, value) in spec.get("env", {}):
-      environment += format("echo 'export %(key)s=%(value)s' >> $INSTALL_ROOT/etc/profile.d/init.sh\n",
+    for (key, value) in spec.get("env", {}).items():
+      environment += format("echo 'export %(key)s=%(value)s' >> $INSTALLROOT/etc/profile.d/init.sh\n",
                              architecture=args.architecture,
                              key=key,
-                             package=dep,
-                             revision=depSpec["revision"],
                              value=value,
-                             version=depSpec["version"]
                            )
     basePath = "%s_ROOT" % p.upper()
     pathDict = spec.get("append_path", [])
