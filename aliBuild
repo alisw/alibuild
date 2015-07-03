@@ -341,9 +341,9 @@ if __name__ == "__main__":
                  "cat $INSTALLROOT/.original-unrelocated | xargs -n1 -I{} cp '{}' '{}'.unrelocated\n" +
                  "HASHPREFIX=`echo $PKGHASH | cut -b1,2`\n"
                  "mkdir -p ${WORK_DIR}/TARS/$ARCHITECTURE/store/$HASHPREFIX/$PKGHASH\n"
-                 "tar cjvf $WORK_DIR/TARS/$ARCHITECTURE/store/$HASHPREFIX/$PKGHASH/$PKGNAME-$PKGVERSION-$PKGREVISION.$ARCHITECTURE.tar.gz .\n"
+                 "tar czf $WORK_DIR/TARS/$ARCHITECTURE/store/$HASHPREFIX/$PKGHASH/$PKGNAME-$PKGVERSION-$PKGREVISION.$ARCHITECTURE.tar.gz .\n"
                  "ln -sf $WORK_DIR/TARS/$ARCHITECTURE/store/$HASHPREFIX/$PKGHASH/$PKGNAME-$PKGVERSION-$PKGREVISION.$ARCHITECTURE.tar.gz $WORK_DIR/TARS/$ARCHITECTURE/$PKGNAME-$PKGVERSION-$PKGREVISION.$ARCHITECTURE.tar.gz\n"
-                 "cd $WORK_DIR && tar xjvf $WORK_DIR/TARS/$ARCHITECTURE/$PKGNAME-$PKGVERSION-$PKGREVISION.$ARCHITECTURE.tar.gz\n"
+                 "cd $WORK_DIR && tar xzf $WORK_DIR/TARS/$ARCHITECTURE/$PKGNAME-$PKGVERSION-$PKGREVISION.$ARCHITECTURE.tar.gz\n"
                  "sh -ex $ARCHITECTURE/$PKGNAME/$PKGVERSION-$PKGREVISION/relocate-me.sh\n",
                  workDir=workDir,
                  configDir=abspath(args.configDir),
