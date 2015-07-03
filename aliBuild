@@ -356,7 +356,7 @@ if __name__ == "__main__":
                  source=spec.get("source", ""),
                  tag=spec.get("tag", ""),
                  referenceStatement=referenceStatement)
-    scriptName = "%s/BUILD/%s/%s/%s-%s/build.sh" % (workDir, args.architecture, spec["package"], spec["version"], spec["revision"])
+    scriptName = "%s/SPECS/%s/%s/%s-%s/build.sh" % (workDir, args.architecture, spec["package"], spec["version"], spec["revision"])
     err, out = getstatusoutput("mkdir -p %s" % dirname(scriptName))
     script = open(scriptName, "w") 
     script.write(cmd)
