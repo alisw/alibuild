@@ -3,7 +3,7 @@ from argparse import ArgumentParser
 import os
 import sys
 from commands import getstatusoutput
-from os.path import basename, dirname, abspath, exists
+from os.path import basename, dirname, abspath, exists, realpath
 from yaml import load
 from os import makedirs, unlink
 from hashlib import sha1
@@ -294,57 +294,14 @@ if __name__ == "__main__":
       referenceStatement = "export GIT_REFERENCE=%s" % spec["reference"]
       
     debug(spec)
-    cmd = format("set -e\n"
-                 "export WORK_DIR=%(workDir)s\n" + 
-                 dependencies + ""
-                 "export CONFIG_DIR=%(configDir)s\n"
-                 "export PKGNAME=%(pkgname)s\n"
-                 "export PKGHASH=%(hash)s\n"
-                 "export PKGVERSION=%(version)s\n"
-                 "export PKGREVISION=%(revision)s\n"
-                 "export ARCHITECTURE=%(architecture)s\n"
-                 "export SOURCE0=%(source)s\n"
-                 "export GIT_TAG=%(tag)s\n"
-                 "export JOBS=${JOBS-%(jobs)s}\n"
-                 "mkdir -p $WORK_DIR/BUILD $WORK_DIR/SOURCES $WORK_DIR/TARS\n"
-                 "mkdir -p $WORK_DIR/SPECS $WORK_DIR/BUILDROOT $WORK_DIR/INSTALLROOT\n"
-                 "export BUILDROOT=$WORK_DIR/BUILD/$ARCHITECTURE/$PKGNAME/$PKGVERSION-$PKGREVISION\n"
-                 "export INSTALLROOT=$WORK_DIR/INSTALLROOT/$PKGHASH/$ARCHITECTURE/$PKGNAME/$PKGVERSION-$PKGREVISION\n"
-                 "export SOURCEDIR=$WORK_DIR/SOURCES\n"
-                 "rm -fr $INSTALLROOT $BUILDROOT\n"
-                 "mkdir -p $INSTALLROOT $BUILDROOT\n"
-                 "cd $BUILDROOT\n"
-                 "rm -rf $BUILDROOT/log\n"
-                 "export BUILDDIR=$BUILDROOT/$PKGNAME\n"
-                 "%(referenceStatement)s\n"
-                 "if [ ! \"X$SOURCE0\" = X ]; then\n"
-                 "  git clone ${GIT_REFERENCE:+--reference $GIT_REFERENCE} -b ${GIT_TAG} $SOURCE0 $BUILDDIR;\n"
-                 "else\n"
-                 "  mkdir -p $BUILDDIR\n"
-                 "fi\n"
-                 "cd $BUILDDIR\n"
-                 "sh -ex $WORK_DIR/SPECS/$PKGNAME.sh 2>&1 | tee $BUILDROOT/log\n"
-                 "pushd $WORK_DIR/INSTALLROOT/$PKGHASH\n"
-                 "echo $PKGHASH > $INSTALLROOT/.build-hash\n"
-                 "mkdir -p $INSTALLROOT/etc/profile.d\n"
-                 "BIGPKGNAME=`echo $PKGNAME | tr [:lower:] [:upper:]`\n"
-                 "rm -f $INSTALLROOT/etc/profile.d/init.sh\n" +
-                 dependenciesInit +
-                 "echo \"export ${BIGPKGNAME}_ROOT=$INSTALLROOT\" >> $INSTALLROOT/etc/profile.d/init.sh\n"
-                 "echo \"export ${BIGPKGNAME}_VERSION=$PKGVERSION\" >> $INSTALLROOT/etc/profile.d/init.sh\n"
-                 "echo \"export ${BIGPKGNAME}_REVISION=$PKGREVISION\" >> $INSTALLROOT/etc/profile.d/init.sh\n"
-                 "echo \"export ${BIGPKGNAME}_HASH=$PKGHASH\" >> $INSTALLROOT/etc/profile.d/init.sh\n" +
-                 environment +
-                 "cd $WORK_DIR/INSTALLROOT/$PKGHASH && grep -I -H -l -R INSTALLROOT/$PKGHASH $ARCHITECTURE/$PKGNAME/$PKGVERSION-$PKGREVISION >$INSTALLROOT/.original-unrelocated\n"
-                 "echo '#!/bin/sh -e\\nif [ \"X$WORK_DIR\" = X ]; then echo \"Please, define $WORK_DIR\" ; exit 1 ; fi' > $INSTALLROOT/relocate-me.sh\n"
-                 "cat $INSTALLROOT/.original-unrelocated | xargs -n1 -I{} echo \"perl -p -e \\\"s|/[^ ]*INSTALLROOT/$PKGHASH|\$WORK_DIR|g\\\" {}.unrelocated > {}\" >> $INSTALLROOT/relocate-me.sh\n"
-                 "cat $INSTALLROOT/.original-unrelocated | xargs -n1 -I{} cp '{}' '{}'.unrelocated\n" +
-                 "HASHPREFIX=`echo $PKGHASH | cut -b1,2`\n"
-                 "mkdir -p ${WORK_DIR}/TARS/$ARCHITECTURE/store/$HASHPREFIX/$PKGHASH\n"
-                 "tar czf $WORK_DIR/TARS/$ARCHITECTURE/store/$HASHPREFIX/$PKGHASH/$PKGNAME-$PKGVERSION-$PKGREVISION.$ARCHITECTURE.tar.gz .\n"
-                 "ln -sf $WORK_DIR/TARS/$ARCHITECTURE/store/$HASHPREFIX/$PKGHASH/$PKGNAME-$PKGVERSION-$PKGREVISION.$ARCHITECTURE.tar.gz $WORK_DIR/TARS/$ARCHITECTURE/$PKGNAME-$PKGVERSION-$PKGREVISION.$ARCHITECTURE.tar.gz\n"
-                 "cd $WORK_DIR && tar xzf $WORK_DIR/TARS/$ARCHITECTURE/$PKGNAME-$PKGVERSION-$PKGREVISION.$ARCHITECTURE.tar.gz\n"
-                 "sh -ex $ARCHITECTURE/$PKGNAME/$PKGVERSION-$PKGREVISION/relocate-me.sh\n",
+
+    with open( dirname(realpath(__file__))+'/build_template.sh', 'r') as fp:
+      cmd_raw = fp.read()
+
+    cmd = format(cmd_raw,
+                 dependencies=dependencies,
+                 dependenciesInit=dependenciesInit,
+                 environment=environment,
                  workDir=workDir,
                  configDir=abspath(args.configDir),
                  pkgname=spec["package"],
@@ -362,7 +319,6 @@ if __name__ == "__main__":
     script.write(cmd)
     script.flush()
     script.close()
-
 
     err = execute("/bin/bash -e -x %s 2>&1" % scriptName)
     if err:
