@@ -364,7 +364,7 @@ if __name__ == "__main__":
     script.close()
 
 
-    err = execute("/bin/sh -e -x %s 2>&1" % scriptName)
+    err = execute("/bin/bash -e -x %s 2>&1" % scriptName)
     if err:
       print "Error while executing %s" % scriptName
       exit(1)
