@@ -49,10 +49,19 @@ echo "export ${BIGPKGNAME}_HASH=$PKGHASH" >> $INSTALLROOT/etc/profile.d/init.sh
 # Environment
 %(environment)s
 
-cd $WORK_DIR/INSTALLROOT/$PKGHASH && grep -I -H -l -R INSTALLROOT/$PKGHASH $ARCHITECTURE/$PKGNAME/$PKGVERSION-$PKGREVISION >$INSTALLROOT/.original-unrelocated
-echo '#!/bin/sh -e\nif [ "X$WORK_DIR" = X ]; then echo "Please, define $WORK_DIR" ; exit 1 ; fi' > $INSTALLROOT/relocate-me.sh
-cat $INSTALLROOT/.original-unrelocated | xargs -n1 -I{} echo "perl -p -e \"s|/[^ ]*INSTALLROOT/$PKGHASH|\$WORK_DIR|g\" {}.unrelocated > {}" >> $INSTALLROOT/relocate-me.sh
-cat $INSTALLROOT/.original-unrelocated | xargs -n1 -I{} cp '{}' '{}'.unrelocated
+cd "$WORK_DIR/INSTALLROOT/$PKGHASH"
+grep -I -H -l -R "INSTALLROOT/$PKGHASH" "$ARCHITECTURE/$PKGNAME/$PKGVERSION-$PKGREVISION" > "$INSTALLROOT/.original-unrelocated"
+cat > "$INSTALLROOT/relocate-me.sh" <<\EoF
+#!/bin/bash -e
+if [[ "$WORK_DIR" == '' ]]; then
+  echo "Please, define \$WORK_DIR"
+  exit 1
+fi
+EoF
+
+cat "$INSTALLROOT/.original-unrelocated" | xargs -n1 -I{} echo "perl -p -e \"s|/[^ ]*INSTALLROOT/$PKGHASH|\$WORK_DIR|g\" {}.unrelocated > {}" >> $INSTALLROOT/relocate-me.sh
+cat "$INSTALLROOT/.original-unrelocated" | xargs -n1 -I{} cp '{}' '{}'.unrelocated
+
 HASHPREFIX=`echo $PKGHASH | cut -b1,2`
 mkdir -p ${WORK_DIR}/TARS/$ARCHITECTURE/store/$HASHPREFIX/$PKGHASH
 tar czf $WORK_DIR/TARS/$ARCHITECTURE/store/$HASHPREFIX/$PKGHASH/$PKGNAME-$PKGVERSION-$PKGREVISION.$ARCHITECTURE.tar.gz .
