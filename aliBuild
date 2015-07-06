@@ -248,7 +248,7 @@ if __name__ == "__main__":
                                 package=dep,
                                 version=depSpec["version"],
                                 revision=depSpec["revision"],
-                                bigpackage=dep.upper())
+                                bigpackage=dep.upper().replace("-", "_"))
     # Generate the part which creates the environment for the package.
     # This can be either variable set via the "env" keyword in the metadata
     # or paths which get appended via the "append_path" one.
@@ -261,7 +261,7 @@ if __name__ == "__main__":
                              key=key,
                              value=value,
                            )
-    basePath = "%s_ROOT" % p.upper()
+    basePath = "%s_ROOT" % p.upper().replace("-", "_")
     pathDict = spec.get("append_path", [])
 
     for pathEntry in pathDict:
@@ -300,7 +300,7 @@ if __name__ == "__main__":
       
     debug(spec)
 
-    with open( dirname(realpath(__file__))+'/build_template.sh', 'r') as fp:
+    with open(dirname(realpath(__file__))+'/build_template.sh', 'r') as fp:
       cmd_raw = fp.read()
 
     cmd = format(cmd_raw,
