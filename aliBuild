@@ -26,7 +26,7 @@ def gzip():
   return "pigz"
 
 def execute(command, printer=debug):
-  popen = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+  popen = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE)
   lines_iterator = iter(popen.stdout.readline, b"")
   for line in lines_iterator:
     debug(line.strip("\n"))  # yield line
@@ -60,7 +60,7 @@ def updateReferenceRepos(referenceSources, buildOrder, specs):
     if not exists(referenceRepo):
       cmd = ["git", "clone", "--bare", spec["source"], referenceRepo]
       debug(" ".join(cmd))
-      err = execute(cmd)
+      err = execute(" ".join(cmd))
     else:
       err, out = getstatusoutput("cd %s && git fetch --tags" % (referenceRepo))
     if err:
@@ -323,7 +323,7 @@ if __name__ == "__main__":
                  "  mkdir -p $BUILDDIR\n"
                  "fi\n"
                  "cd $BUILDDIR\n"
-                 "sh -ex $WORK_DIR/SPECS/$PKGNAME.sh 2>&1 >$BUILDROOT/log\n"
+                 "sh -ex $WORK_DIR/SPECS/$PKGNAME.sh 2>&1 | tee $BUILDROOT/log\n"
                  "pushd $WORK_DIR/INSTALLROOT/$PKGHASH\n"
                  "echo $PKGHASH > $INSTALLROOT/.build-hash\n"
                  "mkdir -p $INSTALLROOT/etc/profile.d\n"
@@ -341,9 +341,9 @@ if __name__ == "__main__":
                  "cat $INSTALLROOT/.original-unrelocated | xargs -n1 -I{} cp '{}' '{}'.unrelocated\n" +
                  "HASHPREFIX=`echo $PKGHASH | cut -b1,2`\n"
                  "mkdir -p ${WORK_DIR}/TARS/$ARCHITECTURE/store/$HASHPREFIX/$PKGHASH\n"
-                 "tar cjvf $WORK_DIR/TARS/$ARCHITECTURE/store/$HASHPREFIX/$PKGHASH/$PKGNAME-$PKGVERSION-$PKGREVISION.$ARCHITECTURE.tar.gz .\n"
+                 "tar czf $WORK_DIR/TARS/$ARCHITECTURE/store/$HASHPREFIX/$PKGHASH/$PKGNAME-$PKGVERSION-$PKGREVISION.$ARCHITECTURE.tar.gz .\n"
                  "ln -sf $WORK_DIR/TARS/$ARCHITECTURE/store/$HASHPREFIX/$PKGHASH/$PKGNAME-$PKGVERSION-$PKGREVISION.$ARCHITECTURE.tar.gz $WORK_DIR/TARS/$ARCHITECTURE/$PKGNAME-$PKGVERSION-$PKGREVISION.$ARCHITECTURE.tar.gz\n"
-                 "cd $WORK_DIR && tar xjvf $WORK_DIR/TARS/$ARCHITECTURE/$PKGNAME-$PKGVERSION-$PKGREVISION.$ARCHITECTURE.tar.gz\n"
+                 "cd $WORK_DIR && tar xzf $WORK_DIR/TARS/$ARCHITECTURE/$PKGNAME-$PKGVERSION-$PKGREVISION.$ARCHITECTURE.tar.gz\n"
                  "sh -ex $ARCHITECTURE/$PKGNAME/$PKGVERSION-$PKGREVISION/relocate-me.sh\n",
                  workDir=workDir,
                  configDir=abspath(args.configDir),
@@ -364,7 +364,7 @@ if __name__ == "__main__":
     script.close()
 
 
-    err = execute(["/bin/sh", "-e", "-x", scriptName])
+    err = execute("/bin/sh -e -x %s 2>&1" % scriptName)
     if err:
       print "Error while executing %s" % scriptName
       exit(1)
