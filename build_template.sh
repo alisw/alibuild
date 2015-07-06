@@ -1,42 +1,51 @@
+#!/bin/bash
+
+# Build script for %(pkgname)s -- automatically generated
+
 set -e
-export WORK_DIR=%(workDir)s
+export WORK_DIR="%(workDir)s"
 
 # From our dependencies
 %(dependencies)s
 
-export CONFIG_DIR=%(configDir)s
-export PKGNAME=%(pkgname)s
-export PKGHASH=%(hash)s
-export PKGVERSION=%(version)s
-export PKGREVISION=%(revision)s
-export ARCHITECTURE=%(architecture)s
-export SOURCE0=%(source)s
-export GIT_TAG=%(tag)s
+export CONFIG_DIR="%(configDir)s"
+export PKGNAME="%(pkgname)s"
+export PKGHASH="%(hash)s"
+export PKGVERSION="%(version)s"
+export PKGREVISION="%(revision)s"
+export ARCHITECTURE="%(architecture)s"
+export SOURCE0="%(source)s"
+export GIT_TAG="%(tag)s"
 export JOBS=${JOBS-%(jobs)s}
-mkdir -p $WORK_DIR/BUILD $WORK_DIR/SOURCES $WORK_DIR/TARS
-mkdir -p $WORK_DIR/SPECS $WORK_DIR/BUILDROOT $WORK_DIR/INSTALLROOT
-export BUILDROOT=$WORK_DIR/BUILD/$ARCHITECTURE/$PKGNAME/$PKGVERSION-$PKGREVISION
-export INSTALLROOT=$WORK_DIR/INSTALLROOT/$PKGHASH/$ARCHITECTURE/$PKGNAME/$PKGVERSION-$PKGREVISION
-export SOURCEDIR=$WORK_DIR/SOURCES
-rm -fr $INSTALLROOT $BUILDROOT
-mkdir -p $INSTALLROOT $BUILDROOT
-cd $BUILDROOT
-rm -rf $BUILDROOT/log
-export BUILDDIR=$BUILDROOT/$PKGNAME
+mkdir -p "$WORK_DIR/BUILD" "$WORK_DIR/SOURCES" "$WORK_DIR/TARS" \
+  "$WORK_DIR/SPECS" "$WORK_DIR/BUILDROOT" "$WORK_DIR/INSTALLROOT"
+export BUILDROOT="$WORK_DIR/BUILD/$ARCHITECTURE/$PKGNAME/$PKGVERSION-$PKGREVISION"
+export INSTALLROOT="$WORK_DIR/INSTALLROOT/$PKGHASH/$ARCHITECTURE/$PKGNAME/$PKGVERSION-$PKGREVISION"
+export SOURCEDIR="$WORK_DIR/SOURCES"
+rm -fr "$INSTALLROOT" "$BUILDROOT"
+mkdir -p "$INSTALLROOT" "$BUILDROOT"
+cd "$BUILDROOT"
+rm -rf "$BUILDROOT/log"
+export BUILDDIR="$BUILDROOT/$PKGNAME"
+
+# Reference statements
 %(referenceStatement)s
-if [ ! "X$SOURCE0" = X ]; then
-  git clone ${GIT_REFERENCE:+--reference $GIT_REFERENCE} -b ${GIT_TAG} $SOURCE0 $BUILDDIR;
+
+if [[ ! "$SOURCE0" == '' ]]; then
+  git clone ${GIT_REFERENCE:+--reference $GIT_REFERENCE} -b "${GIT_TAG}" "$SOURCE0" "$BUILDDIR"
 else
-  mkdir -p $BUILDDIR
+  mkdir -p "$BUILDDIR"
 fi
-cd $BUILDDIR
+cd "$BUILDDIR"
+
 # Actual build script, as defined in the recipe
-sh -ex $WORK_DIR/SPECS/$PKGNAME.sh 2>&1 >$BUILDROOT/log
-pushd $WORK_DIR/INSTALLROOT/$PKGHASH
-echo $PKGHASH > $INSTALLROOT/.build-hash
-mkdir -p $INSTALLROOT/etc/profile.d
-BIGPKGNAME=`echo $PKGNAME | tr [:lower:] [:upper:]`
-rm -f $INSTALLROOT/etc/profile.d/init.sh
+bash -ex "$WORK_DIR/SPECS/$PKGNAME.sh" 2>&1 >"$BUILDROOT/log"
+
+pushd "$WORK_DIR/INSTALLROOT/$PKGHASH"
+echo "$PKGHASH" > "$INSTALLROOT/.build-hash"
+mkdir -p "$INSTALLROOT/etc/profile.d"
+BIGPKGNAME=`echo "$PKGNAME" | tr [:lower:] [:upper:]`
+rm -f "$INSTALLROOT/etc/profile.d/init.sh"
 
 # Init our dependencies
 %(dependenciesInit)s
@@ -63,8 +72,15 @@ cat "$INSTALLROOT/.original-unrelocated" | xargs -n1 -I{} echo "perl -p -e \"s|/
 cat "$INSTALLROOT/.original-unrelocated" | xargs -n1 -I{} cp '{}' '{}'.unrelocated
 
 HASHPREFIX=`echo $PKGHASH | cut -b1,2`
-mkdir -p ${WORK_DIR}/TARS/$ARCHITECTURE/store/$HASHPREFIX/$PKGHASH
-tar czf $WORK_DIR/TARS/$ARCHITECTURE/store/$HASHPREFIX/$PKGHASH/$PKGNAME-$PKGVERSION-$PKGREVISION.$ARCHITECTURE.tar.gz .
-ln -sf $WORK_DIR/TARS/$ARCHITECTURE/store/$HASHPREFIX/$PKGHASH/$PKGNAME-$PKGVERSION-$PKGREVISION.$ARCHITECTURE.tar.gz $WORK_DIR/TARS/$ARCHITECTURE/$PKGNAME-$PKGVERSION-$PKGREVISION.$ARCHITECTURE.tar.gz
-cd $WORK_DIR && tar xzf $WORK_DIR/TARS/$ARCHITECTURE/$PKGNAME-$PKGVERSION-$PKGREVISION.$ARCHITECTURE.tar.gz
-sh -ex $ARCHITECTURE/$PKGNAME/$PKGVERSION-$PKGREVISION/relocate-me.sh
+mkdir -p "${WORK_DIR}/TARS/$ARCHITECTURE/store/$HASHPREFIX/$PKGHASH"
+
+# Archive creation
+tar czf "$WORK_DIR/TARS/$ARCHITECTURE/store/$HASHPREFIX/$PKGHASH/$PKGNAME-$PKGVERSION-$PKGREVISION.$ARCHITECTURE.tar.gz" .
+ln -nfs \
+  "$WORK_DIR/TARS/$ARCHITECTURE/store/$HASHPREFIX/$PKGHASH/$PKGNAME-$PKGVERSION-$PKGREVISION.$ARCHITECTURE.tar.gz" \
+  "$WORK_DIR/TARS/$ARCHITECTURE/$PKGNAME-$PKGVERSION-$PKGREVISION.$ARCHITECTURE.tar.gz"
+
+# Unpack, and relocate
+cd "$WORK_DIR"
+tar xzf "$WORK_DIR/TARS/$ARCHITECTURE/$PKGNAME-$PKGVERSION-$PKGREVISION.$ARCHITECTURE.tar.gz"
+bash -ex "$ARCHITECTURE/$PKGNAME/$PKGVERSION-$PKGREVISION/relocate-me.sh"

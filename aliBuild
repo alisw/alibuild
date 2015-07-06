@@ -233,12 +233,12 @@ if __name__ == "__main__":
     dependenciesInit = ""
     for dep in spec.get("requires", []):
       depSpec = specs[dep]
-      dependencies += format("source $WORK_DIR/%(architecture)s/%(package)s/%(version)s-%(revision)s/etc/profile.d/init.sh\n",
+      dependencies += format("source \"$WORK_DIR/%(architecture)s/%(package)s/%(version)s-%(revision)s/etc/profile.d/init.sh\"\n",
                              architecture=args.architecture,
                              package=dep,
                              version=depSpec["version"],
                              revision=depSpec["revision"])
-      dependenciesInit += format('echo source $%(bigpackage)s_ROOT/etc/profile.d/init.sh >> $INSTALLROOT/etc/profile.d/init.sh\n',
+      dependenciesInit += format('echo source $%(bigpackage)s_ROOT/etc/profile.d/init.sh >> \"$INSTALLROOT/etc/profile.d/init.sh\"\n',
                                 architecture=args.architecture,
                                 package=dep,
                                 version=depSpec["version"],
@@ -261,7 +261,7 @@ if __name__ == "__main__":
 
     for pathEntry in pathDict:
       key, value = pathEntry.items()[0] 
-      environment += format("echo 'export %(key)s=$%(key)s:%(value)s' >> $INSTALLROOT/etc/profile.d/init.sh\n",
+      environment += format("echo 'export %(key)s=$%(key)s:%(value)s' >> \"$INSTALLROOT/etc/profile.d/init.sh\"\n",
                              architecture=args.architecture,
                              key=key,
                              package=p,
@@ -270,7 +270,7 @@ if __name__ == "__main__":
                              version=spec["version"]
                            )
 
-    # Same thing, but prepending the results so that they win againsty system ones.
+    # Same thing, but prepending the results so that they win against system ones.
     pathDict = [{"LD_LIBRARY_PATH": "$%s/lib" % basePath},
                 {"DYLD_LIBRARY_PATH": "$%s/lib" % basePath},
                 {"PATH": "$%s/bin" % basePath},
@@ -279,7 +279,7 @@ if __name__ == "__main__":
 
     for pathEntry in pathDict:
       key, value = pathEntry.items()[0] 
-      environment += format("echo 'export %(key)s=%(value)s:$%(key)s' >> $INSTALLROOT/etc/profile.d/init.sh\n",
+      environment += format("echo 'export %(key)s=%(value)s:$%(key)s' >> \"$INSTALLROOT/etc/profile.d/init.sh\"\n",
                              architecture=args.architecture,
                              key=key,
                              package=p,
