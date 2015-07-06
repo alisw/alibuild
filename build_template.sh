@@ -68,7 +68,7 @@ if [[ "$WORK_DIR" == '' ]]; then
 fi
 EoF
 
-cat "$INSTALLROOT/.original-unrelocated" | xargs -n1 -I{} echo "perl -p -e \"s|/[^ ]*INSTALLROOT/$PKGHASH|\$WORK_DIR|g\" {}.unrelocated > {}" >> $INSTALLROOT/relocate-me.sh
+cat "$INSTALLROOT/.original-unrelocated" | xargs -n1 -I{} echo "sed -e \"s|/[^ ]*INSTALLROOT/$PKGHASH|\$WORK_DIR|g\" {}.unrelocated > {}" >> $INSTALLROOT/relocate-me.sh
 cat "$INSTALLROOT/.original-unrelocated" | xargs -n1 -I{} cp '{}' '{}'.unrelocated
 
 HASHPREFIX=`echo $PKGHASH | cut -b1,2`
