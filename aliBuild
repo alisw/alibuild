@@ -62,7 +62,8 @@ def updateReferenceRepos(referenceSources, buildOrder, specs):
       debug(" ".join(cmd))
       err = execute(" ".join(cmd))
     else:
-      err, out = getstatusoutput("cd %s && git fetch --tags" % (referenceRepo))
+      err = execute("cd %s && git fetch --tags %s" % (referenceRepo,
+                                                      spec["source"]))
     if err:
       print "Error while updating reference repos %s." % spec["source"] 
       sys.exit(1)
