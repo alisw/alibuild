@@ -54,6 +54,7 @@ echo "export ${BIGPKGNAME}_ROOT=$INSTALLROOT" >> $INSTALLROOT/etc/profile.d/init
 echo "export ${BIGPKGNAME}_VERSION=$PKGVERSION" >> $INSTALLROOT/etc/profile.d/init.sh
 echo "export ${BIGPKGNAME}_REVISION=$PKGREVISION" >> $INSTALLROOT/etc/profile.d/init.sh
 echo "export ${BIGPKGNAME}_HASH=$PKGHASH" >> $INSTALLROOT/etc/profile.d/init.sh
+echo "export ${BIGPKGNAME}_COMMIT=%(commit_hash)s" >> $INSTALLROOT/etc/profile.d/init.sh
 
 # Environment
 %(environment)s

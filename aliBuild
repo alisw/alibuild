@@ -116,7 +116,26 @@ if __name__ == "__main__":
     buildOrder.insert(0, p)
     packages += spec.get('requires', [])
     open("%s/SPECS/%s.sh" % (workDir, p), "w").write(spec["recipe"])
-  
+
+  # Resolve the tag to the actual commit ref, so that 
+  for p in buildOrder:
+    spec = specs[p]
+    spec["commit_hash"] = "0"
+    if "source" in spec:
+      cmd = format("git ls-remote --heads %(source)s",
+                   source = spec["source"])
+      err, out = getstatusoutput(cmd)
+      if err:
+        print "Unable to fetch from %s" % spec["source"]
+        exit(1)
+      # by default we assume tag is a commit hash
+      spec["commit_hash"] = spec["tag"]
+      for l in out.split("\n"):
+        if l.endswith("refs/heads/%s" % spec["tag"]):
+          spec["commit_hash"] = l.split("\t", 1)[0]
+          break
+      debug("Commit hash for %s@%s is %s" % (spec["source"], spec["tag"], spec["commit_hash"]))
+
   # Calculate the hashes. We do this in build order so that we can guarantee
   # that the hashes of the dependencies are calculated first.
   debug("Calculating hashes.")
@@ -125,6 +144,7 @@ if __name__ == "__main__":
     h = sha1(spec["recipe"])
     h.update(spec["version"])
     h.update(spec["package"])
+    h.update(spec["commit_hash"])
     h.update(spec.get("source", "none"))
     if "source" in spec:
       h.update(spec["tag"])
@@ -139,7 +159,7 @@ if __name__ == "__main__":
       h.update(str(time.time()))
     hash = h.hexdigest()
     spec["hash"] = hash
-    debug("Hash for %s is %s" % (p, hash))
+    debug("Hash for recipe %s.sh is %s" % (p, hash))
   
   # Decide how it should be called, based on the hash and what is already
   # available
@@ -229,7 +249,7 @@ if __name__ == "__main__":
     buildOrder.remove(p)
     
   updateReferenceRepos(args.referenceSources, buildOrder, specs)
-  
+
   # Build everything, everytime
   for p in buildOrder:
     spec = specs[p]
@@ -320,6 +340,7 @@ if __name__ == "__main__":
                  jobs=args.jobs,
                  source=spec.get("source", ""),
                  tag=spec.get("tag", ""),
+                 commit_hash=spec["commit_hash"],
                  referenceStatement=referenceStatement)
     scriptName = "%s/SPECS/%s/%s/%s-%s/build.sh" % (workDir, args.architecture, spec["package"], spec["version"], spec["revision"])
     err, out = getstatusoutput("mkdir -p %s" % dirname(scriptName))
