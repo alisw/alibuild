@@ -4,7 +4,7 @@ import os
 import sys
 from commands import getstatusoutput
 from os.path import basename, dirname, abspath, exists, realpath
-from yaml import load
+from yaml import safe_load
 from os import makedirs, unlink
 from hashlib import sha1
 from glob import glob
@@ -104,7 +104,11 @@ if __name__ == "__main__":
       continue
     d = open("%s/%s.sh" % (args.configDir, p)).read()
     header, recipe = d.split("---", 1)
-    spec = load(header)
+    spec = safe_load(header)
+    # Check that version is a string
+    if not isinstance(spec["version"], basestring):
+      print "In recipe \"%s\": version must be a string" % p
+      sys.exit(1)
     spec["recipe"] = recipe.strip("\n")
     specs[p] = spec 
     buildOrder.insert(0, p)
