@@ -5,11 +5,12 @@ A simple build tool for ALICE experiment software and its externals.
 
 ## Recipes format
 
-The recipes are found in the a separate repository. The repository 
-can be specified via the `-c` option and defaults to alidist.
+The recipes are found in the a separate repository. The repository can be 
+specified via the `-c` option and defaults to _alidist_.
 
-The recipes themselves are called `<package>.sh` where `<package>` is the name of
-the package whose build recipe is described, e.g. `root`.
+The recipes themselves are called `<package>.sh` where `<package>` is the name
+of the package whose build recipe is described. Please note that all recipe
+filenames are lowercase: _e.g._ the recipe for `ROOT` will be in `root.sh`.
 
 The recipe itself is made up of two parts: an header, and the actual build
 script, separated by three dashes (`---`) standalone.
