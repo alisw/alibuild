@@ -44,7 +44,7 @@ bash -ex "$WORK_DIR/SPECS/$PKGNAME.sh" 2>&1 >"$BUILDROOT/log"
 pushd "$WORK_DIR/INSTALLROOT/$PKGHASH"
 echo "$PKGHASH" > "$INSTALLROOT/.build-hash"
 mkdir -p "$INSTALLROOT/etc/profile.d"
-BIGPKGNAME=`echo "$PKGNAME" | tr [:lower:] [:upper:]`
+BIGPKGNAME=`echo "$PKGNAME" | tr [:lower:] [:upper:] | tr - _`
 rm -f "$INSTALLROOT/etc/profile.d/init.sh"
 
 # Init our dependencies
