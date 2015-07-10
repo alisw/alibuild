@@ -39,7 +39,8 @@ fi
 cd "$BUILDDIR"
 
 # Actual build script, as defined in the recipe
-bash -ex "$WORK_DIR/SPECS/$PKGNAME.sh" 2>&1 >"$BUILDROOT/log"
+set -o pipefail
+bash -ex "$WORK_DIR/SPECS/$PKGNAME.sh" 2>&1 | tee "$BUILDROOT/log"
 
 pushd "$WORK_DIR/INSTALLROOT/$PKGHASH"
 echo "$PKGHASH" > "$INSTALLROOT/.build-hash"
