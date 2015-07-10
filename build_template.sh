@@ -21,7 +21,7 @@ mkdir -p "$WORK_DIR/BUILD" "$WORK_DIR/SOURCES" "$WORK_DIR/TARS" \
   "$WORK_DIR/SPECS" "$WORK_DIR/BUILDROOT" "$WORK_DIR/INSTALLROOT"
 export BUILDROOT="$WORK_DIR/BUILD/$ARCHITECTURE/$PKGNAME/$PKGVERSION-$PKGREVISION"
 export INSTALLROOT="$WORK_DIR/INSTALLROOT/$PKGHASH/$ARCHITECTURE/$PKGNAME/$PKGVERSION-$PKGREVISION"
-export SOURCEDIR="$WORK_DIR/SOURCES"
+export SOURCEDIR="$WORK_DIR/SOURCES/$PKGNAME/$PKGVERSION/%(commit_hash)s"
 rm -fr "$INSTALLROOT" "$BUILDROOT"
 mkdir -p "$INSTALLROOT" "$BUILDROOT"
 cd "$BUILDROOT"
@@ -31,11 +31,11 @@ export BUILDDIR="$BUILDROOT/$PKGNAME"
 # Reference statements
 %(referenceStatement)s
 
-if [[ ! "$SOURCE0" == '' ]]; then
-  git clone ${GIT_REFERENCE:+--reference $GIT_REFERENCE} -b "${GIT_TAG}" "$SOURCE0" "$BUILDDIR"
-else
-  mkdir -p "$BUILDDIR"
+if [[ ! "$SOURCE0" == '' && ! -d "$SOURCEDIR" ]]; then
+  git clone ${GIT_REFERENCE:+--reference $GIT_REFERENCE} -b "${GIT_TAG}" "$SOURCE0" "$SOURCEDIR"
 fi
+
+mkdir -p "$BUILDDIR" "$SOURCEDIR"
 cd "$BUILDDIR"
 
 # Actual build script, as defined in the recipe

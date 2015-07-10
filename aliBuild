@@ -46,6 +46,8 @@ def updateReferenceRepos(referenceSources, buildOrder, specs):
   for p in buildOrder:
     spec = specs[p]
     referenceRepo = "%s/%s" % (abspath(referenceSources), p) 
+    if os.access(dirname(referenceSources), os.W_OK):
+      getstatusoutput("mkdir -p %s" % referenceSources)
     writeableReference = os.access(referenceSources, os.W_OK)
     if not writeableReference and exists(referenceRepo):
       debug("Using %s as reference for %s." % (referenceRepo, p))
@@ -78,7 +80,7 @@ if __name__ == "__main__":
   parser.add_argument("--work-dir", "-w", dest="workDir", default="sw")
   parser.add_argument("--architecture", "-a", dest="architecture", required=True)
   parser.add_argument("--jobs", "-j", dest="jobs", default=1)
-  parser.add_argument("--reference-sources", dest="referenceSources", default="sw/SOURCES")
+  parser.add_argument("--reference-sources", dest="referenceSources", default="sw/MIRROR")
   parser.add_argument("--debug", "-d", dest="debug", action="store_true", default=False)
   args = parser.parse_args()
   
