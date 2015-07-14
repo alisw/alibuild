@@ -62,6 +62,8 @@ echo "export ${BIGPKGNAME}_COMMIT=%(commit_hash)s" >> $INSTALLROOT/etc/profile.d
 
 cd "$WORK_DIR/INSTALLROOT/$PKGHASH"
 grep -I -H -l -R "INSTALLROOT/$PKGHASH" "$ARCHITECTURE/$PKGNAME/$PKGVERSION-$PKGREVISION" > "$INSTALLROOT/.original-unrelocated"
+
+# Relocate script for <arch>/<pkgname>/<pkgver> structure
 cat > "$INSTALLROOT/relocate-me.sh" <<\EoF
 #!/bin/bash -e
 if [[ "$WORK_DIR" == '' ]]; then
@@ -70,8 +72,20 @@ if [[ "$WORK_DIR" == '' ]]; then
 fi
 EoF
 
-cat "$INSTALLROOT/.original-unrelocated" | xargs -n1 -I{} echo "sed -e \"s|/[^ ]*INSTALLROOT/$PKGHASH|\$WORK_DIR|g\" {}.unrelocated > {}" >> $INSTALLROOT/relocate-me.sh
+cat "$INSTALLROOT/.original-unrelocated" | xargs -n1 -I{} echo "sed -e \"s|/[^ ]*INSTALLROOT/$PKGHASH|\$WORK_DIR|g\" {}.unrelocated > {}" >> "$INSTALLROOT/relocate-me.sh"
 cat "$INSTALLROOT/.original-unrelocated" | xargs -n1 -I{} cp '{}' '{}'.unrelocated
+
+# Relocate script wrt/software root (compatible w/legacy behavior)
+(
+cat <<\EoF
+#!/bin/bash -e
+cd "$(dirname "$0")"
+NEW_PREFIX=${NEW_PREFIX:-$PWD}
+EoF
+cat "$INSTALLROOT/.original-unrelocated" | sed -e 's|^\([^/]\+/\+\)\{3\}||g' | \
+  xargs -n1 -I{} \
+  echo "sed -e \"s|/[^ ]*INSTALLROOT/${PKGHASH}/${ARCHITECTURE}/${PKGNAME}/${PKGVERSION}-${PKGREVISION}|\$NEW_PREFIX|g\" {}.unrelocated > {}"
+) > "$INSTALLROOT/relocate-me-root.sh"
 
 HASHPREFIX=`echo $PKGHASH | cut -b1,2`
 mkdir -p "${WORK_DIR}/TARS/$ARCHITECTURE/store/$HASHPREFIX/$PKGHASH"
