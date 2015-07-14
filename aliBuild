@@ -137,6 +137,13 @@ if __name__ == "__main__":
           spec["commit_hash"] = l.split("\t", 1)[0]
           break
       debug("Commit hash for %s@%s is %s" % (spec["source"], spec["tag"], spec["commit_hash"]))
+      # We emit an event for the main package, when encountered, so that we can
+      # use it to index builds of the same hash on different architectures.
+      if p in ["aliroot", "aliphysics", "o2"]:
+        debug("Main package is %s using %s@%s (%s)" % (p,
+                                                       spec["source"],
+                                                       spec["tag"],
+                                                       spec["commit_hash"]))
 
   # Calculate the hashes. We do this in build order so that we can guarantee
   # that the hashes of the dependencies are calculated first.
