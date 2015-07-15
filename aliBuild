@@ -114,7 +114,11 @@ if __name__ == "__main__":
       buildOrder.remove(p)
       buildOrder.insert(0, p)
       continue
-    d = open("%s/%s.sh" % (args.configDir, p.lower())).read()
+    try:
+      d = open("%s/%s.sh" % (args.configDir, p.lower())).read()
+    except IOError,e:
+      print e
+      exit(1)
     header, recipe = d.split("---", 1)
     spec = safe_load(header)
     # Check that version is a string
