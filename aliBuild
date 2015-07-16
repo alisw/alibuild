@@ -28,7 +28,7 @@ def gzip():
 
 def execute(command, printer=debug):
   popen = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE)
-  lines_iterator = iter(popen.stdout.readline, b"")
+  lines_iterator = iter(popen.stdout.readline, "")
   for line in lines_iterator:
     debug(line.strip("\n"))  # yield line
   output = popen.communicate()[0]
@@ -382,8 +382,9 @@ if __name__ == "__main__":
       
     debug(spec)
 
-    with open(dirname(realpath(__file__))+'/build_template.sh', 'r') as fp:
-      cmd_raw = fp.read()
+    fp = open(dirname(realpath(__file__))+'/build_template.sh', 'r')
+    cmd_raw = fp.read()
+    fp.close()
 
     source = spec.get("source", "")
     cmd = format(cmd_raw,
