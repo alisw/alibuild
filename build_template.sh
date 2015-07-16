@@ -32,7 +32,8 @@ export BUILDDIR="$BUILDROOT/$PKGNAME"
 %(referenceStatement)s
 
 if [[ ! "$SOURCE0" == '' && ! -d "$SOURCEDIR" ]]; then
-  git clone ${GIT_REFERENCE:+--reference $GIT_REFERENCE} -b "${GIT_TAG}" "$SOURCE0" "$SOURCEDIR"
+  git clone ${GIT_REFERENCE:+--reference $GIT_REFERENCE} "$SOURCE0" "$SOURCEDIR"
+  (cd $SOURCEDIR && git checkout "${GIT_TAG}")
 fi
 
 mkdir -p "$BUILDDIR" "$SOURCEDIR"
