@@ -108,6 +108,19 @@ if __name__ == "__main__":
   if not exists(specDir):
     makedirs(specDir)
 
+  err, out = getstatusoutput("GIT_DIR=%s/.git git show-ref HEAD | cut -f1 -d\ " % dirname(__file__))
+  if err:
+    print "Impossible to find %sbuild reference" % star()
+    exit(0)
+  print format("Using %(star)sBuild from %(star)sbuild@%(hash)s",
+               star=star(),
+               hash=out)
+
+  err, out = getstatusoutput("GIT_DIR=%s/.git git show-ref HEAD | cut -f1 -d\ " % args.configDir)
+  if err:
+    print "Impossible to find %sdist reference" % star()
+    exit(0)
+  print "Using recipes from %sdist@%s" % (star(), out)
   while packages:
     p = packages.pop(0)
     if p in specs:
