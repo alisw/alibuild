@@ -177,8 +177,12 @@ if __name__ == "__main__":
     spec = specs[p]
     if "source" in spec:
       debug("Commit hash for %s@%s is %s" % (spec["source"], spec["tag"], spec["commit_hash"]))
+
   # Calculate the hashes. We do this in build order so that we can guarantee
-  # that the hashes of the dependencies are calculated first.
+  # that the hashes of the dependencies are calculated first.  Also notice that
+  # if the commit hash is a real hash, and not a tag, we can safely assume
+  # that's unique, and therefore we can avoid putting the repository or the
+  # name of the branch in the hash.
   debug("Calculating hashes.")
   for p in buildOrder:
     spec = specs[p]
@@ -186,9 +190,10 @@ if __name__ == "__main__":
     h.update(spec["version"])
     h.update(spec["package"])
     h.update(spec["commit_hash"])
-    h.update(spec.get("source", "none"))
-    if "source" in spec:
-      h.update(spec["tag"])
+    if spec["commit_hash"] == spec.get("tag", "0"):
+      h.update(spec.get("source", "none"))
+      if "source" in spec:
+        h.update(spec["tag"])
     h.update(str(spec.get("env", {})))
     h.update(str(spec.get("append_path", {})))
     h.update(str(spec.get("prepend_path", {})))
@@ -380,7 +385,7 @@ if __name__ == "__main__":
                  jobs=args.jobs,
                  source=spec.get("source", ""),
                  tag=spec.get("tag", ""),
-                 commit_hash=spec["commit_hash"],
+                 commit_hash=spec["commit_hash"][0:10],
                  referenceStatement=referenceStatement)
     scriptName = "%s/SPECS/%s/%s/%s-%s/build.sh" % (workDir, args.architecture, spec["package"], spec["version"], spec["revision"])
     err, out = getstatusoutput("mkdir -p %s" % dirname(scriptName))
