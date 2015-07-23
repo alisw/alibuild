@@ -75,6 +75,13 @@ def updateReferenceRepos(referenceSources, buildOrder, specs):
       sys.exit(1)
     spec["reference"] = referenceRepo
 
+def getDirectoryHash(d):
+  err, out = getstatusoutput("GIT_DIR=%s/.git git show-ref HEAD | cut -f1 -d\ " % d)
+  if err:
+    print "Impossible to find reference for %s " % d 
+    exit(0)
+  return out
+
 if __name__ == "__main__":
   parser = ArgumentParser()
   parser.add_argument("action")
@@ -108,19 +115,13 @@ if __name__ == "__main__":
   if not exists(specDir):
     makedirs(specDir)
 
-  err, out = getstatusoutput("GIT_DIR=%s/.git git show-ref HEAD | cut -f1 -d\ " % dirname(__file__))
-  if err:
-    print "Impossible to find %sbuild reference" % star()
-    exit(0)
-  print format("Using %(star)sBuild from %(star)sbuild@%(hash)s",
+  print format("Using %(star)sBuild from "
+               "%(star)sbuild@%(toolHash)s recipes "
+               "in %(star)sdist@%(distHash)s",
                star=star(),
-               hash=out)
+               toolHash=getDirectoryHash(dirname(__file__)),
+               distHash=getDirectoryHash(args.configDir))
 
-  err, out = getstatusoutput("GIT_DIR=%s/.git git show-ref HEAD | cut -f1 -d\ " % args.configDir)
-  if err:
-    print "Impossible to find %sdist reference" % star()
-    exit(0)
-  print "Using recipes from %sdist@%s" % (star(), out)
   while packages:
     p = packages.pop(0)
     if p in specs:
