@@ -115,12 +115,12 @@ if __name__ == "__main__":
   if not exists(specDir):
     makedirs(specDir)
 
-  print format("Using %(star)sBuild from "
+  debug(format("Using %(star)sBuild from "
                "%(star)sbuild@%(toolHash)s recipes "
                "in %(star)sdist@%(distHash)s",
                star=star(),
                toolHash=getDirectoryHash(dirname(__file__)),
-               distHash=getDirectoryHash(args.configDir))
+               distHash=getDirectoryHash(args.configDir)))
 
   while packages:
     p = packages.pop(0)
