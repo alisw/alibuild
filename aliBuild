@@ -66,8 +66,8 @@ def updateReferenceRepos(referenceSources, buildOrder, specs):
       err = execute(" ".join(cmd))
     else:
       err = execute(format("cd %(referenceRepo)s && "
-                           "git fetch --tags %(source)s && "
-                           "git fetch %(source)s",
+                           "git fetch --tags %(source)s 2>&1 && "
+                           "git fetch %(source)s 2>&1",
                            referenceRepo=referenceRepo,
                            source=spec["source"]))
     if err:
@@ -108,6 +108,19 @@ if __name__ == "__main__":
   if not exists(specDir):
     makedirs(specDir)
 
+  err, out = getstatusoutput("GIT_DIR=%s/.git git show-ref HEAD | cut -f1 -d\ " % dirname(__file__))
+  if err:
+    print "Impossible to find %sbuild reference" % star()
+    exit(0)
+  print format("Using %(star)sBuild from %(star)sbuild@%(hash)s",
+               star=star(),
+               hash=out)
+
+  err, out = getstatusoutput("GIT_DIR=%s/.git git show-ref HEAD | cut -f1 -d\ " % args.configDir)
+  if err:
+    print "Impossible to find %sdist reference" % star()
+    exit(0)
+  print "Using recipes from %sdist@%s" % (star(), out)
   while packages:
     p = packages.pop(0)
     if p in specs:
@@ -219,7 +232,7 @@ if __name__ == "__main__":
     # If there is already an installed package:
     # - Remove it if we do not know its hash
     # - Use the latest number in the version, to decide its revision
-    print installations
+    debug(installations)
     if not installations:
       spec["revision"] = 1
       newBuildOrder.append(p)
@@ -394,6 +407,7 @@ if __name__ == "__main__":
     script.flush()
     script.close()
 
+    print "Building %s@%s" % (spec["package"], spec["version"])
     err = execute("/bin/bash -e -x %s 2>&1" % scriptName)
     if err:
       print "Error while executing %s" % scriptName
