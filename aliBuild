@@ -385,6 +385,7 @@ if __name__ == "__main__":
     with open(dirname(realpath(__file__))+'/build_template.sh', 'r') as fp:
       cmd_raw = fp.read()
 
+    source = spec.get("source", "")
     cmd = format(cmd_raw,
                  dependencies=dependencies,
                  dependenciesInit=dependenciesInit,
@@ -397,7 +398,8 @@ if __name__ == "__main__":
                  revision=spec["revision"],
                  architecture=args.architecture,
                  jobs=args.jobs,
-                 source=spec.get("source", ""),
+                 source=source,
+                 write_repo=spec.get("write_repo", source),
                  tag=spec.get("tag", ""),
                  commit_hash=spec["commit_hash"][0:10],
                  referenceStatement=referenceStatement)
