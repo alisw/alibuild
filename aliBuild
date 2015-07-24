@@ -45,7 +45,7 @@ def updateReferenceRepos(referenceSources, buildOrder, specs):
   debug("Updating references.")
   for p in buildOrder:
     spec = specs[p]
-    referenceRepo = "%s/%s" % (abspath(referenceSources), p) 
+    referenceRepo = "%s/%s" % (abspath(referenceSources), p.lower()) 
     if os.access(dirname(referenceSources), os.W_OK):
       getstatusoutput("mkdir -p %s" % referenceSources)
     writeableReference = os.access(referenceSources, os.W_OK)
