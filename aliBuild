@@ -177,7 +177,7 @@ if __name__ == "__main__":
     spec = specs[p]
     mainPackage = p
     mainHash = spec["commit_hash"]
-    if p in ["aliroot", "aliphysics", "o2"]:
+    if p.lower() in ["aliroot", "aliphysics", "o2"]:
       break
   debug("Main package is %s@%s" % (mainPackage, mainHash))
   if args.debug:
