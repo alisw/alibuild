@@ -23,9 +23,9 @@ export BUILDROOT="$WORK_DIR/BUILD/$ARCHITECTURE/$PKGNAME/$PKGVERSION-$PKGREVISIO
 export INSTALLROOT="$WORK_DIR/INSTALLROOT/$PKGHASH/$ARCHITECTURE/$PKGNAME/$PKGVERSION-$PKGREVISION"
 export SOURCEDIR="$WORK_DIR/SOURCES/$PKGNAME/$PKGVERSION/%(commit_hash)s"
 SHORT_TAG=${GIT_TAG:0:10}
-if [[ "${SHORT_TAG:-0}" != %(commit_hash)s ]]; then
+if [[ %(commit_hash)s != ${GIT_TAG} && "${SHORT_TAG:-0}" != %(commit_hash)s ]]; then
   mkdir -p "$(dirname $WORK_DIR/SOURCES/$PKGNAME/$PKGVERSION/${GIT_TAG:-0})"
-  ln -snf $SOURCEDIR "$WORK_DIR/SOURCES/$PKGNAME/$PKGVERSION/${GIT_TAG:-0}"
+  ln -snf %(commit_hash)s "$WORK_DIR/SOURCES/$PKGNAME/$PKGVERSION/${GIT_TAG:-0}"
 fi
 rm -fr "$INSTALLROOT" "$BUILDROOT"
 mkdir -p "$INSTALLROOT" "$BUILDROOT"
@@ -37,6 +37,8 @@ export BUILDDIR="$BUILDROOT/$PKGNAME"
 %(referenceStatement)s
 
 if [[ ! "$SOURCE0" == '' && ! -d "$SOURCEDIR" ]]; then
+  # In case there is a stale link / file, for whatever reason.
+  rm -fr $SOURCEDIR
   git clone ${GIT_REFERENCE:+--reference $GIT_REFERENCE} "$SOURCE0" "$SOURCEDIR"
   (cd $SOURCEDIR && git checkout "${GIT_TAG}" && git remote set-url --push origin %(write_repo)s)
 fi
