@@ -388,6 +388,10 @@ if __name__ == "__main__":
     fp.close()
 
     source = spec.get("source", "")
+    # Shortend the commit hash in case it's a real commit hash and not simply
+    # the tag.
+    if spec["tag"] != spec["commit_hash"]:
+      commit_hash = spec["commit_hash"][0:10]
     cmd = format(cmd_raw,
                  dependencies=dependencies,
                  dependenciesInit=dependenciesInit,
@@ -403,7 +407,7 @@ if __name__ == "__main__":
                  source=source,
                  write_repo=spec.get("write_repo", source),
                  tag=spec["tag"],
-                 commit_hash=spec["commit_hash"][0:10],
+                 commit_hash=commit_hash,
                  referenceStatement=referenceStatement)
     scriptName = "%s/SPECS/%s/%s/%s-%s/build.sh" % (workDir, args.architecture, spec["package"], spec["version"], spec["revision"])
     err, out = getstatusoutput("mkdir -p %s" % dirname(scriptName))
