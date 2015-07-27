@@ -37,6 +37,8 @@ export BUILDDIR="$BUILDROOT/$PKGNAME"
 %(referenceStatement)s
 
 if [[ ! "$SOURCE0" == '' && ! -d "$SOURCEDIR" ]]; then
+  # In case there is a stale link / file, for whatever reason.
+  rm -fr $SOURCEDIR
   git clone ${GIT_REFERENCE:+--reference $GIT_REFERENCE} "$SOURCE0" "$SOURCEDIR"
   (cd $SOURCEDIR && git checkout "${GIT_TAG}" && git remote set-url --push origin %(write_repo)s)
 fi
