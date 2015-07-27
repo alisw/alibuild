@@ -409,7 +409,11 @@ if __name__ == "__main__":
                  tag=spec["tag"],
                  commit_hash=commit_hash,
                  referenceStatement=referenceStatement)
-    scriptName = "%s/SPECS/%s/%s/%s-%s/build.sh" % (workDir, args.architecture, spec["package"], spec["version"], spec["revision"])
+    scriptName = "%s/SPECS/%s/%s/%s-%s/build.sh" % (workDir,
+                                                    args.architecture,
+                                                    spec["package"],
+                                                    spec["version"], 
+                                                    spec["revision"])
     err, out = getstatusoutput("mkdir -p %s" % dirname(scriptName))
     script = open(scriptName, "w") 
     script.write(cmd)
