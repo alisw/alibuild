@@ -390,6 +390,7 @@ if __name__ == "__main__":
     source = spec.get("source", "")
     # Shortend the commit hash in case it's a real commit hash and not simply
     # the tag.
+    commit_hash = spec["commit_hash"]
     if spec["tag"] != spec["commit_hash"]:
       commit_hash = spec["commit_hash"][0:10]
     cmd = format(cmd_raw,
