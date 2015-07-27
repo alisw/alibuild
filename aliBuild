@@ -139,6 +139,7 @@ if __name__ == "__main__":
     if not isinstance(spec["version"], basestring):
       print "In recipe \"%s\": version must be a string" % p
       sys.exit(1)
+    spec["tag"] = spec.get("tag", spec["version"])
     spec["recipe"] = recipe.strip("\n")
     specs[p] = spec 
     buildOrder.insert(0, p)
@@ -401,7 +402,7 @@ if __name__ == "__main__":
                  jobs=args.jobs,
                  source=source,
                  write_repo=spec.get("write_repo", source),
-                 tag=spec.get("tag", ""),
+                 tag=spec["tag"],
                  commit_hash=spec["commit_hash"][0:10],
                  referenceStatement=referenceStatement)
     scriptName = "%s/SPECS/%s/%s/%s-%s/build.sh" % (workDir, args.architecture, spec["package"], spec["version"], spec["revision"])
