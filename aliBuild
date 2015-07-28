@@ -2,6 +2,7 @@
 from argparse import ArgumentParser
 import os
 import sys
+import shutil
 from commands import getstatusoutput
 from os.path import basename, dirname, abspath, exists, realpath
 from yaml import safe_load
@@ -243,7 +244,7 @@ if __name__ == "__main__":
     for d in installations:
       hashFile = "%s/.build-hash" % d
       if not exists(hashFile):
-        rmdir("%s")
+        shutil.rmtree("%s" % d)
       version = basename(d)
       assert("-" in version)
       revision = int(version.rsplit("-")[-1])
