@@ -80,7 +80,7 @@ def getDirectoryHash(d):
   err, out = getstatusoutput("GIT_DIR=%s/.git git show-ref HEAD | cut -f1 -d\ " % d)
   if err:
     print "Impossible to find reference for %s " % d 
-    exit(0)
+    sys.exit(0)
   return out
 
 if __name__ == "__main__":
@@ -133,7 +133,7 @@ if __name__ == "__main__":
       d = open("%s/%s.sh" % (args.configDir, p.lower())).read()
     except IOError,e:
       print e
-      exit(1)
+      sys.exit(1)
     header, recipe = d.split("---", 1)
     spec = safe_load(header)
     # Check that version is a string
@@ -157,7 +157,7 @@ if __name__ == "__main__":
       err, out = getstatusoutput(cmd)
       if err:
         print "Unable to fetch from %s" % spec["source"]
-        exit(1)
+        sys.exit(1)
       # by default we assume tag is a commit hash
       spec["commit_hash"] = spec["tag"]
       for l in out.split("\n"):
@@ -306,7 +306,7 @@ if __name__ == "__main__":
     if err:
       print "Error while unpacking."
       print out
-      exit(1)
+      sys.exit(1)
     buildOrder.remove(p)
     
   updateReferenceRepos(args.referenceSources, buildOrder, specs)
@@ -426,4 +426,4 @@ if __name__ == "__main__":
     err = execute("/bin/bash -e -x %s 2>&1" % scriptName)
     if err:
       print "Error while executing %s" % scriptName
-      exit(1)
+      sys.exit(1)
