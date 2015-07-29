@@ -245,7 +245,10 @@ if __name__ == "__main__":
   newBuildOrder = []
   for p in buildOrder:
     spec = specs[p]
-    installations = glob("%s/%s/%s/*" % (workDir, args.architecture, p))
+    installations = glob("%s/%s/%s/*%s*" % (workDir, 
+                                            args.architecture,
+                                            p, 
+                                            spec["version"]))
     # In case there is no installed software, revision is 1
     # If there is already an installed package:
     # - Remove it if we do not know its hash
