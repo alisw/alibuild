@@ -13,6 +13,7 @@ import subprocess
 from os import readlink
 import logging
 from logging import debug,error
+from datetime import datetime
 import time
 
 def format(s, **kwds):
@@ -194,6 +195,20 @@ if __name__ == "__main__":
     if "source" in spec:
       debug("Commit hash for %s@%s is %s" % (spec["source"], spec["tag"], spec["commit_hash"]))
 
+  # Expand variables found in the version.  You can define things like date
+  # with %(year)s %(month)s %(day)s %(hour)s and you can refer to some of the
+  # other properties like %(tag)s %(commit_hash)s
+  now = datetime.now()
+  for p in buildOrder:
+    spec = specs[p]
+    spec["version"] = format(spec["version"],
+                             commit_hash=spec["commit_hash"],
+                             tag=spec["tag"],
+                             year=str(now.year),
+                             month=str(now.month),
+                             day=str(now.day),
+                             hour=str(now.hour))
+
   # Calculate the hashes. We do this in build order so that we can guarantee
   # that the hashes of the dependencies are calculated first.  Also notice that
   # if the commit hash is a real hash, and not a tag, we can safely assume
@@ -230,7 +245,10 @@ if __name__ == "__main__":
   newBuildOrder = []
   for p in buildOrder:
     spec = specs[p]
-    installations = glob("%s/%s/%s/*" % (workDir, args.architecture, p))
+    installations = glob("%s/%s/%s/*%s*" % (workDir, 
+                                            args.architecture,
+                                            p, 
+                                            spec["version"]))
     # In case there is no installed software, revision is 1
     # If there is already an installed package:
     # - Remove it if we do not know its hash
