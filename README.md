@@ -42,7 +42,15 @@ make install
 The following entries are mandatory in the header:
 
   - `package`: the name of the package
-  - `version`: a mnemonic
+  - `version`: a mnemonic for the version which will be used in the name
+    of the package. Notice you can actually use some special formatting
+    substitutions which will be replaced with the associated value on build.
+    Valid substitutions are:
+      - ```%(commit_hash)s```
+      - ```%(tag)s```
+      - ```%(year)s```
+      - ```%(month)s```
+      - ```%(hour)s```
 
 The following entries are optional in the header:
 
