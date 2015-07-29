@@ -23,10 +23,7 @@ def star():
   return basename(sys.argv[0]).replace("Build", "")
 
 def gzip():
-  err, out = getstatusoutput("which pigz")
-  if err:
-    return "gzip"
-  return "pigz"
+  return getstatusoutput("which pigz")[0] and "gzip" or pigz
 
 def execute(command, printer=debug):
   popen = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE)
