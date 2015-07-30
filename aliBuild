@@ -30,6 +30,11 @@ def execute(command, printer=debug):
   exitCode = popen.returncode
   return exitCode
 
+def dieOnError(error, msg):
+  if error:
+    print msg
+    sys.exit(1)
+
 def updateReferenceRepos(referenceSources, buildOrder, specs):
   # Update source reference area, if possible.
   # If the area is already there and cannot be written, assume it maintained
@@ -85,6 +90,12 @@ if __name__ == "__main__":
   parser.add_argument("--architecture", "-a", dest="architecture", required=True)
   parser.add_argument("--jobs", "-j", dest="jobs", default=1)
   parser.add_argument("--reference-sources", dest="referenceSources", default="sw/MIRROR")
+  parser.add_argument("--remote-store", dest="remoteStore", default="",
+                      help="Where to find packages already built for reuse."
+                           "Use ssh:// in front for remote store. End with ::rw if you want to upload.")
+  parser.add_argument("--write-store", dest="writeStore", default="",
+                      help="Where to upload the built packages for reuse."
+                           "Use ssh:// in front for remote store.")
   parser.add_argument("--debug", "-d", dest="debug", action="store_true", default=False)
   args = parser.parse_args()
   
@@ -97,6 +108,18 @@ if __name__ == "__main__":
     logger_handler.setFormatter(logging.Formatter('%(levelname)s: %(message)s'))
   else:
     logger.setLevel(logging.INFO)
+
+  rsyncOptions = ""
+  if args.remoteStore.startswith("ssh://"):
+    args.remoteStore = args.remoteStore[6:]
+  if args.writeStore.startswith("ssh://"):
+    args.writeStore = args.writeStore[6:]
+  if args.remoteStore.endswith("::rw") and args.writeStore:
+    print "You cannot specify ::rw and --write-store at the same time"
+    sys.exit(1)
+  if args.remoteStore.endswith("::rw"):
+    args.remoteStore = args.remoteStore[0:-4]
+    args.writeStore = args.remoteStore
 
   # Setup build environment.
   if not args.action == "build":
@@ -280,6 +303,7 @@ if __name__ == "__main__":
       "architecture": args.architecture
     }
     tarSpecs = [
+      ("storePath", "TARS/%(architecture)s/store/%(prefix)s/%(hash)s"),
       ("tarballHashDir", "%(repo)s/TARS/%(architecture)s/store/%(prefix)s/%(hash)s"),
       ("tarballLinkDir", "%(repo)s/TARS/%(architecture)s/%(package)s"),
       ("tarballName", "%(package)s-%(version)s.%(architecture)s.tar.gz"),
@@ -308,6 +332,16 @@ if __name__ == "__main__":
     # the old one but where the relocation will work for the new dictory. Here
     # we simply store the fact that we can reuse the contents of cachedTarball.
     spec = specs[p]
+    if args.remoteStore:
+      debug("Updating remote store for package %s@%s" % (p, spec["hash"]))
+      cmd = format("mkdir -p %(tarballHashDir)s && "
+                   "rsync -av %(rsyncOptions)s %(remoteStore)s/%(storePath)s/ %(tarballHashDir)s/ || true",
+                   rsyncOptions=rsyncOptions,
+                   remoteStore=args.remoteStore,
+                   storePath=spec["storePath"],
+                   tarballHashDir=spec["tarballHashDir"])
+      err = execute(cmd)
+      dieOnError(err, "Unable to update from specified store.")
     debug("Looking for cached tarball in %s" % spec["tarballHashDir"])
     # FIXME: I should get the tarballHashDir updated with server at this point.
     #        It does not really matter that the symlinks are ok at this point
@@ -440,6 +474,16 @@ if __name__ == "__main__":
     if err:
       print "Error while executing %s" % scriptName
       sys.exit(1)
+    if args.writeStore:
+      cmd = format("cd %(workdir)s && "
+                   "rsync -avR %(rsyncOptions)s --ignore-existing %(storePath)s/%(tarballNameWithRev)s  %(remoteStore)s/",
+                   workdir=args.workDir,
+                   remoteStore=args.remoteStore,
+                   rsyncOptions=rsyncOptions,
+                   storePath=spec["storePath"],
+                   tarballNameWithRev=spec["tarballNameWithRev"])
+      err = execute(cmd)
+      dieOnError(err, "Unable to upload tarball.")
     # FIXME: I should try uploading here.
     #        - I upload the tarball to a temporary location.
     #        - I should try creating the symlink. If it does not succeed, I
