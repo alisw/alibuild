@@ -126,3 +126,19 @@ uppercased):
 In every package you can find an environment file in
 `$<PACKAGE>_ROOT/etc/profile.d/init.sh` which sets up the environment so that
 it the built software can be used.
+
+## Speedup build process by using a build store.
+
+In order to avoid rebuilding packages every single time we start from scratch,
+aliBuild supports the concept of an object store where already built tarballs
+are kept. This means that if it notices that a recipe being built has the same
+hash of one of the tarballs in the store, it will fetch it, unpack, and
+relocate it as required. 
+
+In order to specify the object store you can use the option `--remote-store
+<uri>` where `<uri>` is either a file path, or in the for
+`ssh://<hostname>:<path>`. Notice the latter will use ssh to connect to the
+host, therefore you must make sure you have access to `<hostname>`.
+
+If you have write access to the store, you can upload tarballs by specifying
+`--write-store <uri>` or by adding `::rw` to the `--remote-store` uri.
