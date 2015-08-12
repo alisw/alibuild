@@ -157,6 +157,7 @@ if __name__ == "__main__":
       print "In recipe \"%s\": version must be a string" % p
       sys.exit(1)
     spec["tag"] = spec.get("tag", spec["version"])
+    spec["version"] = spec["version"].replace("/", "_")
     spec["recipe"] = recipe.strip("\n")
     specs[p] = spec 
     buildOrder.insert(0, p)
