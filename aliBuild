@@ -270,7 +270,12 @@ if __name__ == "__main__":
   # We now iterate on all the packages, making sure we build correctly every
   # single one of them. This is done this way so that the second time we run we
   # can check if the build was consistent and if it is, we bail out.
+  packageIterations = 0
   while buildOrder:
+    packageIterations += 1
+    if packageIterations > 20:
+      print "Too many attempts at building %s. Something wrong with the repository?"
+      exit(1)
     p = buildOrder[0]
     spec = specs[p]
     # Since we can execute this multiple times for a given package, in order to
@@ -355,6 +360,7 @@ if __name__ == "__main__":
         shutil.rmtree(dirname(hashFile))
       else:
         buildOrder.pop(0)
+        packageIterations = 0
         continue
     except:
       shutil.rmtree(dirname(hashFile), True)
