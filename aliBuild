@@ -485,11 +485,3 @@ if __name__ == "__main__":
                    tarballNameWithRev=spec["tarballNameWithRev"])
       err = execute(cmd)
       dieOnError(err, "Unable to upload tarball.")
-    # FIXME: I should try uploading here.
-    #        - I upload the tarball to a temporary location.
-    #        - I should try creating the symlink. If it does not succeed, I
-    #          should retry the build updating the tarball cache for this hash
-    #          and using an incremented revision in case there is no new tarball.
-    #        - If I manage to create the link I then move the tarball in place. 
-    #        - If I cannot move it in place, it means someone else managed, so I
-    #          can simply remove the uploaded tarball and continue.
