@@ -267,6 +267,16 @@ if __name__ == "__main__":
     ]
     spec.update(dict([(x, format(y, **pkgSpec)) for (x, y) in tarSpecs]))
 
+  for p in buildOrder:
+    spec = specs[p]
+    todo = [p]
+    spec["full_requires"] = []
+    while todo:
+      requires = specs[todo.pop(0)].get("requires", [])
+      spec["full_requires"] += requires
+      todo += requires
+    spec["full_requires"] = set(spec["full_requires"])
+
   # We now iterate on all the packages, making sure we build correctly every
   # single one of them. This is done this way so that the second time we run we
   # can check if the build was consistent and if it is, we bail out.
@@ -354,16 +364,57 @@ if __name__ == "__main__":
 
     # Now that we have all the information about the package we want to build, let's
     # check if it wasn't built / unpacked already.
-    hashFile = "%s/%s/%s/%s-%s/.build-hash" % (workDir, args.architecture, p, spec["version"], spec["revision"])
+    hashFile = "%s/%s/%s/%s-%s/.build-hash" % (workDir, 
+                                               args.architecture, 
+                                               spec["package"],
+                                               spec["version"],
+                                               spec["revision"])
     try:
-      if open(hashFile).read().strip("\n") != spec["hash"]:
-        shutil.rmtree(dirname(hashFile))
-      else:
-        buildOrder.pop(0)
-        packageIterations = 0
-        continue
+      fileHash = open(hashFile).read().strip("\n")
     except:
+      fileHash = "0"
+    if fileHash != spec["hash"]:
+      if fileHash != "0":
+        debug("Mismatch between local area and the one which I should build. Redoing.")
       shutil.rmtree(dirname(hashFile), True)
+    else:
+      # If we get here, we know we are in sync with whatever remote store.  We
+      # can therefore create a directory which contains all the packages which
+      # were used to compile this one.
+      distributionLinks = []
+      print spec["full_requires"]
+      target = format("TARS/%(a)s/dist/%(p)s/%(p)s-%(v)s-%(r)s",
+                      a=args.architecture,
+                      p=spec["package"],
+                      v=spec["version"],
+                      r=spec["revision"])
+      shutil.rmtree(target, True)
+      for x in [spec["package"]] + list(spec["full_requires"]):
+        dep = specs[x]
+        source = format("../../../../../TARS/%(a)s/store/%(sh)s/%(h)s/%(p)s-%(v)s-%(r)s.%(a)s.tar.gz",
+                        a=args.architecture,
+                        sh=dep["hash"][0:2],
+                        h=dep["hash"],
+                        p=dep["package"],
+                        v=dep["version"],
+                        r=dep["revision"])
+        err = execute(format("cd %(workDir)s &&"
+                             "mkdir -p %(target)s &&"
+                             "ln -sfn %(source)s %(target)s",
+                             workDir = args.workDir,
+                             target=target,
+                             source=source))
+      if args.writeStore:
+        cmd = format("cd %(w)s && "
+                     "rsync -avR %(o)s --ignore-existing %(t)s/  %(rs)s/",
+                     w=args.workDir,
+                     rs=args.writeStore,
+                     o=rsyncOptions,
+                     t=target)
+        execute(cmd)
+      buildOrder.pop(0)
+      packageIterations = 0
+      continue
 
     debug("Looking for cached tarball in %s" % spec["tarballHashDir"])
     # FIXME: I should get the tarballHashDir updated with server at this point.
