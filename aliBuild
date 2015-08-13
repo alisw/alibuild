@@ -217,6 +217,7 @@ if __name__ == "__main__":
     spec = specs[p]
     spec["version"] = format(spec["version"],
                              commit_hash=spec["commit_hash"],
+                             short_hash=spec["commit_hash"][0:10],
                              tag=spec["tag"],
                              year=str(now.year),
                              month=str(now.month),
