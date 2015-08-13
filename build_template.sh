@@ -63,7 +63,7 @@ else
   # Unpack the cached tarball in the $INSTALLROOT and remove the unrelocated
   # files.
   mkdir -p $WORK_DIR/TMP/$PKGHASH
-  %(gzip)s -dc $CACHED_TARBALL | tar -C $WORK_DIR/TMP/$PKGHASH -v -x
+  %(gzip)s -dc $CACHED_TARBALL | tar -C $WORK_DIR/TMP/$PKGHASH -x
   mkdir -p $(dirname $INSTALLROOT)
   rm -rf $INSTALLROOT
   mv $WORK_DIR/TMP/$PKGHASH/$ARCHITECTURE/$PKGNAME/$PKGVERSION-* $INSTALLROOT
