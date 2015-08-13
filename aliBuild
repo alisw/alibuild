@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 from argparse import ArgumentParser
-import os, sys, shutil, subprocess, logging, time
+import os, sys, shutil, subprocess, logging, time, re
 from commands import getstatusoutput
 from os.path import basename, dirname, abspath, exists, realpath
 from yaml import safe_load
@@ -35,49 +35,47 @@ def dieOnError(error, msg):
     print msg
     sys.exit(1)
 
-def updateReferenceRepos(referenceSources, buildOrder, specs):
+def updateReferenceRepos(referenceSources, p, spec):
   # Update source reference area, if possible.
   # If the area is already there and cannot be written, assume it maintained
   # by someone else.
   #
   # If the area can be created, clone a bare repository with the sources.
   debug("Updating references.")
-  for p in buildOrder:
-    spec = specs[p]
-    referenceRepo = "%s/%s" % (abspath(referenceSources), p.lower()) 
-    if os.access(dirname(referenceSources), os.W_OK):
-      getstatusoutput("mkdir -p %s" % referenceSources)
-    writeableReference = os.access(referenceSources, os.W_OK)
-    if not writeableReference and exists(referenceRepo):
-      debug("Using %s as reference for %s." % (referenceRepo, p))
-      spec["reference"] = referenceRepo
-      continue
-    if not writeableReference:
-      debug("Cannot create reference for %s in specified folder.", p)
-      continue
-    
-    err, out = getstatusoutput("mkdir -p %s" % abspath(referenceSources))
-    if not "source" in spec:
-      continue
-    if not exists(referenceRepo):
-      cmd = ["git", "clone", "--bare", spec["source"], referenceRepo]
-      debug(" ".join(cmd))
-      err = execute(" ".join(cmd))
-    else:
-      err = execute(format("cd %(referenceRepo)s && "
-                           "git fetch --tags %(source)s 2>&1 && "
-                           "git fetch %(source)s 2>&1",
-                           referenceRepo=referenceRepo,
-                           source=spec["source"]))
-    if err:
-      print "Error while updating reference repos %s." % spec["source"] 
-      sys.exit(1)
+  referenceRepo = "%s/%s" % (abspath(referenceSources), p.lower())
+  if os.access(dirname(referenceSources), os.W_OK):
+    getstatusoutput("mkdir -p %s" % referenceSources)
+  writeableReference = os.access(referenceSources, os.W_OK)
+  if not writeableReference and exists(referenceRepo):
+    debug("Using %s as reference for %s." % (referenceRepo, p))
     spec["reference"] = referenceRepo
+    return
+  if not writeableReference:
+    debug("Cannot create reference for %s in specified folder.", p)
+    return
+
+  err, out = getstatusoutput("mkdir -p %s" % abspath(referenceSources))
+  if not "source" in spec:
+    return
+  if not exists(referenceRepo):
+    cmd = ["git", "clone", "--bare", spec["source"], referenceRepo]
+    debug(" ".join(cmd))
+    err = execute(" ".join(cmd))
+  else:
+    err = execute(format("cd %(referenceRepo)s && "
+                         "git fetch --tags %(source)s 2>&1 && "
+                         "git fetch %(source)s 2>&1",
+                         referenceRepo=referenceRepo,
+                         source=spec["source"]))
+  if err:
+    print "Error while updating reference repos %s." % spec["source"]
+    sys.exit(1)
+  spec["reference"] = referenceRepo
 
 def getDirectoryHash(d):
   err, out = getstatusoutput("GIT_DIR=%s/.git git show-ref HEAD | cut -f1 -d\ " % d)
   if err:
-    print "Impossible to find reference for %s " % d 
+    print "Impossible to find reference for %s " % d
     sys.exit(0)
   return out
 
@@ -98,7 +96,7 @@ if __name__ == "__main__":
                            "Use ssh:// in front for remote store.")
   parser.add_argument("--debug", "-d", dest="debug", action="store_true", default=False)
   args = parser.parse_args()
-  
+
   logger = logging.getLogger()
   logger_handler = logging.StreamHandler()
   logger.addHandler(logger_handler)
@@ -159,12 +157,12 @@ if __name__ == "__main__":
     spec["tag"] = spec.get("tag", spec["version"])
     spec["version"] = spec["version"].replace("/", "_")
     spec["recipe"] = recipe.strip("\n")
-    specs[p] = spec 
-    buildOrder.insert(0, p)
+    specs[spec["package"]] = spec
+    buildOrder.insert(0, spec["package"])
     packages += spec.get('requires', [])
     open("%s/SPECS/%s.sh" % (workDir, spec["package"]), "w").write(spec["recipe"])
 
-  # Resolve the tag to the actual commit ref, so that 
+  # Resolve the tag to the actual commit ref, so that
   for p in buildOrder:
     spec = specs[p]
     spec["commit_hash"] = "0"
@@ -201,7 +199,7 @@ if __name__ == "__main__":
   debug("Main package is %s@%s" % (mainPackage, mainHash))
   if args.debug:
     logger_handler.setFormatter(
-        logging.Formatter("%%(levelname)s:%s:%s: %%(message)s" % 
+        logging.Formatter("%%(levelname)s:%s:%s: %%(message)s" %
                           (mainPackage, mainHash[0:8])))
 
   # Now that we have the main package set, we can print out Useful information
@@ -219,6 +217,7 @@ if __name__ == "__main__":
     spec = specs[p]
     spec["version"] = format(spec["version"],
                              commit_hash=spec["commit_hash"],
+                             short_hash=spec["commit_hash"][0:10],
                              tag=spec["tag"],
                              year=str(now.year),
                              month=str(now.month),
@@ -246,117 +245,138 @@ if __name__ == "__main__":
     if bool(spec.get("force_rebuild", False)):
       h.update(str(time.time()))
     spec["hash"] = h.hexdigest()
-    debug("Hash for recipe %s.sh is %s" % (p, spec["hash"]))
-  
-  # Decide how it should be called, based on the hash and what is already
-  # available
-  # FIXME: check in the repository as well and download tarball if already
-  #        build
-  debug("Checking for packages already built.")
-  newBuildOrder = []
-  for p in buildOrder:
-    spec = specs[p]
-    installations = glob("%s/%s/%s/*%s*" % (workDir, 
-                                            args.architecture,
-                                            p, 
-                                            spec["version"]))
-    # In case there is no installed software, revision is 1
-    # If there is already an installed package:
-    # - Remove it if we do not know its hash
-    # - Use the latest number in the version, to decide its revision
-    debug(installations)
-    if not installations:
-      spec["revision"] = 1
-      newBuildOrder.append(p)
-      continue
-    busyRevisions = []
-    for d in installations:
-      hashFile = "%s/.build-hash" % d
-      if not exists(hashFile):
-        shutil.rmtree("%s" % d)
-      version = basename(d)
-      assert("-" in version)
-      revision = int(version.rsplit("-")[-1])
-      h = open(hashFile).read().strip("\n")
-      # If we have an hash match, we use the old revision for the package
-      # and we do not need to build it.
-      if h == spec["hash"]:
-        print "Package %s with hash %s is already found in %s. Not building." % (p, h, d)
-        spec["revision"] = revision
-      else:
-        busyRevisions.append(revision)
-    if not "revision" in spec:
-      spec["revision"] = min(set(range(1, max(busyRevisions)+2)) - set(busyRevisions))
-      newBuildOrder.append(p)
-  buildOrder = newBuildOrder
+    debug("Hash for recipe %s is %s" % (p, spec["hash"]))
 
-  # This adds to the spec where it should find, locally or remotely the various
-  # tarballs and links.
+  # This adds to the spec where it should find, locally or remotely the
+  # various tarballs and links.
   for p in buildOrder:
     spec = specs[p]
     pkgSpec = {
       "repo": workDir,
       "package": spec["package"],
       "version": spec["version"],
-      "revision": spec["revision"],
       "hash": spec["hash"],
       "prefix": spec["hash"][0:2],
       "architecture": args.architecture
     }
     tarSpecs = [
       ("storePath", "TARS/%(architecture)s/store/%(prefix)s/%(hash)s"),
+      ("linksPath", "TARS/%(architecture)s/%(package)s"),
       ("tarballHashDir", "%(repo)s/TARS/%(architecture)s/store/%(prefix)s/%(hash)s"),
-      ("tarballLinkDir", "%(repo)s/TARS/%(architecture)s/%(package)s"),
-      ("tarballName", "%(package)s-%(version)s.%(architecture)s.tar.gz"),
-      ("tarballNameWithRev", "%(package)s-%(version)s-%(revision)s.%(architecture)s.tar.gz"),
-    ] 
+      ("tarballLinkDir", "%(repo)s/TARS/%(architecture)s/%(package)s")
+    ]
     spec.update(dict([(x, format(y, **pkgSpec)) for (x, y) in tarSpecs]))
- 
-  # If the software already exists as a tarball and has the same hash, we reuse
-  # it. If a remote repo is specified, before doing any action we try to sync
-  # with the remote server.
-  debug("Updating from tarballs")
-  for p in buildOrder:
-    # If we arrived here it really means we have a tarball which was created 
+
+  # We now iterate on all the packages, making sure we build correctly every
+  # single one of them. This is done this way so that the second time we run we
+  # can check if the build was consistent and if it is, we bail out.
+  packageIterations = 0
+  while buildOrder:
+    packageIterations += 1
+    if packageIterations > 20:
+      print "Too many attempts at building %s. Something wrong with the repository?"
+      exit(1)
+    p = buildOrder[0]
+    spec = specs[p]
+    # Since we can execute this multiple times for a given package, in order to
+    # ensure consistency, we need to reset things and make them pristine.
+    spec.pop("revision", None)
+
+    debug("Updating from tarballs")
+    # If we arrived here it really means we have a tarball which was created
     # using the same recipe. We will use it as a cache for the build. This means
-    # that while we will still perform the build process, rather than 
+    # that while we will still perform the build process, rather than
     # executing the build itself we will:
     #
     # - Unpack it in a temporary place.
-    # - Invoke the relocation specifying the correct work_dir and the 
+    # - Invoke the relocation specifying the correct work_dir and the
     #   correct path which should have been used.
     # - Move the version directory to its final destination, including the
     #   correct revision.
-    # - Repack it and put it in the store with the  
+    # - Repack it and put it in the store with the
     #
     # this will result in a new package which has the same binary contents of
     # the old one but where the relocation will work for the new dictory. Here
     # we simply store the fact that we can reuse the contents of cachedTarball.
-    spec = specs[p]
     if args.remoteStore:
       debug("Updating remote store for package %s@%s" % (p, spec["hash"]))
-      cmd = format("mkdir -p %(tarballHashDir)s && "
-                   "rsync -av %(rsyncOptions)s %(remoteStore)s/%(storePath)s/ %(tarballHashDir)s/ || true",
+      cmd = format("mkdir -p %(tarballHashDir)s\n"
+                   "rsync -av %(rsyncOptions)s %(remoteStore)s/%(storePath)s/ %(tarballHashDir)s/ || true\n"
+                   "rsync -av --delete %(rsyncOptions)s %(remoteStore)s/%(linksPath)s/ %(tarballLinkDir)s/ || true\n",
                    rsyncOptions=rsyncOptions,
                    remoteStore=args.remoteStore,
                    storePath=spec["storePath"],
-                   tarballHashDir=spec["tarballHashDir"])
+                   linksPath=spec["linksPath"],
+                   tarballHashDir=spec["tarballHashDir"],
+                   tarballLinkDir=spec["tarballLinkDir"])
       err = execute(cmd)
       dieOnError(err, "Unable to update from specified store.")
+    # Decide how it should be called, based on the hash and what is already
+    # available.
+    debug("Checking for packages already built.")
+    linksGlob = format("%(w)s/TARS/%(a)s/%(p)s/%(p)s-%(v)s-*.%(a)s.tar.gz",
+                       w=workDir,
+                       a=args.architecture,
+                       p=spec["package"],
+                       v=spec["version"])
+    debug("Glob patter used: %s" % linksGlob)
+    packages = glob(linksGlob)
+    # In case there is no installed software, revision is 1
+    # If there is already an installed package:
+    # - Remove it if we do not know its hash
+    # - Use the latest number in the version, to decide its revision
+    debug("Packages already built using this version\n%s" % "\n".join(packages))
+    if not packages:
+      spec["revision"] = 1
+    busyRevisions = []
+    for d in packages:
+      realPath = readlink(d)
+      matcher = format("../../%(a)s/store/[0-9a-f]{2}/([0-9a-f]*)/%(p)s-%(v)s-([0-9]*).%(a)s.tar.gz",
+                       a=args.architecture,
+                       p=spec["package"],
+                       v=spec["version"])
+      m = re.match(matcher, realPath)
+      if not m:
+        continue
+      h, revision = m.groups()
+      revision = int(revision)
+      # If we have an hash match, we use the old revision for the package
+      # and we do not need to build it.
+      if h == spec["hash"]:
+        print "Package %s with hash %s is already found in %s. Not building." % (p, h, d)
+        spec["revision"] = revision
+        break
+      else:
+        busyRevisions.append(revision)
+
+    if not "revision" in spec:
+      spec["revision"] = min(set(range(1, max(busyRevisions)+2)) - set(busyRevisions))
+
+    # Now that we have all the information about the package we want to build, let's
+    # check if it wasn't built / unpacked already.
+    hashFile = "%s/%s/%s/%s-%s/.build-hash" % (workDir, args.architecture, p, spec["version"], spec["revision"])
+    try:
+      if open(hashFile).read().strip("\n") != spec["hash"]:
+        shutil.rmtree(dirname(hashFile))
+      else:
+        buildOrder.pop(0)
+        packageIterations = 0
+        continue
+    except:
+      shutil.rmtree(dirname(hashFile), True)
+
     debug("Looking for cached tarball in %s" % spec["tarballHashDir"])
     # FIXME: I should get the tarballHashDir updated with server at this point.
     #        It does not really matter that the symlinks are ok at this point
     #        as I only used the tarballs as reusable binary blobs.
     spec["cachedTarball"] = (glob("%s/*" % spec["tarballHashDir"]) or [""])[0]
-    debug(spec["cachedTarball"] and 
-          "Found tarball in %s" % spec["cachedTarball"] or 
+    debug(spec["cachedTarball"] and
+          "Found tarball in %s" % spec["cachedTarball"] or
           "No cache tarballs found")
-    
-  updateReferenceRepos(args.referenceSources, buildOrder, specs)
 
-  # Build everything, everytime
-  for p in buildOrder:
-    spec = specs[p]
+    # FIXME: Why doing it here? This should really be done before anything else.
+    updateReferenceRepos(args.referenceSources, p, spec)
+
     # Generate the part which sources the environment for all the dependencies.
     # Notice that we guarantee that a dependency is always sourced before the
     # parts depending on it, but we do not guaranteed anything for the order in
@@ -395,7 +415,7 @@ if __name__ == "__main__":
     pathDict = spec.get("append_path", [])
 
     for pathEntry in pathDict:
-      key, value = pathEntry.items()[0] 
+      key, value = pathEntry.items()[0]
       environment += format("echo 'export %(key)s=$%(key)s:%(value)s' >> \"$INSTALLROOT/etc/profile.d/init.sh\"\n",
                              architecture=args.architecture,
                              key=key,
@@ -413,7 +433,7 @@ if __name__ == "__main__":
     pathDict += spec.get("prepend_path", [])
 
     for pathEntry in pathDict:
-      key, value = pathEntry.items()[0] 
+      key, value = pathEntry.items()[0]
       environment += format("echo 'export %(key)s=%(value)s:$%(key)s' >> \"$INSTALLROOT/etc/profile.d/init.sh\"\n",
                              architecture=args.architecture,
                              key=key,
@@ -427,7 +447,7 @@ if __name__ == "__main__":
     referenceStatement = ""
     if "reference" in spec:
       referenceStatement = "export GIT_REFERENCE=%s" % spec["reference"]
-      
+
     debug(spec)
 
     fp = open(dirname(realpath(__file__))+'/build_template.sh', 'r')
@@ -462,10 +482,10 @@ if __name__ == "__main__":
     scriptName = "%s/SPECS/%s/%s/%s-%s/build.sh" % (workDir,
                                                     args.architecture,
                                                     spec["package"],
-                                                    spec["version"], 
+                                                    spec["version"],
                                                     spec["revision"])
     err, out = getstatusoutput("mkdir -p %s" % dirname(scriptName))
-    script = open(scriptName, "w") 
+    script = open(scriptName, "w")
     script.write(cmd)
     script.flush()
     script.close()
@@ -476,12 +496,17 @@ if __name__ == "__main__":
       print "Error while executing %s" % scriptName
       sys.exit(1)
     if args.writeStore:
+      tarballNameWithRev = format("%(package)s-%(version)s-%(revision)s.%(architecture)s.tar.gz",
+                                  architecture=args.architecture,
+                                  **spec)
       cmd = format("cd %(workdir)s && "
-                   "rsync -avR %(rsyncOptions)s --ignore-existing %(storePath)s/%(tarballNameWithRev)s  %(remoteStore)s/",
+                   "rsync -avR %(rsyncOptions)s --ignore-existing %(storePath)s/%(tarballNameWithRev)s  %(remoteStore)s/ &&"
+                   "rsync -avR %(rsyncOptions)s --ignore-existing %(linksPath)s/%(tarballNameWithRev)s  %(remoteStore)s/",
                    workdir=args.workDir,
                    remoteStore=args.remoteStore,
                    rsyncOptions=rsyncOptions,
                    storePath=spec["storePath"],
-                   tarballNameWithRev=spec["tarballNameWithRev"])
+                   linksPath=spec["linksPath"],
+                   tarballNameWithRev=tarballNameWithRev)
       err = execute(cmd)
       dieOnError(err, "Unable to upload tarball.")
