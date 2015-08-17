@@ -2,6 +2,13 @@
 
 A simple build tool for ALICE experiment software and its externals.
 
+## Instant Gratification
+
+Instant gratification (almost) with:
+
+    git clone https://github.com/alisw/alibuild.git
+    git clone https://github.com/alisw/alidist.git
+    alibuild/aliBuild -d -a slc7_amd64 -j 16 build aliroot
 
 ## Recipes format
 
