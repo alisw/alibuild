@@ -35,17 +35,20 @@ rm -fr "$WORK_DIR/INSTALLROOT/$PKGHASH" "$BUILDROOT"
 mkdir -p "$INSTALLROOT" "$BUILDROOT" "$BUILDDIR"
 cd "$BUILDROOT"
 rm -rf "$BUILDROOT/log"
+ln -snf $PKGHASH $WORK_DIR/BUILD/$PKGNAME-latest
 
 # Reference statements
 %(referenceStatement)s
 
-if [[ ! "$SOURCE0" == '' && ! -d "$SOURCEDIR" ]]; then
+if [[ ! "$SOURCE0" == '' && "${SOURCE0:0:1}" != "/" && ! -d "$SOURCEDIR" ]]; then
   # In case there is a stale link / file, for whatever reason.
   rm -rf $SOURCEDIR
   git clone ${GIT_REFERENCE:+--reference $GIT_REFERENCE} "$SOURCE0" "$SOURCEDIR"
   cd $SOURCEDIR
   git checkout "${GIT_TAG}"
   git remote set-url --push origin %(write_repo)s
+elif [[ ! "$SOURCE0" == '' && "${SOURCE0:0:1}" == "/" ]]; then
+  ln -snf $SOURCE0 $SOURCEDIR
 fi
 
 mkdir -p "$SOURCEDIR"

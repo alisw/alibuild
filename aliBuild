@@ -1,13 +1,12 @@
 #!/usr/bin/env python
-from argparse import ArgumentParser
 import os, sys, shutil, subprocess, logging, time, re
+from argparse import ArgumentParser
 from commands import getstatusoutput
-from os.path import basename, dirname, abspath, exists, realpath
+from os.path import basename, dirname, abspath, exists, realpath, join
 from yaml import safe_load
-from os import makedirs, unlink
+from os import makedirs, unlink, readlink
 from hashlib import sha1
 from glob import glob
-from os import readlink
 from logging import debug,error
 from datetime import datetime
 
@@ -84,6 +83,7 @@ if __name__ == "__main__":
   parser.add_argument("action")
   parser.add_argument("pkgname")
   parser.add_argument("--config-dir", "-c", dest="configDir", default="%sdist" % star())
+  parser.add_argument("--devel", dest="devel", default=[])
   parser.add_argument("--work-dir", "-w", dest="workDir", default="sw")
   parser.add_argument("--architecture", "-a", dest="architecture", required=True)
   parser.add_argument("--jobs", "-j", dest="jobs", default=1)
@@ -119,9 +119,15 @@ if __name__ == "__main__":
     args.remoteStore = args.remoteStore[0:-4]
     args.writeStore = args.remoteStore
 
+  if args.devel:
+    args.devel = args.devel.split(",")
+    print "Write store disabled since --devel option passed."
+    args.writeStore = ""
+
   # Setup build environment.
   if not args.action == "build":
     parser.error("Action %s unsupported" % args.action)
+
   packages = [args.pkgname]
   specs = {}
   buildOrder = []
@@ -167,6 +173,11 @@ if __name__ == "__main__":
     spec = specs[p]
     spec["commit_hash"] = "0"
     if "source" in spec:
+      # Nothing to do if we are local.
+      if spec["package"] in args.devel:
+        spec["source"] = join(os.getcwd(), spec["package"])
+        continue
+
       cmd = format("git ls-remote --heads %(source)s",
                    source = spec["source"])
       err, out = getstatusoutput(cmd)
