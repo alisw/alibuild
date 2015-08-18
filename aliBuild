@@ -337,7 +337,7 @@ if __name__ == "__main__":
                        a=args.architecture,
                        p=spec["package"],
                        v=spec["version"])
-    debug("Glob patter used: %s" % linksGlob)
+    debug("Glob pattern used: %s" % linksGlob)
     packages = glob(linksGlob)
     # In case there is no installed software, revision is 1
     # If there is already an installed package:

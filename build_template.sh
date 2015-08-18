@@ -19,8 +19,7 @@ export GIT_TAG="%(tag)s"
 export JOBS=${JOBS-%(jobs)s}
 export PKGPATH=${ARCHITECTURE}/${PKGNAME}/${PKGVERSION}-${PKGREVISION}
 mkdir -p "$WORK_DIR/BUILD" "$WORK_DIR/SOURCES" "$WORK_DIR/TARS" \
-         "$WORK_DIR/LEGACY" "$WORK_DIR/SPECS" "$WORK_DIR/BUILDROOT" \
-         "$WORK_DIR/INSTALLROOT"
+         "$WORK_DIR/SPECS" "$WORK_DIR/BUILDROOT" "$WORK_DIR/INSTALLROOT"
 export BUILDROOT="$WORK_DIR/BUILD/$PKGHASH"
 export INSTALLROOT="$WORK_DIR/INSTALLROOT/$PKGHASH/$PKGPATH"
 export SOURCEDIR="$WORK_DIR/SOURCES/$PKGNAME/$PKGVERSION/%(commit_hash)s"
@@ -61,7 +60,7 @@ CACHED_TARBALL=%(cachedTarball)s
 
 # In case we have a cached tarball, we skip the build and expand it, change the
 # relocation script so that it takes into account the new location.
-if [ X$CACHED_TARBALL = X ]; then
+if [[ "$CACHED_TARBALL" == "" ]]; then
   set -o pipefail
   bash -ex "$WORK_DIR/SPECS/$PKGNAME.sh" 2>&1 | tee "$BUILDROOT/log"
 else
@@ -117,38 +116,17 @@ cat "$INSTALLROOT/.original-unrelocated" | xargs -n1 -I{} echo "sed -e \"s|/[^ ]
 cat "$INSTALLROOT/.original-unrelocated" | xargs -n1 -I{} cp '{}' '{}'.unrelocated
 cd "$WORK_DIR/INSTALLROOT/$PKGHASH"
 
-# Relocate script wrt/software root (compatible w/legacy behavior)
-(
-cat <<\EoF
-#!/bin/bash -e
-cd "$(dirname "$0")"
-NEW_PREFIX=${NEW_PREFIX:-$PWD}
-EoF
-cat "$INSTALLROOT/.original-unrelocated" | sed -e 's|^\([^/]\+/\+\)\{3\}||g' | \
-  xargs -n1 -I{} \
-  echo "sed -e \"s|/[^ ]*INSTALLROOT/${PKGHASH}/${PKGPATH}|\$NEW_PREFIX|g\" {}.unrelocated > {}"
-) > "$INSTALLROOT/relocate-me-root.sh"
-
 # Archive creation
 HASHPREFIX=`echo $PKGHASH | cut -b1,2`
 HASH_PATH=$ARCHITECTURE/store/$HASHPREFIX/$PKGHASH
 mkdir -p "${WORK_DIR}/TARS/$HASH_PATH" \
-         "${WORK_DIR}/LEGACY/$HASH_PATH" \
-         "${WORK_DIR}/TARS/$ARCHITECTURE/$PKGNAME" \
-         "${WORK_DIR}/LEGACY/$ARCHITECTURE/$PKGNAME"
+         "${WORK_DIR}/TARS/$ARCHITECTURE/$PKGNAME"
 
 PACKAGE_WITH_REV=$PKGNAME-$PKGVERSION-$PKGREVISION.$ARCHITECTURE.tar.gz
-LEGACY_WITH_REV=$PKGNAME_$PKGVERSION-$PKGREVISION.$ARCHITECTURE.tar.gz
 tar -C $WORK_DIR/INSTALLROOT/$PKGHASH -c -z -f "$WORK_DIR/TARS/$HASH_PATH/$PACKAGE_WITH_REV" .
-tar -C $INSTALLROOT/.. -c -z -f "$WORK_DIR/LEGACY/$HASH_PATH/$PACKAGE_WITH_REV" $PKGVERSION-$PKGREVISION
-
 ln -nfs \
   "../../$HASH_PATH/$PACKAGE_WITH_REV" \
   "$WORK_DIR/TARS/$ARCHITECTURE/$PKGNAME/$PACKAGE_WITH_REV"
-
-ln -nfs \
-  "../../$HASH_PATH/$PACKAGE_WITH_REV" \
-  "$WORK_DIR/LEGACY/$ARCHITECTURE/$PKGNAME/$LEGACY_WITH_REV"
 
 # Unpack, and relocate
 cd "$WORK_DIR"
