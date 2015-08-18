@@ -2,6 +2,13 @@
 
 A simple build tool for ALICE experiment software and its externals.
 
+## Instant Gratification
+
+Instant gratification (almost) with:
+
+    git clone https://github.com/alisw/alibuild.git
+    git clone https://github.com/alisw/alidist.git
+    alibuild/aliBuild -d -a slc7_amd64 -j 16 build aliroot
 
 ## Recipes format
 
@@ -47,6 +54,7 @@ The following entries are mandatory in the header:
     substitutions which will be replaced with the associated value on build.
     Valid substitutions are:
       - ```%(commit_hash)s```
+      - ```%(short_hash)s```
       - ```%(tag)s```
       - ```%(year)s```
       - ```%(month)s```
@@ -142,3 +150,22 @@ host, therefore you must make sure you have access to `<hostname>`.
 
 If you have write access to the store, you can upload tarballs by specifying
 `--write-store <uri>` or by adding `::rw` to the `--remote-store` uri.
+
+## Developing packages locally (experimental)
+
+One of the use cases we want to cover is the ability to develop external
+packages without having to go through an commit - push - pull cycle.
+
+In order to do so, you can use the `--devel <package>` where package is a
+package which you have already checked out locally at the same level as
+alibuild and alidist. For example, if you want to build O2 while having the
+ability to modify ROOT, you can do the following:
+
+    git clone https://github.com/alisw/alibuild
+    git clone https://github.com/alisw/alidist
+    git clone https://github.com/root-mirror/root
+    <modify files in root/>
+    alibuild/aliBuild ... --devel ROOT build O2
+
+the above will make sure the build will pick up your changes in the local
+directory.

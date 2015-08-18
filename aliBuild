@@ -1,13 +1,9 @@
 #!/usr/bin/env python
-from argparse import ArgumentParser
-import os, sys, shutil, subprocess, logging, time, re
+import os, sys, shutil, subprocess, logging, time, re, yaml, hashlib, argparse
 from commands import getstatusoutput
-from os.path import basename, dirname, abspath, exists, realpath
-from yaml import safe_load
-from os import makedirs, unlink
-from hashlib import sha1
+from os.path import basename, dirname, abspath, exists, realpath, join
+from os import makedirs, unlink, readlink
 from glob import glob
-from os import readlink
 from logging import debug,error
 from datetime import datetime
 
@@ -80,10 +76,11 @@ def getDirectoryHash(d):
   return out
 
 if __name__ == "__main__":
-  parser = ArgumentParser()
+  parser = argparse.ArgumentParser()
   parser.add_argument("action")
   parser.add_argument("pkgname")
   parser.add_argument("--config-dir", "-c", dest="configDir", default="%sdist" % star())
+  parser.add_argument("--devel", dest="devel", default=[])
   parser.add_argument("--work-dir", "-w", dest="workDir", default="sw")
   parser.add_argument("--architecture", "-a", dest="architecture", required=True)
   parser.add_argument("--jobs", "-j", dest="jobs", default=1)
@@ -119,9 +116,15 @@ if __name__ == "__main__":
     args.remoteStore = args.remoteStore[0:-4]
     args.writeStore = args.remoteStore
 
+  if args.devel:
+    args.devel = args.devel.split(",")
+    print "Write store disabled since --devel option passed."
+    args.writeStore = ""
+
   # Setup build environment.
   if not args.action == "build":
     parser.error("Action %s unsupported" % args.action)
+
   packages = [args.pkgname]
   specs = {}
   buildOrder = []
@@ -149,7 +152,7 @@ if __name__ == "__main__":
       print e
       sys.exit(1)
     header, recipe = d.split("---", 1)
-    spec = safe_load(header)
+    spec = yaml.safe_load(header)
     # Check that version is a string
     if not isinstance(spec["version"], basestring):
       print "In recipe \"%s\": version must be a string" % p
@@ -167,6 +170,11 @@ if __name__ == "__main__":
     spec = specs[p]
     spec["commit_hash"] = "0"
     if "source" in spec:
+      # Nothing to do if we are local.
+      if spec["package"] in args.devel:
+        spec["source"] = join(os.getcwd(), spec["package"])
+        continue
+
       cmd = format("git ls-remote --heads %(source)s",
                    source = spec["source"])
       err, out = getstatusoutput(cmd)
@@ -232,7 +240,7 @@ if __name__ == "__main__":
   debug("Calculating hashes.")
   for p in buildOrder:
     spec = specs[p]
-    h = sha1()
+    h = hashlib.sha1()
     for x in ["recipe", "version", "package", "commit_hash",
               "env", "append_path", "prepend_path"]:
       h.update(str(spec.get(x, "none")))
