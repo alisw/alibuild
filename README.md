@@ -67,21 +67,28 @@ The following entries are optional in the header:
     that you can easily point to the actual sources used by the software.
   - `tag`: tag in the above mentioned repository which points to the software
     to be built.
-  - `env`: list of one entry dictionaries whose key-value pairs are environment
-    variables name and value to be set, *e.g.*:
+  - `env`: dictionary whose key-value pairs are environment variables to be set,
+    *e.g.*:
 
         env:
-          - "$ROOTSYS": $ROOT_ROOT
+          "$ROOTSYS": $ROOT_ROOT
 
-  - `prepend_path`: list of one entry dictionaries whose key-value pairs are
-    an environment variable name and a path to be appended to it, like it
-    happens in `LD_LIBRARY_PATH`, *e.g*:
+  - `prepend_path`: dictionary whose key-value pairs are an environment variable
+    name and a path to be prepended to it, as it happens in `LD_LIBRARY_PATH`.
+    You can append multiple paths to a single variable by specifying a list too,
+    *e.g.*:
 
         prepend_path:
-          - "PATH": "$FOO_ROOT/binexec/foobar"
+          "PATH": "$FOO_ROOT/binexec/foobar"
+          "LD_LIBRARY_PATH": [ "$FOO_ROOT/sub/lib", "$FOO_ROOT/sub/lib64 ]
+          "DYLD_LIBRARY_PATH":
+            - "$FOO_ROOT/sub/lib"
+            - "$FOO_ROOT/sub/lib64
 
-    will result in prepending `$FOO_ROOT/binexec/foobar` to `$PATH`
-  - `append_path`: same as `prepend_path`, paths are appended rather than
+    will result in prepending `$FOO_ROOT/binexec/foobar` to `$PATH`, and both
+    `$FOO_ROOT/sub/lib` and `lib64` to `LD_LIBRARY_PATH` and
+    `DYLD_LIBRARY_PATH`.
+  - `append_path`: same as `prepend_path` but paths are appended rather than
     prepended.
 
 

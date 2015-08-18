@@ -461,46 +461,42 @@ if __name__ == "__main__":
     # By default we append LD_LIBRARY_PATH, PATH and DYLD_LIBRARY_PATH
     # FIXME: do not append variables for Mac on Linux.
     environment = ""
-    if type(spec.get("env", {})) != dict:
+    if not isinstance(spec.get("env", {}), dict):
       print "Tag `env' in %s should be a dict." % p
       sys.exit(1)
-    for (key, value) in spec.get("env", {}).items():
-      environment += format("echo 'export %(key)s=%(value)s' >> $INSTALLROOT/etc/profile.d/init.sh\n",
-                             architecture=args.architecture,
-                             key=key,
-                             value=value,
-                           )
-    basePath = "%s_ROOT" % p.upper().replace("-", "_")
-    pathDict = spec.get("append_path", [])
 
-    for pathEntry in pathDict:
-      key, value = pathEntry.items()[0]
-      environment += format("echo 'export %(key)s=$%(key)s:%(value)s' >> \"$INSTALLROOT/etc/profile.d/init.sh\"\n",
-                             architecture=args.architecture,
-                             key=key,
-                             package=p,
-                             revision=spec["revision"],
-                             value=value,
-                             version=spec["version"]
-                           )
+    for key,value in spec.get("env", {}).iteritems():
+      environment += format("echo 'export %(key)s=%(value)s' >> $INSTALLROOT/etc/profile.d/init.sh\n",
+                            key=key,
+                            value=value)
+    basePath = "%s_ROOT" % p.upper().replace("-", "_")
+
+    pathDict = spec.get("append_path", {})
+    if not isinstance(pathDict, dict):
+      print "Tag `append_path' in %s should be a dict." % p
+      sys.exit(1)
+    for pathName,pathVal in pathDict.iteritems():
+      pathVal = isinstance(pathVal, list) and pathVal or [ pathVal ]
+      environment += format("echo 'export %(key)s=%(value)s:$%(key)s' >> \"$INSTALLROOT/etc/profile.d/init.sh\"\n",
+                            key=pathName,
+                            value=":".join(pathVal))
 
     # Same thing, but prepending the results so that they win against system ones.
-    pathDict = [{"LD_LIBRARY_PATH": "$%s/lib" % basePath},
-                {"DYLD_LIBRARY_PATH": "$%s/lib" % basePath},
-                {"PATH": "$%s/bin" % basePath},
-               ]
-    pathDict += spec.get("prepend_path", [])
-
-    for pathEntry in pathDict:
-      key, value = pathEntry.items()[0]
+    defaultPrependPaths = { "LD_LIBRARY_PATH": "$%s/lib" % basePath,
+                            "DYLD_LIBRARY_PATH": "$%s/lib" % basePath,
+                            "PATH": "$%s/bin" % basePath }
+    pathDict = spec.get("prepend_path", {})
+    if not isinstance(pathDict, dict):
+      print "Tag `prepend_path' in %s should be a dict." % p
+      sys.exit(1)
+    for pathName,pathVal in pathDict.iteritems():
+      pathDict[pathName] = isinstance(pathVal, list) and pathVal or [ pathVal ]
+    for pathName,pathVal in defaultPrependPaths.iteritems():
+      pathDict[pathName] = [ pathVal ] + pathDict.get(pathName, [])
+    for pathName,pathVal in pathDict.iteritems():
       environment += format("echo 'export %(key)s=%(value)s:$%(key)s' >> \"$INSTALLROOT/etc/profile.d/init.sh\"\n",
-                             architecture=args.architecture,
-                             key=key,
-                             package=p,
-                             revision=spec["revision"],
-                             value=value,
-                             version=spec["version"]
-                           )
+                            key=pathName,
+                            value=":".join(pathVal))
 
     # The actual build script.
     referenceStatement = ""
