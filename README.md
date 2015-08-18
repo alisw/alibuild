@@ -54,6 +54,7 @@ The following entries are mandatory in the header:
     substitutions which will be replaced with the associated value on build.
     Valid substitutions are:
       - ```%(commit_hash)s```
+      - ```%(short_hash)s```
       - ```%(tag)s```
       - ```%(year)s```
       - ```%(month)s```
