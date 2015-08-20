@@ -162,7 +162,19 @@ if __name__ == "__main__":
     spec["recipe"] = recipe.strip("\n")
     specs[spec["package"]] = spec
     buildOrder.insert(0, spec["package"])
-    packages += spec.get('requires', [])
+    realRequires = []
+    for require in spec.get("requires", []):
+      matcher = ".*"
+      if ":" in require:
+        require, matcher = require.split(":", 1)
+      if not re.match(matcher, args.architecture):
+        debug("Not appending %s as a requirement" % require)
+        continue
+      debug("appending %s as a requirement" % require)
+      packages.append(require)
+      realRequires.append(require)
+    spec["requires"] = realRequires
+      
     open("%s/SPECS/%s.sh" % (workDir, spec["package"]), "w").write(spec["recipe"])
 
   # Resolve the tag to the actual commit ref, so that

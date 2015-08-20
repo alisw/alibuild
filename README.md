@@ -43,7 +43,6 @@ make ${JOBS+-j $JOBS}
 make install
 ```
 
-
 ### The header
 
 The following entries are mandatory in the header:
@@ -90,7 +89,26 @@ The following entries are optional in the header:
     `DYLD_LIBRARY_PATH`.
   - `append_path`: same as `prepend_path` but paths are appended rather than
     prepended.
+  - `requires`: a list of run-time and build-time dependency for the package. E.g.:
+    
+      package: AliRoot
+      requires:
+        - ROOT
+      ...
 
+    The specified dependencies will be built before building the given package.
+    You can specify platform specific dependencies by adding
+    `:<regular-expression>` to the dependency name. Such a reqular expression will
+    be matched against the architecture and if it does not match, it will not be
+    included. E.g:
+    
+      package: AliRoot-test
+      requires:
+        - "igprof:(?!osx).*"
+      ...
+
+    will make sure that `IgProf` is only built on platforms which do not begin
+    by `osx`.
 
 ### The body
 
