@@ -43,7 +43,6 @@ make ${JOBS+-j $JOBS}
 make install
 ```
 
-
 ### The header
 
 The following entries are mandatory in the header:
@@ -90,7 +89,26 @@ The following entries are optional in the header:
     `DYLD_LIBRARY_PATH`.
   - `append_path`: same as `prepend_path` but paths are appended rather than
     prepended.
+  - `requires`: a list of run-time and build-time dependency for the package. E.g.:
+    
+      package: AliRoot
+      requires:
+        - ROOT
+      ...
 
+    The specified dependencies will be built before building the given package.
+    You can specify platform specific dependencies by adding
+    `:<regular-expression>` to the dependency name. Such a reqular expression will
+    be matched against the architecture and if it does not match, it will not be
+    included. E.g:
+    
+      package: AliRoot-test
+      requires:
+        - "igprof:(?!osx).*"
+      ...
+
+    will make sure that `IgProf` is only built on platforms which do not begin
+    by `osx`.
 
 ### The body
 
@@ -175,4 +193,15 @@ ability to modify ROOT, you can do the following:
     alibuild/aliBuild ... --devel ROOT build O2
 
 the above will make sure the build will pick up your changes in the local
-directory.
+directory. 
+
+As a cherry on the cake, in case your recipe does not require any environment,
+you can even do:
+
+    cd sw/BUILD/ROOT/latest
+    make install
+
+and it will correctly install everything in `sw/<arch>/ROOT/latest`.
+
+It's also important to notice that if you use the devel mode, you will not be
+able to write to any store and the generated tgz will be empty.
