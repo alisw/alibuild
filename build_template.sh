@@ -21,7 +21,15 @@ export PKGPATH=${ARCHITECTURE}/${PKGNAME}/${PKGVERSION}-${PKGREVISION}
 mkdir -p "$WORK_DIR/BUILD" "$WORK_DIR/SOURCES" "$WORK_DIR/TARS" \
          "$WORK_DIR/SPECS" "$WORK_DIR/BUILDROOT" "$WORK_DIR/INSTALLROOT"
 export BUILDROOT="$WORK_DIR/BUILD/$PKGHASH"
-export INSTALLROOT="$WORK_DIR/INSTALLROOT/$PKGHASH/$PKGPATH"
+
+# In case the repository is local, it means we are in development mode, so we
+# install directly in $WORK_DIR/$PKGPATH so that we can do make install
+# directly into BUILD/$PKGPATH and have changes being propagated.
+if [ "${SOURCE0:0:1}" == "/" ]; then
+  export INSTALLROOT="$WORK_DIR/$PKGPATH"
+else
+  export INSTALLROOT="$WORK_DIR/INSTALLROOT/$PKGHASH/$PKGPATH"
+fi
 export SOURCEDIR="$WORK_DIR/SOURCES/$PKGNAME/$PKGVERSION/%(commit_hash)s"
 export BUILDDIR="$BUILDROOT/$PKGNAME"
 
@@ -33,7 +41,7 @@ if [[ %(commit_hash)s != ${GIT_TAG} && "${SHORT_TAG:-0}" != %(commit_hash)s ]]; 
   ln -snf %(commit_hash)s "$WORK_DIR/SOURCES/$PKGNAME/$PKGVERSION/${GIT_TAG_DIR}"
 fi
 rm -fr "$WORK_DIR/INSTALLROOT/$PKGHASH" "$BUILDROOT"
-mkdir -p "$INSTALLROOT" "$BUILDROOT" "$BUILDDIR"
+mkdir -p "$INSTALLROOT" "$BUILDROOT" "$BUILDDIR" "$WORK_DIR/INSTALLROOT/$PKGHASH/$PKGPATH"
 cd "$BUILDROOT"
 rm -rf "$BUILDROOT/log"
 ln -snf $PKGHASH $WORK_DIR/BUILD/$PKGNAME-latest
@@ -99,7 +107,7 @@ EOF
 %(environment)s
 
 cd "$WORK_DIR/INSTALLROOT/$PKGHASH/$PKGPATH"
-grep -I -H -l -R "INSTALLROOT/$PKGHASH" . | sed -e 's|^\./||' > "$INSTALLROOT/.original-unrelocated"
+{ grep -I -H -l -R "INSTALLROOT/$PKGHASH" . || true; } | sed -e 's|^\./||' > "$INSTALLROOT/.original-unrelocated"
 
 # Relocate script for <arch>/<pkgname>/<pkgver> structure
 cat > "$INSTALLROOT/relocate-me.sh" <<EoF
@@ -132,3 +140,4 @@ ln -nfs \
 cd "$WORK_DIR"
 tar xzf "$WORK_DIR/TARS/$HASH_PATH/$PACKAGE_WITH_REV"
 bash -ex "$ARCHITECTURE/$PKGNAME/$PKGVERSION-$PKGREVISION/relocate-me.sh"
+ln -snf $PKGVERSION-$PKGREVISION $ARCHITECTURE/$PKGNAME/latest

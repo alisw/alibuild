@@ -175,4 +175,15 @@ ability to modify ROOT, you can do the following:
     alibuild/aliBuild ... --devel ROOT build O2
 
 the above will make sure the build will pick up your changes in the local
-directory.
+directory. 
+
+As a cherry on the cake, in case your recipe does not require any environment,
+you can even do:
+
+    cd sw/BUILD/ROOT/latest
+    make install
+
+and it will correctly install everything in `sw/<arch>/ROOT/latest`.
+
+It's also important to notice that if you use the devel mode, you will not be
+able to write to any store and the generated tgz will be empty.

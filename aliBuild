@@ -170,10 +170,9 @@ if __name__ == "__main__":
     spec = specs[p]
     spec["commit_hash"] = "0"
     if "source" in spec:
-      # Nothing to do if we are local.
+      # Replace source with local one if we are in development mode.
       if spec["package"] in args.devel:
         spec["source"] = join(os.getcwd(), spec["package"])
-        continue
 
       cmd = format("git ls-remote --heads %(source)s",
                    source = spec["source"])
@@ -186,6 +185,9 @@ if __name__ == "__main__":
       for l in out.split("\n"):
         if l.endswith("refs/heads/%s" % spec["tag"]):
           spec["commit_hash"] = l.split("\t", 1)[0]
+          if spec["package"] in args.devel:
+            spec["devel_hash"] = spec["commit_hash"]
+            spec["commit_hash"] = "0"
           break
 
   # Decide what is the main package we are building and at what commit.
@@ -252,6 +254,7 @@ if __name__ == "__main__":
       h.update(specs[dep]["hash"])
     if bool(spec.get("force_rebuild", False)):
       h.update(str(time.time()))
+    h.update(spec.get("devel_hash",""))
     spec["hash"] = h.hexdigest()
     debug("Hash for recipe %s is %s" % (p, spec["hash"]))
 
@@ -389,8 +392,8 @@ if __name__ == "__main__":
       # If we get here, we know we are in sync with whatever remote store.  We
       # can therefore create a directory which contains all the packages which
       # were used to compile this one.
+      debug("Package %s was correctly compiled. Moving to next one" % spec["package"])
       distributionLinks = []
-      print spec["full_requires"]
       target = format("TARS/%(a)s/dist/%(p)s/%(p)s-%(v)s-%(r)s",
                       a=args.architecture,
                       p=spec["package"],
