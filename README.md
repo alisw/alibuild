@@ -109,6 +109,9 @@ The following entries are optional in the header:
 
     will make sure that `IgProf` is only built on platforms which do not begin
     by `osx`.
+    will make sure that IgProf is only built on architectures whose name does
+    not begin with `osx`.
+  - `force_rebuild`: set it to `true` to force re-running the build recipe.
 
 ### The body
 
