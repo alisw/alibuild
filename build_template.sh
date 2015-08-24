@@ -34,10 +34,10 @@ export SOURCEDIR="$WORK_DIR/SOURCES/$PKGNAME/$PKGVERSION/%(commit_hash)s"
 export BUILDDIR="$BUILDROOT/$PKGNAME"
 
 SHORT_TAG=${GIT_TAG:0:10}
+mkdir -p $(dirname $SOURCEDIR)
 if [[ %(commit_hash)s != ${GIT_TAG} && "${SHORT_TAG:-0}" != %(commit_hash)s ]]; then
   GIT_TAG_DIR=${GIT_TAG:-0}
   GIT_TAG_DIR=${GIT_TAG_DIR//\//_}
-  mkdir -p "$(dirname $WORK_DIR/SOURCES/$PKGNAME/$PKGVERSION/${GIT_TAG_DIR})"
   ln -snf %(commit_hash)s "$WORK_DIR/SOURCES/$PKGNAME/$PKGVERSION/${GIT_TAG_DIR}"
 fi
 rm -fr "$WORK_DIR/INSTALLROOT/$PKGHASH" "$BUILDROOT"

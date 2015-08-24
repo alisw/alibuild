@@ -91,24 +91,27 @@ The following entries are optional in the header:
     prepended.
   - `requires`: a list of run-time and build-time dependency for the package. E.g.:
     
-      package: AliRoot
-      requires:
-        - ROOT
-      ...
+        package: AliRoot
+        requires:
+          - ROOT
+        ...
 
     The specified dependencies will be built before building the given package.
-    You can specify platform specific dependencies by adding
-    `:<regular-expression>` to the dependency name. Such a reqular expression will
-    be matched against the architecture and if it does not match, it will not be
-    included. E.g:
+    You can specify platform-specific dependencies by appending `:<regexp>` to
+    the dependency name. Such a reqular expression will be matched against the
+    architecture provided via `--architecture` and if it does not match it will
+    not be included. For instance:
     
-      package: AliRoot-test
-      requires:
-        - "igprof:(?!osx).*"
-      ...
+        package: AliRoot-test
+        requires:
+          - "igprof:(?!osx).*"
+        ...
 
     will make sure that `IgProf` is only built on platforms which do not begin
     by `osx`.
+    will make sure that IgProf is only built on architectures whose name does
+    not begin with `osx`.
+  - `force_rebuild`: set it to `true` to force re-running the build recipe.
 
 ### The body
 
