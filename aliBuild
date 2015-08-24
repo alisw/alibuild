@@ -197,8 +197,16 @@ if __name__ == "__main__":
       for l in out.split("\n"):
         if l.endswith("refs/heads/%s" % spec["tag"]):
           spec["commit_hash"] = l.split("\t", 1)[0]
+          # We are in development mode, we need to rebuild if the commit hash
+          # is different and if there are extra changes on to.
           if spec["package"] in args.devel:
-            spec["devel_hash"] = spec["commit_hash"]
+            cmd = format("cd %(source)s ; git diff -r HEAD | sha1sum",
+                         source = spec["source"])
+            debug(cmd)
+            err, out = getstatusoutput(cmd)
+            debug(out)
+            dieOnError(err, "Unable to detect source code changes.")
+            spec["devel_hash"] = spec["commit_hash"] + out
             spec["commit_hash"] = "0"
           break
 
