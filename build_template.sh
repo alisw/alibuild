@@ -18,8 +18,10 @@ export SOURCE0="%(source)s"
 export GIT_TAG="%(tag)s"
 export JOBS=${JOBS-%(jobs)s}
 export PKGPATH=${ARCHITECTURE}/${PKGNAME}/${PKGVERSION}-${PKGREVISION}
+%(incremental_hash)s
+INCREMENTAL_BUILD_HASH=${INCREMENTAL_BUILD_HASH:-0}
 mkdir -p "$WORK_DIR/BUILD" "$WORK_DIR/SOURCES" "$WORK_DIR/TARS" \
-         "$WORK_DIR/SPECS" "$WORK_DIR/BUILDROOT" "$WORK_DIR/INSTALLROOT"
+         "$WORK_DIR/SPECS" "$WORK_DIR/INSTALLROOT"
 export BUILDROOT="$WORK_DIR/BUILD/$PKGHASH"
 
 # In case the repository is local, it means we are in development mode, so we
@@ -40,10 +42,13 @@ if [[ %(commit_hash)s != ${GIT_TAG} && "${SHORT_TAG:-0}" != %(commit_hash)s ]]; 
   GIT_TAG_DIR=${GIT_TAG_DIR//\//_}
   ln -snf %(commit_hash)s "$WORK_DIR/SOURCES/$PKGNAME/$PKGVERSION/${GIT_TAG_DIR}"
 fi
-rm -fr "$WORK_DIR/INSTALLROOT/$PKGHASH" "$BUILDROOT"
+rm -fr "$WORK_DIR/INSTALLROOT/$PKGHASH"
+# We remove the build directory only if we are not in incremental mode.
+if [[ "$INCREMENTAL_BUILD_HASH" == 0 ]]; then
+  rm -rf "$BUILDROOT"
+fi
 mkdir -p "$INSTALLROOT" "$BUILDROOT" "$BUILDDIR" "$WORK_DIR/INSTALLROOT/$PKGHASH/$PKGPATH"
 cd "$BUILDROOT"
-rm -rf "$BUILDROOT/log"
 ln -snf $PKGHASH $WORK_DIR/BUILD/$PKGNAME-latest
 
 # Reference statements
@@ -66,14 +71,31 @@ cd "$BUILDDIR"
 # Actual build script, as defined in the recipe
 CACHED_TARBALL=%(cachedTarball)s
 
-# In case we have a cached tarball, we skip the build and expand it, change the
-# relocation script so that it takes into account the new location.
-if [[ "$CACHED_TARBALL" == "" ]]; then
+# This actually does the build, taking in to account shortcuts like
+# having a pre build tarball or having an incremental recipe (in the
+# case of development mode).
+#
+# - If the build was never done and we do not have a cached tarball,
+#   build everything as usual.
+# - If the build was started, we do not have a tarball, and we
+#   have a non trivial incremental recipe, use it to continue the build.
+# - If the build was started, but we do not have a incremental build recipe,
+#   simply rebuild as usual.
+# - In case we have a cached tarball, we skip the build and expand it, change
+#   the relocation script so that it takes into account the new location.
+if [[ "$CACHED_TARBALL" == "" && ! -f $BUILDROOT/log ]]; then
+  set -o pipefail
+  bash -ex "$WORK_DIR/SPECS/$PKGNAME.sh" 2>&1 | tee "$BUILDROOT/log"
+elif [[ "$CACHED_TARBALL" == "" && $INCREMENTAL_BUILD_HASH != "0" ]]; then
+  set -o pipefail
+  (%(incremental_recipe)s) | tee -a "$BUILDROOT/log"
+elif [[ "$CACHED_TARBALL" == "" ]]; then
   set -o pipefail
   bash -ex "$WORK_DIR/SPECS/$PKGNAME.sh" 2>&1 | tee "$BUILDROOT/log"
 else
   # Unpack the cached tarball in the $INSTALLROOT and remove the unrelocated
   # files.
+  rm -rf "$BUILDROOT/log"
   mkdir -p $WORK_DIR/TMP/$PKGHASH
   %(gzip)s -dc $CACHED_TARBALL | tar -C $WORK_DIR/TMP/$PKGHASH -x
   mkdir -p $(dirname $INSTALLROOT)
@@ -82,7 +104,7 @@ else
   pushd $WORK_DIR/INSTALLROOT/$PKGHASH
     WORK_DIR=$WORK_DIR/INSTALLROOT/$PKGHASH bash -ex $INSTALLROOT/relocate-me.sh
   popd
-  find $INSTALLROOT -name "*.unrelocated" -delete 
+  find $INSTALLROOT -name "*.unrelocated" -delete
   rm -rf $WORK_DIR/TMP/$PKGHASH
 fi
 

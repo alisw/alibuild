@@ -274,7 +274,12 @@ if __name__ == "__main__":
       h.update(specs[dep]["hash"])
     if bool(spec.get("force_rebuild", False)):
       h.update(str(time.time()))
-    h.update(spec.get("devel_hash",""))
+    if spec["package"] in args.devel and "incremental_recipe" in spec:
+      h.update(spec["incremental_recipe"])
+      incremental_hash = hashlib.sha1(spec["incremental_recipe"]).hexdigest()
+      spec["incremental_hash"] = "INCREMENTAL_BUILD_HASH=%s" % incremental_hash
+    elif p in args.devel:
+      h.update(spec.get("devel_hash"))
     spec["hash"] = h.hexdigest()
     debug("Hash for recipe %s is %s" % (p, spec["hash"]))
 
@@ -384,8 +389,11 @@ if __name__ == "__main__":
       # If we have an hash match, we use the old revision for the package
       # and we do not need to build it.
       if h == spec["hash"]:
-        print "Package %s with hash %s is already found in %s. Not building." % (p, h, d)
         spec["revision"] = revision
+        if spec["package"] in args.devel and "incremental_recipe" in spec:
+          spec["obsolete_tarball"] = d
+        else:
+          print "Package %s with hash %s is already found in %s. Not building." % (p, h, d)
         break
       else:
         busyRevisions.append(revision)
@@ -412,7 +420,14 @@ if __name__ == "__main__":
       # If we get here, we know we are in sync with whatever remote store.  We
       # can therefore create a directory which contains all the packages which
       # were used to compile this one.
-      debug("Package %s was correctly compiled. Moving to next one" % spec["package"])
+      debug("Package %s was correctly compiled. Moving to next one." % spec["package"])
+      # If using incremental builds, next time we execute the script we need to remove
+      # the placeholders which avoid rebuilds.
+      if spec["package"] in args.devel and "incremental_recipe" in spec:
+        unlink(hashFile)
+      if "obsolete_tarball" in spec:
+        unlink(realpath(spec["obsolete_tarball"]))
+        unlink(spec["obsolete_tarball"])
       distributionLinks = []
       target = format("TARS/%(a)s/dist/%(p)s/%(p)s-%(v)s-%(r)s",
                       a=args.architecture,
@@ -546,6 +561,8 @@ if __name__ == "__main__":
                  configDir=abspath(args.configDir),
                  pkgname=spec["package"],
                  hash=spec["hash"],
+                 incremental_hash=spec.get("incremental_hash", ""),
+                 incremental_recipe=spec.get("incremental_recipe", ":"),
                  version=spec["version"],
                  revision=spec["revision"],
                  architecture=args.architecture,
