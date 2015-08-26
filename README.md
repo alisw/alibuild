@@ -144,7 +144,7 @@ Some environment variables are made available to the script.
    write files outside this directory.
  - `BUILD_ROOT`: it contains `BUILDDIR` and the logfile for the build
  - `CONFIG_DIR`: directory containing all the build recipes.
- - `SOURCEDIR`: TODO
+ - `SOURCEDIR`: where the sources are cloned.
 
 For each dependency already built, the corresponding enviornment file is loaded.
 This will include, apart from custom variables and the usual `PATH` and library
@@ -178,6 +178,8 @@ host, therefore you must make sure you have access to `<hostname>`.
 
 If you have write access to the store, you can upload tarballs by specifying
 `--write-store <uri>` or by adding `::rw` to the `--remote-store` uri.
+
+Support for web based repository is foreseen, but not yet implemented.
 
 ## Developing packages locally (experimental)
 
