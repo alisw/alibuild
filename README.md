@@ -1,6 +1,8 @@
 # aliBuild
 
-A simple build tool for ALICE experiment software and its externals.
+A simple build tool for ALICE experiment software and its externals. Recipes
+for the externals and ALICE software are stored in
+[alidist](https://github.com/alisw/alidist)
 
 ## Instant Gratification
 
