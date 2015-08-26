@@ -208,3 +208,13 @@ and it will correctly install everything in `sw/<arch>/ROOT/latest`.
 
 It's also important to notice that if you use the devel mode, you will not be
 able to write to any store and the generated tgz will be empty.
+
+### Incremental builds
+
+When developing locally using the `--devel` mode, if the external is well
+behaved and supports incremental building, it is possible to specify an
+`incremental_recipe` in the YAML preamble. Such a recipe will be used after the
+second time the build happens (to ensure that the non incremental parts of the
+build are done) and will be executed directly in $BUILDDIR, only recompiled
+what changed. Notice that if this is the case the incremental recipe will always
+be executed.
