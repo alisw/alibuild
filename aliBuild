@@ -71,6 +71,42 @@ def getDirectoryHash(d):
   dieOnError(err, "Impossible to find reference for %s " % d)
   return out
 
+# Creates a directory in the store which contains symlinks to the package
+# and it's direct / indirect dependencies
+def createDistLinks(spec, args, repoType, requiresType):
+  target = format("TARS/%(a)s/%(rp)s/%(p)s/%(p)s-%(v)s-%(r)s",
+                  a=args.architecture,
+                  rp=repoType,
+                  p=spec["package"],
+                  v=spec["version"],
+                  r=spec["revision"])
+  shutil.rmtree(target, True)
+  for x in [spec["package"]] + list(spec[requiresType]):
+    dep = specs[x]
+    source = format("../../../../../TARS/%(a)s/store/%(sh)s/%(h)s/%(p)s-%(v)s-%(r)s.%(a)s.tar.gz",
+                    a=args.architecture,
+                    sh=dep["hash"][0:2],
+                    h=dep["hash"],
+                    p=dep["package"],
+                    v=dep["version"],
+                    r=dep["revision"])
+    err = execute(format("cd %(workDir)s &&"
+                         "mkdir -p %(target)s &&"
+                         "ln -sfn %(source)s %(target)s",
+                         workDir = args.workDir,
+                         target=target,
+                         source=source))
+
+  rsyncOptions = ""
+  if args.writeStore:
+    cmd = format("cd %(w)s && "
+                 "rsync -avR %(o)s --ignore-existing %(t)s/  %(rs)s/",
+                 w=args.workDir,
+                 rs=args.writeStore,
+                 o=rsyncOptions,
+                 t=target)
+    execute(cmd)
+
 if __name__ == "__main__":
   parser = argparse.ArgumentParser()
   parser.add_argument("action")
@@ -419,36 +455,11 @@ if __name__ == "__main__":
       if "obsolete_tarball" in spec:
         unlink(realpath(spec["obsolete_tarball"]))
         unlink(spec["obsolete_tarball"])
-      distributionLinks = []
-      target = format("TARS/%(a)s/dist/%(p)s/%(p)s-%(v)s-%(r)s",
-                      a=args.architecture,
-                      p=spec["package"],
-                      v=spec["version"],
-                      r=spec["revision"])
-      shutil.rmtree(target, True)
-      for x in [spec["package"]] + list(spec["full_requires"]):
-        dep = specs[x]
-        source = format("../../../../../TARS/%(a)s/store/%(sh)s/%(h)s/%(p)s-%(v)s-%(r)s.%(a)s.tar.gz",
-                        a=args.architecture,
-                        sh=dep["hash"][0:2],
-                        h=dep["hash"],
-                        p=dep["package"],
-                        v=dep["version"],
-                        r=dep["revision"])
-        err = execute(format("cd %(workDir)s &&"
-                             "mkdir -p %(target)s &&"
-                             "ln -sfn %(source)s %(target)s",
-                             workDir = args.workDir,
-                             target=target,
-                             source=source))
-      if args.writeStore:
-        cmd = format("cd %(w)s && "
-                     "rsync -avR %(o)s --ignore-existing %(t)s/  %(rs)s/",
-                     w=args.workDir,
-                     rs=args.writeStore,
-                     o=rsyncOptions,
-                     t=target)
-        execute(cmd)
+      # We need to create 2 sets of links, once with the full requires,
+      # once with only direct dependencies, since that's required to
+      # register packages in Alien.
+      createDistLinks(spec, args, "dist", "full_requires")
+      createDistLinks(spec, args, "dist-direct", "requires")
       buildOrder.pop(0)
       packageIterations = 0
       continue
