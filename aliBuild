@@ -63,17 +63,49 @@ def updateReferenceRepos(referenceSources, p, spec):
                          "git fetch %(source)s 2>&1",
                          referenceRepo=referenceRepo,
                          source=spec["source"]))
-  if err:
-    print "Error while updating reference repos %s." % spec["source"]
-    sys.exit(1)
+  dieOnError(err, "Error while updating reference repos %s." % spec["source"])
   spec["reference"] = referenceRepo
 
 def getDirectoryHash(d):
   err, out = getstatusoutput("GIT_DIR=%s/.git git show-ref HEAD | cut -f1 -d\ " % d)
-  if err:
-    print "Impossible to find reference for %s " % d
-    sys.exit(0)
+  dieOnError(err, "Impossible to find reference for %s " % d)
   return out
+
+# Creates a directory in the store which contains symlinks to the package
+# and its direct / indirect dependencies
+def createDistLinks(spec, args, repoType, requiresType):
+  target = format("TARS/%(a)s/%(rp)s/%(p)s/%(p)s-%(v)s-%(r)s",
+                  a=args.architecture,
+                  rp=repoType,
+                  p=spec["package"],
+                  v=spec["version"],
+                  r=spec["revision"])
+  shutil.rmtree(target, True)
+  for x in [spec["package"]] + list(spec[requiresType]):
+    dep = specs[x]
+    source = format("../../../../../TARS/%(a)s/store/%(sh)s/%(h)s/%(p)s-%(v)s-%(r)s.%(a)s.tar.gz",
+                    a=args.architecture,
+                    sh=dep["hash"][0:2],
+                    h=dep["hash"],
+                    p=dep["package"],
+                    v=dep["version"],
+                    r=dep["revision"])
+    err = execute(format("cd %(workDir)s &&"
+                         "mkdir -p %(target)s &&"
+                         "ln -sfn %(source)s %(target)s",
+                         workDir = args.workDir,
+                         target=target,
+                         source=source))
+
+  rsyncOptions = ""
+  if args.writeStore:
+    cmd = format("cd %(w)s && "
+                 "rsync -avR %(o)s --ignore-existing %(t)s/  %(rs)s/",
+                 w=args.workDir,
+                 rs=args.writeStore,
+                 o=rsyncOptions,
+                 t=target)
+    execute(cmd)
 
 if __name__ == "__main__":
   parser = argparse.ArgumentParser()
@@ -109,9 +141,8 @@ if __name__ == "__main__":
     args.remoteStore = args.remoteStore[6:]
   if args.writeStore.startswith("ssh://"):
     args.writeStore = args.writeStore[6:]
-  if args.remoteStore.endswith("::rw") and args.writeStore:
-    print "You cannot specify ::rw and --write-store at the same time"
-    sys.exit(1)
+  dieOnError(args.remoteStore.endswith("::rw") and args.writeStore,
+             "You cannot specify ::rw and --write-store at the same time")
   if args.remoteStore.endswith("::rw"):
     args.remoteStore = args.remoteStore[0:-4]
     args.writeStore = args.remoteStore
@@ -149,14 +180,12 @@ if __name__ == "__main__":
     try:
       d = open("%s/%s.sh" % (args.configDir, p.lower())).read()
     except IOError,e:
-      print e
-      sys.exit(1)
+      dieOnError(True, str(e))
     header, recipe = d.split("---", 1)
     spec = yaml.safe_load(header)
     # Check that version is a string
-    if not isinstance(spec["version"], basestring):
-      print "In recipe \"%s\": version must be a string" % p
-      sys.exit(1)
+    dieOnError(not isinstance(spec["version"], basestring),
+               "In recipe \"%s\": version must be a string" % p)
     spec["tag"] = spec.get("tag", spec["version"])
     spec["version"] = spec["version"].replace("/", "_")
     spec["recipe"] = recipe.strip("\n")
@@ -189,9 +218,7 @@ if __name__ == "__main__":
       cmd = format("git ls-remote --heads %(source)s",
                    source = spec["source"])
       err, out = getstatusoutput(cmd)
-      if err:
-        print "Unable to fetch from %s" % spec["source"]
-        sys.exit(1)
+      dieOnError(err, "Unable to fetch from %s" % spec["source"])
       # by default we assume tag is a commit hash
       spec["commit_hash"] = spec["tag"]
       for l in out.split("\n"):
@@ -428,36 +455,11 @@ if __name__ == "__main__":
       if "obsolete_tarball" in spec:
         unlink(realpath(spec["obsolete_tarball"]))
         unlink(spec["obsolete_tarball"])
-      distributionLinks = []
-      target = format("TARS/%(a)s/dist/%(p)s/%(p)s-%(v)s-%(r)s",
-                      a=args.architecture,
-                      p=spec["package"],
-                      v=spec["version"],
-                      r=spec["revision"])
-      shutil.rmtree(target, True)
-      for x in [spec["package"]] + list(spec["full_requires"]):
-        dep = specs[x]
-        source = format("../../../../../TARS/%(a)s/store/%(sh)s/%(h)s/%(p)s-%(v)s-%(r)s.%(a)s.tar.gz",
-                        a=args.architecture,
-                        sh=dep["hash"][0:2],
-                        h=dep["hash"],
-                        p=dep["package"],
-                        v=dep["version"],
-                        r=dep["revision"])
-        err = execute(format("cd %(workDir)s &&"
-                             "mkdir -p %(target)s &&"
-                             "ln -sfn %(source)s %(target)s",
-                             workDir = args.workDir,
-                             target=target,
-                             source=source))
-      if args.writeStore:
-        cmd = format("cd %(w)s && "
-                     "rsync -avR %(o)s --ignore-existing %(t)s/  %(rs)s/",
-                     w=args.workDir,
-                     rs=args.writeStore,
-                     o=rsyncOptions,
-                     t=target)
-        execute(cmd)
+      # We need to create 2 sets of links, once with the full requires,
+      # once with only direct dependencies, since that's required to
+      # register packages in Alien.
+      createDistLinks(spec, args, "dist", "full_requires")
+      createDistLinks(spec, args, "dist-direct", "requires")
       buildOrder.pop(0)
       packageIterations = 0
       continue
@@ -499,10 +501,8 @@ if __name__ == "__main__":
     # By default we append LD_LIBRARY_PATH, PATH and DYLD_LIBRARY_PATH
     # FIXME: do not append variables for Mac on Linux.
     environment = ""
-    if not isinstance(spec.get("env", {}), dict):
-      print "Tag `env' in %s should be a dict." % p
-      sys.exit(1)
-
+    dieOnError(not isinstance(spec.get("env", {}), dict),
+               "Tag `env' in %s should be a dict." % p)
     for key,value in spec.get("env", {}).iteritems():
       environment += format("echo 'export %(key)s=%(value)s' >> $INSTALLROOT/etc/profile.d/init.sh\n",
                             key=key,
@@ -510,9 +510,8 @@ if __name__ == "__main__":
     basePath = "%s_ROOT" % p.upper().replace("-", "_")
 
     pathDict = spec.get("append_path", {})
-    if not isinstance(pathDict, dict):
-      print "Tag `append_path' in %s should be a dict." % p
-      sys.exit(1)
+    dieOnError(not isinstance(pathDict, dict),
+               "Tag `append_path' in %s should be a dict." % p)
     for pathName,pathVal in pathDict.iteritems():
       pathVal = isinstance(pathVal, list) and pathVal or [ pathVal ]
       environment += format("echo 'export %(key)s=%(value)s:$%(key)s' >> \"$INSTALLROOT/etc/profile.d/init.sh\"\n",
@@ -524,9 +523,8 @@ if __name__ == "__main__":
                             "DYLD_LIBRARY_PATH": "$%s/lib" % basePath,
                             "PATH": "$%s/bin" % basePath }
     pathDict = spec.get("prepend_path", {})
-    if not isinstance(pathDict, dict):
-      print "Tag `prepend_path' in %s should be a dict." % p
-      sys.exit(1)
+    dieOnError(not isinstance(pathDict, dict),
+               "Tag `prepend_path' in %s should be a dict." % p)
     for pathName,pathVal in pathDict.iteritems():
       pathDict[pathName] = isinstance(pathVal, list) and pathVal or [ pathVal ]
     for pathName,pathVal in defaultPrependPaths.iteritems():
@@ -587,9 +585,7 @@ if __name__ == "__main__":
 
     print "Building %s@%s" % (spec["package"], spec["version"])
     err = execute("/bin/bash -e -x %s 2>&1" % scriptName)
-    if err:
-      print "Error while executing %s" % scriptName
-      sys.exit(1)
+    dieOnError(err, "Error while executing %s" % scriptName)
     if args.writeStore:
       tarballNameWithRev = format("%(package)s-%(version)s-%(revision)s.%(architecture)s.tar.gz",
                                   architecture=args.architecture,
