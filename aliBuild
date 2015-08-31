@@ -72,7 +72,7 @@ def getDirectoryHash(d):
   return out
 
 # Creates a directory in the store which contains symlinks to the package
-# and it's direct / indirect dependencies
+# and its direct / indirect dependencies
 def createDistLinks(spec, args, repoType, requiresType):
   target = format("TARS/%(a)s/%(rp)s/%(p)s/%(p)s-%(v)s-%(r)s",
                   a=args.architecture,

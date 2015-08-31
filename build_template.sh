@@ -129,7 +129,8 @@ EOF
 %(environment)s
 
 cd "$WORK_DIR/INSTALLROOT/$PKGHASH/$PKGPATH"
-{ grep -I -H -l -R "INSTALLROOT/$PKGHASH" . || true; } | sed -e 's|^\./||' > "$INSTALLROOT/.original-unrelocated"
+# Find which files need relocation.
+{ grep -I -H -l -R "\(INSTALLROOT/$PKGHASH\|[@][@]PKGREVISION[@]$PKGHASH[@][@]\)" . || true; } | sed -e 's|^\./||' > "$INSTALLROOT/.original-unrelocated"
 
 # Relocate script for <arch>/<pkgname>/<pkgver> structure
 cat > "$INSTALLROOT/relocate-me.sh" <<EoF
@@ -143,6 +144,7 @@ PKGPATH=\${PKGPATH:-${PKGPATH}}
 EoF
 
 cat "$INSTALLROOT/.original-unrelocated" | xargs -n1 -I{} echo "sed -e \"s|/[^ ]*INSTALLROOT/$PKGHASH/\$ORIGINAL_PKGPATH|\$WORK_DIR/\$PKGPATH|g\" \$PKGPATH/{}.unrelocated > \$PKGPATH/{}" >> "$INSTALLROOT/relocate-me.sh"
+cat "$INSTALLROOT/.original-unrelocated" | xargs -n1 -I{} echo "sed -e \"s|[@][@]PKGREVISION[@]$PKGHASH[@][@]|$PKGREVISION|g\" \$PKGPATH/{}.unrelocated > \$PKGPATH/{}" >> "$INSTALLROOT/relocate-me.sh"
 cat "$INSTALLROOT/.original-unrelocated" | xargs -n1 -I{} cp '{}' '{}'.unrelocated
 cd "$WORK_DIR/INSTALLROOT/$PKGHASH"
 
