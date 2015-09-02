@@ -143,8 +143,7 @@ ORIGINAL_PKGPATH=${PKGPATH}
 PKGPATH=\${PKGPATH:-${PKGPATH}}
 EoF
 
-cat "$INSTALLROOT/.original-unrelocated" | xargs -n1 -I{} echo "sed -e \"s|/[^ ]*INSTALLROOT/$PKGHASH/\$ORIGINAL_PKGPATH|\$WORK_DIR/\$PKGPATH|g\" \$PKGPATH/{}.unrelocated > \$PKGPATH/{}" >> "$INSTALLROOT/relocate-me.sh"
-cat "$INSTALLROOT/.original-unrelocated" | xargs -n1 -I{} echo "sed -e \"s|[@][@]PKGREVISION[@]$PKGHASH[@][@]|$PKGREVISION|g\" \$PKGPATH/{}.unrelocated > \$PKGPATH/{}" >> "$INSTALLROOT/relocate-me.sh"
+cat "$INSTALLROOT/.original-unrelocated" | xargs -n1 -I{} echo "sed -e \"s|/[^ ]*INSTALLROOT/$PKGHASH/\$ORIGINAL_PKGPATH|\$WORK_DIR/\$PKGPATH|g;s|[@][@]PKGREVISION[@]$PKGHASH[@][@]|$PKGREVISION|g\" \$PKGPATH/{}.unrelocated > \$PKGPATH/{}" >> "$INSTALLROOT/relocate-me.sh"
 cat "$INSTALLROOT/.original-unrelocated" | xargs -n1 -I{} cp '{}' '{}'.unrelocated
 cd "$WORK_DIR/INSTALLROOT/$PKGHASH"
 
