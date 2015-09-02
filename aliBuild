@@ -247,7 +247,7 @@ if __name__ == "__main__":
   # we use it as main package, rather than the last one.
   mainPackage = None
   mainHash = None
-  for p in buildOrder:
+  for p in reversed(buildOrder):
     spec = specs[p]
     mainPackage = p
     mainHash = spec["commit_hash"]
