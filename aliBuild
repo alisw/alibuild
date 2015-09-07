@@ -174,8 +174,6 @@ if __name__ == "__main__":
   while packages:
     p = packages.pop(0)
     if p in specs:
-      buildOrder.remove(p)
-      buildOrder.insert(0, p)
       continue
     try:
       d = open("%s/%s.sh" % (args.configDir, p.lower())).read()
@@ -190,7 +188,6 @@ if __name__ == "__main__":
     spec["version"] = spec["version"].replace("/", "_")
     spec["recipe"] = recipe.strip("\n")
     specs[spec["package"]] = spec
-    buildOrder.insert(0, spec["package"])
     realRequires = []
     for require in spec.get("requires", []):
       matcher = ".*"
@@ -206,6 +203,26 @@ if __name__ == "__main__":
       
     open("%s/SPECS/%s.sh" % (workDir, spec["package"]), "w").write(spec["recipe"])
 
+  # Do topological sort to have the correct build order even in the 
+  # case of non-tree like dependencies..
+  # The actual algorith used can be found at:
+  #
+  # http://www.stoimen.com/blog/2012/10/01/computer-algorithms-topological-sort-of-a-graph/
+  #
+  edges = [(p["package"], d) for p in specs.values() for d in p["requires"] ]
+  L = [l for l in specs.values() if not l["requires"]]
+  S = []
+  while L:
+    spec = L.pop(0)
+    S.append(spec)
+    nextVertex = [e[0] for e in edges if e[1] == spec["package"]]
+    edges = [e for e in edges if e[1] != spec["package"]]
+    hasPredecessors = set([m for e in edges for m in nextVertex if e[0] == m])
+    withPredecessor = set(nextVertex) - hasPredecessors
+    L += [specs[m] for m in withPredecessor]
+  buildOrder = [s["package"] for s in S]
+  debug("We will build packages in the following order: %s", " ".join(buildOrder))
+  
   # Resolve the tag to the actual commit ref, so that
   for p in buildOrder:
     spec = specs[p]
