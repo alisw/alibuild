@@ -150,6 +150,7 @@ if __name__ == "__main__":
   if args.devel:
     args.devel = args.devel.split(",")
     print "Write store disabled since --devel option passed."
+    print "Development packages: %s" % " ".join(args.devel)
     args.writeStore = ""
 
   # Setup build environment.
@@ -248,7 +249,7 @@ if __name__ == "__main__":
       # By default we assume tag is a commit hash.
       spec["commit_hash"] = spec["tag"]
       for l in out.split("\n"):
-        if l.endswith("refs/heads/%s" % spec["tag"]):
+        if l.endswith("refs/heads/%s" % spec["tag"]) or spec["package"] in args.devel:
           spec["commit_hash"] = l.split("\t", 1)[0]
           # We are in development mode, we need to rebuild if the commit hash
           # is different and if there are extra changes on to.

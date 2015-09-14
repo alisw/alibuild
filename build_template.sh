@@ -139,11 +139,13 @@ if [[ "\$WORK_DIR" == '' ]]; then
   echo 'Please, define \$WORK_DIR'
   exit 1
 fi
-ORIGINAL_PKGPATH=${PKGPATH}
-PKGPATH=\${PKGPATH:-${PKGPATH}}
+OP=${PKGPATH}
+PP=\${PKGPATH:-${PKGPATH}}
+PH=${PKGHASH}
 EoF
 
-cat "$INSTALLROOT/.original-unrelocated" | xargs -n1 -I{} echo "sed -e \"s|/[^ ]*INSTALLROOT/$PKGHASH/\$ORIGINAL_PKGPATH|\$WORK_DIR/\$PKGPATH|g;s|[@][@]PKGREVISION[@]$PKGHASH[@][@]|$PKGREVISION|g\" \$PKGPATH/{}.unrelocated > \$PKGPATH/{}" >> "$INSTALLROOT/relocate-me.sh"
+cat "$INSTALLROOT/.original-unrelocated" | xargs -n1 -I{} echo "sed -e \"s|/[^ ]*INSTALLROOT/\$PH/\$OP|\$WORK_DIR/\$PP|g;s|[@][@]PKGREVISION[@]\$PH[@][@]|$PKGREVISION|g\" \$PP/{}.unrelocated > \$PP/{}" >> "$INSTALLROOT/relocate-me.sh"
+cat "$INSTALLROOT/relocate-me.sh"
 cat "$INSTALLROOT/.original-unrelocated" | xargs -n1 -I{} cp '{}' '{}'.unrelocated
 cd "$WORK_DIR/INSTALLROOT/$PKGHASH"
 
