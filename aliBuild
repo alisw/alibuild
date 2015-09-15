@@ -488,10 +488,12 @@ if __name__ == "__main__":
     # FIXME: I should get the tarballHashDir updated with server at this point.
     #        It does not really matter that the symlinks are ok at this point
     #        as I only used the tarballs as reusable binary blobs.
-    spec["cachedTarball"] = (glob("%s/*" % spec["tarballHashDir"]) or [""])[0]
-    debug(spec["cachedTarball"] and
-          "Found tarball in %s" % spec["cachedTarball"] or
-          "No cache tarballs found")
+    spec["cachedTarball"] = ""
+    if not spec["package"] in args.devel:
+      spec["cachedTarball"] = (glob("%s/*" % spec["tarballHashDir"]) or [""])[0]
+      debug(spec["cachedTarball"] and
+            "Found tarball in %s" % spec["cachedTarball"] or
+            "No cache tarballs found")
 
     # FIXME: Why doing it here? This should really be done before anything else.
     updateReferenceRepos(args.referenceSources, p, spec)
