@@ -1,0 +1,75 @@
+#!/usr/bin/env python
+
+from argparse import ArgumentParser
+from glob import glob
+from tempfile import NamedTemporaryFile
+import logging, sys, yaml
+from logging import debug, error, info
+from os import remove
+from subprocess import Popen, PIPE, STDOUT
+
+def format(s, **kwds):
+  return s % kwds
+
+def execute(command):
+  popen = Popen(command, shell=False, stdout=PIPE, stderr=STDOUT)
+  linesIterator = iter(popen.stdout.readline, "")
+  for line in linesIterator:
+    debug(line.strip("\n"))  # yield line
+  output = popen.communicate()[0]
+  debug(output)
+  exitCode = popen.returncode
+  return exitCode
+
+def deps(recipesDir, outFile):
+  dot = []
+  for p in glob("%s/*.sh" % recipesDir):
+    debug(format("Reading file %(filename)s", filename=p))
+    try:
+      recipe = yaml.safe_load(open(p).read().split("---")[0])
+      name = recipe["package"]
+    except Exception as e:
+      error(format("Error reading recipe %(filename)s: %(type)s: %(msg)s",
+                   filename=p, type=type(e).__name__, msg=str(e)))
+      sys.exit(1)
+    dot.append(format("\"%(package)s\";", package=name))
+    for d in recipe.get("requires", []):
+      dot.append(format("\"%(package)s\" -> \"%(dependency)s\";",
+                 package=name, dependency=d.split(":")[0]))
+
+  with NamedTemporaryFile(delete=False) as fp:
+    fp.write("digraph {\n  ")
+    fp.write("\n  ".join(dot))
+    fp.write("\n}\n")
+  try:
+    execute(["dot", fp.name, "-Tpdf", "-o", outFile])
+  except Exception as e:
+    error(format("Error generating dependencies with dot: %(type)s: %(msg)s",
+                 type=type(e).__name__, msg=str(e)))
+  else:
+    info(format("Dependencies graph generated: %(outFile)s", outFile=outFile))
+  remove(fp.name)
+
+def main():
+  parser = ArgumentParser()
+  parser.add_argument("--dist", dest="distDir", default="alidist",
+                      help="Recipes directory")
+  parser.add_argument("--output-file", "-o", dest="outFile", default="dist.pdf",
+                      help="Output file (PDF format)")
+  parser.add_argument("--debug", "-d", dest="debug", action="store_true", default=False,
+                      help="Debug output")
+  args = parser.parse_args()
+  
+  logger = logging.getLogger()
+  loggerHandler = logging.StreamHandler()
+  logger.addHandler(loggerHandler)
+
+  loggerHandler.setFormatter(logging.Formatter('%(levelname)-5s: %(message)s'))
+  if args.debug: logger.setLevel(logging.DEBUG)
+  else: logger.setLevel(logging.INFO)
+
+  deps(recipesDir=args.distDir,
+       outFile=args.outFile)
+
+if __name__ == "__main__":
+  main()
