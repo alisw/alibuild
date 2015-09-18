@@ -222,3 +222,18 @@ second time the build happens (to ensure that the non incremental parts of the
 build are done) and will be executed directly in $BUILDDIR, only recompiled
 what changed. Notice that if this is the case the incremental recipe will always
 be executed.
+
+## Dependency graph
+
+Assuming you are in a directory containing `alibuild` and `alidist`, you can
+generate a dependency plot with:
+
+    alibuild/aliDeps
+
+A file named `dist.pdf` will be created. `dot` from Graphviz is required. To
+show all the dependencies recursively from a specific package (for instance,
+`ThePEG`) use:
+
+    alibuild/aliDeps ThePEG
+
+Use `-h` or `--help` for more options.
