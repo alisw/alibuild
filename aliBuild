@@ -280,14 +280,14 @@ if __name__ == "__main__":
   # can always extract it from it.
   # If one of the special packages is in the list of packages to be built,
   # we use it as main package, rather than the last one.
-  mainPackage = None
-  mainHash = None
-  for p in reversed(buildOrder):
-    spec = specs[p]
-    mainPackage = p
-    mainHash = spec["commit_hash"]
-    if p.lower() in ["aliroot", "aliphysics", "o2"]:
-      break
+  mainPackage = buildOrder[-1]
+  MAIN_PACKAGES = ["aliroot", "aliphysics", "o2"]
+  hasMainPackages = [x for x in reversed(buildOrder) 
+                     if x.lower() in MAIN_PACKAGES]
+  if hasMainPackages:
+    mainPackage = hasMainPackages[-1]
+  mainHash = specs[mainPackage]["commit_hash"]
+
   debug("Main package is %s@%s" % (mainPackage, mainHash))
   if args.debug:
     logger_handler.setFormatter(
