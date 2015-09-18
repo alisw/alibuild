@@ -113,6 +113,9 @@ The following entries are optional in the header:
     by `osx`.
     will make sure that IgProf is only built on architectures whose name does
     not begin with `osx`.
+  - `build_requires`: currently behaves just like `requires` with the exception
+    that packages in this list are not included in the dependency graph
+    produced by alideps.
   - `force_rebuild`: set it to `true` to force re-running the build recipe.
 
 ### The body

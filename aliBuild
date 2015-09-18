@@ -182,6 +182,8 @@ if __name__ == "__main__":
       dieOnError(True, str(e))
     header, recipe = d.split("---", 1)
     spec = yaml.safe_load(header)
+    # For the moment we treat build_requires just as requires.
+    spec["requires"] = spec.get("requires", []) + spec.get("build_requires", [])
     # Check that version is a string
     dieOnError(not isinstance(spec["version"], basestring),
                "In recipe \"%s\": version must be a string" % p)
