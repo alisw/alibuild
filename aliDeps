@@ -12,7 +12,7 @@ def format(s, **kwds):
   return s % kwds
 
 def execute(command):
-  popen = Popen(command, shell=False, stdout=PIPE, stderr=STDOUT)
+  popen = Popen(command, shell=(isinstance(command, basestring)), stdout=PIPE, stderr=STDOUT)
   linesIterator = iter(popen.stdout.readline, "")
   for line in linesIterator:
     debug(line.strip("\n"))  # yield line
@@ -21,7 +21,7 @@ def execute(command):
   exitCode = popen.returncode
   return exitCode
 
-def deps(recipesDir, topPackage, outFile):
+def deps(recipesDir, topPackage, outFile, transitiveRed):
   dot = {}
   for p in glob("%s/*.sh" % recipesDir):
     debug(format("Reading file %(filename)s", filename=p))
@@ -57,6 +57,9 @@ def deps(recipesDir, topPackage, outFile):
         fp.write("  \"%s\" -> \"%s\";\n" % (p,d))
     fp.write("}\n")
   try:
+    if transitiveRed:
+      execute(format("tred %(dotFile)s > %(dotFile)s.0 && mv %(dotFile)s.0 %(dotFile)s",
+              dotFile=fp.name))
     execute(["dot", fp.name, "-Tpdf", "-o", outFile])
   except Exception as e:
     error(format("Error generating dependencies with dot: %(type)s: %(msg)s",
@@ -75,6 +78,8 @@ def main():
                       help="Output file (PDF format)")
   parser.add_argument("--debug", "-d", dest="debug", action="store_true", default=False,
                       help="Debug output")
+  parser.add_argument("--neat", "-n", dest="neat", action="store_true", default=False,
+                      help="Neat graph with transitive reduction")
   args = parser.parse_args()
   
   logger = logging.getLogger()
@@ -87,7 +92,8 @@ def main():
 
   if not deps(recipesDir=args.distDir,
               topPackage=args.topPackage,
-              outFile=args.outFile):
+              outFile=args.outFile,
+              transitiveRed=args.neat):
     sys.exit(1)
 
 if __name__ == "__main__":
