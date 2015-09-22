@@ -57,6 +57,7 @@ The following entries are mandatory in the header:
       - ```%(commit_hash)s```
       - ```%(short_hash)s```
       - ```%(tag)s```
+      - ```%(tag_basename)s```
       - ```%(year)s```
       - ```%(month)s```
       - ```%(hour)s```

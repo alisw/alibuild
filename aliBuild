@@ -272,6 +272,7 @@ if __name__ == "__main__":
                              commit_hash=spec["commit_hash"],
                              short_hash=spec["commit_hash"][0:10],
                              tag=spec["tag"],
+                             tag_basename=basename(spec["tag"]),
                              **nowKwds)
 
   # Decide what is the main package we are building and at what commit.
