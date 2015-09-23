@@ -1,0 +1,57 @@
+#!/bin/bash -e
+
+# Load and test Modulefiles created by recipes.
+
+MODULECVMFS='/cvmfs/alice.cern.ch/x86_64-2.6-gnu-4.1.2/Modules/3.2.10/Scientific/5.x'
+MODULECMD=$(which modulecmd 2>/dev/null || true)
+[[ "$MODULECMD" == '' ]] && MODULECMD="env LD_LIBRARY_PATH=$MODULECVMFS/lib:\$LD_LIBRARY_PATH $MODULECVMFS/bin/modulecmd"
+MODULECMD="$MODULECMD bash"
+
+WORK_DIR=${WORK_DIR:-$(cd $(dirname $0)/..; pwd)/sw}
+ARCHITECTURE=${ARCHITECTURE:-slc5}
+export MODULEPATH=$WORK_DIR/MODULES/$ARCHITECTURE
+
+rm -rf $MODULEPATH
+mkdir -p $MODULEPATH
+
+pushd $MODULEPATH
+find $WORK_DIR/$ARCHITECTURE -name modulefiles | while read FILE; do
+  PKGVER=$(basename $(cd $FILE/../..;pwd))
+  PKGNAME=$(basename $(cd $FILE/../../..;pwd))
+  mkdir -p $PKGNAME
+  cp $FILE/$PKGNAME $PKGNAME/$PKGVER
+done
+mkdir BASE
+cat > BASE/1.0 <<EOF
+#%Module1.0
+proc ModulesHelp { } {
+  global version
+  puts stderr "This module is THE module of the ALICE."
+}
+set version 1.0
+module-whatis "ALICE versions module for the ALICE"
+set base_path $WORK_DIR/$ARCHITECTURE
+setenv BASEDIR \$base_path
+set osname [uname sysname]
+set osarchitecture [uname machine]
+EOF
+popd
+
+echo "==> Available modules"
+$MODULECMD avail
+
+if [[ "$*" == '' ]]; then
+  echo ''
+  echo "==> Use $0 [module1 [module2...] to load modules."
+  false
+fi
+
+echo "==> Loading $*"
+eval $($MODULECMD add $*)
+
+echo "==> Loaded modules"
+$MODULECMD list
+
+echo "==> Type exit to exit the environment"
+export PS1="[Modules: $*] \w \$> "
+exec bash --norc -i

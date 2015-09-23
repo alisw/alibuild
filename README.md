@@ -241,3 +241,20 @@ show all the dependencies recursively from a specific package (for instance,
     alibuild/aliDeps ThePEG
 
 Use `-h` or `--help` for more options.
+
+## Modulefiles
+
+ALICE software is loading the environment from CVMFS by means of
+[Modulefiles](http://modules.sourceforge.net/). To test the environment loaded
+by those modulefiles, export your working directory and architecture, then run
+the `aliModules` script:
+
+    export WORK_DIR=/path/containing/sw
+    export ARCHITECTURE=slc5_x86-64
+    alibuild/aliModules [module1 [module2...]]
+
+If you do not specify any module, the list of available ones is printed. You
+will enter a shell which has the environment configured by Modulefiles.
+
+Note that you must have `modulecmd` on your system (on RedHat-based OSes it is
+the `environment-modules` package).
