@@ -1,0 +1,73 @@
+#!/bin/bash
+
+MIRROR=/build/mirror
+WORKAREA=/build/workarea/$NODE_NAME
+
+echo "=== ENVIRONMENT ==="
+env
+echo "=== /ENVIRONMENT ==="
+echo "Host: $(hostname)"
+lsb_release -a 2>/dev/null
+echo "uname: $(uname -a)"
+echo "Date: $(date)"
+
+set -e
+
+mkdir -p $WORKAREA
+
+echo "Mirror:"
+ls $MIRROR
+
+git clone https://github.com/alisw/ali-bot
+git clone -b $ALIBUILD_BRANCH https://github.com/$ALIBUILD_REPO/alibuild
+git clone -b $ALIDIST_BRANCH https://github.com/$ALIDIST_REPO/alidist
+
+for x in $OVERRIDE_TAGS; do
+  OVERRIDE_PACKAGE=$(echo $x | cut -f1 -d= | tr '[:upper:]' '[:lower:]')
+  OVERRIDE_TAG=$(echo $x | cut -f2 -d=)
+  perl -p -i -e "s|tag: .*|tag: $OVERRIDE_TAG|" alidist/$OVERRIDE_PACKAGE.sh
+done
+
+set +e
+
+RWOPT=''
+[[ "$PUBLISH_BUILDS" == true ]] && RWOPT='::rw'
+
+alibuild/aliBuild --reference-sources $MIRROR \
+                  --work-dir $WORKAREA \
+                  --remote-store rsync://repo.marathon.mesos/store/$RWOPT \
+                  --debug \
+                  -a $ARCHITECTURE \
+                  -j 16 \
+                  build $PACKAGE_NAME
+BUILDERROR=$?
+
+echo "Disk usage of work area:"
+df -h $WORKAREA
+rm -rf $WORKAREA
+echo "Build terminated with exitcode $BUILDERROR and build area cleaned."
+
+set -e
+
+[[ $BUILDERROR != 0 ]] && exit $?
+
+echo ALIROOT_BUILD_NR=$BUILD_NUMBER >> results.props
+echo PACKAGE_NAME=$PACKAGE_NAME >> results.props
+
+ALIDIST_HASH=$(cd $WORKSPACE/alidist && git show-ref HEAD | cut -f1 -d\ )
+ALIBUILD_HASH=$(cd $WORKSPACE/alibuild && git show-ref HEAD | cut -f1 -d\ )
+
+case $PACKAGE_NAME in
+  aliroot*|zlib*)
+for x in gun ppbench; do
+cat << EOF > $x-tests.props
+ALIROOT_BUILD_NR=$BUILD_NUMBER
+PACKAGE_NAME=$PACKAGE_NAME
+ALIDIST_HASH=$ALIDIST_HASH
+ALIBUILD_HASH=$ALIBUILD_HASH
+TEST_TO_RUN=$x
+BUILD_DATE=$BUILD_DATE
+EOF
+done
+  ;;
+esac
