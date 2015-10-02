@@ -85,13 +85,13 @@ CACHED_TARBALL=%(cachedTarball)s
 #   the relocation script so that it takes into account the new location.
 if [[ "$CACHED_TARBALL" == "" && ! -f $BUILDROOT/log ]]; then
   set -o pipefail
-  bash -ex "$WORK_DIR/SPECS/$PKGNAME.sh" 2>&1 | tee "$BUILDROOT/log"
+  bash -ex "$WORK_DIR/SPECS/$ARCHITECTURE/$PKGNAME/$PKGVERSION-$PKGREVISION/$PKGNAME.sh" 2>&1 | tee "$BUILDROOT/log"
 elif [[ "$CACHED_TARBALL" == "" && $INCREMENTAL_BUILD_HASH != "0" ]]; then
   set -o pipefail
   (%(incremental_recipe)s) | tee -a "$BUILDROOT/log"
 elif [[ "$CACHED_TARBALL" == "" ]]; then
   set -o pipefail
-  bash -ex "$WORK_DIR/SPECS/$PKGNAME.sh" 2>&1 | tee "$BUILDROOT/log"
+  bash -ex "$WORK_DIR/SPECS/$ARCHITECTURE/$PKGNAME/$PKGVERSION-$PKGREVISION/$PKGNAME.sh" 2>&1 | tee "$BUILDROOT/log"
 else
   # Unpack the cached tarball in the $INSTALLROOT and remove the unrelocated
   # files.

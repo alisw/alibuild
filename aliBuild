@@ -10,6 +10,11 @@ from datetime import datetime
 def format(s, **kwds):
   return s % kwds
 
+def writeAll(fn, txt):
+  f = open(fn, "w")
+  f.write(txt)
+  f.close()
+
 def star():
   return basename(sys.argv[0]).replace("Build", "")
 
@@ -203,8 +208,6 @@ if __name__ == "__main__":
       packages.append(require)
       realRequires.append(require)
     spec["requires"] = realRequires
-      
-    open("%s/SPECS/%s.sh" % (workDir, spec["package"]), "w").write(spec["recipe"])
 
   # Do topological sort to have the correct build order even in the 
   # case of non-tree like dependencies..
@@ -597,20 +600,19 @@ if __name__ == "__main__":
                  referenceStatement=referenceStatement,
                  cachedTarball=spec["cachedTarball"],
                  gzip=gzip())
-    scriptName = "%s/SPECS/%s/%s/%s-%s/build.sh" % (workDir,
-                                                    args.architecture,
-                                                    spec["package"],
-                                                    spec["version"],
-                                                    spec["revision"])
-    err, out = getstatusoutput("mkdir -p %s" % dirname(scriptName))
-    script = open(scriptName, "w")
-    script.write(cmd)
-    script.flush()
-    script.close()
+
+    scriptDir = "%s/SPECS/%s/%s/%s-%s" % (workDir,
+                                          args.architecture,
+                                          spec["package"],
+                                          spec["version"],
+                                          spec["revision"])
+    err, out = getstatusoutput("mkdir -p %s" % scriptDir)
+    writeAll("%s/build.sh" % scriptDir, cmd)
+    writeAll("%s/%s.sh" % (scriptDir, spec["package"]), spec["recipe"])
 
     print "Building %s@%s" % (spec["package"], spec["version"])
-    err = execute("/bin/bash -e -x %s 2>&1" % scriptName)
-    dieOnError(err, "Error while executing %s" % scriptName)
+    err = execute("/bin/bash -e -x %s/build.sh 2>&1" % scriptDir)
+    dieOnError(err, "Error while executing %s/build.sh" % scriptDir)
     if args.writeStore:
       tarballNameWithRev = format("%(package)s-%(version)s-%(revision)s.%(architecture)s.tar.gz",
                                   architecture=args.architecture,
