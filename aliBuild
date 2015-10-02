@@ -118,8 +118,12 @@ if __name__ == "__main__":
   parser.add_argument("pkgname")
   parser.add_argument("--config-dir", "-c", dest="configDir", default="%sdist" % star())
   parser.add_argument("--devel", dest="devel", default=[])
+  parser.add_argument("--docker", dest="docker", action="store_true", default=False)
   parser.add_argument("--work-dir", "-w", dest="workDir", default="sw")
   parser.add_argument("--architecture", "-a", dest="architecture", required=True)
+  parser.add_argument("-e", dest="environment", action='append', default=[])
+  parser.add_argument("-v", dest="volumes", action='append', default=[], 
+                      help="Specify volumes to be used in Docker")
   parser.add_argument("--jobs", "-j", dest="jobs", default=1)
   parser.add_argument("--reference-sources", dest="referenceSources", default="sw/MIRROR")
   parser.add_argument("--remote-store", dest="remoteStore", default="",
@@ -140,6 +144,12 @@ if __name__ == "__main__":
     logger_handler.setFormatter(logging.Formatter('%(levelname)s: %(message)s'))
   else:
     logger.setLevel(logging.INFO)
+  
+  # The docker image is given by the first part of the architecture we want to
+  # build for.
+  dockerImage = ""
+  if args.docker:
+    dockerImage = "alisw/%s-builder" % args.architecture.split("_")[0]
 
   rsyncOptions = ""
   if args.remoteStore.startswith("ssh://"):
@@ -565,7 +575,7 @@ if __name__ == "__main__":
     # The actual build script.
     referenceStatement = ""
     if "reference" in spec:
-      referenceStatement = "export GIT_REFERENCE=%s" % spec["reference"]
+      referenceStatement = "export GIT_REFERENCE=${GIT_REFERENCE_OVERRIDE:-%s}/%s" % (dirname(spec["reference"]), basename(spec["reference"]))
 
     debug(spec)
 
@@ -579,6 +589,11 @@ if __name__ == "__main__":
     commit_hash = spec["commit_hash"]
     if spec["tag"] != spec["commit_hash"]:
       commit_hash = spec["commit_hash"][0:10]
+
+    # Split the source in two parts, sourceDir and sourceName.  This is done so
+    # that when we use Docker we can replace sourceDir with the correct
+    # container path, if required.  No changes for what concerns the standard
+    # bash builds, though.
     cmd = format(cmd_raw,
                  dependencies=dependencies,
                  dependenciesInit=dependenciesInit,
@@ -593,7 +608,8 @@ if __name__ == "__main__":
                  revision=spec["revision"],
                  architecture=args.architecture,
                  jobs=args.jobs,
-                 source=source,
+                 sourceDir=source and (dirname(source) + "/") or "",
+                 sourceName=source and basename(source) or "",
                  write_repo=spec.get("write_repo", source),
                  tag=spec["tag"],
                  commit_hash=commit_hash,
@@ -611,8 +627,52 @@ if __name__ == "__main__":
     writeAll("%s/%s.sh" % (scriptDir, spec["package"]), spec["recipe"])
 
     print "Building %s@%s" % (spec["package"], spec["version"])
-    err = execute("/bin/bash -e -x %s/build.sh 2>&1" % scriptDir)
+    # In case the --docker options is passed, we setup a docker container which
+    # will perform the actual build. Otherwise build as usual using bash.
+    if dockerImage:
+      additionalEnv = ""
+      additionalVolumes = ""
+      develVolumes = ""
+      mirrorVolume = "reference" in spec and " -v %s:/mirror" % dirname(spec["reference"]) or ""
+      overrideSource = source.startswith("/") and "-e SOURCE0_DIR_OVERRIDE=/" or ""
+
+      for devel in args.devel:
+        develVolumes += "-v $PWD/`readlink %s || echo %s`:/%s:ro" % (devel, devel, devel)
+      for env in args.environment:
+        additionalEnv = "-e %s" % env
+      for volume in args.volumes:
+        additionalVolumes = "-v %s" % volume
+      dockerWrapper = format("docker run --rm -it"
+              " -v %(workdir)s:/sw"
+              " -v %(scriptDir)s/build.sh:/build.sh:ro"
+              " %(mirrorVolume)s"
+              " %(develVolumes)s"
+              " %(additionalEnv)s"
+              " %(additionalVolumes)s"
+              " -e ARCHITECTURE=%(architecture)s"
+              " -e GIT_REFERENCE_OVERRIDE=/mirror"
+              " -e JOBS=%(jobs)s"
+              " %(overrideSource)s"
+              " -e WORK_DIR_OVERRIDE=/sw"
+              " %(image)s"
+              " /bin/bash -e -x /build.sh",
+              additionalEnv=additionalEnv,
+              additionalVolumes=additionalVolumes,
+              architecture=args.architecture,
+              develVolumes=develVolumes,
+              workdir=abspath(args.workDir),
+              image=dockerImage,
+              mirrorVolume=mirrorVolume,
+              jobs=args.jobs,
+              overrideSource=overrideSource,
+              scriptDir=scriptDir)
+      debug(dockerWrapper)
+      err = execute(dockerWrapper)
+    else:
+      err = execute("/bin/bash -e -x %s/build.sh 2>&1" % scriptDir)
+
     dieOnError(err, "Error while executing %s/build.sh" % scriptDir)
+
     if args.writeStore:
       tarballNameWithRev = format("%(package)s-%(version)s-%(revision)s.%(architecture)s.tar.gz",
                                   architecture=args.architecture,
