@@ -227,6 +227,7 @@ build are done) and will be executed directly in $BUILDDIR, only recompiled
 what changed. Notice that if this is the case the incremental recipe will always
 be executed.
 
+
 ## Dependency graph
 
 Assuming you are in a directory containing `alibuild` and `alidist`, you can
@@ -241,6 +242,7 @@ show all the dependencies recursively from a specific package (for instance,
     alibuild/aliDeps ThePEG
 
 Use `-h` or `--help` for more options.
+
 
 ## Modulefiles
 
@@ -258,3 +260,25 @@ will enter a shell which has the environment configured by Modulefiles.
 
 Note that you must have `modulecmd` on your system (on RedHat-based OSes it is
 the `environment-modules` package).
+
+### Running in Docker
+
+Very often one needs to run on a platform which is different from
+the one being used for development. The common use case is that
+development happens on a Mac while production runs on some older Linux
+distribution like SLC5 or SLC6. In order to improve the experience
+of cross platform development aliBuild now offers the ability to run
+in [Docker](http://docker.io) via the `--docker` option. When it is
+specified the first part of the architecture will be used to construct
+the name of the docker container to be used for the build and the build
+itself will be performed inside that container. For example if you
+specify:
+
+```bash
+alibuild --docker -a slc7_x86-64 build ROOT
+```
+
+the build itself will happen inside the alisw/slc7-builder Docker
+container. Environment variables can be passed to docker by specifying
+them with the `-e` option. Extra volumes can be specified with the -v
+option using the same syntax used by Docker.
