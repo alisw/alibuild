@@ -660,7 +660,7 @@ if __name__ == "__main__":
               additionalVolumes=additionalVolumes,
               architecture=args.architecture,
               develVolumes=develVolumes,
-              workdir=args.workDir,
+              workdir=abspath(args.workDir),
               image=dockerImage,
               mirrorVolume=mirrorVolume,
               jobs=args.jobs,
