@@ -72,7 +72,7 @@ def updateReferenceRepos(referenceSources, p, spec):
   spec["reference"] = referenceRepo
 
 def getDirectoryHash(d):
-  err, out = getstatusoutput("GIT_DIR=%s/.git git show-ref HEAD | cut -f1 -d\ " % d)
+  err, out = getstatusoutput("GIT_DIR=%s/.git git rev-parse HEAD" % d)
   dieOnError(err, "Impossible to find reference for %s " % d)
   return out
 
