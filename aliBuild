@@ -112,6 +112,12 @@ def createDistLinks(spec, args, repoType, requiresType):
                  t=target)
     execute(cmd)
 
+def filterByArchitecture(arch, requires):
+  for r in requires:
+    require, matcher = ":" in r and r.split(":", 1) or (r, ".*")
+    if re.match(matcher, arch):
+      yield require
+
 if __name__ == "__main__":
   parser = argparse.ArgumentParser()
   parser.add_argument("action")
@@ -198,8 +204,11 @@ if __name__ == "__main__":
     header, recipe = d.split("---", 1)
     spec = yaml.safe_load(header)
     # For the moment we treat build_requires just as requires.
-    spec["runtime_requires"] = spec.get("requires", [])
-    spec["requires"] = spec["runtime_requires"] + spec.get("build_requires", [])
+    fn = lambda what: filterByArchitecture(args.architecture, spec.get(what, []))
+    spec["requires"] = [x for x in fn("requires")]
+    spec["build_requires"] = [x for x in fn("build_requires")]
+    spec["runtime_requires"] = spec["requires"]
+    spec["requires"] = spec["runtime_requires"] + spec["build_requires"]
     # Check that version is a string
     dieOnError(not isinstance(spec["version"], basestring),
                "In recipe \"%s\": version must be a string" % p)
@@ -207,18 +216,7 @@ if __name__ == "__main__":
     spec["version"] = spec["version"].replace("/", "_")
     spec["recipe"] = recipe.strip("\n")
     specs[spec["package"]] = spec
-    realRequires = []
-    for require in spec.get("requires", []):
-      matcher = ".*"
-      if ":" in require:
-        require, matcher = require.split(":", 1)
-      if not re.match(matcher, args.architecture):
-        debug("Not appending %s as a requirement" % require)
-        continue
-      debug("appending %s as a requirement" % require)
-      packages.append(require)
-      realRequires.append(require)
-    spec["requires"] = realRequires
+    packages += spec["requires"]
 
   # Do topological sort to have the correct build order even in the 
   # case of non-tree like dependencies..
