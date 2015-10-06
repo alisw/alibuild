@@ -3,18 +3,17 @@
 # Build script for %(pkgname)s -- automatically generated
 
 set -e
-export WORK_DIR="%(workDir)s"
+export WORK_DIR="${WORK_DIR_OVERRIDE:-%(workDir)s}"
 
 # From our dependencies
 %(dependencies)s
 
-export CONFIG_DIR="%(configDir)s"
 export PKGNAME="%(pkgname)s"
 export PKGHASH="%(hash)s"
 export PKGVERSION="%(version)s"
 export PKGREVISION="%(revision)s"
 export ARCHITECTURE="%(architecture)s"
-export SOURCE0="%(source)s"
+export SOURCE0="${SOURCE0_DIR_OVERRIDE:-%(sourceDir)s}%(sourceName)s"
 export GIT_TAG="%(tag)s"
 export JOBS=${JOBS-%(jobs)s}
 export PKGPATH=${ARCHITECTURE}/${PKGNAME}/${PKGVERSION}-${PKGREVISION}
