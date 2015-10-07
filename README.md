@@ -69,6 +69,8 @@ The following entries are optional in the header:
     that you can easily point to the actual sources used by the software.
   - `tag`: tag in the above mentioned repository which points to the software
     to be built.
+  - `tag_basename`: if the tag resembles a path, e.g. `a/b/c`, returns the 
+    last part of the path, `c` in this case.
   - `env`: dictionary whose key-value pairs are environment variables to be set,
     *e.g.*:
 
