@@ -138,9 +138,15 @@ if __name__ == "__main__":
   parser.add_argument("--write-store", dest="writeStore", default="",
                       help="Where to upload the built packages for reuse."
                            "Use ssh:// in front for remote store.")
+  parser.add_argument("--disable", dest="disable", default=[],
+                      metavar="PACKAGE",
+                      help="Do not build PACKAGE and all its (unique) dependencies.")
+
   parser.add_argument("--debug", "-d", dest="debug", action="store_true", default=False)
   args = parser.parse_args()
 
+  if args.disable:
+    args.disable = args.disable.split(",")
   logger = logging.getLogger()
   logger_handler = logging.StreamHandler()
   logger.addHandler(logger_handler)
@@ -203,10 +209,12 @@ if __name__ == "__main__":
       dieOnError(True, str(e))
     header, recipe = d.split("---", 1)
     spec = yaml.safe_load(header)
+    if spec["package"] in args.disable:
+      continue
     # For the moment we treat build_requires just as requires.
     fn = lambda what: filterByArchitecture(args.architecture, spec.get(what, []))
-    spec["requires"] = [x for x in fn("requires")]
-    spec["build_requires"] = [x for x in fn("build_requires")]
+    spec["requires"] = [x for x in fn("requires") if not x in args.disable]
+    spec["build_requires"] = [x for x in fn("build_requires") if not x in args.disable]
     spec["runtime_requires"] = spec["requires"]
     spec["requires"] = spec["runtime_requires"] + spec["build_requires"]
     # Check that version is a string
@@ -236,7 +244,6 @@ if __name__ == "__main__":
     withPredecessor = set(nextVertex) - hasPredecessors
     L += [specs[m] for m in withPredecessor]
   buildOrder = [s["package"] for s in S]
-  debug("We will build packages in the following order: %s", " ".join(buildOrder))
 
   # Date fields to substitute: they are zero-padded
   now = datetime.now()
@@ -382,6 +389,8 @@ if __name__ == "__main__":
       todo += requires
     spec["full_requires"] = set(spec["full_requires"])
     spec["full_runtime_requires"] = set(spec["full_runtime_requires"])
+
+  debug("We will build packages in the following order: %s", " ".join(buildOrder))
 
   # We now iterate on all the packages, making sure we build correctly every
   # single one of them. This is done this way so that the second time we run we
