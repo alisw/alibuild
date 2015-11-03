@@ -654,7 +654,7 @@ if __name__ == "__main__":
       overrideSource = source.startswith("/") and "-e SOURCE0_DIR_OVERRIDE=/" or ""
 
       for devel in args.devel:
-        develVolumes += "-v $PWD/`readlink %s || echo %s`:/%s:ro" % (devel, devel, devel)
+        develVolumes += " -v $PWD/`readlink %s || echo %s`:/%s:ro " % (devel, devel, devel)
       for env in args.environment:
         additionalEnv = "-e %s" % env
       for volume in args.volumes:
