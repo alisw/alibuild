@@ -12,6 +12,11 @@ export PKGNAME="%(pkgname)s"
 export PKGHASH="%(hash)s"
 export PKGVERSION="%(version)s"
 export PKGREVISION="%(revision)s"
+
+export PKG_NAME="$PKGNAME"
+export PKG_VERSION="$PKGVERSION"
+export PKG_BUILDNUM="$PKGREVISION"
+
 export ARCHITECTURE="%(architecture)s"
 export SOURCE0="${SOURCE0_DIR_OVERRIDE:-%(sourceDir)s}%(sourceName)s"
 export GIT_TAG="%(tag)s"
