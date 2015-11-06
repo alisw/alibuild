@@ -632,6 +632,9 @@ if __name__ == "__main__":
                  commit_hash=commit_hash,
                  referenceStatement=referenceStatement,
                  cachedTarball=spec["cachedTarball"],
+                 requires=" ".join(spec["requires"]),
+                 build_requires=" ".join(spec["build_requires"]),
+                 runtime_requires=" ".join(spec["runtime_requires"]),
                  gzip=gzip())
 
     scriptDir = "%s/SPECS/%s/%s/%s-%s" % (workDir,
