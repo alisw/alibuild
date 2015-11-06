@@ -153,6 +153,11 @@ Some environment variables are made available to the script.
  - `BUILD_ROOT`: it contains `BUILDDIR` and the logfile for the build
  - `CONFIG_DIR`: directory containing all the build recipes.
  - `SOURCEDIR`: where the sources are cloned.
+ - `REQUIRES`: space-separated list of all dependencies, both runtime and build
+   only.
+ - `BUILD_REQUIRES`: space-separated list of all build dependencies, not needed
+   at runtime.
+ - `RUNTIME_REQUIRES`: space-separated list of all runtime dependencies only.
 
 For each dependency already built, the corresponding enviornment file is loaded.
 This will include, apart from custom variables and the usual `PATH` and library
