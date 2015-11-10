@@ -19,17 +19,17 @@ find $WORK_DIR/$ARCHITECTURE -name modulefiles | while read FILE; do
   PKGVER=$(basename $(cd $FILE/../..;pwd))
   PKGNAME=$(basename $(cd $FILE/../../..;pwd))
   mkdir -p $PKGNAME
-  cp $FILE/$PKGNAME $PKGNAME/$PKGVER
+  cp $FILE/$PKGNAME $PKGNAME/$PKGVER 2> /dev/null || echo "WARNING: no modulefile for $PKGNAME/$PKGVER"
 done
 mkdir BASE
 cat > BASE/1.0 <<EOF
 #%Module1.0
 proc ModulesHelp { } {
   global version
-  puts stderr "This module is THE module of the ALICE."
+  puts stderr "Main ALICE module."
 }
 set version 1.0
-module-whatis "ALICE versions module for the ALICE"
+module-whatis "Main ALICE module."
 set base_path $WORK_DIR/$ARCHITECTURE
 setenv BASEDIR \$base_path
 set osname [uname sysname]
