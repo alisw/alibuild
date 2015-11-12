@@ -21,8 +21,11 @@ def execute(command):
   exitCode = popen.returncode
   return exitCode
 
-def deps(recipesDir, topPackage, outFile, transitiveRed):
+def deps(recipesDir, topPackage, outFile, buildRequires, transitiveRed):
   dot = {}
+  keys = [ "requires" ]
+  if buildRequires:
+    keys.append("build_requires")
   for p in glob("%s/*.sh" % recipesDir):
     debug(format("Reading file %(filename)s", filename=p))
     try:
@@ -33,8 +36,9 @@ def deps(recipesDir, topPackage, outFile, transitiveRed):
                    filename=p, type=type(e).__name__, msg=str(e)))
       sys.exit(1)
     dot[name] = dot.get(name, [])
-    for d in recipe.get("requires", []):
-      dot[name].append(d.split(":")[0])
+    for k in keys:
+      for d in recipe.get(k, []):
+        dot[name].append(d.split(":")[0])
 
   selected = None
   if topPackage != "all":
@@ -78,6 +82,8 @@ def main():
                       help="Output file (PDF format)")
   parser.add_argument("--debug", "-d", dest="debug", action="store_true", default=False,
                       help="Debug output")
+  parser.add_argument("--build-requires", "-b", dest="buildRequires", action="store_true",
+                      default=False, help="Debug output")
   parser.add_argument("--neat", "-n", dest="neat", action="store_true", default=False,
                       help="Neat graph with transitive reduction")
   args = parser.parse_args()
@@ -93,6 +99,7 @@ def main():
   if not deps(recipesDir=args.distDir,
               topPackage=args.topPackage,
               outFile=args.outFile,
+              buildRequires=args.buildRequires,
               transitiveRed=args.neat):
     sys.exit(1)
 
