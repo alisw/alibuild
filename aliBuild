@@ -141,8 +141,6 @@ if __name__ == "__main__":
   parser.add_argument("--disable", dest="disable", default=[],
                       metavar="PACKAGE",
                       help="Do not build PACKAGE and all its (unique) dependencies.")
-  parser.add_argument("--defaults", dest="defaults", default="release",
-                      metavar="FILE", help="Specify which defaults to use")
 
   parser.add_argument("--debug", "-d", dest="debug", action="store_true", default=False)
   args = parser.parse_args()
@@ -216,9 +214,7 @@ if __name__ == "__main__":
     # For the moment we treat build_requires just as requires.
     fn = lambda what: filterByArchitecture(args.architecture, spec.get(what, []))
     spec["requires"] = [x for x in fn("requires") if not x in args.disable]
-    spec["build_requires"] = [x for x in fn("build_requires") if not x in args.disable] 
-    if spec["package"] != "defaults-" + args.defaults:
-      spec["build_requires"].append("defaults-" + args.defaults)
+    spec["build_requires"] = [x for x in fn("build_requires") if not x in args.disable]
     spec["runtime_requires"] = spec["requires"]
     spec["requires"] = spec["runtime_requires"] + spec["build_requires"]
     # Check that version is a string
@@ -291,13 +287,11 @@ if __name__ == "__main__":
 
     # Version may contain date params like tag, plus %(commit_hash)s,
     # %(short_hash)s and %(tag)s.
-    defaults_upper = args.defaults != "release" and "_" + args.defaults.upper().replace("-", "_") or ""
     spec["version"] = format(spec["version"],
                              commit_hash=spec["commit_hash"],
                              short_hash=spec["commit_hash"][0:10],
                              tag=spec["tag"],
                              tag_basename=basename(spec["tag"]),
-                             defaults_upper=defaults_upper,
                              **nowKwds)
 
   # Decide what is the main package we are building and at what commit.
@@ -565,7 +559,7 @@ if __name__ == "__main__":
     dieOnError(not isinstance(spec.get("env", {}), dict),
                "Tag `env' in %s should be a dict." % p)
     for key,value in spec.get("env", {}).iteritems():
-      environment += format("echo 'export %(key)s=\"%(value)s\"' >> $INSTALLROOT/etc/profile.d/init.sh\n",
+      environment += format("echo 'export %(key)s=%(value)s' >> $INSTALLROOT/etc/profile.d/init.sh\n",
                             key=key,
                             value=value)
     basePath = "%s_ROOT" % p.upper().replace("-", "_")
