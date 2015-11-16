@@ -289,3 +289,33 @@ the build itself will happen inside the alisw/slc7-builder Docker
 container. Environment variables can be passed to docker by specifying
 them with the `-e` option. Extra volumes can be specified with the -v
 option using the same syntax used by Docker.
+
+## Defaults
+
+aliBuild uses a special file, called "defaults-release.sh" which will
+be included as a build requires of any recipe. This is in general handy
+to specify common options like CXXFLAGS or dependencies. It's up to the
+recipe handle correctly the presence of these options.
+
+It is also possible to specify on the command line a different set of
+defaults, for example if you want to include code coverage. This is
+done via the `--defaults <default-name>` option which will change the
+defaults included to be `defaults-<default-name>.sh`.
+
+An extra variable `%(defaults_upper)s` can be used to form the version
+string accordingly. For example you could trigger a debug build by
+adding `--defaults debug`, which will pick up defaults-debug.sh, and
+then have:
+
+    version: %(tag)s%(defaults_upper)s
+
+in one of your recipes, which will expand to:
+
+    version: SOME_TAG_DEBUG
+
+If you want to add your own default, you should at least provide:
+
+- **CXXFLAGS**: the CXXFLAGS to use
+- **CFLAGS**: the CFLAGS to use
+- **LDFLAGS**: the LDFLAGS tos use
+- **CMAKE_BUILD_TYPE**: the build type which needs to be used by cmake projects
