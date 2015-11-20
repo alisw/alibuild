@@ -44,13 +44,16 @@ The following entries are mandatory in the header:
     of the package. Notice you can actually use some special formatting
     substitutions which will be replaced with the associated value on build.
     Valid substitutions are:
-      - ```%(commit_hash)s```
-      - ```%(short_hash)s```
-      - ```%(tag)s```
-      - ```%(tag_basename)s```
-      - ```%(year)s```
-      - ```%(month)s```
-      - ```%(hour)s```
+      - `%(commit_hash)s`
+      - `%(short_hash)s`
+      - `%(tag)s`
+      - `%(tag_basename)s`
+      - `%(year)s`
+      - `%(month)s`
+      - `%(day)s`
+      - `%(hour)s`
+
+    Month, day and hour are zero-padded to two digits.
 
 The following entries are optional in the header:
 
