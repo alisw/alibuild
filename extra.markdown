@@ -1,5 +1,5 @@
 ---
-title: aliBuild
+title: ALIBUILD
 subtitle: Extra tools
 layout: main
 ---
