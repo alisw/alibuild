@@ -1,5 +1,5 @@
 ---
-title: aliBuild
+title: ALIBUILD
 subtitle: Quick Start
 layout: main
 ---
