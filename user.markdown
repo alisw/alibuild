@@ -1,5 +1,5 @@
 ---
-title: alibuild
+title: ALIBUILD
 subtitle: User command line reference manual
 layout: main
 ---
