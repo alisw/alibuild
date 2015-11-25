@@ -1,5 +1,5 @@
 ---
-title: aliBuild
+title: ALIBUILD
 subtitle: Recipe reference manual
 layout: main
 ---
