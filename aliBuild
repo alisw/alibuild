@@ -211,6 +211,8 @@ if __name__ == "__main__":
       dieOnError(True, str(e))
     header, recipe = d.split("---", 1)
     spec = yaml.safe_load(header)
+    dieOnError(spec["package"].lower() != p.lower(),
+               "%s.sh has different package field: %s" % (p, spec["package"]))
     if spec["package"] in args.disable:
       continue
     # For the moment we treat build_requires just as requires.
