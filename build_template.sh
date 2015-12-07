@@ -3,6 +3,7 @@
 # Build script for %(pkgname)s -- automatically generated
 
 set -e
+set +h
 export WORK_DIR="${WORK_DIR_OVERRIDE:-%(workDir)s}"
 
 # From our dependencies
