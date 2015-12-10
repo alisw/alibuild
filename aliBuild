@@ -1,11 +1,65 @@
 #!/usr/bin/env python
-import os, sys, shutil, subprocess, logging, time, re, yaml, hashlib, argparse
+import os, logging, time, re, yaml, hashlib, argparse
+import sys, shutil, subprocess, socket
 from commands import getstatusoutput
 from os.path import basename, dirname, abspath, exists, realpath, join
-from os import makedirs, unlink, readlink
+from os import makedirs, unlink, readlink, getenv
 from glob import glob
-from logging import debug,error
 from datetime import datetime
+
+debug, error, riemannStream = (None, None, None)
+
+# A stream object which will end up pushing data to a riemann server
+class RiemannStream(object):
+  def __init__(self, host, port):
+    self.currentHost = socket.gethostname()
+    self.buffer = ""
+    self.state = None
+    self.enabled = False
+    self.attributes = {}
+    self.begin = time.time()
+    if not host:
+      return
+    try:
+      import bernhard
+      self.client = bernhard.Client(host=host, port=port)
+      self.client.send({'host': self.currentHost, 'state': 'ok', 'service': "alibuild started"})
+      self.enabled = True
+      print "Sending log data to %s:%s" % (host, port)
+    except Exception, e:
+      print "RIEMANN_HOST %s:%s specified, however there was a problem initialising:"  % (host, port)
+      print e
+
+  def setAttributes(self, **attributes):
+    self.attributes = attributes
+    self.begin = time.time()
+    self.attributes["start_time"] = self.begin
+
+  def setState(self, state):
+    self.state = state
+
+  def write(self, s):
+    self.buffer += s
+
+  def flush(self):
+    for x in self.buffer.strip("\n").split("\n"):
+      serviceLabel = ""
+      if "package" in self.attributes:
+        serviceLabel += " %(package)s@%(package_hash)s" % self.attributes
+      if "architecture" in self.attributes:
+        serviceLabel += " " + self.attributes["architecture"]
+      payload = {'host': self.currentHost,
+                 'service': 'alibuild_log%s' % serviceLabel,
+                 'hostname': self.currentHost,
+                 'description': x,
+                 'ttl': getenv("RIEMANN_TTL", 60),
+                 'metric': time.time() - self.begin
+                }
+      payload.update({'attributes': self.attributes})
+      if self.state:
+        payload['state'] = self.state
+      self.client.send(payload)
+    self.buffer = ""
 
 def format(s, **kwds):
   return s % kwds
@@ -31,9 +85,10 @@ def execute(command, printer=debug):
   exitCode = popen.returncode
   return exitCode
 
-def dieOnError(error, msg):
-  if error:
-    print msg
+def dieOnError(err, msg):
+  if err:
+    riemannStream.setState('critical')
+    error(msg)
     sys.exit(1)
 
 def updateReferenceRepos(referenceSources, p, spec):
@@ -149,7 +204,7 @@ if __name__ == "__main__":
 
   if args.disable:
     args.disable = args.disable.split(",")
-  logger = logging.getLogger()
+  logger = logging.getLogger('alibuild')
   logger_handler = logging.StreamHandler()
   logger.addHandler(logger_handler)
 
@@ -158,6 +213,16 @@ if __name__ == "__main__":
     logger_handler.setFormatter(logging.Formatter('%(levelname)s: %(message)s'))
   else:
     logger.setLevel(logging.INFO)
+
+  debug = logger.debug
+  error = logger.error
+
+  riemannStream = RiemannStream(host=getenv("RIEMANN_HOST"),
+                                port=getenv("RIEMANN_PORT", "5555"))
+  # If the RiemannStreamer can be used, we add it to those use during
+  # printout.
+  if riemannStream.enabled:
+    logger.addHandler(logging.StreamHandler(stream=riemannStream))
   
   # The docker image is given by the first part of the architecture we want to
   # build for.
@@ -414,6 +479,11 @@ if __name__ == "__main__":
     # Since we can execute this multiple times for a given package, in order to
     # ensure consistency, we need to reset things and make them pristine.
     spec.pop("revision", None)
+    riemannStream.setAttributes(package = spec["package"],
+                                package_hash = spec["version"],
+                                architecture = args.architecture,
+                                defaults = args.defaults)
+    riemannStream.setState("warning")
 
     debug("Updating from tarballs")
     # If we arrived here it really means we have a tarball which was created
@@ -507,6 +577,7 @@ if __name__ == "__main__":
       # If we get here, we know we are in sync with whatever remote store.  We
       # can therefore create a directory which contains all the packages which
       # were used to compile this one.
+      riemannStream.setState('ok')
       debug("Package %s was correctly compiled. Moving to next one." % spec["package"])
       # If using incremental builds, next time we execute the script we need to remove
       # the placeholders which avoid rebuilds.
