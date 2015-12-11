@@ -222,7 +222,7 @@ if __name__ == "__main__":
   # If the RiemannStreamer can be used, we add it to those use during
   # printout.
   if riemannStream.enabled:
-    logger.addHandler(logging.StreamHandler(stream=riemannStream))
+    logger.addHandler(logging.StreamHandler(riemannStream))
   
   # The docker image is given by the first part of the architecture we want to
   # build for.
