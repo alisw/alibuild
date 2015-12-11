@@ -139,3 +139,13 @@ If you want to add your own default, you should at least provide:
 - **CFLAGS**: the CFLAGS to use
 - **LDFLAGS**: the LDFLAGS tos use
 - **CMAKE_BUILD_TYPE**: the build type which needs to be used by cmake projects
+
+## Monitoring builds with Riemann
+
+aliBuild comes with support for pushing every single line produced by
+the output to a [Riemann](https://riemann.io) instance. This can be
+enabled by setting the two environment variables:
+
+- `RIEMANN_HOST`: the hostname Riemann server you want to push your data to, defaults 
+  to `localhost`.
+- `RIEMANN_PORT`: the port the Riemann server is listening at, defaults to 5555.
