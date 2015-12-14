@@ -625,9 +625,9 @@ if __name__ == "__main__":
         "revision": depSpec["revision"],
         "bigpackage": dep.upper().replace("-", "_")
       }
-      dependencies += format("source \"$WORK_DIR/%(architecture)s/%(package)s/%(version)s-%(revision)s/etc/profile.d/init.sh\"\n",
+      dependencies += format("[ \"X$%(bigpackage)s_VERSION\" = X  ] && source \"$WORK_DIR/%(architecture)s/%(package)s/%(version)s-%(revision)s/etc/profile.d/init.sh\"\n",
                              **depInfo)
-      dependenciesInit += format('echo source \${WORK_DIR}/%(architecture)s/%(package)s/%(version)s-%(revision)s/etc/profile.d/init.sh >> \"$INSTALLROOT/etc/profile.d/init.sh\"\n',
+      dependenciesInit += format('echo [ \\\"X\$%(bigpackage)s_VERSION\\\" = X ] \&\& source \${WORK_DIR}/%(architecture)s/%(package)s/%(version)s-%(revision)s/etc/profile.d/init.sh >> \"$INSTALLROOT/etc/profile.d/init.sh\"\n',
                              **depInfo)
     # Generate the part which creates the environment for the package.
     # This can be either variable set via the "env" keyword in the metadata
