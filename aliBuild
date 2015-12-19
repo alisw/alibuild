@@ -178,7 +178,8 @@ if __name__ == "__main__":
   parser.add_argument("action")
   parser.add_argument("pkgname")
   parser.add_argument("--config-dir", "-c", dest="configDir", default="%sdist" % star())
-  parser.add_argument("--devel", dest="devel", default=[])
+  parser.add_argument("--no-local", dest="noDevel", default=[],
+                      help="Do not pick up the following packages from a local checkout.")
   parser.add_argument("--docker", dest="docker", action="store_true", default=False)
   parser.add_argument("--work-dir", "-w", dest="workDir", default="sw")
   parser.add_argument("--architecture", "-a", dest="architecture", required=True)
@@ -241,11 +242,10 @@ if __name__ == "__main__":
     args.remoteStore = args.remoteStore[0:-4]
     args.writeStore = args.remoteStore
 
-  if args.devel:
-    args.devel = args.devel.split(",")
-    print "Write store disabled since --devel option passed."
-    print "Development packages: %s" % " ".join(args.devel)
-    args.writeStore = ""
+
+  if args.noDevel:
+    args.noDevel = args.noDevel.split(",")
+
 
   # Setup build environment.
   if not args.action == "build":
@@ -322,14 +322,23 @@ if __name__ == "__main__":
               "month": str(now.month).zfill(2),
               "day": str(now.day).zfill(2),
               "hour": str(now.hour).zfill(2) }
-  
+
+  # Check if any of the packages can be picked up from a local checkout
+  develCandidates = [basename(d) for d in glob("*") if os.path.isdir(d)]
+  develPkgs = [p for p in buildOrder
+               if p in develCandidates and p not in args.noDevel]
+  if develPkgs:
+    print "Write store disabled since some packages will be picked up from local checkout."
+    print "Local packages: %s" % " ".join(develPkgs)
+    args.writeStore = ""
+
   # Resolve the tag to the actual commit ref, so that
   for p in buildOrder:
     spec = specs[p]
     spec["commit_hash"] = "0"
     if "source" in spec:
       # Replace source with local one if we are in development mode.
-      if spec["package"] in args.devel:
+      if spec["package"] in develPkgs:
         spec["source"] = join(os.getcwd(), spec["package"])
 
       cmd = format("git ls-remote --heads %(source)s",
@@ -341,11 +350,11 @@ if __name__ == "__main__":
       # By default we assume tag is a commit hash.
       spec["commit_hash"] = spec["tag"]
       for l in out.split("\n"):
-        if l.endswith("refs/heads/%s" % spec["tag"]) or spec["package"] in args.devel:
+        if l.endswith("refs/heads/%s" % spec["tag"]) or spec["package"] in develPkgs:
           spec["commit_hash"] = l.split("\t", 1)[0]
           # We are in development mode, we need to rebuild if the commit hash
           # is different and if there are extra changes on to.
-          if spec["package"] in args.devel:
+          if spec["package"] in develPkgs:
             cmd = format("cd %(source)s ; git diff -r HEAD | sha1sum",
                          source = spec["source"])
             debug(cmd)
@@ -416,11 +425,11 @@ if __name__ == "__main__":
       h.update(specs[dep]["hash"])
     if bool(spec.get("force_rebuild", False)):
       h.update(str(time.time()))
-    if spec["package"] in args.devel and "incremental_recipe" in spec:
+    if spec["package"] in develPkgs and "incremental_recipe" in spec:
       h.update(spec["incremental_recipe"])
       incremental_hash = hashlib.sha1(spec["incremental_recipe"]).hexdigest()
       spec["incremental_hash"] = "INCREMENTAL_BUILD_HASH=%s" % incremental_hash
-    elif p in args.devel:
+    elif p in develPkgs:
       h.update(spec.get("devel_hash"))
     spec["hash"] = h.hexdigest()
     debug("Hash for recipe %s is %s" % (p, spec["hash"]))
@@ -545,7 +554,7 @@ if __name__ == "__main__":
       # and we do not need to build it.
       if h == spec["hash"]:
         spec["revision"] = revision
-        if spec["package"] in args.devel and "incremental_recipe" in spec:
+        if spec["package"] in develPkgs and "incremental_recipe" in spec:
           spec["obsolete_tarball"] = d
         else:
           print "Package %s with hash %s is already found in %s. Not building." % (p, h, d)
@@ -581,7 +590,7 @@ if __name__ == "__main__":
       debug("Package %s was correctly compiled. Moving to next one." % spec["package"])
       # If using incremental builds, next time we execute the script we need to remove
       # the placeholders which avoid rebuilds.
-      if spec["package"] in args.devel and "incremental_recipe" in spec:
+      if spec["package"] in develPkgs and "incremental_recipe" in spec:
         unlink(hashFile)
       if "obsolete_tarball" in spec:
         unlink(realpath(spec["obsolete_tarball"]))
@@ -601,7 +610,7 @@ if __name__ == "__main__":
     #        It does not really matter that the symlinks are ok at this point
     #        as I only used the tarballs as reusable binary blobs.
     spec["cachedTarball"] = ""
-    if not spec["package"] in args.devel:
+    if not spec["package"] in develPkgs:
       spec["cachedTarball"] = (glob("%s/*" % spec["tarballHashDir"]) or [""])[0]
       debug(spec["cachedTarball"] and
             "Found tarball in %s" % spec["cachedTarball"] or
@@ -735,7 +744,7 @@ if __name__ == "__main__":
       mirrorVolume = "reference" in spec and " -v %s:/mirror" % dirname(spec["reference"]) or ""
       overrideSource = source.startswith("/") and "-e SOURCE0_DIR_OVERRIDE=/" or ""
 
-      for devel in args.devel:
+      for devel in develPkgs:
         develVolumes += " -v $PWD/`readlink %s || echo %s`:/%s:ro " % (devel, devel, devel)
       for env in args.environment:
         additionalEnv = "-e %s" % env

@@ -199,19 +199,23 @@ Support for web based repository is foreseen, but not yet implemented.
 One of the use cases we want to cover is the ability to develop external
 packages without having to go through an commit - push - pull cycle.
 
-In order to do so, you can use the `--devel <package>` where package is a
-package which you have already checked out locally at the same level as
-alibuild and alidist. For example, if you want to build O2 while having the
-ability to modify ROOT, you can do the following:
+In order to do so, you can simply checkout one or more packages you want
+to at the same level as alibuild and alidist.
+
+For example, if you want to build O2 while having the ability to modify
+ROOT, you can do the following:
 
     git clone https://github.com/alisw/alibuild
     git clone https://github.com/alisw/alidist
-    git clone https://github.com/root-mirror/root
+    git clone https://github.com/root-mirror/root ROOT
     <modify files in root/>
-    alibuild/aliBuild ... --devel ROOT build O2
+    alibuild/aliBuild ... build O2
 
-the above will make sure the build will pick up your changes in the local
-directory. 
+The above will make sure the build will pick up your changes in the
+local directory rather than using the version specified in `alidist.sh`.
+Since sometimes this might not be the intended behavior you can
+selectively disable this by using the `--no-local <package>` option
+(e.g. `--no-local ROOT` in the above example).
 
 As a cherry on the cake, in case your recipe does not require any environment,
 you can even do:
