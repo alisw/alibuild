@@ -10,7 +10,7 @@ For a quick start introduction, please look [here](./quick.html).
 
     usage: aliBuild [-h] 
                     [--config-dir CONFIGDIR] 
-                    [--devel DEVEL] 
+                    [--no-local PACKAGE[,PACKAGE]] 
                     [--docker]
                     [--work-dir WORKDIR] 
                     --architecture ARCHITECTURE
@@ -52,18 +52,19 @@ Support for web based repository is foreseen, but not yet implemented.
 One of the use cases we want to cover is the ability to develop external
 packages without having to go through an commit - push - pull cycle.
 
-In order to do so, you can use the `--devel <package>` where package is a
-package which you have already checked out locally at the same level as
-alibuild and alidist. For example, if you want to build O2 while having the
-ability to modify ROOT, you can do the following:
+In order to do so, you can simply checkout the package you want to
+develop at the same level as alibuild and alidist.
+
+For example, if you want to build O2 while having the ability to modify
+ROOT, you can do the following:
 
     git clone https://github.com/alisw/alibuild
     git clone https://github.com/alisw/alidist
-    git clone https://github.com/root-mirror/root
-    <modify files in root/>
-    alibuild/aliBuild ... --devel ROOT build O2
+    git clone https://github.com/root-mirror/root ROOT
+    <modify files in ROOT/>
+    alibuild/aliBuild ... build O2
 
-the above will make sure the build will pick up your changes in the local
+The above will make sure the build will pick up your changes in the local
 directory. 
 
 As a cherry on the cake, in case your recipe does not require any environment,
@@ -74,8 +75,12 @@ you can even do:
 
 and it will correctly install everything in `sw/<arch>/ROOT/latest`.
 
-It's also important to notice that if you use the devel mode, you will not be
-able to write to any store and the generated tgz will be empty.
+It's also important to notice that if you use your own checkout of a
+package, you will not be able to write to any store and the generated
+tgz will be empty. 
+
+If you wish to temporary compile with the package as specified by
+alidist, you can use the `--no-local <PACKAGE>` option.
 
 ### Incremental builds
 
