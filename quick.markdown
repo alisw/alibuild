@@ -31,6 +31,7 @@ where:
   - `slc7_x86-64`: CERN Centos 7 and compatibles, on Intel / AMD x86-64.
   - `ubuntu1404_x86-64`: Ubuntu 1404 and compatibles, on Intel / AMD x86-64.
   - `osx_x86-64`: OSX, on Intel / AMD x86-64.
+  - `slc7_ppc64`: RHEL7 on POWER8 (LE only for now).
 
 - `<jobs>` is the maximum number of parallel processes to be used for building
   where possible.
