@@ -145,6 +145,25 @@ If you want to add your own default, you should at least provide:
 - **LDFLAGS**: the LDFLAGS tos use
 - **CMAKE_BUILD_TYPE**: the build type which needs to be used by cmake projects
 
+## Controlling which system packages are picked up
+
+When compiling, there is a number of packages which can be picked up
+from the system, and only if they are not found, do not have their
+devel part installed, or they are not considered good enough they are
+recompiled from scratch. A typical example is things like autotools,
+zlib or cmake which should be available on a standard developer machine
+and we rebuild them as last resort. In certain cases, to ensure full
+compatibility on what is done in production it might be desirable to
+always pick up our own version of the tools. This can be done by passing
+the `--no-system` option to alibuild. On the other hand, there might
+be cases in which you want to pick up not only basic tools, but also
+advanced ones like ROOT, Geant4, or Pythia from the system, either to
+save time or because you have a pre-existing setup which you do not want
+to touch. In this case you can use `--always-prefer-system` option which
+will try very hard to reuse as many system packages as possible (always
+checking they are actually compatible with the one used in the recipe).
+
+
 ## Monitoring builds with Riemann
 
 aliBuild comes with support for pushing every single line produced by
