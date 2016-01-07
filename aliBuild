@@ -199,6 +199,10 @@ if __name__ == "__main__":
                       help="Do not build PACKAGE and all its (unique) dependencies.")
   parser.add_argument("--defaults", dest="defaults", default="release",
                       metavar="FILE", help="Specify which defaults to use")
+  parser.add_argument("--always-prefer-system", dest="preferSystem", default=False,
+                      action="store_true", help="Always use system packages when compatible")
+  parser.add_argument("--no-system", dest="noSystem", default=False,
+                      action="store_true", help="Never use system packages")
 
   parser.add_argument("--debug", "-d", dest="debug", action="store_true", default=False)
   args = parser.parse_args()
@@ -278,8 +282,22 @@ if __name__ == "__main__":
     spec = yaml.safe_load(header)
     dieOnError(spec["package"].lower() != p.lower(),
                "%s.sh has different package field: %s" % (p, spec["package"]))
+    # If --prefer-system is passed or if prefer_system is set to
+    # true inside the recipe, use the script specified in the
+    # prefer_system_check stanza to see if we can use the system version
+    # of a tool.
+    if not args.noSystem and (args.preferSystem or re.match(spec.get("prefer_system", "(?!.*)"), args.architecture)):
+      cmd = spec.get("prefer_system_check", "false")
+      err, output = getstatusoutput(cmd.strip())
+      if not err:
+        print "Using package %s from the system as preferred choice." % spec["package"]
+        args.disable.append(spec["package"])
+      else:
+        print "System package %s cannot be used. Building our own copy." % spec["package"]
+
     if spec["package"] in args.disable:
       continue
+
     # For the moment we treat build_requires just as requires.
     fn = lambda what: filterByArchitecture(args.architecture, spec.get(what, []))
     spec["requires"] = [x for x in fn("requires") if not x in args.disable]
@@ -296,6 +314,10 @@ if __name__ == "__main__":
     spec["recipe"] = recipe.strip("\n")
     specs[spec["package"]] = spec
     packages += spec["requires"]
+
+  for x in specs.values():
+    x["requires"] = [r for r in x["requires"] if not r in args.disable]
+    x["build_requires"] = [r for r in x["build_requires"] if not r in args.disable]
 
   # Do topological sort to have the correct build order even in the 
   # case of non-tree like dependencies..
