@@ -21,7 +21,7 @@ def execute(command):
   exitCode = popen.returncode
   return exitCode
 
-def deps(recipesDir, topPackage, outFile, buildRequires, transitiveRed):
+def deps(recipesDir, topPackage, outFile, buildRequires, transitiveRed, disable):
   dot = {}
   keys = [ "requires" ]
   if buildRequires:
@@ -31,6 +31,9 @@ def deps(recipesDir, topPackage, outFile, buildRequires, transitiveRed):
     try:
       recipe = yaml.safe_load(open(p).read().split("---")[0])
       name = recipe["package"]
+      if name in disable:
+        debug("Ignoring %s, disabled explicitly" % name)
+        continue
     except Exception as e:
       error(format("Error reading recipe %(filename)s: %(type)s: %(msg)s",
                    filename=p, type=type(e).__name__, msg=str(e)))
@@ -38,7 +41,8 @@ def deps(recipesDir, topPackage, outFile, buildRequires, transitiveRed):
     dot[name] = dot.get(name, [])
     for k in keys:
       for d in recipe.get(k, []):
-        dot[name].append(d.split(":")[0])
+        d = d.split(":")[0]
+        d in disable or dot[name].append(d)
 
   selected = None
   if topPackage != "all":
@@ -49,7 +53,9 @@ def deps(recipesDir, topPackage, outFile, buildRequires, transitiveRed):
     olen = 0
     while len(selected) != olen:
       olen = len(selected)
-      selected += [ d for s in selected for d in dot[s] if not d in selected ]
+      selected += [ d
+                    for s in selected if s in dot
+                    for d in dot[s] if not d in selected ]
     selected.sort()
 
   with NamedTemporaryFile(delete=False) as fp:
@@ -86,8 +92,12 @@ def main():
                       default=False, help="Debug output")
   parser.add_argument("--neat", "-n", dest="neat", action="store_true", default=False,
                       help="Neat graph with transitive reduction")
+  parser.add_argument("--disable", dest="disable", default="",
+                      help="List of packages to ignore")
   args = parser.parse_args()
-  
+
+  args.disable = args.disable.split(",")
+
   logger = logging.getLogger()
   loggerHandler = logging.StreamHandler()
   logger.addHandler(loggerHandler)
@@ -96,12 +106,12 @@ def main():
   if args.debug: logger.setLevel(logging.DEBUG)
   else: logger.setLevel(logging.INFO)
 
-  if not deps(recipesDir=args.distDir,
-              topPackage=args.topPackage,
-              outFile=args.outFile,
-              buildRequires=args.buildRequires,
-              transitiveRed=args.neat):
-    sys.exit(1)
+  deps(recipesDir=args.distDir,
+       topPackage=args.topPackage,
+       outFile=args.outFile,
+       buildRequires=args.buildRequires,
+       transitiveRed=args.neat,
+       disable=args.disable) or sys.exit(1)
 
 if __name__ == "__main__":
   main()
