@@ -207,6 +207,9 @@ if __name__ == "__main__":
   parser.add_argument("--debug", "-d", dest="debug", action="store_true", default=False)
   args = parser.parse_args()
 
+  if args.preferSystem and args.noSystem:
+    parser.error("choose either --always-prefer-system or --no-system")
+
   if args.disable:
     args.disable = args.disable.split(",")
   logger = logging.getLogger('alibuild')
@@ -282,10 +285,9 @@ if __name__ == "__main__":
     spec = yaml.safe_load(header)
     dieOnError(spec["package"].lower() != p.lower(),
                "%s.sh has different package field: %s" % (p, spec["package"]))
-    # If --prefer-system is passed or if prefer_system is set to
-    # true inside the recipe, use the script specified in the
-    # prefer_system_check stanza to see if we can use the system version
-    # of a tool.
+    # If --always-prefer-system is passed or if prefer_system is set to true
+    # inside the recipe, use the script specified in the prefer_system_check
+    # stanza to see if we can use the system version of the package.
     if not args.noSystem and (args.preferSystem or re.match(spec.get("prefer_system", "(?!.*)"), args.architecture)):
       cmd = spec.get("prefer_system_check", "false")
       err, output = getstatusoutput(cmd.strip())
