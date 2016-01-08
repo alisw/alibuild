@@ -113,6 +113,15 @@ The following entries are optional in the header:
     that packages in this list are not included in the dependency graph
     produced by alideps.
   - `force_rebuild`: set it to `true` to force re-running the build recipe.
+  - `prefer_system_check`: a script which is used to determine whether
+    or not the system equivalent of the package can be used. See also
+    `prefer_system`. If the `--no-system` option is specified, our own
+    version of the tool is used.
+  - `prefer_system`: a regular expression for architectures which should
+    use the `prefer_system_check` by default to determine if the system
+    version of the tool can be used. In case the rule does not match the
+    architecture or it's not present, the system check is performed only
+    if `--always-prefer-system` option is provided.
 
 ### The body
 
