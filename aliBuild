@@ -210,6 +210,9 @@ if __name__ == "__main__":
   if args.preferSystem and args.noSystem:
     parser.error("choose either --always-prefer-system or --no-system")
 
+  if args.docker and args.architecture.startswith("osx"):
+    parser.error("cannot use `-a %s` and --docker" % args.architecture)
+
   if args.disable:
     args.disable = args.disable.split(",")
   logger = logging.getLogger('alibuild')
