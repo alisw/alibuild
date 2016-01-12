@@ -213,6 +213,9 @@ if __name__ == "__main__":
   if args.docker and args.architecture.startswith("osx"):
     parser.error("cannot use `-a %s` and --docker" % args.architecture)
 
+  if args.docker and getstatusoutput("which docker")[0]:
+    parser.error("cannot use --docker as docker executable is not found")
+
   if args.disable:
     args.disable = args.disable.split(",")
   logger = logging.getLogger('alibuild')
