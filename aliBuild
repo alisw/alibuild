@@ -322,6 +322,7 @@ if __name__ == "__main__":
   for x in specs.values():
     x["requires"] = [r for r in x["requires"] if not r in args.disable]
     x["build_requires"] = [r for r in x["build_requires"] if not r in args.disable]
+    x["runtime_requires"] = [r for r in x["build_requires"] if not r in args.disable]
 
   print "\n".join(["Using package %s from the system as preferred choice." % x for x in systemPackages])
   print "\n".join(["System package %s cannot be used. Building our own copy." % x for x in ownPackages])
