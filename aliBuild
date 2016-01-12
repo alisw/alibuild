@@ -273,6 +273,8 @@ if __name__ == "__main__":
                toolHash=getDirectoryHash(dirname(__file__)),
                distHash=getDirectoryHash(args.configDir)))
 
+  systemPackages = set()
+  ownPackages = set()
   while packages:
     p = packages.pop(0)
     if p in specs:
@@ -292,10 +294,10 @@ if __name__ == "__main__":
       cmd = spec.get("prefer_system_check", "false")
       err, output = getstatusoutput(cmd.strip())
       if not err:
-        print "Using package %s from the system as preferred choice." % spec["package"]
+        systemPackages.update([spec["package"]])
         args.disable.append(spec["package"])
       else:
-        print "System package %s cannot be used. Building our own copy." % spec["package"]
+        ownPackages.update([spec["package"]])
 
     if spec["package"] in args.disable:
       continue
@@ -320,6 +322,9 @@ if __name__ == "__main__":
   for x in specs.values():
     x["requires"] = [r for r in x["requires"] if not r in args.disable]
     x["build_requires"] = [r for r in x["build_requires"] if not r in args.disable]
+
+  print "\n".join(["Using package %s from the system as preferred choice." % x for x in systemPackages])
+  print "\n".join(["System package %s cannot be used. Building our own copy." % x for x in ownPackages])
 
   # Do topological sort to have the correct build order even in the 
   # case of non-tree like dependencies..
