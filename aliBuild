@@ -446,6 +446,9 @@ if __name__ == "__main__":
   # can always extract it from it.
   # If one of the special packages is in the list of packages to be built,
   # we use it as main package, rather than the last one.
+  if not buildOrder:
+    print "Nothing to be done."
+    exit(0)
   mainPackage = buildOrder[-1]
   MAIN_PACKAGES = ["aliroot", "aliphysics", "o2"]
   hasMainPackages = [x for x in reversed(buildOrder) 
