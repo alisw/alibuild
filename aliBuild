@@ -243,6 +243,9 @@ if __name__ == "__main__":
   parser.add_argument("--debug", "-d", dest="debug", action="store_true", default=False)
   args = parser.parse_args()
 
+  if args.remoteStore or args.writeStore:
+    args.noSystem = True
+  
   if not args.architecture:
     parser.error("cannot determine architecture."
                  " Please pass it explicitly.\n%s" % ARCHITECTURE_TABLE)
