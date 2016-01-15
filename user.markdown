@@ -13,7 +13,7 @@ For a quick start introduction, please look [here](./quick.html).
                     [--no-local PACKAGE[,PACKAGE]] 
                     [--docker]
                     [--work-dir WORKDIR] 
-                    --architecture ARCHITECTURE
+                    [-a / --architecture ARCHITECTURE]
                     [-e ENVIRONMENT] 
                     [-v VOLUMES] 
                     [--jobs JOBS]
