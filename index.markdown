@@ -12,4 +12,4 @@ Instant gratification on your [CERN Centos 7](http://linux.web.cern.ch/linux/cen
 
     git clone https://github.com/alisw/alibuild.git
     git clone https://github.com/alisw/alidist.git
-    alibuild/aliBuild -d -a slc7_x86-64 -j 16 build AliRoot
+    alibuild/aliBuild -d -j 16 build AliRoot
