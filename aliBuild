@@ -3,7 +3,7 @@ import os, logging, time, re, yaml, hashlib, argparse
 import sys, shutil, subprocess, socket
 from commands import getstatusoutput
 from os.path import basename, dirname, abspath, exists, realpath, join
-from os import makedirs, unlink, readlink, getenv
+from os import makedirs, unlink, readlink, getenv, rmdir
 from glob import glob
 from datetime import datetime
 
@@ -251,6 +251,8 @@ if __name__ == "__main__":
                      action="store_true", help="Do not check for valid architecture")
 
   parser.add_argument("--debug", "-d", dest="debug", action="store_true", default=False)
+  parser.add_argument("--no-auto-cleanup", help="Do not cleanup build by products automatically",
+                      dest="autoCleanup", action="store_false", default=True)
   args = parser.parse_args()
 
   if args.remoteStore or args.writeStore:
@@ -703,6 +705,27 @@ if __name__ == "__main__":
       createDistLinks(spec, args, "dist-runtime", "full_runtime_requires")
       buildOrder.pop(0)
       packageIterations = 0
+      # We can now delete the INSTALLROOT and BUILD directories,
+      # assuming the package is not a development one.
+      if not spec["package"] in develPkgs and args.autoCleanup:
+        shutil.rmtree(format("%(w)s/BUILD/%(h)s", w=workDir,
+                                                  h=spec["hash"]),
+                      True)
+        shutil.rmtree(format("%(w)s/INSTALLROOT/%(h)s", w=workDir,
+                                                        h=spec["hash"]),
+                      True)
+        try:
+          unlink(format("%(w)s/BUILD/%(p)s-latest",
+                 w=workDir, p=spec["package"]))
+        except:
+          pass
+        try:
+          rmdir(format("%(w)s/BUILD",
+                w=workDir, p=spec["package"]))
+          rmdir(format("%(w)s/INSTALLROOT",
+                w=workDir, p=spec["package"]))
+        except:
+          pass
       continue
 
     debug("Looking for cached tarball in %s" % spec["tarballHashDir"])
