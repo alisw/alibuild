@@ -2,7 +2,7 @@
 
 A simple build tool for ALICE experiment software and its externals. Recipes
 for the externals and ALICE software are stored in
-[alidist](https://github.com/alisw/alidist)
+[alidist](https://github.com/alisw/alidist).
 
 ## Instant Gratification
 
@@ -10,7 +10,7 @@ Instant gratification (almost) with:
 
     git clone https://github.com/alisw/alibuild.git
     git clone https://github.com/alisw/alidist.git
-    alibuild/aliBuild -d -a slc7_amd64 -j 16 build aliroot
+    alibuild/aliBuild -d -j 16 build aliroot
 
 ## Recipes format
 
