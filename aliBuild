@@ -3,7 +3,7 @@ import os, logging, time, re, yaml, hashlib, argparse
 import sys, shutil, subprocess, socket
 from commands import getstatusoutput
 from os.path import basename, dirname, abspath, exists, realpath, join
-from os import makedirs, unlink, readlink, getenv
+from os import makedirs, unlink, readlink, getenv, sysconf
 from glob import glob
 from datetime import datetime
 
@@ -199,6 +199,23 @@ def detectArch():
     return None
   return None
 
+# Detect number of available CPUs. Fallback to 1.
+def detectJobs():
+  # Python 2.6+
+  try:
+    import multiprocessing
+    return multiprocessing.cpu_count()
+  except (ImportError, NotImplementedError):
+    pass
+  # POSIX
+  try:
+    res = int(os.sysconf("SC_NPROCESSORS_ONLN"))
+    if res > 0:
+      return res
+  except (AttributeError, ValueError):
+    pass
+  return 1
+
 def matchValidArch(architecture):
   return [x for x in VALID_ARCHS_RE if re.match(x, architecture)]
 
@@ -230,7 +247,7 @@ if __name__ == "__main__":
   parser.add_argument("-e", dest="environment", action='append', default=[])
   parser.add_argument("-v", dest="volumes", action='append', default=[], 
                       help="Specify volumes to be used in Docker")
-  parser.add_argument("--jobs", "-j", dest="jobs", default=1)
+  parser.add_argument("--jobs", "-j", dest="jobs", type=int, default=detectJobs())
   parser.add_argument("--reference-sources", dest="referenceSources", default="sw/MIRROR")
   parser.add_argument("--remote-store", dest="remoteStore", default="",
                       help="Where to find packages already built for reuse."
@@ -316,10 +333,8 @@ if __name__ == "__main__":
     args.remoteStore = args.remoteStore[0:-4]
     args.writeStore = args.remoteStore
 
-
   if args.noDevel:
     args.noDevel = args.noDevel.split(",")
-
 
   # Setup build environment.
   if not args.action == "build":
@@ -333,6 +348,8 @@ if __name__ == "__main__":
   if not exists(specDir):
     makedirs(specDir)
 
+  debug("Building for architecture %s" % args.architecture)
+  debug("Number of parallel builds: %d" % args.jobs)
   debug(format("Using %(star)sBuild from "
                "%(star)sbuild@%(toolHash)s recipes "
                "in %(star)sdist@%(distHash)s",
