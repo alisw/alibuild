@@ -8,7 +8,10 @@ MODULECMD=$(which modulecmd 2>/dev/null || true)
 MODULECMD="$MODULECMD bash"
 
 WORK_DIR=${WORK_DIR:-$(cd $(dirname $0)/..; pwd)/sw}
-ARCHITECTURE=${ARCHITECTURE:-slc5}
+
+AUTO_ARCHITECTURE=$(ls -1 $WORK_DIR | grep -vE '^[A-Z]+$' | head -n1)
+[[ "$AUTO_ARCHITECTURE" != '' ]] || AUTO_ARCHITECTURE=slc5_x86-64
+ARCHITECTURE=${ARCHITECTURE:-$AUTO_ARCHITECTURE}
 export MODULEPATH=$WORK_DIR/MODULES/$ARCHITECTURE
 
 rm -rf $MODULEPATH
