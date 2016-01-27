@@ -13,6 +13,9 @@ menu:
   - 
     name: reference.html
     label: REFERENCE
+  -
+    name: support.html
+    label: SUPPORT
 defaults: 
   -
     scope:
