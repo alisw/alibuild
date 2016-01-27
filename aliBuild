@@ -199,7 +199,7 @@ def detectArch():
     return None
   return None
 
-# Detect number of available CPUs. Fallback to 1.
+# Detect number of available CPUs.
 def detectJobs():
   # Python 2.6+
   try:
@@ -208,13 +208,7 @@ def detectJobs():
   except (ImportError, NotImplementedError):
     pass
   # POSIX
-  try:
-    res = int(os.sysconf("SC_NPROCESSORS_ONLN"))
-    if res > 0:
-      return res
-  except (AttributeError, ValueError):
-    pass
-  return 1
+  return int(os.sysconf("SC_NPROCESSORS_ONLN"))
 
 def matchValidArch(architecture):
   return [x for x in VALID_ARCHS_RE if re.match(x, architecture)]
