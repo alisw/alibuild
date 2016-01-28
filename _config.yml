@@ -14,8 +14,8 @@ menu:
     name: reference.html
     label: REFERENCE
   -
-    name: support.html
-    label: SUPPORT
+    name: troubleshooting.html
+    label: TROUBLESHOOTING
 defaults: 
   -
     scope:

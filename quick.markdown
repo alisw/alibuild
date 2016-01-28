@@ -16,7 +16,7 @@ recipes from a repository called `alidist`:
 
 Once you have obtained both repository, you can trigger a build via:
 
-    alibuild/aliBuild [-d] -a <architecture> -j <jobs> build <package>
+    alibuild/aliBuild [-d] -j <jobs> build <package>
 
 where:
 
@@ -25,16 +25,9 @@ where:
   - `AliPhysics`
   - `O2`
   - `ROOT`
-- `<architecture>` is the platform we are building for. This can be be:
-  - `slc5_x86-64`: Scientific Linux 5 and compatibles, on Intel / AMD x86-64.
-  - `slc6_x86-64`: Scientific Linux 6 and compatibles, on Intel / AMD x86-64.
-  - `slc7_x86-64`: CERN Centos 7 and compatibles, on Intel / AMD x86-64.
-  - `ubuntu1404_x86-64`: Ubuntu 1404 and compatibles, on Intel / AMD x86-64.
-  - `osx_x86-64`: OSX, on Intel / AMD x86-64.
-  - `slc7_ppc64`: RHEL7 on POWER8 (LE only for now).
-
+- `-d` can be used to have verbose debug output.
 - `<jobs>` is the maximum number of parallel processes to be used for building
-  where possible.
+  where possible (defaults to the number of CPUs available if omitted).
 
 ### Results of a build
 
