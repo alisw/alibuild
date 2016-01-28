@@ -47,7 +47,7 @@ If you have write access to the store, you can upload tarballs by specifying
 
 Support for web based repository is foreseen, but not yet implemented.
 
-## Developing packages locally (experimental)
+## Developing packages locally
 
 One of the use cases we want to cover is the ability to develop external
 packages without having to go through an commit - push - pull cycle.
@@ -84,14 +84,28 @@ alidist, you can use the `--no-local <PACKAGE>` option.
 
 ### Incremental builds
 
-When developing locally using the `--devel` mode, if the external is well
-behaved and supports incremental building, it is possible to specify an
-`incremental_recipe` in the YAML preamble. Such a recipe will be used after the
-second time the build happens (to ensure that the non incremental parts of the
-build are done) and will be executed directly in $BUILDDIR, only recompiled
-what changed. Notice that if this is the case the incremental recipe will always
-be executed.
+When developing locally using the development mode, if the external
+is well behaved and supports incremental building, it is possible to
+specify an `incremental_recipe` in the YAML preamble. Such a recipe will
+be used after the second time the build happens (to ensure that the non
+incremental parts of the build are done) and will be executed directly
+in $BUILDDIR, only recompiled what changed. Notice that if this is the
+case the incremental recipe will always be executed.
 
+### Forcing a different architecture
+
+While alibuild does its best to find out which OS / distribution you are
+using, sometimes it might fail to do so, for example in the case you
+start using a new *buntu flavour or a bleeding edge version of Centos.
+In order to force the the correct architecture for the build you can use
+the `--architecture` (`-a`) flag with one of the supported options:
+
+- `slc5_x86-64`: Scientific Linux 5 and compatibles, on Intel / AMD x86-64.
+- `slc6_x86-64`: Scientific Linux 6 and compatibles, on Intel / AMD x86-64.
+- `slc7_x86-64`: CERN Centos 7 and compatibles, on Intel / AMD x86-64.
+- `ubuntu1404_x86-64`: Ubuntu 1404 and compatibles, on Intel / AMD x86-64.
+- `osx_x86-64`: OSX, on Intel / AMD x86-64.
+- `slc7_ppc64`: RHEL7 on POWER8 (LE only for now).
 
 ### Running in Docker
 
@@ -167,7 +181,6 @@ save time or because you have a pre-existing setup which you do not want
 to touch. In this case you can use `--always-prefer-system` option which
 will try very hard to reuse as many system packages as possible (always
 checking they are actually compatible with the one used in the recipe).
-
 
 ## Monitoring builds with Riemann
 
