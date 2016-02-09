@@ -865,11 +865,13 @@ if __name__ == "__main__":
                  runtime_requires=" ".join(spec["runtime_requires"]),
                  gzip=gzip())
 
-    scriptDir = "%s/SPECS/%s/%s/%s-%s" % (workDir,
-                                          args.architecture,
-                                          spec["package"],
-                                          spec["version"],
-                                          spec["revision"])
+    commonPath = "%s/%%s/%s/%s/%s-%s" % (workDir,
+                                         args.architecture,
+                                         spec["package"],
+                                         spec["version"],
+                                         spec["revision"])
+    scriptDir = commonPath % "SPECS"
+
     err, out = getstatusoutput("mkdir -p %s" % scriptDir)
     writeAll("%s/build.sh" % scriptDir, cmd)
     writeAll("%s/%s.sh" % (scriptDir, spec["package"]), spec["recipe"])
@@ -919,7 +921,11 @@ if __name__ == "__main__":
     else:
       err = execute("/bin/bash -e -x %s/build.sh 2>&1" % scriptDir)
 
-    dieOnError(err, "Error while executing %s/build.sh" % scriptDir)
+    dieOnError(err, format("Error while executing %(sd)s/build.sh\n"
+                           "Log can be found in %(w)s/BUILD/%(p)s-latest/log",
+                           sd=scriptDir,
+                           w=abspath(args.workDir),
+                           p=spec["package"]))
 
     if args.writeStore:
       tarballNameWithRev = format("%(package)s-%(version)s-%(revision)s.%(architecture)s.tar.gz",
