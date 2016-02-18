@@ -57,7 +57,10 @@ class RiemannStream(object):
       payload.update({'attributes': self.attributes})
       if self.state:
         payload['state'] = self.state
-      self.client.send(payload)
+      try:
+        self.client.send(payload)
+      except:
+        pass
     self.buffer = ""
 
 def format(s, **kwds):
