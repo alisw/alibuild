@@ -116,12 +116,17 @@ The following entries are optional in the header:
   - `prefer_system_check`: a script which is used to determine whether
     or not the system equivalent of the package can be used. See also
     `prefer_system`. If the `--no-system` option is specified, our own
-    version of the tool is used.
+    version of the tool is used. Shell exit code is used to steer the build: in
+    case the check returns 0, the system package is used and the recipe is not
+    run. In case the check returns nonzero, our own version of the package is
+    built through the recipe.
   - `prefer_system`: a regular expression for architectures which should
     use the `prefer_system_check` by default to determine if the system
-    version of the tool can be used. In case the rule does not match the
-    architecture or it's not present, the system check is performed only
-    if `--always-prefer-system` option is provided.
+    version of the tool can be used. When the rule matches, the result of
+    `prefer_system_check` determines whether to build the recipe. When the rule
+    does not match, the check is skipped and the recipe is run. Using the switch
+    `--always-prefer-system` runs the check always (even when the regular
+    expression for the architecture does not match).
 
 ### The body
 
