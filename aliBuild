@@ -50,14 +50,17 @@ class RiemannStream(object):
         serviceLabel += " " + self.attributes["architecture"]
       payload = {'host': self.currentHost,
                  'service': 'alibuild_log%s' % serviceLabel,
-                 'description': x,
+                 'description': x.decode('unicode_escape').encode('ascii','ignore'),
                  'ttl': getenv("RIEMANN_TTL", 60),
                  'metric': time.time() - self.begin
                 }
       payload.update({'attributes': self.attributes})
       if self.state:
         payload['state'] = self.state
-      self.client.send(payload)
+      try:
+        self.client.send(payload)
+      except:
+        pass
     self.buffer = ""
 
 def format(s, **kwds):
@@ -192,7 +195,7 @@ def detectArch():
       version = version[0] + version[1]
     processor = platform.processor()
     return format("%(d)s%(v)s_%(c)s",
-                  d=distribution.replace("centos","slc").lower(),
+                  d=distribution.replace("centos","slc").replace("redhat","slc").lower(),
                   v=version.split(".")[0],
                   c=platform.processor().replace("_", "-"))
   except:
