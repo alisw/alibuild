@@ -195,7 +195,7 @@ def detectArch():
       version = version[0] + version[1]
     processor = platform.processor()
     return format("%(d)s%(v)s_%(c)s",
-                  d=distribution.replace("centos","slc").lower(),
+                  d=distribution.replace("centos","slc").replace("redhat","slc").lower(),
                   v=version.split(".")[0],
                   c=platform.processor().replace("_", "-"))
   except:
