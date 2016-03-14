@@ -6,6 +6,8 @@ from os.path import basename, dirname, abspath, exists, realpath, join
 from os import makedirs, unlink, readlink, getenv, sysconf, rmdir
 from glob import glob
 from datetime import datetime
+from urllib2 import urlopen, URLError
+import json
 
 debug, error, riemannStream = (None, None, None)
 
@@ -236,6 +238,111 @@ ARCHITECTURE_TABLE = [
            "   Yosemite and El-Captain: osx_x86-64\n\n"
       ]
 
+# Helper class which does not do anything to sync
+class NoRemoteSync:
+  def syncToLocal(self, p, spec):
+    pass
+  def syncToRemote(self, p, spec):
+    pass
+
+class HttpRemoteSync:
+  def __init__(self, remoteStore, architecture, workdir):
+    self.remoteStore = remoteStore
+    self.writeStore = ""
+    self.architecture = architecture
+    self.workdir = workdir
+
+  def syncToLocal(self, p, spec):
+    debug("Updating remote store for package %s@%s" % (p, spec["hash"]))
+    hashListUrl = format("%(rs)s/%(sp)s/",
+                        rs=self.remoteStore,
+                        sp=spec["storePath"])
+    pkgListUrl = format("%(rs)s/%(sp)s/",
+                        rs=self.remoteStore,
+                        sp=spec["linksPath"])
+    hashList = []
+    pkgList = []
+    try:
+      hashList = json.loads(urlopen(hashListUrl).read())
+      pkgList = json.loads(urlopen(pkgListUrl).read())
+    except URLError, e:
+      debug("Cannot find precompiled package for %s@%s" % (p, spec["hash"]))
+      pass
+    except Exception, e:
+      print e
+      error("Unknown response from server")
+
+    cmd = format("mkdir -p %(hd)s\n"
+                 "mkdir -p %(ld)s\n",
+                 hd=spec["tarballHashDir"],
+                 ld=spec["tarballLinkDir"])
+    hashList = [x["name"] for x in hashList]
+
+    for pkg in hashList:
+      cmd += format("curl -o %(hd)s/%(n)s -L %(rs)s/%(sp)s/%(n)s\n",
+                    n=pkg,
+                    sp=spec["storePath"],
+                    rs=self.remoteStore,
+                    hd=spec["tarballHashDir"])
+    relativeHashDir = spec["tarballHashDir"].replace(self.workdir, "")
+    for pkg in pkgList:
+      if pkg["name"] in hashList:
+        cmd += format("ln -sf ../../%(a)s/store/%(sh)s/%(h)s/%(n)s %(ld)s/%(n)s\n",
+                      a = self.architecture,
+                      h = spec["hash"],
+                      sh = spec["hash"][0:2],
+                      n = pkg["name"],
+                      ld = spec["tarballLinkDir"])
+      else:
+        cmd += format("ln -s unknown %(ld)s/%(n)s || true\n",
+                      ld = spec["tarballLinkDir"],
+                      n = pkg["name"])
+    execute(cmd)
+
+  def syncToRemote(self, p, spec):
+    return
+
+# Helper class to sync package build directory using RSync.
+class RsyncRemoteSync:
+  def __init__(self, remoteStore, writeStore, architecture, workdir, rsyncOptions):
+    self.remoteStore = re.sub("^ssh://", "", remoteStore)
+    self.writeStore = re.sub("^ssh://", "", writeStore)
+    self.architecture = architecture
+    self.rsyncOptions = rsyncOptions
+    self.workdir = workdir
+
+  def syncToLocal(self, p, spec):
+    debug("Updating remote store for package %s@%s" % (p, spec["hash"]))
+    cmd = format("mkdir -p %(tarballHashDir)s\n"
+                 "rsync -av %(ro)s %(remoteStore)s/%(storePath)s/ %(tarballHashDir)s/ || true\n"
+                 "rsync -av --delete %(ro)s %(remoteStore)s/%(linksPath)s/ %(tarballLinkDir)s/ || true\n",
+                 ro=self.rsyncOptions,
+                 remoteStore=self.remoteStore,
+                 storePath=spec["storePath"],
+                 linksPath=spec["linksPath"],
+                 tarballHashDir=spec["tarballHashDir"],
+                 tarballLinkDir=spec["tarballLinkDir"])
+    err = execute(cmd)
+    dieOnError(err, "Unable to update from specified store.")
+
+  def syncToRemote(self, p, spec):
+    if not self.writeStore:
+      return
+    tarballNameWithRev = format("%(package)s-%(version)s-%(revision)s.%(architecture)s.tar.gz",
+                                architecture=self.architecture,
+                                **spec)
+    cmd = format("cd %(workdir)s && "
+                 "rsync -avR %(rsyncOptions)s --ignore-existing %(storePath)s/%(tarballNameWithRev)s  %(remoteStore)s/ &&"
+                 "rsync -avR %(rsyncOptions)s --ignore-existing %(linksPath)s/%(tarballNameWithRev)s  %(remoteStore)s/",
+                 workdir=self.workdir,
+                 remoteStore=self.remoteStore,
+                 rsyncOptions=self.rsyncOptions,
+                 storePath=spec["storePath"],
+                 linksPath=spec["linksPath"],
+                 tarballNameWithRev=tarballNameWithRev)
+    err = execute(cmd)
+    dieOnError(err, "Unable to upload tarball.")
+
 if __name__ == "__main__":
   parser = argparse.ArgumentParser()
   parser.add_argument("action")
@@ -327,17 +434,19 @@ if __name__ == "__main__":
   if args.docker:
     dockerImage = "alisw/%s-builder" % args.architecture.split("_")[0]
 
-  rsyncOptions = ""
-  if args.remoteStore.startswith("ssh://"):
-    args.remoteStore = args.remoteStore[6:]
-  if args.writeStore.startswith("ssh://"):
-    args.writeStore = args.writeStore[6:]
   dieOnError(args.remoteStore.endswith("::rw") and args.writeStore,
              "You cannot specify ::rw and --write-store at the same time")
   if args.remoteStore.endswith("::rw"):
     args.remoteStore = args.remoteStore[0:-4]
     args.writeStore = args.remoteStore
 
+  if args.remoteStore.startswith("http"):
+    syncHelper = HttpRemoteSync(args.remoteStore, args.architecture, args.workDir)
+  elif args.remoteStore:
+    syncHelper = RsyncRemoteSync(args.remoteStore, args.writeStore, args.architecture, args.workDir, "")
+  else:
+    syncHelper = NoRemoteSync()
+ 
   if args.noDevel:
     args.noDevel = args.noDevel.split(",")
 
@@ -449,7 +558,7 @@ if __name__ == "__main__":
   if develPkgs:
     print "Write store disabled since some packages will be picked up from local checkout."
     print "Local packages: %s" % " ".join(develPkgs)
-    args.writeStore = ""
+    syncHelper.writeStore = ""
 
   # Resolve the tag to the actual commit ref, so that
   for p in buildOrder:
@@ -632,19 +741,8 @@ if __name__ == "__main__":
     # this will result in a new package which has the same binary contents of
     # the old one but where the relocation will work for the new dictory. Here
     # we simply store the fact that we can reuse the contents of cachedTarball.
-    if args.remoteStore:
-      debug("Updating remote store for package %s@%s" % (p, spec["hash"]))
-      cmd = format("mkdir -p %(tarballHashDir)s\n"
-                   "rsync -av %(rsyncOptions)s %(remoteStore)s/%(storePath)s/ %(tarballHashDir)s/ || true\n"
-                   "rsync -av --delete %(rsyncOptions)s %(remoteStore)s/%(linksPath)s/ %(tarballLinkDir)s/ || true\n",
-                   rsyncOptions=rsyncOptions,
-                   remoteStore=args.remoteStore,
-                   storePath=spec["storePath"],
-                   linksPath=spec["linksPath"],
-                   tarballHashDir=spec["tarballHashDir"],
-                   tarballLinkDir=spec["tarballLinkDir"])
-      err = execute(cmd)
-      dieOnError(err, "Unable to update from specified store.")
+    syncHelper.syncToLocal(p, spec)
+
     # Decide how it should be called, based on the hash and what is already
     # available.
     debug("Checking for packages already built.")
@@ -930,18 +1028,4 @@ if __name__ == "__main__":
                            w=abspath(args.workDir),
                            p=spec["package"]))
 
-    if args.writeStore:
-      tarballNameWithRev = format("%(package)s-%(version)s-%(revision)s.%(architecture)s.tar.gz",
-                                  architecture=args.architecture,
-                                  **spec)
-      cmd = format("cd %(workdir)s && "
-                   "rsync -avR %(rsyncOptions)s --ignore-existing %(storePath)s/%(tarballNameWithRev)s  %(remoteStore)s/ &&"
-                   "rsync -avR %(rsyncOptions)s --ignore-existing %(linksPath)s/%(tarballNameWithRev)s  %(remoteStore)s/",
-                   workdir=args.workDir,
-                   remoteStore=args.remoteStore,
-                   rsyncOptions=rsyncOptions,
-                   storePath=spec["storePath"],
-                   linksPath=spec["linksPath"],
-                   tarballNameWithRev=tarballNameWithRev)
-      err = execute(cmd)
-      dieOnError(err, "Unable to upload tarball.")
+    syncHelper.syncToRemote(p, spec)
