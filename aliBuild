@@ -267,6 +267,7 @@ class HttpRemoteSync:
       pkgList = json.loads(urlopen(pkgListUrl).read())
     except URLError, e:
       debug("Cannot find precompiled package for %s@%s" % (p, spec["hash"]))
+      print e
       pass
     except Exception, e:
       print e
@@ -297,6 +298,7 @@ class HttpRemoteSync:
         cmd += format("ln -s unknown %(ld)s/%(n)s 2>/dev/null || true\n",
                       ld = spec["tarballLinkDir"],
                       n = pkg["name"])
+    print cmd
     execute(cmd)
 
   def syncToRemote(self, p, spec):
