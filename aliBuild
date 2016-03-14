@@ -842,6 +842,10 @@ if __name__ == "__main__":
     # that when we use Docker we can replace sourceDir with the correct
     # container path, if required.  No changes for what concerns the standard
     # bash builds, though.
+    if args.docker:
+      cachedTarball = re.sub("^" + workDir, "/sw", spec["cachedTarball"])
+    else:
+      cachedTarball = spec["cachedTarball"]
     cmd = format(cmd_raw,
                  dependencies=dependencies,
                  dependenciesInit=dependenciesInit,
@@ -862,7 +866,7 @@ if __name__ == "__main__":
                  tag=spec["tag"],
                  commit_hash=commit_hash,
                  referenceStatement=referenceStatement,
-                 cachedTarball=spec["cachedTarball"],
+                 cachedTarball=cachedTarball,
                  requires=" ".join(spec["requires"]),
                  build_requires=" ".join(spec["build_requires"]),
                  runtime_requires=" ".join(spec["runtime_requires"]),
