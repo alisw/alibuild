@@ -7,6 +7,7 @@ from os import makedirs, unlink, readlink, getenv, sysconf, rmdir
 from glob import glob
 from datetime import datetime
 from urllib2 import urlopen, URLError
+import ssl
 import json
 
 debug, error, riemannStream = (None, None, None)
@@ -246,11 +247,12 @@ class NoRemoteSync:
     pass
 
 class HttpRemoteSync:
-  def __init__(self, remoteStore, architecture, workdir):
+  def __init__(self, remoteStore, architecture, workdir, insecure):
     self.remoteStore = remoteStore
     self.writeStore = ""
     self.architecture = architecture
     self.workdir = workdir
+    self.insecure = insecure
 
   def syncToLocal(self, p, spec):
     debug("Updating remote store for package %s@%s" % (p, spec["hash"]))
@@ -263,8 +265,13 @@ class HttpRemoteSync:
     hashList = []
     pkgList = []
     try:
-      hashList = json.loads(urlopen(hashListUrl).read())
-      pkgList = json.loads(urlopen(pkgListUrl).read())
+      if self.insecure:
+        context = ssl._create_unverified_context()
+        hashList = json.loads(urlopen(hashListUrl, context=context).read())
+        pkgList = json.loads(urlopen(pkgListUrl, context=context).read())
+      else:
+        hashList = json.loads(urlopen(hashListUrl).read())
+        pkgList = json.loads(urlopen(pkgListUrl).read())
     except URLError, e:
       debug("Cannot find precompiled package for %s@%s" % (p, spec["hash"]))
       print e
@@ -280,7 +287,8 @@ class HttpRemoteSync:
     hashList = [x["name"] for x in hashList]
 
     for pkg in hashList:
-      cmd += format("curl -o %(hd)s/%(n)s -L %(rs)s/%(sp)s/%(n)s\n",
+      cmd += format("curl %(i)s -o %(hd)s/%(n)s -L %(rs)s/%(sp)s/%(n)s\n",
+                    i="-k" if self.insecure else "",
                     n=pkg,
                     sp=spec["storePath"],
                     rs=self.remoteStore,
@@ -378,6 +386,8 @@ if __name__ == "__main__":
                       action="store_true", help="Never use system packages")
   parser.add_argument("--force-unknown-architecture", dest="forceUnknownArch", default=False,
                      action="store_true", help="Do not check for valid architecture")
+  parser.add_argument("--insecure", dest="insecure", default=False,
+                     action="store_true", help="Do not check for valid certificates")
 
   parser.add_argument("--debug", "-d", dest="debug", action="store_true", default=False)
   parser.add_argument("--no-auto-cleanup", help="Do not cleanup build by products automatically",
@@ -443,7 +453,7 @@ if __name__ == "__main__":
     args.writeStore = args.remoteStore
 
   if args.remoteStore.startswith("http"):
-    syncHelper = HttpRemoteSync(args.remoteStore, args.architecture, args.workDir)
+    syncHelper = HttpRemoteSync(args.remoteStore, args.architecture, args.workDir, args.insecure)
   elif args.remoteStore:
     syncHelper = RsyncRemoteSync(args.remoteStore, args.writeStore, args.architecture, args.workDir, "")
   else:
