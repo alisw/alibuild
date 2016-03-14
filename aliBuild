@@ -294,7 +294,7 @@ class HttpRemoteSync:
                       n = pkg["name"],
                       ld = spec["tarballLinkDir"])
       else:
-        cmd += format("ln -s unknown %(ld)s/%(n)s || true\n",
+        cmd += format("ln -s unknown %(ld)s/%(n)s 2>/dev/null || true\n",
                       ld = spec["tarballLinkDir"],
                       n = pkg["name"])
     execute(cmd)
