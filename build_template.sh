@@ -9,6 +9,7 @@ export WORK_DIR="${WORK_DIR_OVERRIDE:-%(workDir)s}"
 # From our dependencies
 %(dependencies)s
 
+export CAN_DELETE="%(can_delete)s"
 export PKGNAME="%(pkgname)s"
 export PKGHASH="%(hash)s"
 export PKGVERSION="%(version)s"
@@ -175,5 +176,6 @@ ln -nfs \
 # Unpack, and relocate
 cd "$WORK_DIR"
 tar xzf "$WORK_DIR/TARS/$HASH_PATH/$PACKAGE_WITH_REV"
+[ "X$CAN_DELETE" = X1 ] && rm "$WORK_DIR/TARS/$HASH_PATH/$PACKAGE_WITH_REV"
 bash -ex "$ARCHITECTURE/$PKGNAME/$PKGVERSION-$PKGREVISION/relocate-me.sh"
 ln -snf $PKGVERSION-$PKGREVISION $ARCHITECTURE/$PKGNAME/latest

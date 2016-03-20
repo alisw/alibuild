@@ -387,6 +387,8 @@ if __name__ == "__main__":
                      action="store_true", help="Do not check for valid architecture")
   parser.add_argument("--insecure", dest="insecure", default=False,
                      action="store_true", help="Do not check for valid certificates")
+  parser.add_argument("--aggressive-cleanup", dest="aggressiveCleanup", default=False,
+                      action="store_true", help="Perform additional cleanups")
 
   parser.add_argument("--debug", "-d", dest="debug", action="store_true", default=False)
   parser.add_argument("--no-auto-cleanup", help="Do not cleanup build by products automatically",
@@ -955,7 +957,9 @@ if __name__ == "__main__":
       cachedTarball = re.sub("^" + workDir, "/sw", spec["cachedTarball"])
     else:
       cachedTarball = spec["cachedTarball"]
+
     cmd = format(cmd_raw,
+                 can_delete = args.aggressiveCleanup,
                  dependencies=dependencies,
                  dependenciesInit=dependenciesInit,
                  environment=environment,
