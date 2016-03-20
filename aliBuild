@@ -843,16 +843,20 @@ if __name__ == "__main__":
       # assuming the package is not a development one. We also can
       # delete the SOURCES in case we have aggressive-cleanup enabled.
       if not spec["package"] in develPkgs and args.autoCleanup:
-        shutil.rmtree(format("%(w)s/BUILD/%(h)s", w=workDir,
-                                                  h=spec["hash"]),
-                      True)
-        shutil.rmtree(format("%(w)s/INSTALLROOT/%(h)s", w=workDir,
-                                                        h=spec["hash"]),
-                      True)
+        cleanupDirs = [format("%(w)s/BUILD/%(h)s", 
+                              w=workDir,
+                              h=spec["hash"]),
+                       format("%(w)s/INSTALLROOT/%(h)s",
+                              w=workDir,
+                              h=spec["hash"])]
         if args.aggressiveCleanup:
-          shutil.rmtree(format("%(w)s/SOURCES/%(p)s",
-                               w=workDir,
-                               p=spec["package"]))
+          cleanupDirs.append(format("%(w)s/SOURCES/%(p)s",
+                                    w=workDir,
+                                    p=spec["package"]))
+        debug("Cleaning up:\n" + "\n".join(cleanupDirs))
+
+        for d in cleanupDirs:
+          shutil.rmtree(d, True)
         try:
           unlink(format("%(w)s/BUILD/%(p)s-latest",
                  w=workDir, p=spec["package"]))
