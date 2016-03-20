@@ -840,7 +840,8 @@ if __name__ == "__main__":
       buildOrder.pop(0)
       packageIterations = 0
       # We can now delete the INSTALLROOT and BUILD directories,
-      # assuming the package is not a development one.
+      # assuming the package is not a development one. We also can
+      # delete the SOURCES in case we have aggressive-cleanup enabled.
       if not spec["package"] in develPkgs and args.autoCleanup:
         shutil.rmtree(format("%(w)s/BUILD/%(h)s", w=workDir,
                                                   h=spec["hash"]),
@@ -848,6 +849,10 @@ if __name__ == "__main__":
         shutil.rmtree(format("%(w)s/INSTALLROOT/%(h)s", w=workDir,
                                                         h=spec["hash"]),
                       True)
+        if args.aggressiveCleanup:
+          shutil.rmtree(format("%(w)s/SOURCES/%(p)s",
+                               w=workDir,
+                               p=spec["package"]))
         try:
           unlink(format("%(w)s/BUILD/%(p)s-latest",
                  w=workDir, p=spec["package"]))
