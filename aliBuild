@@ -279,34 +279,37 @@ class HttpRemoteSync:
       print e
       error("Unknown response from server")
 
-    cmd = format("mkdir -p %(hd)s\n"
-                 "mkdir -p %(ld)s\n",
+    cmd = format("mkdir -p %(hd)s && "
+                 "mkdir -p %(ld)s",
                  hd=spec["tarballHashDir"],
                  ld=spec["tarballLinkDir"])
+    execute(cmd)
     hashList = [x["name"] for x in hashList]
 
     for pkg in hashList:
-      cmd += format("curl %(i)s -o %(hd)s/%(n)s -L %(rs)s/%(sp)s/%(n)s\n",
-                    i="-k" if self.insecure else "",
-                    n=pkg,
-                    sp=spec["storePath"],
-                    rs=self.remoteStore,
-                    hd=spec["tarballHashDir"])
+      cmd = format("curl %(i)s -o %(hd)s/%(n)s -L %(rs)s/%(sp)s/%(n)s\n",
+                   i="-k" if self.insecure else "",
+                   n=pkg,
+                   sp=spec["storePath"],
+                   rs=self.remoteStore,
+                   hd=spec["tarballHashDir"])
       debug(cmd)
+      execute(cmd)
     relativeHashDir = spec["tarballHashDir"].replace(self.workdir, "")
     for pkg in pkgList:
       if pkg["name"] in hashList:
-        cmd += format("ln -sf ../../%(a)s/store/%(sh)s/%(h)s/%(n)s %(ld)s/%(n)s\n",
-                      a = self.architecture,
-                      h = spec["hash"],
-                      sh = spec["hash"][0:2],
-                      n = pkg["name"],
-                      ld = spec["tarballLinkDir"])
+        cmd = format("ln -sf ../../%(a)s/store/%(sh)s/%(h)s/%(n)s %(ld)s/%(n)s\n",
+                     a = self.architecture,
+                     h = spec["hash"],
+                     sh = spec["hash"][0:2],
+                     n = pkg["name"],
+                     ld = spec["tarballLinkDir"])
+        execute(cmd)
       else:
-        cmd += format("ln -s unknown %(ld)s/%(n)s 2>/dev/null || true\n",
-                      ld = spec["tarballLinkDir"],
-                      n = pkg["name"])
-    execute(cmd)
+        cmd = format("ln -s unknown %(ld)s/%(n)s 2>/dev/null || true\n",
+                     ld = spec["tarballLinkDir"],
+                     n = pkg["name"])
+        execute(cmd)
 
   def syncToRemote(self, p, spec):
     return
