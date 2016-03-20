@@ -292,6 +292,7 @@ class HttpRemoteSync:
                     sp=spec["storePath"],
                     rs=self.remoteStore,
                     hd=spec["tarballHashDir"])
+      debug(cmd)
     relativeHashDir = spec["tarballHashDir"].replace(self.workdir, "")
     for pkg in pkgList:
       if pkg["name"] in hashList:
