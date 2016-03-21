@@ -53,7 +53,7 @@ class RiemannStream(object):
         serviceLabel += " " + self.attributes["architecture"]
       payload = {'host': self.currentHost,
                  'service': 'alibuild_log%s' % serviceLabel,
-                 'description': x.decode('unicode_escape').encode('ascii','ignore'),
+                 'description': x.decode('utf-8').encode('ascii','ignore'),
                  'ttl': getenv("RIEMANN_TTL", 60),
                  'metric': time.time() - self.begin
                 }
