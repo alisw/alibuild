@@ -355,6 +355,13 @@ class RsyncRemoteSync:
     err = execute(cmd)
     dieOnError(err, "Unable to upload tarball.")
 
+def prunePaths(workDir):
+  for x in ["PATH", "LD_LIBRARY_PATH", "DYLD_LIBRARY_PATH"]:
+    if not x in os.environ:
+      continue
+    workDirEscaped = re.escape("%s" % workDir) + "[^:]*:?"
+    os.environ[x] = re.sub(workDirEscaped, "", os.environ[x])
+
 if __name__ == "__main__":
   parser = argparse.ArgumentParser()
   parser.add_argument("action")
@@ -474,6 +481,7 @@ if __name__ == "__main__":
   specs = {}
   buildOrder = []
   workDir = abspath(args.workDir)
+  prunePaths(workDir)
   specDir = "%s/SPECS" % workDir
   if not exists(specDir):
     makedirs(specDir)

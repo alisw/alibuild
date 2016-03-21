@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import argparse
-from os.path import exists
+import os, re
+from os.path import exists, abspath
 from glob import glob
 import yaml
 from commands import getstatusoutput
@@ -17,14 +18,25 @@ def execute(command, prefix):
     print prefix + ":" + output
   print prefix + ": exit code " + str(popen.returncode)
 
+def prunePaths(workDir):
+  for x in ["PATH", "LD_LIBRARY_PATH", "DYLD_LIBRARY_PATH"]:
+    if not x in os.environ:
+      continue
+    workDirEscaped = re.escape("%s" % workDir) + "[^:]*:?"
+    os.environ[x] = re.sub(workDirEscaped, "", os.environ[x])
+
 if __name__ == "__main__":
   parser = argparse.ArgumentParser()
   parser.add_argument("-c", "--config", help="path to alidist", dest="config", default="alidist")
+  parser.add_argument("-w", "--work-dir", help="path to work dir", dest="workDir", default="workDir")
   args = parser.parse_args()
   if not exists(args.config):
     parser.error("Wrong path to alidist specified: %s" % args.config)
   
+  prunePaths(abspath(args.workDir))
+  
   for x in glob("%s/*.sh" % args.config):
+    print "Reading", x
     txt = file(x).read()
     header, body = txt.split("---", 1)
     spec = yaml.safe_load(header)
