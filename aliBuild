@@ -577,8 +577,17 @@ if __name__ == "__main__":
 
   # Check if any of the packages can be picked up from a local checkout
   develCandidates = [basename(d) for d in glob("*") if os.path.isdir(d)]
+  develCandidatesUpper = [basename(d).upper() for d in glob("*") if os.path.isdir(d)]
   develPkgs = [p for p in buildOrder
                if p in develCandidates and p not in args.noDevel]
+  develPkgsUpper = [(p, p.upper()) for p in buildOrder
+                    if p.upper() in develCandidatesUpper and p not in args.noDevel]
+  if set(develPkgs) != set(x for (x, y) in develPkgsUpper):
+    error(format("The following development packages have wrong spelling: %(pkgs)s."
+                 "Please check your local checkout and adapt to the correct one indicated.",
+                 pkgs=", ".join(set(x.strip() for (x,y) in develPkgsUpper) - set(develPkgs))))
+    exit(1)
+
   if develPkgs:
     print "Write store disabled since some packages will be picked up from local checkout."
     print "Local packages: %s" % " ".join(develPkgs)
