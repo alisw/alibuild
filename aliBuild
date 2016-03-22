@@ -81,14 +81,24 @@ def gzip():
   return getstatusoutput("which pigz")[0] and "gzip" or "pigz"
 
 def execute(command, printer=debug):
+  if not printer:
+    printer = debug
   popen = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE)
   lines_iterator = iter(popen.stdout.readline, "")
   for line in lines_iterator:
-    debug(line.strip("\n"))  # yield line
+    printer(line.strip("\n"))  # yield line
   output = popen.communicate()[0]
-  debug(output)
+  printer(output)
   exitCode = popen.returncode
   return exitCode
+
+class Hasher:
+  def __init__(self):
+    self.h = hashlib.sha1()
+  def __call__(self, txt):
+    self.h.update(txt)
+  def hexdigest(self):
+    return self.h.hexdigest()
 
 def dieOnError(err, msg):
   if err:
@@ -618,13 +628,11 @@ if __name__ == "__main__":
           # We are in development mode, we need to rebuild if the commit hash
           # is different and if there are extra changes on to.
           if spec["package"] in develPkgs:
-            cmd = format("cd %(source)s ; git diff -r HEAD | sha1sum",
-                         source = spec["source"])
-            debug(cmd)
-            err, out = getstatusoutput(cmd)
-            debug(out)
+            cmd = "cd %s && git diff -r HEAD" % spec["source"]
+            h = Hasher()
+            err = execute(cmd, h)
             dieOnError(err, "Unable to detect source code changes.")
-            spec["devel_hash"] = spec["commit_hash"] + out
+            spec["devel_hash"] = spec["commit_hash"] + h.hexdigest()
             spec["commit_hash"] = "0"
           break
 
