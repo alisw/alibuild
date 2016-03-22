@@ -363,6 +363,8 @@ def prunePaths(workDir):
     os.environ[x] = re.sub(workDirEscaped, "", os.environ[x])
 
 if __name__ == "__main__":
+  os.environ["LANG"] = "C"
+  os.environ["LC_ALL"] = "C"
   parser = argparse.ArgumentParser()
   parser.add_argument("action")
   parser.add_argument("pkgname")
