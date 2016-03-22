@@ -942,7 +942,7 @@ if __name__ == "__main__":
                "Tag `append_path' in %s should be a dict." % p)
     for pathName,pathVal in pathDict.iteritems():
       pathVal = isinstance(pathVal, list) and pathVal or [ pathVal ]
-      environment += format("echo 'export %(key)s=%(value)s:$%(key)s' >> \"$INSTALLROOT/etc/profile.d/init.sh\"\n",
+      environment += format("\ncat << \EOF >> \"$INSTALLROOT/etc/profile.d/init.sh\"\nexport %(key)s=$%(key)s:%(value)s\nEOF",
                             key=pathName,
                             value=":".join(pathVal))
 
@@ -958,7 +958,7 @@ if __name__ == "__main__":
     for pathName,pathVal in defaultPrependPaths.iteritems():
       pathDict[pathName] = [ pathVal ] + pathDict.get(pathName, [])
     for pathName,pathVal in pathDict.iteritems():
-      environment += format("echo 'export %(key)s=%(value)s:$%(key)s' >> \"$INSTALLROOT/etc/profile.d/init.sh\"\n",
+      environment += format("\ncat << \EOF >> \"$INSTALLROOT/etc/profile.d/init.sh\"\nexport %(key)s=%(value)s:$%(key)s\nEOF",
                             key=pathName,
                             value=":".join(pathVal))
 
