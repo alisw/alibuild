@@ -1,0 +1,13 @@
+sudo: required
+dist: trusty
+services:
+  - docker
+cache:
+  directories:
+    - $HOME/sw/TARS
+before_install: |
+  sudo apt-get install -y curl
+  cd ..
+  git clone -b IB/v5-06/next https://github.com/alisw/alidist
+script: |
+  time alibuild/aliBuild --aggressive-cleanup --docker -a slc7_x86-64 -d build zlib
