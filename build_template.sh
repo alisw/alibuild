@@ -154,6 +154,8 @@ PH=${PKGHASH}
 EoF
 
 cat "$INSTALLROOT/.original-unrelocated" | xargs -n1 -I{} echo "sed -e \"s|/[^ ]*INSTALLROOT/\$PH/\$OP|\$WORK_DIR/\$PP|g;s|[@][@]PKGREVISION[@]\$PH[@][@]|$PKGREVISION|g\" \$PP/{}.unrelocated > \$PP/{}" >> "$INSTALLROOT/relocate-me.sh"
+# Always relocate the modulefile so that it works also in devel mode.
+grep etc/modulefiles "$INSTALLROOT/.original-unrelocated" || echo "sed -i .forced-relocation -e \"s|[@][@]PKGREVISION[@]\$PH[@][@]|$PKGREVISION|g\" \$PP/etc/modulefiles/$PKGNAME" >> "$INSTALLROOT/relocate-me.sh"
 cat "$INSTALLROOT/relocate-me.sh"
 cat "$INSTALLROOT/.original-unrelocated" | xargs -n1 -I{} cp '{}' '{}'.unrelocated
 cd "$WORK_DIR/INSTALLROOT/$PKGHASH"
