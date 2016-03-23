@@ -9,7 +9,7 @@ Instant gratification with:
     git clone https://github.com/alisw/alibuild.git
     git clone https://github.com/alisw/alidist.git
     alibuild/aliBuild build AliRoot
-    alibuild/aliModules enter AliRoot/latest
+    alibuild/alienv enter AliRoot/latest
     aliroot -b
 
 Full documentation at:
