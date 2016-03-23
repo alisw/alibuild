@@ -387,7 +387,7 @@ if __name__ == "__main__":
                       help="Where to upload the built packages for reuse."
                            "Use ssh:// in front for remote store.")
   parser.add_argument("--disable", dest="disable", default=[],
-                      metavar="PACKAGE",
+                      metavar="PACKAGE", action="append",
                       help="Do not build PACKAGE and all its (unique) dependencies.")
   parser.add_argument("--defaults", dest="defaults", default="release",
                       metavar="FILE", help="Specify which defaults to use")
@@ -431,8 +431,7 @@ if __name__ == "__main__":
   if args.docker and getstatusoutput("which docker")[0]:
     parser.error("cannot use --docker as docker executable is not found")
 
-  if args.disable:
-    args.disable = args.disable.split(",")
+  args.disable = [x for x in ",".join(args.disable).split(",") if x]
   logger = logging.getLogger('alibuild')
   logger_handler = logging.StreamHandler()
   logger.addHandler(logger_handler)
