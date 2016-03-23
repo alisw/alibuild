@@ -71,7 +71,7 @@ current one. For instance:
 
     alibuild/alienv setenv VO_ALICE@AliRoot::latest -c aliroot -b
 
-To see other commands consult the guids:
+To see other commands consult the online manual:
 
     alibuild/alienv help
 
