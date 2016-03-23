@@ -51,31 +51,36 @@ For example:
 we call this path "the `PACKAGE_ROOT` for package `<package>`".
  
 
-## Modulefiles
+## Loading the package environment
 
-ALICE software is loading the environment from CVMFS by means of
-[Modulefiles](http://modules.sourceforge.net/). To test the environment loaded
-by those modulefiles, export your working directory and architecture, then run
-the `aliModules` script:
+Environment for packages built using aliBuild is managed by
+[Environment Modules](http://modules.sourceforge.net). Assuming you are in the
+toplevel directory containing `alibuild`, `alidist` and `sw` you can do:
 
-    export WORK_DIR=/path/containing/sw
-    export ARCHITECTURE=slc5_x86-64
-    alibuild/aliModules [module1 [module2...]]
+    alibuild/aliModules avail
 
-If you do not specify any module, the list of available ones is printed. You
-will enter a shell which has the environment configured by Modulefiles.
+to list the available packages, and:
 
-Note that you must have `modulecmd` on your system (on RedHat-based OSes it is
-the `environment-modules` package).
+    alibuild/aliModules enter PackageA/VersionA [PackageB/VersionB...]
 
-### Environment for packages which do not have a module-file
+to enter a shell with the appropriate environment set. Note that loading a
+toplevel package recursively sets the environment for all its dependencies.
 
-Some packages do not have a module file as they are not directly distributed to the grid.
+Environment Modules is required: the package is usually called
+`environment-modules` on Linux, or simply `modules` if using Homebrew on OSX.
 
-In that case you can use the  `init.sh` file found file for any package:
-`$<PACKAGE>_ROOT/etc/profile.d/init.sh` which sets up the environment so
-that it the built software can be used. In order to use it:
 
-    WORK_DIR=$PWD/sw source sw/slc7_x86-64/AliRoot/v5-07-01-1/etc/profile.d/init.sh
+### Environment for packages lacking a module definition
 
-this will bring in a package and all it's dependencies.
+Some packages do not have a modulefile: this usually occurs for those which are
+not distributed on the Grid. If you think this is wrong feel free to submit a
+[pull request](https://github.com/alisw/alidist/pulls) or
+[open an issue](https://github.com/alisw/alidist/issues) to the relevant
+packages.
+
+It is still possible to load the environment by sourcing the `init.sh` file
+produced for each package under the `etc/profile.d` subdirectory. For instance:
+
+    WORK_DIR=$PWD/sw source sw/slc7_x86-64/AliRoot/v5-08-02-1/etc/profile.d/init.sh
+
+Dependencies are automatically loaded.
