@@ -1,60 +1,142 @@
 #!/bin/bash -e
 
 # Load and test Modulefiles created by recipes.
+PROG=$(basename "$0")
 
-MODULECVMFS='/cvmfs/alice.cern.ch/x86_64-2.6-gnu-4.1.2/Modules/3.2.10/Scientific/5.x'
-MODULECMD=$(which modulecmd 2>/dev/null || true)
-[[ "$MODULECMD" == '' ]] && MODULECMD="env LD_LIBRARY_PATH=$MODULECVMFS/lib:\$LD_LIBRARY_PATH $MODULECVMFS/bin/modulecmd"
-MODULECMD="$MODULECMD bash"
+function printHelp() {
+local EM=`printf '\033[35m'`
+local ET=`printf '\033[36m'`
+local EZ=`printf '\033[m'`
+cat >&2 <<EoF
+$PROG -- load environment for aliBuild packages through modulefiles
 
-WORK_DIR=${WORK_DIR:-$(cd $(dirname $0)/..; pwd)/sw}
+Usage: $PROG \\
+         [--architecture|-a ${ET}ARCHITECTURE${EZ}] \\
+         [--work-dir|-w ${ET}WORKDIR${EZ}]          \\
+         [--no-update]                    \\
+         ${ET}COMMAND...${EZ}
 
-AUTO_ARCHITECTURE=$(ls -1 $WORK_DIR | grep -vE '^[A-Z]+$' | head -n1)
-[[ "$AUTO_ARCHITECTURE" != '' ]] || AUTO_ARCHITECTURE=slc5_x86-64
-ARCHITECTURE=${ARCHITECTURE:-$AUTO_ARCHITECTURE}
-export MODULEPATH=$WORK_DIR/MODULES/$ARCHITECTURE
+  ${EM}--no-update${EZ} skips refreshing the modules directory
 
-rm -rf $MODULEPATH
-mkdir -p $MODULEPATH
+  ${ET}WORKDIR${EZ} defaults to sw
+  ${ET}ARCHITECTURE${EZ} is automatically detected in most cases
 
-pushd $MODULEPATH
-find $WORK_DIR/$ARCHITECTURE -name modulefiles | while read FILE; do
-  PKGVER=$(basename $(cd $FILE/../..;pwd))
-  PKGNAME=$(basename $(cd $FILE/../../..;pwd))
-  mkdir -p $PKGNAME
-  cp $FILE/$PKGNAME $PKGNAME/$PKGVER 2> /dev/null || echo "WARNING: no modulefile for $PKGNAME/$PKGVER"
-done
-mkdir BASE
-cat > BASE/1.0 <<EOF
-#%Module1.0
-proc ModulesHelp { } {
-  global version
-  puts stderr "Main ALICE module."
+  ${ET}COMMAND...${EZ} might be:
+
+    ${EM}help${EZ}
+      This help screen.
+
+    ${EM}enter${EZ} [MODULE1 [MODULE2...]]
+      Enters a new shell with the given modules loaded.
+      Return to the clean environment by exiting the shell with ${ET}exit${EZ}.
+
+    ${EM}command${EZ} [MODULE1 [MODULE2...]] -- cmdInEnvironment [PARAM1 [PARAM2...]]
+      Executes the given command with environment defined by the given modules.
+      Exit code is preserved.
+      Example: $ET$PROG command AliRoot/v5-08-02-1 -- aliroot -b$EZ
+
+    ${EM}avail${EZ}
+      List available modules.
+
+    ${EM}ANYTHING_ELSE${EZ}
+      Pass all arguments as-is to the ${ET}modulecmd${EZ} command.
+      Example: print AliRoot env for zsh: $ET$PROG zsh load AliRoot/v5-08-02-1$EZ
+      Consult ${ET}man modulecmd${EZ} for more information.
+
+EoF
+[[ -z "$1" ]] || printf "\033[31mERROR: $1\033[m\n" >&2
 }
-set version 1.0
-module-whatis "Main ALICE module."
+
+function installHint() {
+  if [[ `uname` == Darwin ]]; then
+    CMD='brew install modules'
+  elif which apt-get > /dev/null 2>&1; then
+    CMD='apt-get install environment-modules'
+  elif which yum > /dev/null 2>&1; then
+    CMD='yum install environment-modules'
+  fi
+  printf "\033[31mERROR: Environment Modules was not found on your system.\n" >&2
+  if [[ -z "$CMD" ]]; then
+    printf "       The package is usually called \033[35menvironment-modules\033[31m.\n" >&2
+  else
+    printf "       Get it with: \033[35m$CMD\n" >&2
+  fi
+  printf "\033[m"
+}
+
+WORK_DIR=sw
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --architecture|-a) ARCHITECTURE="$2"; shift 2 ;;
+    --work-dir|-w) WORK_DIR="$2"; shift 2 ;;
+    --no-update) NO_UPDATE=1; shift ;;
+    --help|help) printHelp; exit 0 ;;
+    *) break ;;
+  esac
+done
+
+[[ ! -d "$WORK_DIR" ]] && { printHelp "Work dir $WORK_DIR cannot be accessed"; false; }
+WORK_DIR=$(cd "$WORK_DIR"; pwd)
+[[ -z "$ARCHITECTURE" ]] && ARCHITECTURE=$(ls -1t $WORK_DIR | grep -vE '^[A-Z]+$' | head -n1)
+[[ -z "$ARCHITECTURE" ]] && { printHelp "Cannot autodetect architecture"; false; }
+
+MODULECMD=$(PATH="$PATH:`brew --prefix modules 2>/dev/null || true`/Modules/bin" which modulecmd || true)
+[[ -z "$MODULECMD" ]] && { installHint; false; }
+
+if [[ -z "$NO_UPDATE" ]]; then
+  # Collect all modulefiles in one place
+  rm -rf $WORK_DIR/MODULES/$ARCHITECTURE
+  mkdir -p $WORK_DIR/MODULES/$ARCHITECTURE/BASE
+  cat > $WORK_DIR/MODULES/$ARCHITECTURE/BASE/1.0 <<EOF
+#%Module1.0
 set base_path $WORK_DIR/$ARCHITECTURE
 setenv BASEDIR \$base_path
 set osname [uname sysname]
 set osarchitecture [uname machine]
 EOF
-popd
-
-echo "==> Available modules"
-$MODULECMD avail
-
-if [[ "$*" == '' ]]; then
-  echo ''
-  echo "==> Use $0 [module1 [module2...] to load modules."
-  false
+  while read PKG; do
+    PKGVER=${PKG##*/}
+    PKGNAME=${PKG%/*}
+    PKGNAME=${PKGNAME##*/}
+    [[ ! -e "$PKG/etc/modulefiles/$PKGNAME" ]] && continue
+    mkdir -p "$WORK_DIR/MODULES/$ARCHITECTURE/$PKGNAME"
+    cp "$PKG/etc/modulefiles/$PKGNAME" "$WORK_DIR/MODULES/$ARCHITECTURE/$PKGNAME/$PKGVER"
+  done < <(find $WORK_DIR/$ARCHITECTURE -maxdepth 2 -mindepth 2)
+else
+  printf "\033[33mWARNING: not updating modulefiles\033[m" >&2
 fi
 
-echo "==> Loading $*"
-eval $($MODULECMD add $*)
-
-echo "==> Loaded modules"
-$MODULECMD list
-
-echo "==> Type exit to exit the environment"
-export PS1="[Modules: $*] \w \$> "
-exec bash --norc -i
+export MODULEPATH="$WORK_DIR/MODULES/$ARCHITECTURE:$MODULEPATH"
+case "$1" in
+  enter)
+    # Enters a new interactive shell with the given environment.
+    shift
+    eval $($MODULECMD bash add "$@")
+    export PS1="[$*] \w \$> "
+    exec bash --norc -i
+  ;;
+  command)
+    # Executes a command with the given environment.
+    shift
+    MODULES=()
+    while [[ $# -gt 0 ]]; do
+      [[ "$1" == -- ]] && { shift; break; }
+      MODULES+=("$1")
+      shift
+    done
+    eval $($MODULECMD bash add "$MODULES")
+    exec "$@"
+  ;;
+  avail)
+    exec $MODULECMD bash avail
+  ;;
+  '')
+    printHelp "What do you want to do?"
+    false
+  ;;
+  *)
+    # Wrapper to modulecmd.
+    exec $MODULECMD "$@"
+  ;;
+esac
