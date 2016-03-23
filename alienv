@@ -1,0 +1,202 @@
+#!/bin/bash -e
+
+# Load and test Modulefiles created by recipes.
+PROG=$(basename "$0")
+
+# Detect parent shell (fall back to bash)
+[[ -z "$MODULES_SHELL" ]] && MODULES_SHELL=$(ps -e -o pid,command | grep -E "^\s*$PPID\s+" | awk '{print $2}' | sed -e 's/^-\?\(.*\)$/\1/')
+case "$MODULES_SHELL" in
+  sh)                                      ;;
+  csh|tcsh) SHELL_NORC_PARAM=-f            ;;
+  ksh)      SHELL_NORC_ENV="ENV=/dev/null" ;;
+  zsh)      SHELL_NORC_PARAM=--no-rcs      ;;
+  *)        MODULES_SHELL=bash
+            SHELL_NORC_PARAM=--norc        ;;
+esac
+
+function printHelp() {
+local EM=`printf '\033[35m'`
+local ET=`printf '\033[36m'`
+local EZ=`printf '\033[m'`
+cat >&2 <<EoF
+$PROG -- load environment for aliBuild packages through modulefiles
+
+Usage: $0 \\
+         [--architecture|-a ${ET}ARCHITECTURE${EZ}] \\
+         [--work-dir|-w ${ET}WORKDIR${EZ}]          \\
+         [--no-refresh]                   \\
+         ${ET}COMMAND...${EZ}
+
+  ${EM}--no-refresh${EZ} skips refreshing the modules directory.
+
+  ${ET}WORKDIR${EZ} defaults to sw.
+  ${ET}ARCHITECTURE${EZ} is automatically detected in most cases.
+
+  ${ET}COMMAND...${EZ} might be:
+
+    ${EM}help${EZ}
+      This help screen.
+
+    ${EM}enter${EZ} [${ET}--clean-env${EZ}|${ET}-e${EZ}] MODULE1[,MODULE2...]
+      Enters a new shell with the given modules loaded.
+      Return to the clean environment by exiting the shell with ${ET}exit${EZ}.
+      Inside the environment you can use the native ${ET}modulecmd${EZ}.
+      By default you enter the same shell type you are in. Override with environment variable ${ET}MODULES_SHELL${EZ}.
+      Use ${ET}--clean-env${EZ} to ignore the shell startup file (e.g. ~/.bashrc).
+      This is useful if by default it exports paths that conflict with modules.
+
+    ${EM}setenv${EZ} MODULE1[,MODULE2...] ${ET}-c${EZ} cmdInEnvironment [PARAM1 [PARAM2...]]
+      Executes the given command with environment defined by the given modules.
+      Everything after ${ET}-c${EZ} is executed as-is.
+      Exit code is preserved.
+      Example: $ET$0 setenv AliRoot/v5-08-02-1 -c aliroot -b$EZ
+
+    ${EM}printenv${EZ} or ${EM}load${EZ} MODULE1[,MODULE2...]
+      Prints the environment in the current shell for the given modules.
+      This command does not set any environment and it must be executed through ${ET}eval${EZ} to be effective.
+      Override shell with the environment variable ${ET}MODULES_SHELL${EZ}.
+      Example: ${ET}eval \`$0 load AliRoot/latest\`$EZ (those are backquotes!)
+
+    ${EM}unload${EZ} MODULE1[,MODULE2...]
+      Prints the environment in the current shell for unloading the given modules.
+      This command does not set any environment and it must be executed through ${ET}eval${EZ} to be effective.
+      Override shell with the environment variable ${ET}MODULES_SHELL${EZ}.
+      Example: ${ET}eval \`$0 unload AliRoot\`$EZ (version can be omitted)
+
+    ${EM}q${EZ} or ${EM}query${EZ} [REGEXP]
+      List all available modules, or the ones matching ${ET}REGEXP${EZ} if provided.
+
+    ${EM}list${EZ}
+      List loaded modules.
+
+    ${EM}modulecmd${EZ} [PARAM1 [PARAM2...]]]
+      Pass all arguments as-is to the ${ET}modulecmd${EZ} command.
+      Example: print AliRoot env for zsh: $ET$0 modulecmd zsh load AliRoot/v5-08-02-1$EZ
+      Consult ${ET}man modulecmd${EZ} for more information.
+
+EoF
+[[ -z "$1" ]] || printf "\033[31mERROR: $1\033[m\n" >&2
+}
+
+function installHint() {
+  if [[ `uname` == Darwin ]]; then
+    CMD='brew install modules'
+  elif which apt-get > /dev/null 2>&1; then
+    CMD='apt-get install environment-modules'
+  elif which yum > /dev/null 2>&1; then
+    CMD='yum install environment-modules'
+  fi
+  printf "\033[31mERROR: Environment Modules was not found on your system.\n" >&2
+  if [[ -z "$CMD" ]]; then
+    printf "       The package is usually called \033[35menvironment-modules\033[31m.\n" >&2
+  else
+    printf "       Get it with: \033[35m$CMD\n" >&2
+  fi
+  printf "\033[m"
+}
+
+function normModules() {
+  echo "$@" | sed -e 's/,/ /g; s/VO_ALICE@//g; s!::!/!g'
+}
+
+DEFAULT_WORK_DIRS=( sw ../sw )
+ARGS=()
+COMMAND_IN_ENV=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --architecture|-a) ARCHITECTURE="$2"; shift 2 ;;
+    --work-dir|-w) WORK_DIR="$2"; shift 2 ;;
+    --no-refresh) NO_REFRESH=1; shift ;;
+    --clean-env|-e) CLEAN_ENV=1; shift ;;
+    --help|help) printHelp; exit 0 ;;
+    -c) shift; COMMAND_IN_ENV=("$@"); break ;;
+    *) ARGS+=("$1"); shift ;;
+  esac
+done
+
+ACTION="${ARGS[0]}"
+ARGS=("${ARGS[@]:1}")
+
+if [[ -z "$WORK_DIR" ]]; then
+  for WORK_DIR in "${DEFAULT_WORK_DIRS[@]}"; do
+    [[ -d "$WORK_DIR" ]] && break || WORK_DIR=
+  done
+  [[ -z "$WORK_DIR" ]] && { printHelp "No default work dir (${DEFAULT_WORK_DIRS[*]}) can be accessed"; false; }
+fi
+[[ ! -d "$WORK_DIR" ]] && { printHelp "Work dir $WORK_DIR cannot be accessed"; false; }
+WORK_DIR=$(cd "$WORK_DIR"; pwd)
+[[ -z "$ARCHITECTURE" ]] && ARCHITECTURE=$(ls -1t $WORK_DIR | grep -vE '^[A-Z]+$' | head -n1)
+[[ -z "$ARCHITECTURE" ]] && { printHelp "Cannot autodetect architecture"; false; }
+
+MODULECMD=$(PATH="$PATH:`brew --prefix modules 2>/dev/null || true`/Modules/bin" which modulecmd || true)
+[[ -z "$MODULECMD" ]] && { installHint; false; }
+
+if [[ -z "$NO_REFRESH" ]]; then
+  # Collect all modulefiles in one place
+  rm -rf $WORK_DIR/MODULES/$ARCHITECTURE
+  mkdir -p $WORK_DIR/MODULES/$ARCHITECTURE/BASE
+  cat > $WORK_DIR/MODULES/$ARCHITECTURE/BASE/1.0 <<EOF
+#%Module1.0
+set base_path $WORK_DIR/$ARCHITECTURE
+setenv BASEDIR \$base_path
+set osname [uname sysname]
+set osarchitecture [uname machine]
+EOF
+  while read PKG; do
+    PKGVER=${PKG##*/}
+    PKGNAME=${PKG%/*}
+    PKGNAME=${PKGNAME##*/}
+    [[ ! -e "$PKG/etc/modulefiles/$PKGNAME" ]] && continue
+    mkdir -p "$WORK_DIR/MODULES/$ARCHITECTURE/$PKGNAME"
+    cp "$PKG/etc/modulefiles/$PKGNAME" "$WORK_DIR/MODULES/$ARCHITECTURE/$PKGNAME/$PKGVER"
+  done < <(find $WORK_DIR/$ARCHITECTURE -maxdepth 2 -mindepth 2)
+else
+  printf "\033[33mWARNING: not updating modulefiles\033[m\n" >&2
+fi
+
+export MODULEPATH="$WORK_DIR/MODULES/$ARCHITECTURE:$MODULEPATH"
+case "$ACTION" in
+  enter)
+    MODULES=$(normModules "${ARGS[@]}")
+    eval $($MODULECMD bash add $MODULES)
+    if [[ ! -z "$CLEAN_ENV" ]]; then
+      case $MODULES_SHELL in
+        sh|bash) export PS1="[$MODULES]"' \w $> '   ;;
+        ksh)     export PS1="[$MODULES]"' $PWD $> ' ;;
+        zsh)     export PS1="[$MODULES]"' %~ %#> '  ;;
+      esac
+    fi
+    exec ${CLEAN_ENV:+env $SHELL_NORC_ENV} $MODULES_SHELL ${CLEAN_ENV:+$SHELL_NORC_PARAM} -i
+  ;;
+  printenv|load|unload)
+    [[ $ACTION == printenv ]] && ACTION=load
+    exec $MODULECMD $MODULES_SHELL $ACTION $(normModules "${ARGS[@]}")
+  ;;
+  setenv)
+    [[ -z "${COMMAND_IN_ENV[*]}" ]] && { printHelp "No command specified with -c"; false; }
+    eval $($MODULECMD bash add $(normModules "${ARGS[@]}"))
+    exec "${COMMAND_IN_ENV[@]}"
+  ;;
+  q|query)
+    [[ -z "${ARGS[0]}" ]] && SEARCH_CMD=cat || SEARCH_CMD=( grep -iE "${ARGS[0]}" )
+    exec $MODULECMD bash -t avail 2>&1 | grep -E '^[^/]+/[^/]+$' | grep -vE ':$' | \
+      "${SEARCH_CMD[@]}" | sed -e 's!^\([^/]\+\)/\([^/]\+\)$!VO_ALICE@\1::\2!'
+  ;;
+  avail)
+    exec $MODULECMD bash avail
+  ;;
+  list)
+    exec $MODULECMD bash list
+  ;;
+  modulecmd)
+    exec $MODULECMD "${ARGS[@]}"
+  ;;
+  '')
+    printHelp "What do you want to do?"
+  ;;
+  *)
+    printHelp "Unknown command: $1"
+  ;;
+esac
+false
