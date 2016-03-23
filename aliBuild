@@ -399,7 +399,7 @@ if __name__ == "__main__":
   parser.add_argument("--disable", dest="disable", default=[],
                       metavar="PACKAGE", action="append",
                       help="Do not build PACKAGE and all its (unique) dependencies.")
-  parser.add_argument("--defaults", dest="defaults", default="release",
+  parser.add_argument("--defaults", dest="defaults", default="release", nargs="?",
                       metavar="FILE", help="Specify which defaults to use")
   parser.add_argument("--always-prefer-system", dest="preferSystem", default=False,
                       action="store_true", help="Always use system packages when compatible")
@@ -493,6 +493,14 @@ if __name__ == "__main__":
   buildOrder = []
   workDir = abspath(args.workDir)
   prunePaths(workDir)
+
+  if not exists("%s/defaults-%s.sh" % (args.configDir, args.defaults)):
+    viableDefaults = ["- " + basename(x).replace("defaults-","").replace(".sh", "")
+                      for x in glob("%s/defaults-*.sh" % args.configDir)]
+    parser.error(format("Default `%(d)s' does not exists. Viable options:\n%(v)s",
+                 d=args.defaults or "<no defaults specified>",
+                 v="\n".join(viableDefaults)))
+
   specDir = "%s/SPECS" % workDir
   if not exists(specDir):
     makedirs(specDir)
