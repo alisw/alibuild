@@ -13,10 +13,10 @@ $PROG -- load environment for aliBuild packages through modulefiles
 Usage: $PROG \\
          [--architecture|-a ${ET}ARCHITECTURE${EZ}] \\
          [--work-dir|-w ${ET}WORKDIR${EZ}]          \\
-         [--no-update]                    \\
+         [--no-refresh]                   \\
          ${ET}COMMAND...${EZ}
 
-  ${EM}--no-update${EZ} skips refreshing the modules directory
+  ${EM}--no-refresh${EZ} skips refreshing the modules directory
 
   ${ET}WORKDIR${EZ} defaults to sw
   ${ET}ARCHITECTURE${EZ} is automatically detected in most cases
@@ -26,21 +26,27 @@ Usage: $PROG \\
     ${EM}help${EZ}
       This help screen.
 
-    ${EM}enter${EZ} [MODULE1 [MODULE2...]]
+    ${EM}enter${EZ} MODULE1[,MODULE2...]
       Enters a new shell with the given modules loaded.
       Return to the clean environment by exiting the shell with ${ET}exit${EZ}.
+      Inside the environment you can use the native ${ET}modulecmd${EZ}.
 
-    ${EM}command${EZ} [MODULE1 [MODULE2...]] -- cmdInEnvironment [PARAM1 [PARAM2...]]
+    ${EM}setenv${EZ} MODULE1[,MODULE2...] ${ET}-c${EZ} cmdInEnvironment [PARAM1 [PARAM2...]]
       Executes the given command with environment defined by the given modules.
+      Everything after ${ET}-c${EZ} is executed as-is.
       Exit code is preserved.
-      Example: $ET$PROG command AliRoot/v5-08-02-1 -- aliroot -b$EZ
+      Example: $ET$PROG setenv AliRoot/v5-08-02-1 -c aliroot -b$EZ
 
-    ${EM}avail${EZ}
+    ${EM}printenv${EZ} MODULE1[,MODULE2...]
+      Prints the environment to ${ET}eval${EZ} in Bash for the given modules.
+      Use $ET$PROG modulecmd [shell] load MODULE1 [MODULE2...]$EZ for other shells.
+
+    ${EM}q${EZ} or ${EM}query${EZ} or ${EM}avail${EZ}
       List available modules.
 
-    ${EM}ANYTHING_ELSE${EZ}
+    ${EM}modulecmd${EZ} [PARAM1 [PARAM2...]]]
       Pass all arguments as-is to the ${ET}modulecmd${EZ} command.
-      Example: print AliRoot env for zsh: $ET$PROG zsh load AliRoot/v5-08-02-1$EZ
+      Example: print AliRoot env for zsh: $ET$PROG modulecmd zsh load AliRoot/v5-08-02-1$EZ
       Consult ${ET}man modulecmd${EZ} for more information.
 
 EoF
@@ -70,7 +76,7 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --architecture|-a) ARCHITECTURE="$2"; shift 2 ;;
     --work-dir|-w) WORK_DIR="$2"; shift 2 ;;
-    --no-update) NO_UPDATE=1; shift ;;
+    --no-refresh) NO_REFRESH=1; shift ;;
     --help|help) printHelp; exit 0 ;;
     *) break ;;
   esac
@@ -84,7 +90,7 @@ WORK_DIR=$(cd "$WORK_DIR"; pwd)
 MODULECMD=$(PATH="$PATH:`brew --prefix modules 2>/dev/null || true`/Modules/bin" which modulecmd || true)
 [[ -z "$MODULECMD" ]] && { installHint; false; }
 
-if [[ -z "$NO_UPDATE" ]]; then
+if [[ -z "$NO_REFRESH" ]]; then
   # Collect all modulefiles in one place
   rm -rf $WORK_DIR/MODULES/$ARCHITECTURE
   mkdir -p $WORK_DIR/MODULES/$ARCHITECTURE/BASE
@@ -110,33 +116,46 @@ fi
 export MODULEPATH="$WORK_DIR/MODULES/$ARCHITECTURE:$MODULEPATH"
 case "$1" in
   enter)
-    # Enters a new interactive shell with the given environment.
     shift
-    eval $($MODULECMD bash add "$@")
-    export PS1="[$*] \w \$> "
+    MODULES=$(echo "$@" | sed -e 's/,/ /g; s/VO_ALICE@//g; s!::!/!g')
+    eval $($MODULECMD bash add $MODULES)
+    export PS1="[$MODULES] \w \$> "
     exec bash --norc -i
   ;;
-  command)
-    # Executes a command with the given environment.
+  printenv)
+    shift
+    MODULES=$(echo "$@" | sed -e 's/,/ /g; s/VO_ALICE@//g; s!::!/!g')
+    exec $MODULECMD bash add $MODULES
+  ;;
+  setenv)
     shift
     MODULES=()
     while [[ $# -gt 0 ]]; do
-      [[ "$1" == -- ]] && { shift; break; }
+      [[ "$1" == -c ]] && { shift; break; }
       MODULES+=("$1")
       shift
     done
-    eval $($MODULECMD bash add "$MODULES")
+    [[ -z "$*" ]] && { printHelp "No command specified with -c"; false; }
+    MODULES=$(echo "${MODULES[@]}" | sed -e 's/,/ /g; s/VO_ALICE@//g; s!::!/!g')
+    eval $($MODULECMD bash add $MODULES)
     exec "$@"
+  ;;
+  q|query)
+    exec $MODULECMD bash -t avail 2>&1 | grep -E '^[^/]+/[^/]+$' | grep -vE ':$' | \
+      sed -e 's!^\([^/]\+\)/\([^/]\+\)$!VO_ALICE@\1::\2!'
   ;;
   avail)
     exec $MODULECMD bash avail
   ;;
-  '')
-    printHelp "What do you want to do?"
-    false
-  ;;
-  *)
-    # Wrapper to modulecmd.
+  modulecmd)
+    shift
     exec $MODULECMD "$@"
   ;;
+  '')
+    printHelp "What do you want to do?"
+  ;;
+  *)
+    printHelp "Unknown command: $1"
+  ;;
 esac
+false
