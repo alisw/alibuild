@@ -57,17 +57,29 @@ Environment for packages built using aliBuild is managed by
 [Environment Modules](http://modules.sourceforge.net). Assuming you are in the
 toplevel directory containing `alibuild`, `alidist` and `sw` you can do:
 
-    alibuild/aliModules avail
+    alibuild/alienv q
 
 to list the available packages, and:
 
-    alibuild/aliModules enter PackageA/VersionA [PackageB/VersionB...]
+    alibuild/alienv enter VO_ALICE@PackageA::VersionA[,VO_ALICE@PackageB::VersionB...]
 
 to enter a shell with the appropriate environment set. Note that loading a
 toplevel package recursively sets the environment for all its dependencies.
 
+You can also execute a command with the proper environment without altering the
+current one. For instance:
+
+    alibuild/alienv setenv VO_ALICE@AliRoot::latest -c aliroot -b
+
+To see other commands consult the guids:
+
+    alibuild/alienv help
+
 Environment Modules is required: the package is usually called
 `environment-modules` on Linux, or simply `modules` if using Homebrew on OSX.
+
+Note that `alienv` works exactly like the one found on CVMFS, but for local
+packages built with `aliBuild`.
 
 
 ### Environment for packages lacking a module definition
