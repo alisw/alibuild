@@ -63,8 +63,8 @@ Usage: $0 \\
       Override shell with the environment variable ${ET}MODULES_SHELL${EZ}.
       Example: ${ET}eval \`$0 unload AliRoot\`$EZ (version can be omitted)
 
-    ${EM}q${EZ} or ${EM}query${EZ} or ${EM}avail${EZ}
-      List available modules.
+    ${EM}q${EZ} or ${EM}query${EZ} [REGEXP]
+      List all available modules, or the ones matching ${ET}REGEXP${EZ} if provided.
 
     ${EM}list${EZ}
       List loaded modules.
@@ -183,8 +183,10 @@ case "$1" in
     exec "$@"
   ;;
   q|query)
+    shift
+    [[ -z "$1" ]] && SEARCH_CMD=cat || SEARCH_CMD=( grep -iE "$1" )
     exec $MODULECMD bash -t avail 2>&1 | grep -E '^[^/]+/[^/]+$' | grep -vE ':$' | \
-      sed -e 's!^\([^/]\+\)/\([^/]\+\)$!VO_ALICE@\1::\2!'
+      "${SEARCH_CMD[@]}" | sed -e 's!^\([^/]\+\)/\([^/]\+\)$!VO_ALICE@\1::\2!'
   ;;
   avail)
     exec $MODULECMD bash avail
