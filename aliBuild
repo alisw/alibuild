@@ -389,7 +389,7 @@ if __name__ == "__main__":
   parser.add_argument("-v", dest="volumes", action='append', default=[], 
                       help="Specify volumes to be used in Docker")
   parser.add_argument("--jobs", "-j", dest="jobs", type=int, default=detectJobs())
-  parser.add_argument("--reference-sources", dest="referenceSources", default="sw/MIRROR")
+  parser.add_argument("--reference-sources", dest="referenceSources", default="%(workDir)s/MIRROR")
   parser.add_argument("--remote-store", dest="remoteStore", default="",
                       help="Where to find packages already built for reuse."
                            "Use ssh:// in front for remote store. End with ::rw if you want to upload.")
@@ -416,6 +416,8 @@ if __name__ == "__main__":
   parser.add_argument("--no-auto-cleanup", help="Do not cleanup build by products automatically",
                       dest="autoCleanup", action="store_false", default=True)
   args = parser.parse_args()
+
+  args.referenceSources = format(args.referenceSources, workDir=args.workDir)
 
   if args.remoteStore or args.writeStore:
     args.noSystem = True
