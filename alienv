@@ -21,7 +21,7 @@ local EZ=`printf '\033[m'`
 cat >&2 <<EoF
 $PROG -- load environment for aliBuild packages through modulefiles
 
-Usage: $PROG \\
+Usage: $0 \\
          [--architecture|-a ${ET}ARCHITECTURE${EZ}] \\
          [--work-dir|-w ${ET}WORKDIR${EZ}]          \\
          [--no-refresh]                   \\
@@ -49,19 +49,29 @@ Usage: $PROG \\
       Executes the given command with environment defined by the given modules.
       Everything after ${ET}-c${EZ} is executed as-is.
       Exit code is preserved.
-      Example: $ET$PROG setenv AliRoot/v5-08-02-1 -c aliroot -b$EZ
+      Example: $ET$0 setenv AliRoot/v5-08-02-1 -c aliroot -b$EZ
 
-    ${EM}printenv${EZ} MODULE1[,MODULE2...]
-      Prints the environment to ${ET}eval${EZ} in the current shell for the given modules.
+    ${EM}printenv${EZ} or ${EM}load${EZ} MODULE1[,MODULE2...]
+      Prints the environment in the current shell for the given modules.
+      This command does not set any environment and it must be executed through ${ET}eval${EZ} to be effective.
       Override shell with the environment variable ${ET}MODULES_SHELL${EZ}.
-      Use $ET$PROG modulecmd [shell] load MODULE1 [MODULE2...]$EZ for other shells.
+      Example: ${ET}eval \`$0 load AliRoot/latest\`$EZ (those are backquotes!)
+
+    ${EM}unload${EZ} MODULE1[,MODULE2...]
+      Prints the environment in the current shell for unloading the given modules.
+      This command does not set any environment and it must be executed through ${ET}eval${EZ} to be effective.
+      Override shell with the environment variable ${ET}MODULES_SHELL${EZ}.
+      Example: ${ET}eval \`$0 unload AliRoot\`$EZ (version can be omitted)
 
     ${EM}q${EZ} or ${EM}query${EZ} or ${EM}avail${EZ}
       List available modules.
 
+    ${EM}list${EZ}
+      List loaded modules.
+
     ${EM}modulecmd${EZ} [PARAM1 [PARAM2...]]]
       Pass all arguments as-is to the ${ET}modulecmd${EZ} command.
-      Example: print AliRoot env for zsh: $ET$PROG modulecmd zsh load AliRoot/v5-08-02-1$EZ
+      Example: print AliRoot env for zsh: $ET$0 modulecmd zsh load AliRoot/v5-08-02-1$EZ
       Consult ${ET}man modulecmd${EZ} for more information.
 
 EoF
@@ -152,10 +162,12 @@ case "$1" in
     fi
     exec ${CLEAN_ENV:+env $SHELL_NORC_ENV} $MODULES_SHELL ${CLEAN_ENV:+$SHELL_NORC_PARAM} -i
   ;;
-  printenv)
+  printenv|load|unload)
+    CMD=$1
+    [[ $CMD == printenv ]] && CMD=load
     shift
     MODULES=$(echo "$@" | sed -e 's/,/ /g; s/VO_ALICE@//g; s!::!/!g')
-    exec $MODULECMD $MODULES_SHELL add $MODULES
+    exec $MODULECMD $MODULES_SHELL $CMD $MODULES
   ;;
   setenv)
     shift
@@ -176,6 +188,9 @@ case "$1" in
   ;;
   avail)
     exec $MODULECMD bash avail
+  ;;
+  list)
+    exec $MODULECMD bash list
   ;;
   modulecmd)
     shift
