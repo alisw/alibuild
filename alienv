@@ -3,6 +3,17 @@
 # Load and test Modulefiles created by recipes.
 PROG=$(basename "$0")
 
+# Detect parent shell (fall back to bash)
+[[ -z "$MODULES_SHELL" ]] && MODULES_SHELL=$(ps -e -o pid,command | grep -E "^\s*$PPID\s+" | awk '{print $2}' | sed -e 's/^-\?\(.*\)$/\1/')
+case "$MODULES_SHELL" in
+  sh)                                      ;;
+  csh|tcsh) SHELL_NORC_PARAM=-f            ;;
+  ksh)      SHELL_NORC_ENV="ENV=/dev/null" ;;
+  zsh)      SHELL_NORC_PARAM=--no-rcs      ;;
+  *)        MODULES_SHELL=bash
+            SHELL_NORC_PARAM=--norc        ;;
+esac
+
 function printHelp() {
 local EM=`printf '\033[35m'`
 local ET=`printf '\033[36m'`
@@ -10,43 +21,57 @@ local EZ=`printf '\033[m'`
 cat >&2 <<EoF
 $PROG -- load environment for aliBuild packages through modulefiles
 
-Usage: $PROG \\
+Usage: $0 \\
          [--architecture|-a ${ET}ARCHITECTURE${EZ}] \\
          [--work-dir|-w ${ET}WORKDIR${EZ}]          \\
          [--no-refresh]                   \\
          ${ET}COMMAND...${EZ}
 
-  ${EM}--no-refresh${EZ} skips refreshing the modules directory
+  ${EM}--no-refresh${EZ} skips refreshing the modules directory.
 
-  ${ET}WORKDIR${EZ} defaults to sw
-  ${ET}ARCHITECTURE${EZ} is automatically detected in most cases
+  ${ET}WORKDIR${EZ} defaults to sw.
+  ${ET}ARCHITECTURE${EZ} is automatically detected in most cases.
 
   ${ET}COMMAND...${EZ} might be:
 
     ${EM}help${EZ}
       This help screen.
 
-    ${EM}enter${EZ} MODULE1[,MODULE2...]
+    ${EM}enter${EZ} [${ET}--clean-env${EZ}|${ET}-e${EZ}] MODULE1[,MODULE2...]
       Enters a new shell with the given modules loaded.
       Return to the clean environment by exiting the shell with ${ET}exit${EZ}.
       Inside the environment you can use the native ${ET}modulecmd${EZ}.
+      By default you enter the same shell type you are in. Override with environment variable ${ET}MODULES_SHELL${EZ}.
+      Use ${ET}--clean-env${EZ} to ignore the shell startup file (e.g. ~/.bashrc).
+      This is useful if by default it exports paths that conflict with modules.
 
     ${EM}setenv${EZ} MODULE1[,MODULE2...] ${ET}-c${EZ} cmdInEnvironment [PARAM1 [PARAM2...]]
       Executes the given command with environment defined by the given modules.
       Everything after ${ET}-c${EZ} is executed as-is.
       Exit code is preserved.
-      Example: $ET$PROG setenv AliRoot/v5-08-02-1 -c aliroot -b$EZ
+      Example: $ET$0 setenv AliRoot/v5-08-02-1 -c aliroot -b$EZ
 
-    ${EM}printenv${EZ} MODULE1[,MODULE2...]
-      Prints the environment to ${ET}eval${EZ} in Bash for the given modules.
-      Use $ET$PROG modulecmd [shell] load MODULE1 [MODULE2...]$EZ for other shells.
+    ${EM}printenv${EZ} or ${EM}load${EZ} MODULE1[,MODULE2...]
+      Prints the environment in the current shell for the given modules.
+      This command does not set any environment and it must be executed through ${ET}eval${EZ} to be effective.
+      Override shell with the environment variable ${ET}MODULES_SHELL${EZ}.
+      Example: ${ET}eval \`$0 load AliRoot/latest\`$EZ (those are backquotes!)
+
+    ${EM}unload${EZ} MODULE1[,MODULE2...]
+      Prints the environment in the current shell for unloading the given modules.
+      This command does not set any environment and it must be executed through ${ET}eval${EZ} to be effective.
+      Override shell with the environment variable ${ET}MODULES_SHELL${EZ}.
+      Example: ${ET}eval \`$0 unload AliRoot\`$EZ (version can be omitted)
 
     ${EM}q${EZ} or ${EM}query${EZ} or ${EM}avail${EZ}
       List available modules.
 
+    ${EM}list${EZ}
+      List loaded modules.
+
     ${EM}modulecmd${EZ} [PARAM1 [PARAM2...]]]
       Pass all arguments as-is to the ${ET}modulecmd${EZ} command.
-      Example: print AliRoot env for zsh: $ET$PROG modulecmd zsh load AliRoot/v5-08-02-1$EZ
+      Example: print AliRoot env for zsh: $ET$0 modulecmd zsh load AliRoot/v5-08-02-1$EZ
       Consult ${ET}man modulecmd${EZ} for more information.
 
 EoF
@@ -70,7 +95,7 @@ function installHint() {
   printf "\033[m"
 }
 
-WORK_DIR=sw
+DEFAULT_WORK_DIRS=( sw ../sw )
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -82,6 +107,12 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+if [[ -z "$WORK_DIR" ]]; then
+  for WORK_DIR in "${DEFAULT_WORK_DIRS[@]}"; do
+    [[ -d "$WORK_DIR" ]] && break || WORK_DIR=
+  done
+  [[ -z "$WORK_DIR" ]] && { printHelp "No default work dir (${DEFAULT_WORK_DIRS[*]}) can be accessed"; false; }
+fi
 [[ ! -d "$WORK_DIR" ]] && { printHelp "Work dir $WORK_DIR cannot be accessed"; false; }
 WORK_DIR=$(cd "$WORK_DIR"; pwd)
 [[ -z "$ARCHITECTURE" ]] && ARCHITECTURE=$(ls -1t $WORK_DIR | grep -vE '^[A-Z]+$' | head -n1)
@@ -117,15 +148,26 @@ export MODULEPATH="$WORK_DIR/MODULES/$ARCHITECTURE:$MODULEPATH"
 case "$1" in
   enter)
     shift
+    case "$1" in
+      --clean-env|-e) CLEAN_ENV=1 ; shift ;;
+    esac
     MODULES=$(echo "$@" | sed -e 's/,/ /g; s/VO_ALICE@//g; s!::!/!g')
     eval $($MODULECMD bash add $MODULES)
-    export PS1="[$MODULES] \w \$> "
-    exec bash --norc -i
+    if [[ ! -z "$CLEAN_ENV" ]]; then
+      case $MODULES_SHELL in
+        sh|bash) export PS1="[$MODULES]"' \w $> '   ;;
+        ksh)     export PS1="[$MODULES]"' $PWD $> ' ;;
+        zsh)     export PS1="[$MODULES]"' %~ %#> '  ;;
+      esac
+    fi
+    exec ${CLEAN_ENV:+env $SHELL_NORC_ENV} $MODULES_SHELL ${CLEAN_ENV:+$SHELL_NORC_PARAM} -i
   ;;
-  printenv)
+  printenv|load|unload)
+    CMD=$1
+    [[ $CMD == printenv ]] && CMD=load
     shift
     MODULES=$(echo "$@" | sed -e 's/,/ /g; s/VO_ALICE@//g; s!::!/!g')
-    exec $MODULECMD bash add $MODULES
+    exec $MODULECMD $MODULES_SHELL $CMD $MODULES
   ;;
   setenv)
     shift
@@ -146,6 +188,9 @@ case "$1" in
   ;;
   avail)
     exec $MODULECMD bash avail
+  ;;
+  list)
+    exec $MODULECMD bash list
   ;;
   modulecmd)
     shift
