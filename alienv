@@ -85,7 +85,7 @@ function installHint() {
   printf "\033[m"
 }
 
-WORK_DIR=sw
+DEFAULT_WORK_DIRS=( sw ../sw )
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -97,6 +97,12 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+if [[ -z "$WORK_DIR" ]]; then
+  for WORK_DIR in "${DEFAULT_WORK_DIRS[@]}"; do
+    [[ -d "$WORK_DIR" ]] && break || WORK_DIR=
+  done
+  [[ -z "$WORK_DIR" ]] && { printHelp "No default work dir (${DEFAULT_WORK_DIRS[*]}) can be accessed"; false; }
+fi
 [[ ! -d "$WORK_DIR" ]] && { printHelp "Work dir $WORK_DIR cannot be accessed"; false; }
 WORK_DIR=$(cd "$WORK_DIR"; pwd)
 [[ -z "$ARCHITECTURE" ]] && ARCHITECTURE=$(ls -1t $WORK_DIR | grep -vE '^[A-Z]+$' | head -n1)
