@@ -95,17 +95,28 @@ function installHint() {
   printf "\033[m"
 }
 
+function normModules() {
+  echo "$@" | sed -e 's/,/ /g; s/VO_ALICE@//g; s!::!/!g'
+}
+
 DEFAULT_WORK_DIRS=( sw ../sw )
+ARGS=()
+COMMAND_IN_ENV=()
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --architecture|-a) ARCHITECTURE="$2"; shift 2 ;;
     --work-dir|-w) WORK_DIR="$2"; shift 2 ;;
     --no-refresh) NO_REFRESH=1; shift ;;
+    --clean-env|-e) CLEAN_ENV=1; shift ;;
     --help|help) printHelp; exit 0 ;;
-    *) break ;;
+    -c) shift; COMMAND_IN_ENV=("$@"); break ;;
+    *) ARGS+=("$1"); shift ;;
   esac
 done
+
+ACTION="${ARGS[0]}"
+ARGS=("${ARGS[@]:1}")
 
 if [[ -z "$WORK_DIR" ]]; then
   for WORK_DIR in "${DEFAULT_WORK_DIRS[@]}"; do
@@ -141,17 +152,13 @@ EOF
     cp "$PKG/etc/modulefiles/$PKGNAME" "$WORK_DIR/MODULES/$ARCHITECTURE/$PKGNAME/$PKGVER"
   done < <(find $WORK_DIR/$ARCHITECTURE -maxdepth 2 -mindepth 2)
 else
-  printf "\033[33mWARNING: not updating modulefiles\033[m" >&2
+  printf "\033[33mWARNING: not updating modulefiles\033[m\n" >&2
 fi
 
 export MODULEPATH="$WORK_DIR/MODULES/$ARCHITECTURE:$MODULEPATH"
-case "$1" in
+case "$ACTION" in
   enter)
-    shift
-    case "$1" in
-      --clean-env|-e) CLEAN_ENV=1 ; shift ;;
-    esac
-    MODULES=$(echo "$@" | sed -e 's/,/ /g; s/VO_ALICE@//g; s!::!/!g')
+    MODULES=$(normModules "${ARGS[@]}")
     eval $($MODULECMD bash add $MODULES)
     if [[ ! -z "$CLEAN_ENV" ]]; then
       case $MODULES_SHELL in
@@ -163,28 +170,16 @@ case "$1" in
     exec ${CLEAN_ENV:+env $SHELL_NORC_ENV} $MODULES_SHELL ${CLEAN_ENV:+$SHELL_NORC_PARAM} -i
   ;;
   printenv|load|unload)
-    CMD=$1
-    [[ $CMD == printenv ]] && CMD=load
-    shift
-    MODULES=$(echo "$@" | sed -e 's/,/ /g; s/VO_ALICE@//g; s!::!/!g')
-    exec $MODULECMD $MODULES_SHELL $CMD $MODULES
+    [[ $ACTION == printenv ]] && ACTION=load
+    exec $MODULECMD $MODULES_SHELL $ACTION $(normModules "${ARGS[@]}")
   ;;
   setenv)
-    shift
-    MODULES=()
-    while [[ $# -gt 0 ]]; do
-      [[ "$1" == -c ]] && { shift; break; }
-      MODULES+=("$1")
-      shift
-    done
-    [[ -z "$*" ]] && { printHelp "No command specified with -c"; false; }
-    MODULES=$(echo "${MODULES[@]}" | sed -e 's/,/ /g; s/VO_ALICE@//g; s!::!/!g')
-    eval $($MODULECMD bash add $MODULES)
-    exec "$@"
+    [[ -z "${COMMAND_IN_ENV[*]}" ]] && { printHelp "No command specified with -c"; false; }
+    eval $($MODULECMD bash add $(normModules "${ARGS[@]}"))
+    exec "${COMMAND_IN_ENV[@]}"
   ;;
   q|query)
-    shift
-    [[ -z "$1" ]] && SEARCH_CMD=cat || SEARCH_CMD=( grep -iE "$1" )
+    [[ -z "${ARGS[0]}" ]] && SEARCH_CMD=cat || SEARCH_CMD=( grep -iE "${ARGS[0]}" )
     exec $MODULECMD bash -t avail 2>&1 | grep -E '^[^/]+/[^/]+$' | grep -vE ':$' | \
       "${SEARCH_CMD[@]}" | sed -e 's!^\([^/]\+\)/\([^/]\+\)$!VO_ALICE@\1::\2!'
   ;;
@@ -195,8 +190,7 @@ case "$1" in
     exec $MODULECMD bash list
   ;;
   modulecmd)
-    shift
-    exec $MODULECMD "$@"
+    exec $MODULECMD "${ARGS[@]}"
   ;;
   '')
     printHelp "What do you want to do?"
