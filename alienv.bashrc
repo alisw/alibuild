@@ -1,6 +1,6 @@
 # Source this file from your .bashrc, .zshrc or .kshrc.
 # Do not forget to export ALICE_WORK_PREFIX first.
-if [[ -z "$ALICE_WORK_PREFIX" ]]; then
+if test -z "$ALICE_WORK_PREFIX"; then
   echo "Export ALICE_WORK_PREFIX to make the alienv shortcut work." >&2
 else
   alienv() {
