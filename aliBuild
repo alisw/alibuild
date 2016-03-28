@@ -853,7 +853,8 @@ if __name__ == "__main__":
     if fileHash != spec["hash"]:
       if fileHash != "0":
         debug("Mismatch between local area and the one which I should build. Redoing.")
-      shutil.rmtree(dirname(hashFile), True)
+      if not spec["package"] in develPkgs:
+        shutil.rmtree(dirname(hashFile), True)
     else:
       # If we get here, we know we are in sync with whatever remote store.  We
       # can therefore create a directory which contains all the packages which
