@@ -17,6 +17,7 @@ export PKGREVISION="%(revision)s"
 export REQUIRES="%(requires)s"
 export BUILD_REQUIRES="%(build_requires)s"
 export RUNTIME_REQUIRES="%(runtime_requires)s"
+export DEVEL_PREFIX="%(develPrefix)s"
 
 export PKG_NAME="$PKGNAME"
 export PKG_VERSION="$PKGVERSION"
@@ -59,6 +60,9 @@ fi
 mkdir -p "$INSTALLROOT" "$BUILDROOT" "$BUILDDIR" "$WORK_DIR/INSTALLROOT/$PKGHASH/$PKGPATH"
 cd "$BUILDROOT"
 ln -snf $PKGHASH $WORK_DIR/BUILD/$PKGNAME-latest
+if [[ $DEVEL_PREFIX ]]; then
+  ln -snf $PKGHASH $WORK_DIR/BUILD/$PKGNAME-latest-$DEVEL_PREFIX
+fi
 
 # Reference statements
 %(referenceStatement)s
@@ -183,3 +187,6 @@ tar xzf "$WORK_DIR/TARS/$HASH_PATH/$PACKAGE_WITH_REV"
 [ "X$CAN_DELETE" = X1 ] && rm "$WORK_DIR/TARS/$HASH_PATH/$PACKAGE_WITH_REV"
 bash -ex "$ARCHITECTURE/$PKGNAME/$PKGVERSION-$PKGREVISION/relocate-me.sh"
 ln -snf $PKGVERSION-$PKGREVISION $ARCHITECTURE/$PKGNAME/latest
+if [[ $DEVEL_PREFIX ]]; then
+  ln -snf $PKGVERSION-$PKGREVISION $ARCHITECTURE/$PKGNAME/latest-$DEVEL_PREFIX
+fi

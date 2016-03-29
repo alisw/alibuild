@@ -658,7 +658,9 @@ if __name__ == "__main__":
             if err:
               print "Error, unable to lookup changes in development package %s. Is it a git clone?" % spec["source"]
               exit(1)
-            spec["tag"] = args.develPrefix if "develPrefix" in args else out
+            if not "develPrefix" in args:
+              args.develPrefix = out
+            spec["tag"] = args.develPrefix
             spec["commit_hash"] = "0"
           break
 
@@ -911,6 +913,9 @@ if __name__ == "__main__":
         try:
           unlink(format("%(w)s/BUILD/%(p)s-latest",
                  w=workDir, p=spec["package"]))
+          if "develPrefix" in args:
+            unlink(format("%(w)s/BUILD/%(p)s-latest-%(dp)s",
+                   w=workDir, p=spec["package"], dp=args.develPrefix))
         except:
           pass
         try:
@@ -1021,10 +1026,15 @@ if __name__ == "__main__":
     else:
       cachedTarball = spec["cachedTarball"]
 
+    develPrefix = ""
+    if spec["package"] in develPkgs:
+      develPrefix = args.develPrefix
+
     cmd = format(cmd_raw,
                  can_delete = args.aggressiveCleanup,
                  dependencies=dependencies,
                  dependenciesInit=dependenciesInit,
+                 develPrefix=args.develPrefix,
                  environment=environment,
                  workDir=workDir,
                  configDir=abspath(args.configDir),
