@@ -623,6 +623,7 @@ if __name__ == "__main__":
   for p in buildOrder:
     spec = specs[p]
     spec["commit_hash"] = "0"
+    develPackageBranch = ""
     if "source" in spec:
       # Replace source with local one if we are in development mode.
       if spec["package"] in develPkgs:
@@ -658,9 +659,8 @@ if __name__ == "__main__":
             if err:
               print "Error, unable to lookup changes in development package %s. Is it a git clone?" % spec["source"]
               exit(1)
-            if not "develPrefix" in args:
-              args.develPrefix = out.replace("/", "-")
-            spec["tag"] = args.develPrefix
+            develPackageBranch = out.replace("/", "-")
+            spec["tag"] = args.develPrefix if "develPrefix" in args else develPackageBranch
             spec["commit_hash"] = "0"
           break
 
@@ -1028,13 +1028,13 @@ if __name__ == "__main__":
 
     develPrefix = ""
     if spec["package"] in develPkgs:
-      develPrefix = args.develPrefix
+      develPrefix = args.develPrefix if "develPrefix" in args else develPackageBranch
 
     cmd = format(cmd_raw,
                  can_delete = args.aggressiveCleanup,
                  dependencies=dependencies,
                  dependenciesInit=dependenciesInit,
-                 develPrefix=args.develPrefix,
+                 develPrefix=develPrefix,
                  environment=environment,
                  workDir=workDir,
                  configDir=abspath(args.configDir),
