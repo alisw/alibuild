@@ -687,11 +687,9 @@ if __name__ == "__main__":
     print "Nothing to be done."
     exit(0)
   mainPackage = buildOrder[-1]
-  MAIN_PACKAGES = ["aliroot", "aliphysics", "o2"]
-  hasMainPackages = [x for x in reversed(buildOrder) 
-                     if x.lower() in MAIN_PACKAGES]
-  if hasMainPackages:
-    mainPackage = hasMainPackages[-1]
+  mainPackage = "AliRoot" if "AliRoot" in buildOrder else mainPackage
+  mainPackage = "AliPhysics" if "AliPhysics" in buildOrder else mainPackage
+  mainPackage = "O2" if "O2" in buildOrder else mainPackage
   mainHash = specs[mainPackage]["commit_hash"]
 
   debug("Main package is %s@%s" % (mainPackage, mainHash))
