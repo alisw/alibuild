@@ -659,7 +659,7 @@ if __name__ == "__main__":
               print "Error, unable to lookup changes in development package %s. Is it a git clone?" % spec["source"]
               exit(1)
             if not "develPrefix" in args:
-              args.develPrefix = out
+              args.develPrefix = out.replace("/", "-")
             spec["tag"] = args.develPrefix
             spec["commit_hash"] = "0"
           break
