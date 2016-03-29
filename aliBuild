@@ -415,6 +415,8 @@ if __name__ == "__main__":
   parser.add_argument("--debug", "-d", dest="debug", action="store_true", default=False)
   parser.add_argument("--no-auto-cleanup", help="Do not cleanup build by products automatically",
                       dest="autoCleanup", action="store_false", default=True)
+  parser.add_argument("--devel-prefix", "-z", nargs="?", help="Version name to use for development packages. Defaults to branch name.",
+                      dest="develPrefix", default=argparse.SUPPRESS)
   args = parser.parse_args()
 
   args.referenceSources = format(args.referenceSources, workDir=args.workDir)
@@ -495,6 +497,9 @@ if __name__ == "__main__":
   buildOrder = []
   workDir = abspath(args.workDir)
   prunePaths(workDir)
+
+  if "develPrefix" in args and args.develPrefix == None:
+    args.develPrefix = basename(dirname(abspath(args.configDir)))
 
   if not exists("%s/defaults-%s.sh" % (args.configDir, args.defaults)):
     viableDefaults = ["- " + basename(x).replace("defaults-","").replace(".sh", "")
@@ -653,7 +658,7 @@ if __name__ == "__main__":
             if err:
               print "Error, unable to lookup changes in development package %s. Is it a git clone?" % spec["source"]
               exit(1)
-            spec["tag"] = out
+            spec["tag"] = args.develPrefix if "develPrefix" in args else out
             spec["commit_hash"] = "0"
           break
 
