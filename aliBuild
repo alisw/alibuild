@@ -629,7 +629,10 @@ if __name__ == "__main__":
       dieOnError(err, "Unable to fetch from %s" % spec["source"])
       # Tag may contain date params like %(year)s, %(month)s, %(day)s, %(hour).
       spec["tag"] = format(spec["tag"], **nowKwds)
-      # By default we assume tag is a commit hash.
+      # By default we assume tag is a commit hash. We then try to find
+      # out if the tag is actually a branch and we use the tip of the branch
+      # as commit_hash. Finally if the package is a development one, we use the 
+      # name of the branch as commit_hash.
       spec["commit_hash"] = spec["tag"]
       for l in out.split("\n"):
         if l.endswith("refs/heads/%s" % spec["tag"]) or spec["package"] in develPkgs:
@@ -642,6 +645,12 @@ if __name__ == "__main__":
             err = execute(cmd, h)
             dieOnError(err, "Unable to detect source code changes.")
             spec["devel_hash"] = spec["commit_hash"] + h.hexdigest()
+            cmd = "cd %s && git rev-parse --abbrev-ref HEAD" % spec["source"]
+            err, out = getstatusoutput(cmd)
+            if err:
+              print "Error, unable to lookup changes in development package %s. Is it a git clone?" % spec["source"]
+              exit(1)
+            spec["tag"] = out
             spec["commit_hash"] = "0"
           break
 
