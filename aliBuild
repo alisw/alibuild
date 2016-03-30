@@ -142,8 +142,12 @@ def updateReferenceRepos(referenceSources, p, spec):
   spec["reference"] = referenceRepo
 
 def getDirectoryHash(d):
-  err, out = getstatusoutput("GIT_DIR=%s/.git git rev-parse HEAD" % d)
-  dieOnError(err, "Impossible to find reference for %s " % d)
+  if exists(join(d, ".git")):
+    err, out = getstatusoutput("GIT_DIR=%s/.git git rev-parse HEAD" % d)
+    dieOnError(err, "Impossible to find reference for %s " % d)
+  else:
+    err, out = getstatusoutput("pip show alibuild | grep -e \"^Version:\" | sed -e 's/.* //'")
+    dieOnError(err, "Impossible to find reference for %s " % d)
   return out
 
 # Creates a directory in the store which contains symlinks to the package
@@ -373,6 +377,7 @@ def prunePaths(workDir):
     os.environ[x] = re.sub(workDirEscaped, "", os.environ[x])
 
 if __name__ == "__main__":
+
   os.environ["LANG"] = "C"
   os.environ["LC_ALL"] = "C"
   parser = argparse.ArgumentParser()
@@ -1006,9 +1011,14 @@ if __name__ == "__main__":
 
     debug(spec)
 
-    fp = open(dirname(realpath(__file__))+'/build_template.sh', 'r')
-    cmd_raw = fp.read()
-    fp.close()
+    cmd_raw = ""
+    try:
+      fp = open(dirname(realpath(__file__))+'/alibuild_helpers/build_template.sh', 'r')
+      cmd_raw = fp.read()
+      fp.close()
+    except:
+      from pkg_resources import resource_string
+      cmd_raw = resource_string("alibuild_helpers", 'build_template.sh')
 
     source = spec.get("source", "")
     # Shortend the commit hash in case it's a real commit hash and not simply

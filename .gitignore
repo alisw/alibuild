@@ -1,2 +1,5 @@
 .python-version
 *.pyc
+build
+dist
+alibuild.egg-info
