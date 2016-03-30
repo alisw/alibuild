@@ -1141,3 +1141,11 @@ if __name__ == "__main__":
                            p=spec["package"]))
 
     syncHelper.syncToRemote(p, spec)
+  print format("Build successfully completed. "
+               "Your software installation is at:"
+               "\n\n%(wp)s",
+               wp=abspath(join(args.workDir, args.architecture)))
+  for x in develPkgs:
+    print format("\nBuild directory for package %(p)s is %(w)s/BUILD/%(p)s-latest/%(p)s",
+                  p=x,
+                  w=abspath(args.workDir))
