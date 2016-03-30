@@ -75,7 +75,7 @@ def writeAll(fn, txt):
   f.close()
 
 def star():
-  return basename(sys.argv[0]).replace("Build", "")
+  return basename(sys.argv[0]).lower().replace("build", "")
 
 def gzip():
   return getstatusoutput("which pigz")[0] and "gzip" or "pigz"
@@ -502,6 +502,16 @@ if __name__ == "__main__":
   buildOrder = []
   workDir = abspath(args.workDir)
   prunePaths(workDir)
+  
+  if not exists(args.configDir):
+    err = execute(format(
+                    "git clone https://github.com/alisw/%(p)sdist %(cd)s",
+                    p=star(),
+                    cd=abspath(args.configDir))
+                  )
+    if err:
+      print "Unable to download default %sdist" % star()
+      exit(1)
 
   if "develPrefix" in args and args.develPrefix == None:
     args.develPrefix = basename(dirname(abspath(args.configDir)))
