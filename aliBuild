@@ -424,6 +424,11 @@ if __name__ == "__main__":
                       dest="autoCleanup", action="store_false", default=True)
   parser.add_argument("--devel-prefix", "-z", nargs="?", help="Version name to use for development packages. Defaults to branch name.",
                       dest="develPrefix", default=argparse.SUPPRESS)
+
+  parser.add_argument("--devel-packages", "-p", dest="develPackages",
+                      help="Prepare development mode for those packages (comma-separated)")
+  parser.add_argument("--dist", dest="starDist",
+                      help="Prepare development mode by downloading the given recipes set (branch)")
   args = parser.parse_args()
 
   args.referenceSources = format(args.referenceSources, workDir=args.workDir)
@@ -496,7 +501,48 @@ if __name__ == "__main__":
     args.noDevel = args.noDevel.split(",")
 
   # Setup build environment.
-  if not args.action == "build":
+  if args.action == "prepare":
+    setdir = args.pkgname
+    if not args.develPackages:
+      parser.error("please specify a comma-separated list of packages you wish to use in development mode")
+    args.develPackages = [ dict(zip(["name","ver"], y.split("=")[0:2]))
+                           for y in [ x+"=" for x in args.develPackages.split(",") ] ]
+    try:
+      os.path.exists(setdir) or os.mkdir(setdir)
+    except OSError, e:
+      dieOnError(True, str(e))
+    args.develPackages.insert(0, {"name":star()+"dist","ver":args.starDist})
+    for p in args.develPackages:
+      if p["name"] == star()+"dist":
+        spec = { "source": "https://github.com/alisw/%sdist" % star(),
+                 "package": p["name"] }
+      else:
+        try:
+          d = open("%s/%sdist/%s.sh" % (setdir, star(), p["name"].lower())).read()
+        except IOError,e:
+          dieOnError(True, str(e))
+        header,_ = d.split("---", 1)
+        spec = yaml.safe_load(header)
+      writeRepo = spec.get("write_repo", spec.get("source"))
+      dieOnError(not writeRepo, "Package %s has no source field and cannot be developed" % spec["package"])
+      if os.path.exists(setdir+"/"+spec["package"]):
+        debug("not cloning %s since it already exists" % spec["package"])
+        continue
+      debug("cloning %s%s for development" % (spec["package"], " version "+p["ver"] if p["ver"] else ""))
+      updateReferenceRepos(args.referenceSources, spec["package"], spec)
+      err = execute(format("git clone %(readRepo)s%(branch)s --reference %(refSource)s %(cd)s && " +
+                           "cd %(cd)s && git remote set-url origin %(writeRepo)s",
+                           readRepo=spec["source"],
+                           writeRepo=writeRepo,
+                           branch=" -b "+p["ver"] if p["ver"] else "",
+                           refSource=args.referenceSources+"/"+spec["package"].lower(),
+                           cd=setdir+"/"+spec["package"]))
+      dieOnError(err!=0, "cannot clone %s%s" %
+                         (spec["package"], " version "+p["ver"] if p["ver"] else ""))
+    print "Created in %s the clones for developing %s" % \
+          (setdir, ", ".join([ x["name"].lower() for x in args.develPackages ]))
+    exit(0)
+  elif not args.action == "build":
     parser.error("Action %s unsupported" % args.action)
 
   packages = [args.pkgname]
