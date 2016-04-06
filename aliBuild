@@ -385,7 +385,7 @@ if __name__ == "__main__":
   parser = argparse.ArgumentParser()
   parser.add_argument("action")
   parser.add_argument("pkgname")
-  parser.add_argument("--config-dir", "-c", dest="configDir", default="%sdist" % star())
+  parser.add_argument("--config-dir", "-c", dest="configDir", default="%%(prefix)s%sdist" % star())
   parser.add_argument("--no-local", dest="noDevel", default=[],
                       help="Do not pick up the following packages from a local checkout.")
   parser.add_argument("--docker", dest="docker", action="store_true", default=False)
@@ -504,6 +504,7 @@ if __name__ == "__main__":
       setdir = args.develPrefix
     except AttributeError, e:
       parser.error("please specify the development directory to use with -z|--devel-prefix")
+    args.configDir = format(args.configDir, prefix=setdir+"/")
     pkgs = args.pkgname
     pkgs = [ dict(zip(["name","ver"], y.split("=")[0:2]))
                            for y in [ x+"=" for x in pkgs.split(",") ] ]
@@ -511,20 +512,22 @@ if __name__ == "__main__":
       os.path.exists(setdir) or os.mkdir(setdir)
     except OSError, e:
       dieOnError(True, str(e))
-    for p in [{"name":star()+"dist","ver":args.starDist}] + pkgs:
-      if p["name"] == star()+"dist":
+    for p in [{"name":basename(args.configDir),"ver":args.starDist}] + pkgs:
+      if p["name"] == basename(args.configDir):
         spec = { "source": "https://github.com/alisw/%sdist" % star(),
                  "package": p["name"] }
+        dest = args.configDir
       else:
         try:
-          d = open("%s/%sdist/%s.sh" % (setdir, star(), p["name"].lower())).read()
+          d = open("%s/%s.sh" % (args.configDir, p["name"].lower())).read()
         except IOError,e:
           dieOnError(True, str(e))
         header,_ = d.split("---", 1)
         spec = yaml.safe_load(header)
+        dest = setdir+"/"+spec["package"]
       writeRepo = spec.get("write_repo", spec.get("source"))
       dieOnError(not writeRepo, "Package %s has no source field and cannot be developed" % spec["package"])
-      if os.path.exists(setdir+"/"+spec["package"]):
+      if os.path.exists(dest):
         debug("not cloning %s since it already exists" % spec["package"])
         continue
       p["ver"] = p["ver"] if p["ver"] else spec.get("tag")
@@ -536,7 +539,7 @@ if __name__ == "__main__":
                            writeRepo=writeRepo,
                            branch=" -b "+p["ver"] if p["ver"] else "",
                            refSource=args.referenceSources+"/"+spec["package"].lower(),
-                           cd=setdir+"/"+spec["package"]))
+                           cd=dest))
       dieOnError(err!=0, "cannot clone %s%s" %
                          (spec["package"], " version "+p["ver"] if p["ver"] else ""))
     print "Created in %s the clones for developing %s" % \
@@ -545,6 +548,7 @@ if __name__ == "__main__":
   elif not args.action == "build":
     parser.error("Action %s unsupported" % args.action)
 
+  args.configDir = format(args.configDir, prefix="")
   packages = [args.pkgname]
   specs = {}
   buildOrder = []
