@@ -425,8 +425,6 @@ if __name__ == "__main__":
   parser.add_argument("--devel-prefix", "-z", nargs="?", help="Version name to use for development packages. Defaults to branch name.",
                       dest="develPrefix", default=argparse.SUPPRESS)
 
-  parser.add_argument("--devel-packages", "-p", dest="develPackages",
-                      help="Prepare development mode for those packages (comma-separated)")
   parser.add_argument("--dist", dest="starDist",
                       help="Prepare development mode by downloading the given recipes set (branch)")
   args = parser.parse_args()
@@ -502,16 +500,18 @@ if __name__ == "__main__":
 
   # Setup build environment.
   if args.action == "prepare":
-    setdir = args.pkgname
-    if not args.develPackages:
-      parser.error("please specify a comma-separated list of packages you wish to use in development mode")
-    args.develPackages = [ dict(zip(["name","ver"], y.split("=")[0:2]))
-                           for y in [ x+"=" for x in args.develPackages.split(",") ] ]
+    try:
+      setdir = args.develPrefix
+    except AttributeError, e:
+      parser.error("please specify the development directory to use with -z|--devel-prefix")
+    pkgs = args.pkgname
+    pkgs = [ dict(zip(["name","ver"], y.split("=")[0:2]))
+                           for y in [ x+"=" for x in pkgs.split(",") ] ]
     try:
       os.path.exists(setdir) or os.mkdir(setdir)
     except OSError, e:
       dieOnError(True, str(e))
-    for p in [{"name":star()+"dist","ver":args.starDist}] + args.develPackages:
+    for p in [{"name":star()+"dist","ver":args.starDist}] + pkgs:
       if p["name"] == star()+"dist":
         spec = { "source": "https://github.com/alisw/%sdist" % star(),
                  "package": p["name"] }
@@ -540,7 +540,7 @@ if __name__ == "__main__":
       dieOnError(err!=0, "cannot clone %s%s" %
                          (spec["package"], " version "+p["ver"] if p["ver"] else ""))
     print "Created in %s the clones for developing %s" % \
-          (setdir, ", ".join([ x["name"].lower() for x in args.develPackages ]))
+          (setdir, ", ".join([ x["name"].lower() for x in pkgs ]))
     exit(0)
   elif not args.action == "build":
     parser.error("Action %s unsupported" % args.action)
