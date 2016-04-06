@@ -114,8 +114,10 @@ def updateReferenceRepos(referenceSources, p, spec):
   # If the area can be created, clone a bare repository with the sources.
   debug("Updating references.")
   referenceRepo = "%s/%s" % (abspath(referenceSources), p.lower())
-  if os.access(dirname(referenceSources), os.W_OK):
-    getstatusoutput("mkdir -p %s" % referenceSources)
+  try:
+    makedirs(referenceSources)
+  except OSError:
+    pass
   writeableReference = os.access(referenceSources, os.W_OK)
   if not writeableReference and exists(referenceRepo):
     debug("Using %s as reference for %s." % (referenceRepo, p))
