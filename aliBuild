@@ -501,7 +501,7 @@ if __name__ == "__main__":
     try:
       setdir = args.develPrefix
     except AttributeError, e:
-      parser.error("please specify the development directory to use with -z|--devel-prefix")
+      setdir = "."
     args.configDir = format(args.configDir, prefix=setdir+"/")
     pkgs = args.pkgname
     pkgs = [ dict(zip(["name","ver"], y.split("=")[0:2]))
