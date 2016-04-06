@@ -511,8 +511,7 @@ if __name__ == "__main__":
       os.path.exists(setdir) or os.mkdir(setdir)
     except OSError, e:
       dieOnError(True, str(e))
-    args.develPackages.insert(0, {"name":star()+"dist","ver":args.starDist})
-    for p in args.develPackages:
+    for p in [{"name":star()+"dist","ver":args.starDist}] + args.develPackages:
       if p["name"] == star()+"dist":
         spec = { "source": "https://github.com/alisw/%sdist" % star(),
                  "package": p["name"] }
