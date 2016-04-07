@@ -10,7 +10,7 @@ from urllib2 import urlopen, URLError
 import ssl
 import json
 
-debug, error, riemannStream = (None, None, None)
+debug, error, warning, info, riemannStream = (None, None, None, None, None)
 
 # A stream object which will end up pushing data to a riemann server
 class RiemannStream(object):
@@ -28,10 +28,10 @@ class RiemannStream(object):
       self.client = bernhard.Client(host=host, port=port)
       self.client.send({'host': self.currentHost, 'state': 'ok', 'service': "alibuild started"})
       self.enabled = True
-      print "Sending log data to %s:%s" % (host, port)
+      info("Sending log data to %s:%s" % (host, port))
     except Exception, e:
-      print "RIEMANN_HOST %s:%s specified, however there was a problem initialising:"  % (host, port)
-      print e
+      info("RIEMANN_HOST %s:%s specified, however there was a problem initialising:"  % (host, port))
+      info(e)
 
   def setAttributes(self, **attributes):
     self.attributes = attributes
@@ -91,6 +91,17 @@ def execute(command, printer=debug):
   printer(output)
   exitCode = popen.returncode
   return exitCode
+
+class LogFormatter(logging.Formatter):
+  def __init__(self, fmtstr):
+    self.fmtstr = fmtstr
+  def format(self, record):
+    if record.levelno == logging.INFO:
+      return record.msg
+    return "\n".join([ format(self.fmtstr,
+                              levelname=record.levelname,
+                              message=x)
+                       for x in record.msg.split("\n") ])
 
 class Hasher:
   def __init__(self):
@@ -290,7 +301,7 @@ class HttpRemoteSync:
       debug("Cannot find precompiled package for %s@%s" % (p, spec["hash"]))
       pass
     except Exception, e:
-      print e
+      info(e)
       error("Unknown response from server")
 
     cmd = format("mkdir -p %(hd)s && "
@@ -383,7 +394,7 @@ if __name__ == "__main__":
   parser = argparse.ArgumentParser()
   parser.add_argument("action")
   parser.add_argument("pkgname")
-  parser.add_argument("--config-dir", "-c", dest="configDir", default="%sdist" % star())
+  parser.add_argument("--config-dir", "-c", dest="configDir", default="%%(prefix)s%sdist" % star())
   parser.add_argument("--no-local", dest="noDevel", default=[],
                       help="Do not pick up the following packages from a local checkout.")
   parser.add_argument("--docker", dest="docker", action="store_true", default=False)
@@ -422,23 +433,28 @@ if __name__ == "__main__":
                       dest="autoCleanup", action="store_false", default=True)
   parser.add_argument("--devel-prefix", "-z", nargs="?", help="Version name to use for development packages. Defaults to branch name.",
                       dest="develPrefix", default=argparse.SUPPRESS)
+
+  parser.add_argument("--dist", dest="dist", default="",
+                      help="Prepare development mode by downloading the given recipes set ([user/repo@]branch)")
   args = parser.parse_args()
 
   args.referenceSources = format(args.referenceSources, workDir=args.workDir)
+  args.dist = args.dist if "@" in args.dist else "alisw/%sdist@%s" % (star(),args.dist)
+  args.dist = dict(zip(["repo","ver"],args.dist.split("@", 2)))
 
   if args.remoteStore or args.writeStore:
     args.noSystem = True
   
   if not args.architecture:
-    print format("Cannot determine architecture. "
-                 "Please pass it explicitly.\n\n%s" % ARCHITECTURE_TABLE[0])
+    info(format("Cannot determine architecture. "
+                "Please pass it explicitly.\n\n%s" % ARCHITECTURE_TABLE[0]))
     exit(1)
   if not args.forceUnknownArch and not matchValidArch(args.architecture):
-    print format("Unknown / unsupported architecture: %(architecture)s.\n\n"
-                 "%(table)s"
-                 "Alternatively, you can use the `--force-unknown-architecture' option.",
-           table=ARCHITECTURE_TABLE[0],
-           architecture=args.architecture)
+    info(format("Unknown / unsupported architecture: %(architecture)s.\n\n"
+                "%(table)s"
+                "Alternatively, you can use the `--force-unknown-architecture' option.",
+                table=ARCHITECTURE_TABLE[0],
+                architecture=args.architecture))
     exit(1)
 
   if args.preferSystem and args.noSystem:
@@ -455,14 +471,13 @@ if __name__ == "__main__":
   logger_handler = logging.StreamHandler()
   logger.addHandler(logger_handler)
 
-  if args.debug:
-    logger.setLevel(logging.DEBUG)
-    logger_handler.setFormatter(logging.Formatter('%(levelname)s: %(message)s'))
-  else:
-    logger.setLevel(logging.INFO)
+  logger.setLevel(logging.DEBUG if args.debug else logging.INFO)
+  logger_handler.setFormatter(LogFormatter("%(levelname)s: %(message)s"))
 
   debug = logger.debug
   error = logger.error
+  warning = logger.warning
+  info = logger.info
 
   riemannStream = RiemannStream(host=getenv("RIEMANN_HOST"),
                                 port=getenv("RIEMANN_PORT", "5555"))
@@ -494,9 +509,55 @@ if __name__ == "__main__":
     args.noDevel = args.noDevel.split(",")
 
   # Setup build environment.
-  if not args.action == "build":
+  if args.action == "init":
+    setdir = args.develPrefix if "develPrefix" in args else "."
+    args.configDir = format(args.configDir, prefix=setdir+"/")
+    pkgs = args.pkgname
+    pkgs = [ dict(zip(["name","ver"], y.split("@")[0:2]))
+                           for y in [ x+"@" for x in pkgs.split(",") ] ]
+    try:
+      os.path.exists(setdir) or os.mkdir(setdir)
+      os.path.exists(args.referenceSources) or makedirs(args.referenceSources)
+    except OSError, e:
+      dieOnError(True, str(e))
+    for p in [{"name":"stardist","ver":args.dist["ver"]}] + pkgs:
+      if p["name"] == "stardist":
+        spec = { "source": "https://github.com/"+args.dist["repo"],
+                 "package": basename(args.configDir), "version": None }
+        dest = args.configDir
+      else:
+        try:
+          d = open("%s/%s.sh" % (args.configDir, p["name"].lower())).read()
+        except IOError,e:
+          dieOnError(True, str(e))
+        header,_ = d.split("---", 1)
+        spec = yaml.safe_load(header)
+        dest = join(setdir, spec["package"])
+      writeRepo = spec.get("write_repo", spec.get("source"))
+      dieOnError(not writeRepo, "Package %s has no source field and cannot be developed" % spec["package"])
+      if os.path.exists(dest):
+        warning("not cloning %s since it already exists" % spec["package"])
+        continue
+      p["ver"] = p["ver"] if p["ver"] else spec.get("tag", spec["version"])
+      debug("cloning %s%s for development" % (spec["package"], " version "+p["ver"] if p["ver"] else ""))
+      updateReferenceRepos(args.referenceSources, spec["package"], spec)
+      err = execute(format("git clone %(readRepo)s%(branch)s --reference %(refSource)s %(cd)s && " +
+                           "cd %(cd)s && git remote set-url origin %(writeRepo)s",
+                           readRepo=spec["source"],
+                           writeRepo=writeRepo,
+                           branch=" -b "+p["ver"] if p["ver"] else "",
+                           refSource=join(args.referenceSources, spec["package"].lower()),
+                           cd=dest))
+      dieOnError(err!=0, "cannot clone %s%s" %
+                         (spec["package"], " version "+p["ver"] if p["ver"] else ""))
+    print format("Development clones for %(pkgs)s created under %(d)s",
+                 pkgs=", ".join([ x["name"].lower() for x in pkgs ]),
+                 d=setdir)
+    exit(0)
+  elif not args.action == "build":
     parser.error("Action %s unsupported" % args.action)
 
+  args.configDir = format(args.configDir, prefix="")
   packages = [args.pkgname]
   specs = {}
   buildOrder = []
@@ -505,12 +566,13 @@ if __name__ == "__main__":
   
   if not exists(args.configDir):
     err = execute(format(
-                    "git clone https://github.com/alisw/%(p)sdist %(cd)s",
-                    p=star(),
+                    "git clone https://github.com/%(repo)s%(branch)s %(cd)s",
+                    repo=args.dist["repo"],
+                    branch=" -b "+args.dist["ver"] if args.dist["ver"] else "",
                     cd=abspath(args.configDir))
                   )
     if err:
-      print "Unable to download default %sdist" % star()
+      info("Unable to download default %sdist" % star())
       exit(1)
 
   if "develPrefix" in args and args.develPrefix == None:
@@ -587,8 +649,8 @@ if __name__ == "__main__":
     x["build_requires"] = [r for r in x["build_requires"] if not r in args.disable]
     x["runtime_requires"] = [r for r in x["runtime_requires"] if not r in args.disable]
 
-  print "\n".join(["Using package %s from the system as preferred choice." % x for x in systemPackages])
-  print "\n".join(["System package %s cannot be used. Building our own copy." % x for x in ownPackages])
+  info("\n".join(["Using package %s from the system as preferred choice." % x for x in systemPackages]))
+  info("\n".join(["System package %s cannot be used. Building our own copy." % x for x in ownPackages]))
 
   # Do topological sort to have the correct build order even in the 
   # case of non-tree like dependencies..
@@ -630,8 +692,8 @@ if __name__ == "__main__":
     exit(1)
 
   if develPkgs:
-    print "Write store disabled since some packages will be picked up from local checkout."
-    print "Local packages: %s" % " ".join(develPkgs)
+    info("Write store disabled since some packages will be picked up from local checkout.")
+    info("Local packages: %s" % " ".join(develPkgs))
     syncHelper.writeStore = ""
 
   # Resolve the tag to the actual commit ref, so that
@@ -672,7 +734,7 @@ if __name__ == "__main__":
               err, out = getstatusoutput("cd %s && git rev-parse HEAD" % spec["source"])
               out = out[0:10]
             if err:
-              print "Error, unable to lookup changes in development package %s. Is it a git clone?" % spec["source"]
+              error("Error, unable to lookup changes in development package %s. Is it a git clone?" % spec["source"])
               exit(1)
             develPackageBranch = out.replace("/", "-")
             spec["tag"] = args.develPrefix if "develPrefix" in args else develPackageBranch
@@ -699,7 +761,7 @@ if __name__ == "__main__":
   # If one of the special packages is in the list of packages to be built,
   # we use it as main package, rather than the last one.
   if not buildOrder:
-    print "Nothing to be done."
+    info("Nothing to be done.")
     exit(0)
   mainPackage = buildOrder[-1]
   mainPackage = "AliRoot" if "AliRoot" in buildOrder else mainPackage
@@ -710,8 +772,8 @@ if __name__ == "__main__":
   debug("Main package is %s@%s" % (mainPackage, mainHash))
   if args.debug:
     logger_handler.setFormatter(
-        logging.Formatter("%%(levelname)s:%s:%s: %%(message)s" %
-                          (mainPackage, mainHash[0:8])))
+        LogFormatter("%%(levelname)s:%s:%s: %%(message)s" %
+                     (mainPackage, mainHash[0:8])))
 
   # Now that we have the main package set, we can print out Useful information
   # which we will be able to associate with this build.
@@ -796,7 +858,7 @@ if __name__ == "__main__":
   while buildOrder:
     packageIterations += 1
     if packageIterations > 20:
-      print "Too many attempts at building %s. Something wrong with the repository?"
+      error("Too many attempts at building %s. Something wrong with the repository?")
       exit(1)
     p = buildOrder[0]
     spec = specs[p]
@@ -861,7 +923,7 @@ if __name__ == "__main__":
         if spec["package"] in develPkgs and "incremental_recipe" in spec:
           spec["obsolete_tarball"] = d
         else:
-          print "Package %s with hash %s is already found in %s. Not building." % (p, h, d)
+          info("Package %s with hash %s is already found in %s. Not building." % (p, h, d))
         break
       else:
         busyRevisions.append(revision)
@@ -1089,7 +1151,7 @@ if __name__ == "__main__":
     writeAll("%s/build.sh" % scriptDir, cmd)
     writeAll("%s/%s.sh" % (scriptDir, spec["package"]), spec["recipe"])
 
-    print "Building %s@%s" % (spec["package"], spec["version"])
+    info("Building %s@%s" % (spec["package"], spec["version"]))
     # In case the --docker options is passed, we setup a docker container which
     # will perform the actual build. Otherwise build as usual using bash.
     if dockerImage:
@@ -1141,11 +1203,11 @@ if __name__ == "__main__":
                            p=spec["package"]))
 
     syncHelper.syncToRemote(p, spec)
-  print format("Build successfully completed. "
-               "Your software installation is at:"
-               "\n\n%(wp)s",
-               wp=abspath(join(args.workDir, args.architecture)))
+  info(format("Build successfully completed. "
+              "Your software installation is at:"
+              "\n\n%(wp)s",
+              wp=abspath(join(args.workDir, args.architecture))))
   for x in develPkgs:
-    print format("\nBuild directory for package %(p)s is %(w)s/BUILD/%(p)s-latest/%(p)s",
-                  p=x,
-                  w=abspath(args.workDir))
+    info(format("\nBuild directory for package %(p)s is %(w)s/BUILD/%(p)s-latest/%(p)s",
+                p=x,
+                w=abspath(args.workDir)))
