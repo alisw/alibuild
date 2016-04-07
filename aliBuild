@@ -10,7 +10,7 @@ from urllib2 import urlopen, URLError
 import ssl
 import json
 
-debug, error, riemannStream = (None, None, None)
+debug, error, warning, riemannStream = (None, None, None, None)
 
 # A stream object which will end up pushing data to a riemann server
 class RiemannStream(object):
@@ -466,6 +466,7 @@ if __name__ == "__main__":
 
   debug = logger.debug
   error = logger.error
+  warning = logger.warning
 
   riemannStream = RiemannStream(host=getenv("RIEMANN_HOST"),
                                 port=getenv("RIEMANN_PORT", "5555"))
@@ -527,7 +528,7 @@ if __name__ == "__main__":
       writeRepo = spec.get("write_repo", spec.get("source"))
       dieOnError(not writeRepo, "Package %s has no source field and cannot be developed" % spec["package"])
       if os.path.exists(dest):
-        debug("not cloning %s since it already exists" % spec["package"])
+        warning("not cloning %s since it already exists" % spec["package"])
         continue
       p["ver"] = p["ver"] if p["ver"] else spec.get("tag", spec["version"])
       debug("cloning %s%s for development" % (spec["package"], " version "+p["ver"] if p["ver"] else ""))
