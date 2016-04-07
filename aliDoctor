@@ -1,0 +1,44 @@
+#!/usr/bin/env python
+import argparse
+import os, re
+from os.path import exists, abspath
+from glob import glob
+import yaml
+from commands import getstatusoutput
+import subprocess
+
+def execute(command, prefix):
+  print prefix + ":" + command.strip("\n")
+  popen = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE)
+  lines_iterator = iter(popen.stdout.readline, "")
+  for line in lines_iterator:
+    print prefix + ":" +line.strip("\n")  # yield line
+  output = popen.communicate()[0]
+  for x in output.split("\n"):
+    print prefix + ":" + output
+  print prefix + ": exit code " + str(popen.returncode)
+
+def prunePaths(workDir):
+  for x in ["PATH", "LD_LIBRARY_PATH", "DYLD_LIBRARY_PATH"]:
+    if not x in os.environ:
+      continue
+    workDirEscaped = re.escape("%s" % workDir) + "[^:]*:?"
+    os.environ[x] = re.sub(workDirEscaped, "", os.environ[x])
+
+if __name__ == "__main__":
+  parser = argparse.ArgumentParser()
+  parser.add_argument("-c", "--config", help="path to alidist", dest="config", default="alidist")
+  parser.add_argument("-w", "--work-dir", help="path to work dir", dest="workDir", default="workDir")
+  args = parser.parse_args()
+  if not exists(args.config):
+    parser.error("Wrong path to alidist specified: %s" % args.config)
+  
+  prunePaths(abspath(args.workDir))
+  
+  for x in glob("%s/*.sh" % args.config):
+    print "Reading", x
+    txt = file(x).read()
+    header, body = txt.split("---", 1)
+    spec = yaml.safe_load(header)
+    if "prefer_system_check" in spec:
+      execute(spec["prefer_system_check"], spec["package"])

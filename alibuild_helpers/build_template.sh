@@ -9,6 +9,7 @@ export WORK_DIR="${WORK_DIR_OVERRIDE:-%(workDir)s}"
 # From our dependencies
 %(dependencies)s
 
+export CAN_DELETE="%(can_delete)s"
 export PKGNAME="%(pkgname)s"
 export PKGHASH="%(hash)s"
 export PKGVERSION="%(version)s"
@@ -16,6 +17,7 @@ export PKGREVISION="%(revision)s"
 export REQUIRES="%(requires)s"
 export BUILD_REQUIRES="%(build_requires)s"
 export RUNTIME_REQUIRES="%(runtime_requires)s"
+export DEVEL_PREFIX="%(develPrefix)s"
 
 export PKG_NAME="$PKGNAME"
 export PKG_VERSION="$PKGVERSION"
@@ -58,6 +60,9 @@ fi
 mkdir -p "$INSTALLROOT" "$BUILDROOT" "$BUILDDIR" "$WORK_DIR/INSTALLROOT/$PKGHASH/$PKGPATH"
 cd "$BUILDROOT"
 ln -snf $PKGHASH $WORK_DIR/BUILD/$PKGNAME-latest
+if [[ $DEVEL_PREFIX ]]; then
+  ln -snf $PKGHASH $WORK_DIR/BUILD/$PKGNAME-latest-$DEVEL_PREFIX
+fi
 
 # Reference statements
 %(referenceStatement)s
@@ -153,6 +158,10 @@ PH=${PKGHASH}
 EoF
 
 cat "$INSTALLROOT/.original-unrelocated" | xargs -n1 -I{} echo "sed -e \"s|/[^ ]*INSTALLROOT/\$PH/\$OP|\$WORK_DIR/\$PP|g;s|[@][@]PKGREVISION[@]\$PH[@][@]|$PKGREVISION|g\" \$PP/{}.unrelocated > \$PP/{}" >> "$INSTALLROOT/relocate-me.sh"
+# Always relocate the modulefile (if present) so that it works also in devel mode.
+if [[ ! -s "$INSTALLROOT/.original-unrelocated" && -f "$INSTALLROOT/etc/modulefiles/$PKGNAME" ]]; then
+  echo "mv -f \$PP/etc/modulefiles/$PKGNAME \$PP/etc/modulefiles/${PKGNAME}.forced-relocation && sed -e \"s|[@][@]PKGREVISION[@]\$PH[@][@]|$PKGREVISION|g\" \$PP/etc/modulefiles/${PKGNAME}.forced-relocation > \$PP/etc/modulefiles/$PKGNAME" >> "$INSTALLROOT/relocate-me.sh"
+fi
 cat "$INSTALLROOT/relocate-me.sh"
 cat "$INSTALLROOT/.original-unrelocated" | xargs -n1 -I{} cp '{}' '{}'.unrelocated
 cd "$WORK_DIR/INSTALLROOT/$PKGHASH"
@@ -175,5 +184,9 @@ ln -nfs \
 # Unpack, and relocate
 cd "$WORK_DIR"
 tar xzf "$WORK_DIR/TARS/$HASH_PATH/$PACKAGE_WITH_REV"
+[ "X$CAN_DELETE" = X1 ] && rm "$WORK_DIR/TARS/$HASH_PATH/$PACKAGE_WITH_REV"
 bash -ex "$ARCHITECTURE/$PKGNAME/$PKGVERSION-$PKGREVISION/relocate-me.sh"
 ln -snf $PKGVERSION-$PKGREVISION $ARCHITECTURE/$PKGNAME/latest
+if [[ $DEVEL_PREFIX ]]; then
+  ln -snf $PKGVERSION-$PKGREVISION $ARCHITECTURE/$PKGNAME/latest-$DEVEL_PREFIX
+fi
