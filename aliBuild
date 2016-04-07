@@ -529,7 +529,7 @@ if __name__ == "__main__":
       if os.path.exists(dest):
         debug("not cloning %s since it already exists" % spec["package"])
         continue
-      p["ver"] = p["ver"] if p["ver"] else spec.get("tag")
+      p["ver"] = p["ver"] if p["ver"] else spec.get("tag", spec["version"])
       debug("cloning %s%s for development" % (spec["package"], " version "+p["ver"] if p["ver"] else ""))
       updateReferenceRepos(args.referenceSources, spec["package"], spec)
       err = execute(format("git clone %(readRepo)s%(branch)s --reference %(refSource)s %(cd)s && " +
