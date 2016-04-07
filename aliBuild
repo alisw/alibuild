@@ -497,7 +497,7 @@ if __name__ == "__main__":
     args.noDevel = args.noDevel.split(",")
 
   # Setup build environment.
-  if args.action == "prepare":
+  if args.action == "init":
     try:
       setdir = args.develPrefix
     except AttributeError, e:
