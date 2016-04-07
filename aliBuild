@@ -504,8 +504,8 @@ if __name__ == "__main__":
       setdir = "."
     args.configDir = format(args.configDir, prefix=setdir+"/")
     pkgs = args.pkgname
-    pkgs = [ dict(zip(["name","ver"], y.split("=")[0:2]))
-                           for y in [ x+"=" for x in pkgs.split(",") ] ]
+    pkgs = [ dict(zip(["name","ver"], y.split("@")[0:2]))
+                           for y in [ x+"@" for x in pkgs.split(",") ] ]
     try:
       os.path.exists(setdir) or os.mkdir(setdir)
       os.path.exists(args.referenceSources) or makedirs(args.referenceSources)
