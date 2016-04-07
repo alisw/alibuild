@@ -1,5 +1,6 @@
 .python-version
 *.pyc
+*.swp
 build
 dist
 alibuild.egg-info
