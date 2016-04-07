@@ -10,7 +10,7 @@ from urllib2 import urlopen, URLError
 import ssl
 import json
 
-debug, error, riemannStream = (None, None, None)
+debug, error, warning, riemannStream = (None, None, None, None)
 
 # A stream object which will end up pushing data to a riemann server
 class RiemannStream(object):
@@ -383,7 +383,7 @@ if __name__ == "__main__":
   parser = argparse.ArgumentParser()
   parser.add_argument("action")
   parser.add_argument("pkgname")
-  parser.add_argument("--config-dir", "-c", dest="configDir", default="%sdist" % star())
+  parser.add_argument("--config-dir", "-c", dest="configDir", default="%%(prefix)s%sdist" % star())
   parser.add_argument("--no-local", dest="noDevel", default=[],
                       help="Do not pick up the following packages from a local checkout.")
   parser.add_argument("--docker", dest="docker", action="store_true", default=False)
@@ -422,9 +422,14 @@ if __name__ == "__main__":
                       dest="autoCleanup", action="store_false", default=True)
   parser.add_argument("--devel-prefix", "-z", nargs="?", help="Version name to use for development packages. Defaults to branch name.",
                       dest="develPrefix", default=argparse.SUPPRESS)
+
+  parser.add_argument("--dist", dest="starDist", default="",
+                      help="Prepare development mode by downloading the given recipes set ([user/repo@]branch)")
   args = parser.parse_args()
 
   args.referenceSources = format(args.referenceSources, workDir=args.workDir)
+  args.starDist = args.starDist if "@" in args.starDist else "alisw/%sdist@%s" % (star(),args.starDist)
+  args.starDist = dict(zip(["repo","ver"],args.starDist.split("@", 2)))
 
   if args.remoteStore or args.writeStore:
     args.noSystem = True
@@ -463,6 +468,7 @@ if __name__ == "__main__":
 
   debug = logger.debug
   error = logger.error
+  warning = logger.warning
 
   riemannStream = RiemannStream(host=getenv("RIEMANN_HOST"),
                                 port=getenv("RIEMANN_PORT", "5555"))
@@ -494,9 +500,57 @@ if __name__ == "__main__":
     args.noDevel = args.noDevel.split(",")
 
   # Setup build environment.
-  if not args.action == "build":
+  if args.action == "init":
+    try:
+      setdir = args.develPrefix
+    except AttributeError, e:
+      setdir = "."
+    args.configDir = format(args.configDir, prefix=setdir+"/")
+    pkgs = args.pkgname
+    pkgs = [ dict(zip(["name","ver"], y.split("@")[0:2]))
+                           for y in [ x+"@" for x in pkgs.split(",") ] ]
+    try:
+      os.path.exists(setdir) or os.mkdir(setdir)
+      os.path.exists(args.referenceSources) or makedirs(args.referenceSources)
+    except OSError, e:
+      dieOnError(True, str(e))
+    for p in [{"name":"stardist","ver":args.starDist["ver"]}] + pkgs:
+      if p["name"] == "stardist":
+        spec = { "source": "https://github.com/"+args.starDist["repo"],
+                 "package": basename(args.configDir), "version": None }
+        dest = args.configDir
+      else:
+        try:
+          d = open("%s/%s.sh" % (args.configDir, p["name"].lower())).read()
+        except IOError,e:
+          dieOnError(True, str(e))
+        header,_ = d.split("---", 1)
+        spec = yaml.safe_load(header)
+        dest = setdir+"/"+spec["package"]
+      writeRepo = spec.get("write_repo", spec.get("source"))
+      dieOnError(not writeRepo, "Package %s has no source field and cannot be developed" % spec["package"])
+      if os.path.exists(dest):
+        warning("not cloning %s since it already exists" % spec["package"])
+        continue
+      p["ver"] = p["ver"] if p["ver"] else spec.get("tag", spec["version"])
+      debug("cloning %s%s for development" % (spec["package"], " version "+p["ver"] if p["ver"] else ""))
+      updateReferenceRepos(args.referenceSources, spec["package"], spec)
+      err = execute(format("git clone %(readRepo)s%(branch)s --reference %(refSource)s %(cd)s && " +
+                           "cd %(cd)s && git remote set-url origin %(writeRepo)s",
+                           readRepo=spec["source"],
+                           writeRepo=writeRepo,
+                           branch=" -b "+p["ver"] if p["ver"] else "",
+                           refSource=args.referenceSources+"/"+spec["package"].lower(),
+                           cd=dest))
+      dieOnError(err!=0, "cannot clone %s%s" %
+                         (spec["package"], " version "+p["ver"] if p["ver"] else ""))
+    print "Created in %s the clones for developing %s" % \
+          (setdir, ", ".join([ x["name"].lower() for x in pkgs ]))
+    exit(0)
+  elif not args.action == "build":
     parser.error("Action %s unsupported" % args.action)
 
+  args.configDir = format(args.configDir, prefix="")
   packages = [args.pkgname]
   specs = {}
   buildOrder = []
@@ -505,8 +559,9 @@ if __name__ == "__main__":
   
   if not exists(args.configDir):
     err = execute(format(
-                    "git clone https://github.com/alisw/%(p)sdist %(cd)s",
-                    p=star(),
+                    "git clone https://github.com/%(repo)s%(branch)s %(cd)s",
+                    repo=args.starDist["repo"],
+                    branch=" -b "+args.starDist["ver"] if args.starDist["ver"] else "",
                     cd=abspath(args.configDir))
                   )
     if err:
