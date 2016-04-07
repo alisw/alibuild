@@ -423,11 +423,13 @@ if __name__ == "__main__":
   parser.add_argument("--devel-prefix", "-z", nargs="?", help="Version name to use for development packages. Defaults to branch name.",
                       dest="develPrefix", default=argparse.SUPPRESS)
 
-  parser.add_argument("--dist", dest="starDist",
-                      help="Prepare development mode by downloading the given recipes set (branch)")
+  parser.add_argument("--dist", dest="starDist", default="",
+                      help="Prepare development mode by downloading the given recipes set ([user/repo@]branch)")
   args = parser.parse_args()
 
   args.referenceSources = format(args.referenceSources, workDir=args.workDir)
+  args.starDist = args.starDist if "@" in args.starDist else "alisw/%sdist@%s" % (star(),args.starDist)
+  args.starDist = dict(zip(["repo","ver"],args.starDist.split("@", 2)))
 
   if args.remoteStore or args.writeStore:
     args.noSystem = True
@@ -512,10 +514,10 @@ if __name__ == "__main__":
       os.path.exists(args.referenceSources) or makedirs(args.referenceSources)
     except OSError, e:
       dieOnError(True, str(e))
-    for p in [{"name":basename(args.configDir),"ver":args.starDist}] + pkgs:
-      if p["name"] == basename(args.configDir):
-        spec = { "source": "https://github.com/alisw/%sdist" % star(),
-                 "package": p["name"] }
+    for p in [{"name":"stardist","ver":args.starDist["ver"]}] + pkgs:
+      if p["name"] == "stardist":
+        spec = { "source": "https://github.com/"+args.starDist["repo"],
+                 "package": basename(args.configDir), "version": None }
         dest = args.configDir
       else:
         try:
@@ -557,9 +559,9 @@ if __name__ == "__main__":
   
   if not exists(args.configDir):
     err = execute(format(
-                    "git clone https://github.com/alisw/%(p)sdist%(branch)s %(cd)s",
-                    p=star(),
-                    branch=" -b "+args.starDist if args.starDist else "",
+                    "git clone https://github.com/%(repo)s%(branch)s %(cd)s",
+                    repo=args.starDist["repo"],
+                    branch=" -b "+args.starDist["ver"] if args.starDist["ver"] else "",
                     cd=abspath(args.configDir))
                   )
     if err:
