@@ -101,7 +101,7 @@ class LogFormatter(logging.Formatter):
     return "\n".join([ format(self.fmtstr,
                               levelname=record.levelname,
                               message=x)
-                       for x in record.msg.split("\n") ])
+                       for x in str(record.msg).split("\n") ])
 
 class Hasher:
   def __init__(self):
