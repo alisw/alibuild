@@ -8,26 +8,35 @@ layout: main
 
 For a quick start introduction, please look [here](./quick.html).
 
-    usage: aliBuild [-h] 
-                    [--config-dir CONFIGDIR] 
-                    [--no-local PACKAGE[,PACKAGE]] 
-                    [--docker]
-                    [--work-dir WORKDIR] 
-                    [-a / --architecture ARCHITECTURE]
-                    [-e ENVIRONMENT] 
-                    [-v VOLUMES] 
-                    [--jobs JOBS]
-                    [--reference-sources REFERENCESOURCES]
-                    [--remote-store REMOTESTORE] 
-                    [--write-store WRITESTORE]
-                    [--disable PACKAGE[,PACKAGE]]
-                    [--defaults FILE] 
-                    [--debug]
-                    action pkgname
+    usage: alibuild 
+        [-h] 
+        [--config-dir CONFIGDIR] 
+        [--no-local NODEVEL] 
+        [--docker]
+        [--work-dir WORKDIR]
+        [--architecture ARCHITECTURE]
+        [-e ENVIRONMENT]
+        [-v VOLUMES]
+        [--jobs JOBS]
+        [--reference-sources REFERENCESOURCES]
+        [--remote-store REMOTESTORE]
+        [--write-store WRITESTORE]
+        [--disable PACKAGE]
+        [--defaults [FILE]]
+        [--always-prefer-system]
+        [--no-system]
+        [--force-unknown-architecture]
+        [--insecure]
+        [--aggressive-cleanup]
+        [--debug]
+        [--no-auto-cleanup]
+        [--devel-prefix [DEVELPREFIX]] 
+        [--dist DIST]
+                    {init,build} pkgname
 
     positional arguments:
-      action
-        pkgname
+      {init,build}          Either `build' or `prepare'
+      pkgname               One (or more) of the packages in `alidist'
 
 ## Speedup build process by using a build store
 
