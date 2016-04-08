@@ -392,8 +392,8 @@ if __name__ == "__main__":
   os.environ["LANG"] = "C"
   os.environ["LC_ALL"] = "C"
   parser = argparse.ArgumentParser()
-  parser.add_argument("action")
-  parser.add_argument("pkgname")
+  parser.add_argument("action", help="Either `build' or `prepare'")
+  parser.add_argument("pkgname", help="One of the packages in `alidist'")
   parser.add_argument("--config-dir", "-c", dest="configDir", default="%%(prefix)s%sdist" % star())
   parser.add_argument("--no-local", dest="noDevel", default=[],
                       help="Do not pick up the following packages from a local checkout.")
