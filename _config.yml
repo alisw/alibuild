@@ -1,4 +1,4 @@
-highlighter: pygments
+highlighter: rouge
 baseurl: /alibuild
 menu_header: ALIBUILD
 menu:
