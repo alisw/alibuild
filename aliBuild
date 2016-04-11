@@ -207,11 +207,14 @@ VALID_ARCHS_RE = ["slc[5-9]+_(x86-64|ppc64)",
                   "(ubuntu|ubt|osx)[0-9]*_x86-64",
                  ]
 
-# Try to guess a good platform. This does not try to cover all the possibly
-# compatible linux distributions, but tries to get right the common one,
-# obvious one. If you use a Unknownbuntu which is compatible with Ubuntu 15.10
-# you will still have to give an explicit platform string.
-# FIXME: we should have a fallback for lsb_release, since platform.dist is going away.
+# Try to guess a good platform. This does not try to cover all the
+# possibly compatible linux distributions, but tries to get right the
+# common one, obvious one. If you use a Unknownbuntu which is compatible
+# with Ubuntu 15.10 you will still have to give an explicit platform
+# string. 
+#
+# FIXME: we should have a fallback for lsb_release, since platform.dist
+# is going away.
 def detectArch():
   try:
     import platform
