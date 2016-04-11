@@ -446,15 +446,15 @@ if __name__ == "__main__":
     args.noSystem = True
   
   if not args.architecture:
-    info(format("Cannot determine architecture. "
-                "Please pass it explicitly.\n\n%s" % ARCHITECTURE_TABLE[0]))
+    print format("Cannot determine architecture. "
+                 "Please pass it explicitly.\n\n%s" % ARCHITECTURE_TABLE[0])
     exit(1)
   if not args.forceUnknownArch and not matchValidArch(args.architecture):
-    info(format("Unknown / unsupported architecture: %(architecture)s.\n\n"
+    print format("Unknown / unsupported architecture: %(architecture)s.\n\n"
                 "%(table)s"
                 "Alternatively, you can use the `--force-unknown-architecture' option.",
                 table=ARCHITECTURE_TABLE[0],
-                architecture=args.architecture))
+                architecture=args.architecture)
     exit(1)
 
   if args.preferSystem and args.noSystem:
