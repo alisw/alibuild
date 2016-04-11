@@ -221,6 +221,21 @@ def detectArch():
     if distribution == "Ubuntu":
       version = version.split(".")
       version = version[0] + version[1]
+    # Sometimes people using anaconda end up having "debian" as reported
+    # platform. If this is the case use try to use /etc/lsb-release to
+    # detect the string correctly.
+    if distribution == "debian":
+      try:
+        for x in open("/etc/lsb-release").readlines():
+          if not "=" in x:
+            continue
+          key, val = x.split("=", 1)
+          if key == "DISTRIB_ID":
+            distribution = val.strip("\n ")
+          if key == "DISTRIB_RELEASE":
+            version = val.strip("\n ")
+      except:
+        pass
     processor = platform.processor()
     return format("%(d)s%(v)s_%(c)s",
                   d=distribution.replace("centos","slc").replace("redhat","slc").lower(),
