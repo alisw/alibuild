@@ -451,6 +451,8 @@ if __name__ == "__main__":
 
   parser.add_argument("--dist", dest="dist", default="",
                       help="Prepare development mode by downloading the given recipes set ([user/repo@]branch)")
+  parser.add_argument("--dry-run", "-n", dest="dryRun", default=False,
+                      action="store_true", help="Prints what would happen, without actually doing the build.")
   args = parser.parse_args()
 
   args.referenceSources = format(args.referenceSources, workDir=args.workDir)
@@ -530,11 +532,15 @@ if __name__ == "__main__":
     pkgs = args.pkgname
     pkgs = [ dict(zip(["name","ver"], y.split("@")[0:2]))
                            for y in [ x+"@" for x in pkgs.split(",") ] ]
+    if args.dryRun:
+      info("--dry-run / -n specified. Doing nothing.")
+      exit(0)
     try:
       os.path.exists(setdir) or os.mkdir(setdir)
       os.path.exists(args.referenceSources) or makedirs(args.referenceSources)
     except OSError, e:
       dieOnError(True, str(e))
+
     for p in [{"name":"stardist","ver":args.dist["ver"]}] + pkgs:
       if p["name"] == "stardist":
         spec = { "source": "https://github.com/"+args.dist["repo"],
@@ -864,7 +870,11 @@ if __name__ == "__main__":
     spec["full_requires"] = set(spec["full_requires"])
     spec["full_runtime_requires"] = set(spec["full_runtime_requires"])
 
-  debug("We will build packages in the following order: %s", " ".join(buildOrder))
+  debug("We will build packages in the following order: %s" % " ".join(buildOrder))
+  if args.dryRun:
+    info("We will build packages in the following order: %s" % " ".join(buildOrder))
+    info("--dry-run / -n specified. Not building.")
+    exit(0)
 
   # We now iterate on all the packages, making sure we build correctly every
   # single one of them. This is done this way so that the second time we run we

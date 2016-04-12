@@ -10,5 +10,7 @@ before_install: |
   cd ..
   git clone -b IB/v5-06/next https://github.com/alisw/alidist
 script: |
+  time alibuild/aliBuild --help
+  time alibuild/aliBuild build zlib --dry-run
   time alibuild/aliBuild --aggressive-cleanup --docker -a slc7_x86-64 -d build zlib
   time alibuild/aliBuild --aggressive-cleanup --docker -a ubuntu1510_x86-64 -d build zlib
