@@ -648,6 +648,15 @@ if __name__ == "__main__":
       else:
         ownPackages.update([spec["package"]])
 
+    dieOnError(("system_requirement" in spec) and recipe.strip("\n\t "), 
+               "System requirements %s cannot have a recipe" % spec["package"])
+    if re.match(spec.get("system_requirement", "(?!.*)"), args.architecture):
+      cmd = spec.get("system_requirement_check", "false")
+      err, output = getstatusoutput(cmd.strip())
+      dieOnError(err, spec.get("system_requirement_missing",
+                               "%s not found on system" % spec["package"]))
+      args.disable.append(spec["package"])
+
     if spec["package"] in args.disable:
       continue
 
