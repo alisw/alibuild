@@ -58,3 +58,14 @@ aliBuild had troubles with it. Upgrading to the latest version via:
     pip install --upgrade alibuild
 
 or by doing `git pull` should fix the issue.
+
+### aliBuild does not pick up tool X from the sytem
+
+By default aliBuild prefers using tools from the system whenever
+possible. Examples of those tools are CMake, the GCC compiler or the
+autotools suite. If this does not happen even if you have it installed
+it means that aliBuild does not consider you system tool good enough to
+be compatible with the one provided by the recipe. You can verify what
+happens during the system tool detection by running:
+
+    aliDoctor
