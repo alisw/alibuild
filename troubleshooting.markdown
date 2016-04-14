@@ -83,7 +83,8 @@ this is symtomatic of having `SIP` protection enabled on your Mac (now
 default since El Captain).
 
 Starting from El Capitan (OS X 10.11) Apple has introduced System
-Integrity Protection, also known as “rootless mode”. As explained here
+Integrity Protection, also known as “rootless mode”. As explained
+[here](https://dberzano.github.io/2015/10/05/el-capitan/#system_integrity_protection)
 this might have an impact to library loading when you have scripts (or
 applications) invoking other scripts.
 
