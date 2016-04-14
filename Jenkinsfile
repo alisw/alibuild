@@ -13,30 +13,54 @@ node {
   
   stage "Simple tests"
   def test_script = """
-      ls
-      (cd alibuild && git show)
+      (cd alibuild && git show && git log HEAD~5..)
       alibuild/aliBuild --help
       rm -fr alidist
       git clone https://github.com/alisw/alidist
       alibuild/aliBuild -d build zlib
+      alibuild/aliBuild --reference-sources /build/mirror -d build AliRoot -n
     """
 
+    node ("slc7_x86-64-light") {
+      dir ("alibuild") {
+        checkout scm
+      }
+      sh test_script
+    }
+
+  stage "Full build"
+  def full_build_script = """
+      (cd alibuild && git show && git log HEAD~5..)
+      alibuild/aliBuild --help
+      rm -fr alidist
+      git clone https://github.com/alisw/alidist
+      alibuild/aliBuild --reference-sources /build/mirror --debug --remote-store rsync://repo.marathon.mesos/store/ -d build AliRoot
+    """
   parallel(
-    "slc7": {
-      node ("slc7_x86-64-light") {
+    "slc5": {
+      node ("slc5_x86-64-large") {
         dir ("alibuild") {
           checkout scm
         }
-        sh test_script
+        sh full_build_script
+      }
+    },
+    "slc7": {
+      node ("slc7_x86-64-large") {
+        dir ("alibuild") {
+          checkout scm
+        }
+        sh full_build_script
       }
     },
     "ubuntu1510": {
-      node ("ubt1510_x86-64-light") {
+      node ("ubt1510_x86-64-large") {
         dir ("alibuild") {
           checkout scm
         }
-        sh test_script
+        sh full_build_script
       }
     }
   )
+ 
 }
