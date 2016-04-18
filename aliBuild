@@ -2,7 +2,7 @@
 import os, logging, time, re, yaml, hashlib, argparse
 import sys, shutil, subprocess, socket
 from commands import getstatusoutput
-from os.path import basename, dirname, abspath, exists, realpath, join
+from os.path import basename, dirname, abspath, exists, realpath, join, islink
 from os import makedirs, unlink, readlink, getenv, sysconf, rmdir
 from glob import glob
 from datetime import datetime
@@ -410,8 +410,8 @@ if __name__ == "__main__":
   os.environ["LANG"] = "C"
   os.environ["LC_ALL"] = "C"
   parser = argparse.ArgumentParser(epilog="For complete documentation please refer to https://alisw.github.io/alibuild")
-  parser.add_argument("action", choices=["init", "build"], help="Either `build' or `prepare'")
-  parser.add_argument("pkgname", help="One (or more) of the packages in `alidist'")
+  parser.add_argument("action", choices=["init", "build", "clean"], help="what alibuild should do")
+  parser.add_argument("pkgname", nargs="?", help="One (or more) of the packages in `alidist'")
   parser.add_argument("--config-dir", "-c", dest="configDir", default="%%(prefix)s%sdist" % star())
   parser.add_argument("--no-local", dest="noDevel", default=[],
                       help="Do not pick up the following packages from a local checkout.")
@@ -464,7 +464,7 @@ if __name__ == "__main__":
 
   if args.remoteStore or args.writeStore:
     args.noSystem = True
-  
+
   if not args.architecture:
     print format("Cannot determine architecture. "
                  "Please pass it explicitly.\n\n%s" % ARCHITECTURE_TABLE[0])
@@ -528,6 +528,9 @@ if __name__ == "__main__":
   if args.noDevel:
     args.noDevel = args.noDevel.split(",")
 
+  if args.action in ["build", "init"] and not args.pkgname:
+    parser.error("Please provide at least one package to build.")
+
   # Setup build environment.
   if args.action == "init":
     setdir = args.develPrefix if "develPrefix" in args else "."
@@ -577,6 +580,29 @@ if __name__ == "__main__":
     print format("Development clones for %(pkgs)s created under %(d)s",
                  pkgs=", ".join([ x["name"].lower() for x in pkgs ]),
                  d=setdir)
+    exit(0)
+  elif args.action == "clean":
+    # Find all the symlinks in "BUILD"
+    # Find all the directories in "BUILD"
+    # Schedule a directory for deletion if it does not have a symlink
+    # Delete scheduled directories
+    symlinksBuild = [readlink(x) for x in glob("%s/BUILD/*-latest*" % args.workDir)]
+    toDelete = [x for x in glob("%s/BUILD/*" % args.workDir)
+                if not islink(x) and not basename(x) in symlinksBuild]
+    installGlob ="%s/%s/*/" % (args.workDir, args.architecture)
+    symlinksInstall = [readlink(x) for x in glob(installGlob + "latest*")]
+    toDelete += [x for x in glob(installGlob+ "*")
+                 if not islink(x) and not basename(x) in symlinksInstall]
+    if not toDelete:
+      print "Nothing to delete."
+      exit(0)
+    print "This will delete the following directories"
+    print "\n".join(toDelete)
+    if args.dryRun:
+      print "--dry-run / -n specified. Doing nothing."
+      exit(0)
+    for x in toDelete:
+      shutil.rmtree(x)
     exit(0)
   elif not args.action == "build":
     parser.error("Action %s unsupported" % args.action)
