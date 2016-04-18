@@ -5,10 +5,21 @@ node {
   stage "Verify author"
   def power_users = ["ktf", "dberzano"]
   echo "Changeset from " + env.CHANGE_AUTHOR
+
   if (power_users.contains(env.CHANGE_AUTHOR)) {
     echo "PR comes from power user. Testing"
+    slackSend channel: '#github',
+              color: 'good',
+              message: "Automatically testing new PR in Jenkins.\nhttps://alijenkins.cern.ch/job/alibuild-pipeline/branch/${env.BRANCH_NAME} for progress report.",
+              token: env.SLACK_TOKEN
   } else {
-    input "Do you want to test this change?"
+    withCredentials([[$class: 'StringBinding', credentialsId: 'SLACK_TOKEN', variable: 'SLACK_TOKEN']]) {
+      slackSend channel: '#github',
+                color: 'good',
+                message: "A new PR to be approved for aliBuild. Please check https://alijenkins.cern.ch/job/alibuild-pipeline/branch/${env.BRANCH_NAME}",
+                token: env.SLACK_TOKEN
+      input "Do you want to test this change?"
+    }
   }
   
   stage "Simple tests"
