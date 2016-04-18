@@ -221,27 +221,28 @@ def detectArch():
     if platform.system() == "Darwin":
       return "osx_x86-64"
     distribution, version, flavour = platform.dist()
+    # If platform.dist does not return something sensible,
+    # let's try with /etc/os-release
+    if distribution not in ["Ubuntu", "redhat", "centos"] and exists("/etc/os-release"):
+      for x in open("/etc/os-release").readlines():
+        if not "=" in x:
+          continue
+        key, val = x.split("=", 1)
+        val = val.strip("\n \"")
+        if key == "ID":
+          distribution = val
+        if key == "VERSION_ID":
+          version = val
+ 
     if distribution == "Ubuntu":
       version = version.split(".")
       version = version[0] + version[1]
-    # Sometimes people using anaconda end up having "debian" as reported
-    # platform. If this is the case use try to use /etc/lsb-release to
-    # detect the string correctly.
-    if distribution == "debian":
-      try:
-        for x in open("/etc/lsb-release").readlines():
-          if not "=" in x:
-            continue
-          key, val = x.split("=", 1)
-          if key == "DISTRIB_ID":
-            distribution = val.strip("\n ")
-          if key == "DISTRIB_RELEASE":
-            version = val.strip("\n ")
-      except:
-        pass
+    if distribution in ["redhat", "centos"]:
+      distribution = distribution.replace("centos","slc").replace("redhat","slc").lower()
+ 
     processor = platform.processor()
     return format("%(d)s%(v)s_%(c)s",
-                  d=distribution.replace("centos","slc").replace("redhat","slc").lower(),
+                  d=distribution.lower(),
                   v=version.split(".")[0],
                   c=platform.processor().replace("_", "-"))
   except:
