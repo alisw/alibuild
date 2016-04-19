@@ -1260,16 +1260,18 @@ if __name__ == "__main__":
     else:
       err = execute("/bin/bash -e -x %s/build.sh 2>&1" % scriptDir)
 
-    dieOnError(err, format("Error while executing %(sd)s/build.sh\n"
+    dieOnError(err, format("Error while executing %(sd)s/build.sh on `%(h)s'.\n"
                            "Log can be found in %(w)s/BUILD/%(p)s-latest/log",
+                           h=socket.gethostname(),
                            sd=scriptDir,
                            w=abspath(args.workDir),
                            p=spec["package"]))
 
     syncHelper.syncToRemote(p, spec)
-  info(format("Build successfully completed. "
+  info(format("Build successfully completed on `%(h)s'.\n"
               "Your software installation is at:"
               "\n\n%(wp)s",
+              h=socket.gethostname(),
               wp=abspath(join(args.workDir, args.architecture))))
   for x in develPkgs:
     info(format("\nBuild directory for package %(p)s is %(w)s/BUILD/%(p)s-latest/%(p)s",
