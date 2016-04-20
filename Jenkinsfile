@@ -1,7 +1,6 @@
 #!groovy
 
 node {
-
   stage "Verify author"
   def power_users = ["ktf", "dberzano"]
   echo "Changeset from " + env.CHANGE_AUTHOR
@@ -21,57 +20,79 @@ node {
       input "Do you want to test this change?"
     }
   }
-  
-  stage "Simple tests"
-  def test_script = """
+
+  stage "Run tests"
+  def build_script = '''
       (cd alibuild && git show && git log HEAD~5..)
       alibuild/aliBuild --help
       rm -fr alidist
       git clone https://github.com/alisw/alidist
-      alibuild/aliBuild -d build zlib
-      alibuild/aliBuild --reference-sources /build/mirror -d build AliRoot -n
-    """
+      CHANGED_FILES=`cd alibuild && git diff --name-only origin/$CHANGE_TARGET.. | sed -e 's|/.*||' | sort -u`
+      for d in $CHANGED_FILES; do
+        case $d in
+          # Changes in alibuild_helpers can we tested in isolation, so we
+          # do so.
+          alibuild_helpers|tests)
+            PYTHONPATH=alibuild python alibuild/tests/test_*.py
+            ;;
+          # Changes to alibuild require a full rebuild to be validated. The
+          # goal as usual is to fail fast.
+          aliBuild)
+            alibuild/aliBuild -d build zlib
+            alibuild/aliBuild --reference-sources /build/mirror -d build AliRoot -n
+            ;;
+          # All the other changes we do not have tests right now.
+          *) ;;
+        esac
+      done
 
-    node ("slc7_x86-64-light") {
-      dir ("alibuild") {
-        checkout scm
-      }
-      sh test_script
-    }
+      # We do more extensive tests later
+      for d in $CHANGED_FILES; do
+        case $d in
+          # Rebuild everything if aliBuild or build_template.sh changed
+          aliBuild|*build_template.sh)
+            alibuild/aliBuild --reference-sources /build/mirror --remote-store rsync://repo.marathon.mesos/store/ -d build AliRoot
+            ;;
+          # All the other changes we do not have tests right now.
+          *) ;;
+        esac
+      done
+    '''
 
-  stage "Full build"
-  def full_build_script = """
-      (cd alibuild && git show && git log HEAD~5..)
-      alibuild/aliBuild --help
-      rm -fr alidist
-      git clone https://github.com/alisw/alidist
-      alibuild/aliBuild --reference-sources /build/mirror --debug --remote-store rsync://repo.marathon.mesos/store/ -d build AliRoot
-    """
-  parallel(
-    "slc5": {
-      node ("slc5_x86-64-large") {
-        dir ("alibuild") {
-          checkout scm
+    withEnv(["CHANGED_TARGET=${env.CHANGE_TARGET}"]) {
+      parallel(
+        "slc5": {
+          node ("slc5_x86-64-large") {
+            dir ("alibuild") {
+              checkout scm
+            }
+            sh build_script
+          }
+        },
+        "slc6": {
+          node ("slc6_x86-64-large") {
+            dir ("alibuild") {
+              checkout scm
+            }
+            sh build_script
+          }
+        },
+        "slc7": {
+          node ("slc7_x86-64-large") {
+            dir ("alibuild") {
+              checkout scm
+            }
+            sh build_script
+          }
+        },
+        "ubuntu1510": {
+          node ("ubt1510_x86-64-large") {
+            dir ("alibuild") {
+              checkout scm
+            }
+            sh build_script
+          }
         }
-        sh full_build_script
-      }
-    },
-    "slc7": {
-      node ("slc7_x86-64-large") {
-        dir ("alibuild") {
-          checkout scm
-        }
-        sh full_build_script
-      }
-    },
-    "ubuntu1510": {
-      node ("ubt1510_x86-64-large") {
-        dir ("alibuild") {
-          checkout scm
-        }
-        sh full_build_script
-      }
+      )
     }
-  )
- 
 }

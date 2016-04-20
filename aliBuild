@@ -9,6 +9,7 @@ from datetime import datetime
 from urllib2 import urlopen, URLError
 import ssl
 import json
+from alibuild_helpers.utilities import doDetectArch, format
 
 debug, error, warning, info, riemannStream = (None, None, None, None, None)
 
@@ -66,8 +67,6 @@ class RiemannStream(object):
         pass
     self.buffer = ""
 
-def format(s, **kwds):
-  return s % kwds
 
 def writeAll(fn, txt):
   f = open(fn, "w")
@@ -216,38 +215,16 @@ VALID_ARCHS_RE = ["slc[5-9]+_(x86-64|ppc64)",
 # FIXME: we should have a fallback for lsb_release, since platform.dist
 # is going away.
 def detectArch():
+  hasOsRelease = exists("/etc/os-release")
+  osReleaseLines = open("/etc/os-release").readlines() if hasOsRelease else []
   try:
     import platform
-    if platform.system() == "Darwin":
-      return "osx_x86-64"
-    distribution, version, flavour = platform.dist()
-    # If platform.dist does not return something sensible,
-    # let's try with /etc/os-release
-    if distribution not in ["Ubuntu", "redhat", "centos"] and exists("/etc/os-release"):
-      for x in open("/etc/os-release").readlines():
-        if not "=" in x:
-          continue
-        key, val = x.split("=", 1)
-        val = val.strip("\n \"")
-        if key == "ID":
-          distribution = val
-        if key == "VERSION_ID":
-          version = val
- 
-    if distribution == "Ubuntu":
-      version = version.split(".")
-      version = version[0] + version[1]
-    if distribution in ["redhat", "centos"]:
-      distribution = distribution.replace("centos","slc").replace("redhat","slc").lower()
- 
-    processor = platform.processor()
-    return format("%(d)s%(v)s_%(c)s",
-                  d=distribution.lower(),
-                  v=version.split(".")[0],
-                  c=platform.processor().replace("_", "-"))
+    platformTuple = platform.dist()
+    platformSystem = platform.system()
+    platformProcessor = platform.processor()
+    return doDetectArch(hasOsRelease, osReleaseLines, platformTuple, platformSystem, platformProcessor)
   except:
     return None
-  return None
 
 # Detect number of available CPUs. Fallback to 1.
 def detectJobs():
