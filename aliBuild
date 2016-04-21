@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 import os, logging, time, re, yaml, hashlib, argparse
 import sys, shutil, subprocess, socket
 from commands import getstatusoutput
