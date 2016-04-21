@@ -8,35 +8,61 @@ layout: main
 
 For a quick start introduction, please look [here](./quick.html).
 
-    usage: alibuild 
-        [-h] 
-        [--config-dir CONFIGDIR] 
-        [--no-local NODEVEL] 
-        [--docker]
-        [--work-dir WORKDIR]
-        [--architecture ARCHITECTURE]
-        [-e ENVIRONMENT]
-        [-v VOLUMES]
-        [--jobs JOBS]
-        [--reference-sources REFERENCESOURCES]
-        [--remote-store REMOTESTORE]
-        [--write-store WRITESTORE]
-        [--disable PACKAGE]
-        [--defaults [FILE]]
-        [--always-prefer-system]
-        [--no-system]
-        [--force-unknown-architecture]
-        [--insecure]
-        [--aggressive-cleanup]
-        [--debug]
-        [--no-auto-cleanup]
-        [--devel-prefix [DEVELPREFIX]] 
-        [--dist DIST]
-                    {init,build} pkgname
+    usage: alibuild [-h] [--config-dir CONFIGDIR] [--no-local NODEVEL] [--docker]
+                    [--work-dir WORKDIR] [--architecture ARCHITECTURE]
+                    [-e ENVIRONMENT] [-v VOLUMES] [--jobs JOBS]
+                    [--reference-sources REFERENCESOURCES]
+                    [--remote-store REMOTESTORE] [--write-store WRITESTORE]
+                    [--disable PACKAGE] [--defaults [FILE]]
+                    [--always-prefer-system] [--no-system]
+                    [--force-unknown-architecture] [--insecure]
+                    [--aggressive-cleanup] [--debug] [--no-auto-cleanup]
+                    [--devel-prefix [DEVELPREFIX]] [--dist DIST] [--dry-run]
+                    {init,build,clean} [pkgname]
 
     positional arguments:
-      {init,build}          Either `build' or `prepare'
+      {init,build,clean}    what alibuild should do
       pkgname               One (or more) of the packages in `alidist'
+
+    optional arguments:
+      -h, --help            show this help message and exit
+      --config-dir CONFIGDIR, -c CONFIGDIR
+      --no-local NODEVEL    Do not pick up the following packages from a local
+                            checkout.
+      --docker
+      --work-dir WORKDIR, -w WORKDIR
+      --architecture ARCHITECTURE, -a ARCHITECTURE
+      -e ENVIRONMENT
+      -v VOLUMES            Specify volumes to be used in Docker
+      --jobs JOBS, -j JOBS
+      --reference-sources REFERENCESOURCES
+      --remote-store REMOTESTORE
+                            Where to find packages already built for reuse.Use
+                            ssh:// in front for remote store. End with ::rw if you
+                            want to upload.
+      --write-store WRITESTORE
+                            Where to upload the built packages for reuse.Use
+                            ssh:// in front for remote store.
+      --disable PACKAGE     Do not build PACKAGE and all its (unique)
+                            dependencies.
+      --defaults [FILE]     Specify which defaults to use
+      --always-prefer-system
+                            Always use system packages when compatible
+      --no-system           Never use system packages
+      --force-unknown-architecture
+                            Do not check for valid architecture
+      --insecure            Do not check for valid certificates
+      --aggressive-cleanup  Perform additional cleanups
+      --debug, -d
+      --no-auto-cleanup     Do not cleanup build by products automatically
+      --devel-prefix [DEVELPREFIX], -z [DEVELPREFIX]
+                            Version name to use for development packages. Defaults
+                            to branch name.
+      --dist DIST           Prepare development mode by downloading the given
+                            recipes set ([user/repo@]branch)
+      --dry-run, -n         Prints what would happen, without actually doing the
+                            build.
+
 
 ## Speedup build process by using a build store
 
@@ -197,6 +223,25 @@ aliBuild comes with support for pushing every single line produced by
 the output to a [Riemann](https://riemann.io) instance. This can be
 enabled by setting the two environment variables:
 
-- `RIEMANN_HOST`: the hostname Riemann server you want to push your data to, defaults 
-  to `localhost`.
-- `RIEMANN_PORT`: the port the Riemann server is listening at, defaults to 5555.
+- `RIEMANN_HOST`: the hostname Riemann server you want to push your data
+  to, defaults to `localhost`.
+- `RIEMANN_PORT`: the port the Riemann server is listening at, defaults
+  to 5555.
+
+## Cleaning up the build area (new in 1.1.0)
+
+Whenever you build using a different recipe or set of sources, alibuild
+makes sure that all the dependent packages which might be affected
+by the change are rebuild, and it does so in a different directory.
+This can lead to the profiliferation of many build / installation
+directories, in particular while developing a recipe for a new package
+(e.g. a new generator).
+
+In order to remove all past builds and only keep the latest one for each
+alidist area you might have used and for each breanch (but not commit)
+ever build for a given development package you can use the
+
+    aliBuild clean
+
+subcommand which will do its best to clean up your build and
+installation area.
