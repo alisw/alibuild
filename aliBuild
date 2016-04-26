@@ -1,12 +1,13 @@
 #!/usr/bin/env python
+
+# from __future__ import print_function
+
 import os, time, re, yaml, hashlib, argparse
 import sys, shutil, subprocess, socket
-from commands import getstatusoutput
 from os.path import basename, dirname, abspath, exists, realpath, join, islink, expanduser
 from os import makedirs, unlink, readlink, getenv, sysconf, rmdir
 from glob import glob
 from datetime import datetime
-from urllib2 import urlopen, URLError
 import ssl
 import json
 import logging
@@ -15,6 +16,13 @@ from alibuild_helpers.log import logger_handler, logger, LogFormatter, ProgressP
 from alibuild_helpers.utilities import doDetectArch, format, getVersion
 from alibuild_helpers.analytics import decideAnalytics, askForAnalytics, report_screenview, report_exception, report_event
 from alibuild_helpers.analytics import enable_analytics, disable_analytics
+try:
+  from commands import getstatusoutput
+  from urllib2 import urlopen, URLError
+except ImportError:
+  from subprocess import getstatusoutput
+  from urllib.request import urlopen
+  from urllib.error import URLError
 
 def writeAll(fn, txt):
   f = open(fn, "w")
@@ -153,7 +161,7 @@ VALID_ARCHS_RE = ["slc[5-9]+_(x86-64|ppc64)",
 # possibly compatible linux distributions, but tries to get right the
 # common one, obvious one. If you use a Unknownbuntu which is compatible
 # with Ubuntu 15.10 you will still have to give an explicit platform
-# string. 
+# string.
 #
 # FIXME: we should have a fallback for lsb_release, since platform.dist
 # is going away.
@@ -531,7 +539,6 @@ def doMain():
   workDir = abspath(args.workDir)
   prunePaths(workDir)
 
-
   if not exists(args.configDir):
     err = execute(format(
                     "git clone https://github.com/%(repo)s%(branch)s %(cd)s",
@@ -592,7 +599,7 @@ def doMain():
       else:
         ownPackages.update([spec["package"]])
 
-    dieOnError(("system_requirement" in spec) and recipe.strip("\n\t "), 
+    dieOnError(("system_requirement" in spec) and recipe.strip("\n\t "),
                "System requirements %s cannot have a recipe" % spec["package"])
     if re.match(spec.get("system_requirement", "(?!.*)"), args.architecture):
       cmd = spec.get("system_requirement_check", "false")
@@ -607,7 +614,7 @@ def doMain():
     # For the moment we treat build_requires just as requires.
     fn = lambda what: filterByArchitecture(args.architecture, spec.get(what, []))
     spec["requires"] = [x for x in fn("requires") if not x in args.disable]
-    spec["build_requires"] = [x for x in fn("build_requires") if not x in args.disable] 
+    spec["build_requires"] = [x for x in fn("build_requires") if not x in args.disable]
     if spec["package"] != "defaults-" + args.defaults:
       spec["build_requires"].append("defaults-" + args.defaults)
     spec["runtime_requires"] = spec["requires"]
@@ -633,7 +640,7 @@ def doMain():
     banner("The following packages cannot be taken from the system and will be built:\n  %s" %
            ", ".join(ownPackages))
 
-  # Do topological sort to have the correct build order even in the 
+  # Do topological sort to have the correct build order even in the
   # case of non-tree like dependencies..
   # The actual algorith used can be found at:
   #
@@ -705,7 +712,7 @@ def doMain():
       spec["tag"] = format(spec["tag"], **nowKwds)
       # By default we assume tag is a commit hash. We then try to find
       # out if the tag is actually a branch and we use the tip of the branch
-      # as commit_hash. Finally if the package is a development one, we use the 
+      # as commit_hash. Finally if the package is a development one, we use the
       # name of the branch as commit_hash.
       spec["commit_hash"] = spec["tag"]
       for l in out.split("\n"):
@@ -963,8 +970,8 @@ def doMain():
 
     # Now that we have all the information about the package we want to build, let's
     # check if it wasn't built / unpacked already.
-    hashFile = "%s/%s/%s/%s-%s/.build-hash" % (workDir, 
-                                               args.architecture, 
+    hashFile = "%s/%s/%s/%s-%s/.build-hash" % (workDir,
+                                               args.architecture,
                                                spec["package"],
                                                spec["version"],
                                                spec["revision"])
@@ -998,7 +1005,7 @@ def doMain():
       # assuming the package is not a development one. We also can
       # delete the SOURCES in case we have aggressive-cleanup enabled.
       if not spec["package"] in develPkgs and args.autoCleanup:
-        cleanupDirs = [format("%(w)s/BUILD/%(h)s", 
+        cleanupDirs = [format("%(w)s/BUILD/%(h)s",
                               w=workDir,
                               h=spec["hash"]),
                        format("%(w)s/INSTALLROOT/%(h)s",
