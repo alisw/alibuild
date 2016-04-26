@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# from __future__ import print_function
+from __future__ import print_function
 
 import os, time, re, yaml, hashlib, argparse
 import sys, shutil, subprocess, socket
@@ -392,7 +392,7 @@ def doMain():
   report_screenview(args.action)
 
   if args.action == "version":
-    print "aliBuild version: %s" % getVersion()
+    print("aliBuild version: %s" % getVersion())
     sys.exit(0)
 
   args.referenceSources = format(args.referenceSources, workDir=args.workDir)
@@ -403,15 +403,17 @@ def doMain():
     args.noSystem = True
 
   if not args.architecture:
-    print format("Cannot determine architecture. "
-                 "Please pass it explicitly.\n\n%s" % ARCHITECTURE_TABLE[0])
+    print("Cannot determine architecture. Please pass it explicitly."
+          "\n\n{}".format(ARCHITECTURE_TABLE[0]))
     exit(1)
+
   if not args.forceUnknownArch and not matchValidArch(args.architecture):
-    print format("Unknown / unsupported architecture: %(architecture)s.\n\n"
-                "%(table)s"
-                "Alternatively, you can use the `--force-unknown-architecture' option.",
+    print("Unknown / unsupported architecture: {architecture}."
+          "\n\n{table} Alternatively, you can use the"
+          "`--force-unknown-architecture' option.".format(
+                architecture=args.architecture,
                 table=ARCHITECTURE_TABLE[0],
-                architecture=args.architecture)
+          ))
     exit(1)
 
   if args.preferSystem and args.noSystem:
@@ -498,9 +500,9 @@ def doMain():
                            cd=dest))
       dieOnError(err!=0, "cannot clone %s%s" %
                          (spec["package"], " version "+p["ver"] if p["ver"] else ""))
-    print format("Development directory %(d)s created%(pkgs)s",
+    print(format("Development directory %(d)s created%(pkgs)s",
                  pkgs=" for "+", ".join([ x["name"].lower() for x in pkgs ]) if pkgs else "",
-                 d=setdir)
+                 d=setdir))
     exit(0)
   elif args.action == "clean":
     # Find all the symlinks in "BUILD"
@@ -515,12 +517,12 @@ def doMain():
     toDelete += [x for x in glob(installGlob+ "*")
                  if not islink(x) and not basename(x) in symlinksInstall]
     if not toDelete:
-      print "Nothing to delete."
+      print("Nothing to delete.")
       exit(0)
-    print "This will delete the following directories"
-    print "\n".join(toDelete)
+    print("This will delete the following directories")
+    print("\n".join(toDelete))
     if args.dryRun:
-      print "--dry-run / -n specified. Doing nothing."
+      print("--dry-run / -n specified. Doing nothing.")
       exit(0)
     for x in toDelete:
       shutil.rmtree(x)

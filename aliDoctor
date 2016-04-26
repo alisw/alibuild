@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# from __future__ import print_function
+from __future__ import print_function
 
 import argparse
 import os, re
@@ -14,15 +14,15 @@ except ImportError:
   from subprocess import getstatusoutput
 
 def execute(command, prefix):
-  print prefix + ":" + command.strip("\n")
+  print("%s:%s" % (prefix, command.strip("\n")))
   popen = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
   lines_iterator = iter(popen.stdout.readline, "")
   for line in lines_iterator:
-    print prefix + ":" +line.strip("\n")  # yield line
+    print(prefix + ":" +line.strip("\n"))  # yield line
   output = popen.communicate()[0]
   for x in output.split("\n"):
-    print prefix + ":" + output
-  print prefix + ": exit code " + str(popen.returncode)
+    print(prefix + ":" + output)
+  print(prefix + ": exit code " + str(popen.returncode))
 
 def prunePaths(workDir):
   for x in ["PATH", "LD_LIBRARY_PATH", "DYLD_LIBRARY_PATH"]:
@@ -49,7 +49,7 @@ if __name__ == "__main__":
     homebrew_replacement = "true"
 
   for x in glob("%s/*.sh" % args.config):
-    print "Reading", x
+    print("Reading", x)
     txt = file(x).read()
     header, body = txt.split("---", 1)
     spec = yaml.safe_load(header)
