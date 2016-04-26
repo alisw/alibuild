@@ -245,10 +245,10 @@ class HttpRemoteSync:
       else:
         hashList = json.loads(urlopen(hashListUrl).read())
         pkgList = json.loads(urlopen(pkgListUrl).read())
-    except URLError, e:
+    except URLError as e:
       debug("Cannot find precompiled package for %s@%s" % (p, spec["hash"]))
       pass
-    except Exception, e:
+    except Exception as e:
       info(e)
       error("Unknown response from server")
 
@@ -465,7 +465,7 @@ def doMain():
     try:
       os.path.exists(setdir) or os.mkdir(setdir)
       os.path.exists(args.referenceSources) or makedirs(args.referenceSources)
-    except OSError, e:
+    except OSError as e:
       dieOnError(True, str(e))
 
     for p in [{"name":"stardist","ver":args.dist["ver"]}] + pkgs:
@@ -476,7 +476,7 @@ def doMain():
       else:
         try:
           d = open("%s/%s.sh" % (args.configDir, p["name"].lower())).read()
-        except IOError,e:
+        except IOError as e:
           dieOnError(True, str(e))
         header,_ = d.split("---", 1)
         spec = yaml.safe_load(header)
@@ -581,7 +581,7 @@ def doMain():
       continue
     try:
       d = open("%s/%s.sh" % (args.configDir, p.lower())).read()
-    except IOError,e:
+    except IOError as e:
       dieOnError(True, str(e))
     header, recipe = d.split("---", 1)
     spec = yaml.safe_load(header)
@@ -1305,10 +1305,10 @@ if __name__ == "__main__":
     os.environ["ALIBUILD_ANALYTICS_USER_UUID"] = open(expanduser("~/.config/alibuild/analytics-uuid")).read().strip()
   try:
     doMain()
-  except KeyboardInterrupt, e:
+  except KeyboardInterrupt as e:
     info(str(e))
     report_event("user", "ctrlc")
     exit(1)
-  except Exception, e:
+  except Exception as e:
     report_exception(e)
     raise e
