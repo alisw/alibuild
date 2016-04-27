@@ -93,14 +93,13 @@ develop at the same level as alibuild and alidist.
 For example, if you want to build O2 while having the ability to modify
 ROOT, you can do the following:
 
-    git clone https://github.com/alisw/alibuild
     git clone https://github.com/alisw/alidist
     git clone https://github.com/root-mirror/root ROOT
     <modify files in ROOT/>
-    alibuild/aliBuild ... build O2
+    aliBuild ... build O2
 
 The above will make sure the build will pick up your changes in the local
-directory. 
+directory.
 
 As a cherry on the cake, in case your recipe does not require any environment,
 you can even do:

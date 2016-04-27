@@ -4,21 +4,27 @@ subtitle: Quick Start
 layout: main
 ---
 
-aliBuild is a tool to simplify building and installing ALICE / ALFA software.
-The tool itself if available as a github repository which can be checked out via:
+aliBuild is a tool to simplify building and installing ALICE / ALFA
+software. The tool itself is available as a standard PyPi package. You
+can install it via:
+
+    pip install alibuild
+
+Alternatively you can checkout the github repository and use it from
+there:
 
     git clone https://github.com/alisw/alibuild.git
 
-This will provide you the tool itself. In order to work you will need a set of
-recipes from a repository called `alidist`:
+This will provide you the tool itself. In order to work you will need a
+set of recipes from a repository called `alidist`:
 
     git clone https://github.com/alisw/alidist.git
 
 Once you have obtained both repository, you can trigger a build via:
 
-    alibuild/aliBuild [-d] -j <jobs> build <package>
+    aliBuild [-d] -j <jobs> build <package>
 
-where:
+(or alibuild/aliBuild if you are working from sources) where:
 
 - `<package>`: is the name of the package you want to build, e.g.: 
   - `AliRoot`
@@ -26,8 +32,9 @@ where:
   - `O2`
   - `ROOT`
 - `-d` can be used to have verbose debug output.
-- `<jobs>` is the maximum number of parallel processes to be used for building
-  where possible (defaults to the number of CPUs available if omitted).
+- `<jobs>` is the maximum number of parallel processes to be used for
+  building where possible (defaults to the number of CPUs available if
+  omitted).
 
 ### Results of a build
 
@@ -49,7 +56,7 @@ For example:
     sw/slc7_x86-64/AliRoot/v5-07-01-1
 
 we call this path "the `PACKAGE_ROOT` for package `<package>`".
- 
+
 
 ## Loading the package environment
 
