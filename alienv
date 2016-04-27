@@ -223,7 +223,7 @@ case "$ACTION" in
   q|query)
     [[ -z "${ARGS[0]}" ]] && SEARCH_CMD=cat || SEARCH_CMD=( grep -iE "${ARGS[0]}" )
     exec $MODULECMD bash -t avail 2>&1 | grep -E '^[^/]+/[^/]+$' | grep -vE ':$' | \
-      "${SEARCH_CMD[@]}" | sed -e 's!^\([^/]\+\)/\([^/]\+\)$!VO_ALICE@\1::\2!'
+      "${SEARCH_CMD[@]}" | sed -e 's!^\([^/]*\)/\(.*\)$!VO_ALICE@\1::\2!'
   ;;
   avail)
     exec $MODULECMD bash avail
