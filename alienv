@@ -37,13 +37,14 @@ Usage: $0 \\
     ${EM}help${EZ}
       This help screen.
 
-    ${EM}enter${EZ} [${ET}--clean-env${EZ}|${ET}-e${EZ}] MODULE1[,MODULE2...]
+    ${EM}enter${EZ} [${ET}--shellrc${EZ}] MODULE1[,MODULE2...]
       Enters a new shell with the given modules loaded.
       Return to the clean environment by exiting the shell with ${ET}exit${EZ}.
       Inside the environment you can use the native ${ET}modulecmd${EZ}.
       By default you enter the same shell type you are in. Override with environment variable ${ET}MODULES_SHELL${EZ}.
-      Use ${ET}--clean-env${EZ} to ignore the shell startup file (e.g. ~/.bashrc).
-      This is useful if by default it exports paths that conflict with modules.
+      The new shell will not load your shell startup file by default (e.g. ~/.bashrc) to avoid environment conflicts.
+      If you want to retain your shell startup files use ${ET}--shellrc${EZ}.
+      Alternatively you can use the ${EM}load${EZ} command in the current shell.
 
     ${EM}setenv${EZ} MODULE1[,MODULE2...] ${ET}-c${EZ} cmdInEnvironment [PARAM1 [PARAM2...]]
       Executes the given command with environment defined by the given modules.
@@ -102,13 +103,14 @@ function normModules() {
 DEFAULT_WORK_DIRS=( sw ../sw )
 ARGS=()
 COMMAND_IN_ENV=()
+CLEAN_ENV=1
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --architecture|-a) ARCHITECTURE="$2"; shift 2 ;;
     --work-dir|-w) WORK_DIR="$2"; shift 2 ;;
     --no-refresh) NO_REFRESH=1; shift ;;
-    --clean-env|-e) CLEAN_ENV=1; shift ;;
+    --shellrc) unset CLEAN_ENV; shift ;;
     --help|help) printHelp; exit 0 ;;
     -c) shift; COMMAND_IN_ENV=("$@"); break ;;
     *) ARGS+=("$1"); shift ;;
