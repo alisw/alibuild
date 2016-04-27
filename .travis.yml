@@ -12,6 +12,9 @@ before_install: |
 script: |
   set -e
   time alibuild/aliBuild --help
+  time alibuild/aliBuild -z test-init init zlib
+  pushd test-init/alidist && git status && popd
+  pushd test-init/zlib && git status && popd
   time alibuild/aliBuild build zlib --dry-run
   time alibuild/aliBuild --aggressive-cleanup --docker -a slc7_x86-64 -d build zlib
   time alibuild/aliBuild --aggressive-cleanup --docker -a ubuntu1510_x86-64 -d build zlib
