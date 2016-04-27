@@ -8,11 +8,14 @@ A simple build tool for ALICE experiment software and its externals. Recipes
 for the externals and ALICE software are stored in
 [alidist](https://github.com/alisw/alidist).
 
+Install with:
+
+    pip install alibuild
+
 Instant gratification on your machine with:
 
-    git clone https://github.com/alisw/alibuild.git
     git clone https://github.com/alisw/alidist.git
-    alibuild/aliBuild build AliRoot
+    aliBuild build AliRoot
 
 For a more verbose documentation of what is happening have a look at
 the [quickstart guide](quick.html). See the [user guide](user.html)

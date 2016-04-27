@@ -70,6 +70,24 @@ happens during the system tool detection by running:
 
     aliDoctor
 
+### I do not have privileges and I cannot install via pip
+
+If you do not have root privileges on your machine and `pip install alibuild`
+fails, you have two options:
+
+- If your pip supports it, you can add the `--user` flag and that will install
+  alibuild in `~/.local`. I.e.:
+
+      pip install --user alibuild
+
+- If your pip is old or if you do not have pip at all on your system or
+  you do not want to use pip for whatever reasons, you can still simply
+  checkout the sources with:
+
+      git clone https://github.com/alisw/alibuild
+
+  and simply run alibuild by invoking `alibuild/aliBuild`.
+
 ### Fastjet fails to compile on my brand new Mac
 
 A common problem is that whenever you try to compile FastJet on a brand
