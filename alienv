@@ -52,14 +52,14 @@ Usage: $0 \\
       Exit code is preserved.
       Example: $ET$0 setenv AliRoot/v5-08-02-1 -c aliroot -b$EZ
 
-    ${EM}printenv${EZ} or ${EM}load${EZ} MODULE1[,MODULE2...]
-      Prints the environment in the current shell for the given modules.
+    ${EM}printenv${EZ} or ${EM}load${EZ} [${ET}-q${EZ}] MODULE1[,MODULE2...]
+      Prints the environment in the current shell for the given modules (${ET}-q${EZ} for quiet).
       This command does not set any environment and it must be executed through ${ET}eval${EZ} to be effective.
       Override shell with the environment variable ${ET}MODULES_SHELL${EZ}.
       Example: ${ET}eval \`$0 load AliRoot/latest\`$EZ (those are backquotes!)
 
-    ${EM}unload${EZ} MODULE1[,MODULE2...]
-      Prints the environment in the current shell for unloading the given modules.
+    ${EM}unload${EZ} [${ET}-q${EZ}] MODULE1[,MODULE2...]
+      Prints the environment in the current shell for unloading the given modules (${ET}-q${EZ} for quiet).
       This command does not set any environment and it must be executed through ${ET}eval${EZ} to be effective.
       Override shell with the environment variable ${ET}MODULES_SHELL${EZ}.
       Example: ${ET}eval \`$0 unload AliRoot\`$EZ (version can be omitted)
@@ -118,12 +118,14 @@ DEFAULT_WORK_DIRS=( sw ../sw )
 ARGS=()
 COMMAND_IN_ENV=()
 CLEAN_ENV=1
+VERBOSE=1
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --architecture|-a) ARCHITECTURE="$2"; shift 2 ;;
     --work-dir|-w) WORK_DIR="$2"; shift 2 ;;
     --no-refresh) NO_REFRESH=1; shift ;;
+    -q) unset VERBOSE; shift ;;
     --shellrc) unset CLEAN_ENV; shift ;;
     --help|help) printHelp; exit 0 ;;
     -c) shift; COMMAND_IN_ENV=("$@"); break ;;
@@ -218,23 +220,30 @@ case "$ACTION" in
         zsh)     export PS1="[$MODULES]"' %~ %#> '  ;;
       esac
     fi
+    $MODULECMD bash list
+    printf "\033[36mUse \033[35malienv list\033[36m to list loaded modules. " >&2
+    printf "Use \033[35mexit\033[36m to exit this environment.\033[m\n" >&2
     exec ${CLEAN_ENV:+env $SHELL_NORC_ENV} $MODULES_SHELL ${CLEAN_ENV:+$SHELL_NORC_PARAM} -i
   ;;
   printenv|load|unload)
     [[ $ACTION == printenv ]] && ACTION=load
     MODULES=$(normModules "${ARGS[@]}")
     [[ $ACTION == load ]] && existModules $MODULES
+    [[ $VERBOSE == 1 ]] && printf "\033[36mUse \033[35malienv list\033[36m to list loaded modules.\033[m\n" >&2
     exec $MODULECMD $MODULES_SHELL $ACTION $MODULES
   ;;
   setenv)
     [[ -z "${COMMAND_IN_ENV[*]}" ]] && { printHelp "No command specified with -c"; false; }
-    eval $($MODULECMD bash add $(normModules "${ARGS[@]}"))
+    MODULES=$(normModules "${ARGS[@]}")
+    existModules $MODULES
+    eval $($MODULECMD bash add $MODULES)
     exec "${COMMAND_IN_ENV[@]}"
   ;;
   q|query)
     [[ -z "${ARGS[0]}" ]] && SEARCH_CMD=cat || SEARCH_CMD=( grep -iE "${ARGS[0]}" )
-    exec $MODULECMD bash -t avail 2>&1 | grep -E '^[^/]+/[^/]+$' | grep -vE ':$' | \
+    $MODULECMD bash -t avail 2>&1 | grep -E '^[^/]+/[^/]+$' | grep -vE ':$' | \
       "${SEARCH_CMD[@]}" | sed -e 's!^\([^/]*\)/\(.*\)$!VO_ALICE@\1::\2!'
+    exit ${PIPESTATUS[3]}  # grep
   ;;
   avail)
     exec $MODULECMD bash avail
