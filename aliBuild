@@ -723,7 +723,7 @@ if __name__ == "__main__":
   develPkgsUpper = [(p, p.upper()) for p in buildOrder
                     if p.upper() in develCandidatesUpper and p not in args.noDevel]
   if set(develPkgs) != set(x for (x, y) in develPkgsUpper):
-    error(format("The following development packages have wrong spelling: %(pkgs)s."
+    error(format("The following development packages have wrong spelling: %(pkgs)s.\n"
                  "Please check your local checkout and adapt to the correct one indicated.",
                  pkgs=", ".join(set(x.strip() for (x,y) in develPkgsUpper) - set(develPkgs))))
     exit(1)
