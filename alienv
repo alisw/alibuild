@@ -52,16 +52,12 @@ Usage: $0 \\
       Exit code is preserved.
       Example: $ET$0 setenv AliRoot/v5-08-02-1 -c aliroot -b$EZ
 
-    ${EM}printenv${EZ} or ${EM}load${EZ} MODULE1[,MODULE2...]
-      Prints the environment in the current shell for the given modules.
     ${EM}printenv${EZ} or ${EM}load${EZ} [${ET}-q${EZ}] MODULE1[,MODULE2...]
       Prints the environment in the current shell for the given modules (${ET}-q${EZ} for quiet).
       This command does not set any environment and it must be executed through ${ET}eval${EZ} to be effective.
       Override shell with the environment variable ${ET}MODULES_SHELL${EZ}.
       Example: ${ET}eval \`$0 load AliRoot/latest\`$EZ (those are backquotes!)
 
-    ${EM}unload${EZ} MODULE1[,MODULE2...]
-      Prints the environment in the current shell for unloading the given modules.
     ${EM}unload${EZ} [${ET}-q${EZ}] MODULE1[,MODULE2...]
       Prints the environment in the current shell for unloading the given modules (${ET}-q${EZ} for quiet).
       This command does not set any environment and it must be executed through ${ET}eval${EZ} to be effective.
@@ -238,7 +234,9 @@ case "$ACTION" in
   ;;
   setenv)
     [[ -z "${COMMAND_IN_ENV[*]}" ]] && { printHelp "No command specified with -c"; false; }
-    eval $($MODULECMD bash add $(normModules "${ARGS[@]}"))
+    MODULES=$(normModules "${ARGS[@]}")
+    existModules $MODULES
+    eval $($MODULECMD bash add $MODULES)
     exec "${COMMAND_IN_ENV[@]}"
   ;;
   q|query)
