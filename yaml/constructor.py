@@ -1,9 +1,11 @@
 
+from __future__ import unicode_literals
+
 __all__ = ['BaseConstructor', 'SafeConstructor', 'Constructor',
     'ConstructorError']
 
-from error import *
-from nodes import *
+from .error import *
+from .nodes import *
 
 import datetime
 
@@ -132,7 +134,7 @@ class BaseConstructor(object):
             key = self.construct_object(key_node, deep=deep)
             try:
                 hash(key)
-            except TypeError, exc:
+            except TypeError as exc:
                 raise ConstructorError("while constructing a mapping", node.start_mark,
                         "found unacceptable key (%s)" % exc, key_node.start_mark)
             value = self.construct_object(value_node, deep=deep)
@@ -290,12 +292,12 @@ class SafeConstructor(BaseConstructor):
         value = self.construct_scalar(node)
         try:
             return str(value).decode('base64')
-        except (binascii.Error, UnicodeEncodeError), exc:
+        except (binascii.Error, UnicodeEncodeError) as exc:
             raise ConstructorError(None, None,
-                    "failed to decode base64 data: %s" % exc, node.start_mark) 
+                    "failed to decode base64 data: %s" % exc, node.start_mark)
 
     timestamp_regexp = re.compile(
-            ur'''^(?P<year>[0-9][0-9][0-9][0-9])
+            r'''^(?P<year>[0-9][0-9][0-9][0-9])
                 -(?P<month>[0-9][0-9]?)
                 -(?P<day>[0-9][0-9]?)
                 (?:(?:[Tt]|[ \t]+)
@@ -492,7 +494,7 @@ class Constructor(SafeConstructor):
                     "expected non-empty name appended to the tag", mark)
         try:
             __import__(name)
-        except ImportError, exc:
+        except ImportError as exc:
             raise ConstructorError("while constructing a Python module", mark,
                     "cannot find module %r (%s)" % (name.encode('utf-8'), exc), mark)
         return sys.modules[name]
@@ -512,7 +514,7 @@ class Constructor(SafeConstructor):
             object_name = name
         try:
             __import__(module_name)
-        except ImportError, exc:
+        except ImportError as exc:
             raise ConstructorError("while constructing a Python object", mark,
                     "cannot find module %r (%s)" % (module_name.encode('utf-8'), exc), mark)
         module = sys.modules[module_name]
@@ -681,4 +683,3 @@ Constructor.add_multi_constructor(
 Constructor.add_multi_constructor(
     u'tag:yaml.org,2002:python/object/new:',
     Constructor.construct_python_object_new)
-

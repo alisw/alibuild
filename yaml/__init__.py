@@ -1,12 +1,14 @@
 
-from error import *
+from __future__ import absolute_import
 
-from tokens import *
-from events import *
-from nodes import *
+from .error import *
 
-from loader import *
-from dumper import *
+from .tokens import *
+from .events import *
+from .nodes import *
+
+from .loader import *
+from .dumper import *
 
 __version__ = '3.09'
 
@@ -285,4 +287,3 @@ class YAMLObject(object):
         return dumper.represent_yaml_object(cls.yaml_tag, data, cls,
                 flow_style=cls.yaml_flow_style)
     to_yaml = classmethod(to_yaml)
-

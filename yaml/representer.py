@@ -2,8 +2,8 @@
 __all__ = ['BaseRepresenter', 'SafeRepresenter', 'Representer',
     'RepresenterError']
 
-from error import *
-from nodes import *
+from .error import *
+from .nodes import *
 
 import datetime
 
@@ -12,7 +12,11 @@ try:
 except NameError:
     from sets import Set as set
 
-import sys, copy_reg, types
+import sys, types
+try:
+    import copy_reg
+except ImportError:
+    import copyreg as copy_reg
 
 class RepresenterError(YAMLError):
     pass
@@ -486,4 +490,3 @@ Representer.add_multi_representer(types.InstanceType,
 
 Representer.add_multi_representer(object,
         Representer.represent_object)
-

@@ -17,7 +17,7 @@
 
 __all__ = ['Reader', 'ReaderError']
 
-from error import YAMLError, Mark
+from .error import YAMLError, Mark
 
 import codecs, re
 
@@ -190,7 +190,7 @@ class Reader(object):
                 try:
                     data, converted = self.raw_decode(self.raw_buffer,
                             'strict', self.eof)
-                except UnicodeDecodeError, exc:
+                except UnicodeDecodeError as exc:
                     character = exc.object[exc.start]
                     if self.stream is not None:
                         position = self.stream_pointer-len(self.raw_buffer)+exc.start
@@ -222,4 +222,3 @@ class Reader(object):
 #    psyco.bind(Reader)
 #except ImportError:
 #    pass
-

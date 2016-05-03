@@ -8,8 +8,8 @@
 
 __all__ = ['Emitter', 'EmitterError']
 
-from error import YAMLError
-from events import *
+from .error import YAMLError
+from .events import *
 
 class EmitterError(YAMLError):
     pass
@@ -669,7 +669,7 @@ class Emitter(object):
             # Check for indicators.
             if index == 0:
                 # Leading indicators are special characters.
-                if ch in u'#,[]{}&*!|>\'\"%@`': 
+                if ch in u'#,[]{}&*!|>\'\"%@`':
                     flow_indicators = True
                     block_indicators = True
                 if ch in u'?:':
@@ -1132,4 +1132,3 @@ class Emitter(object):
                 spaces = (ch == u' ')
                 breaks = (ch in u'\n\x85\u2028\u2029')
             end += 1
-

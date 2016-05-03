@@ -1,10 +1,10 @@
 
 __all__ = ['BaseDumper', 'SafeDumper', 'Dumper']
 
-from emitter import *
-from serializer import *
-from representer import *
-from resolver import *
+from .emitter import *
+from .serializer import *
+from .representer import *
+from .resolver import *
 
 class BaseDumper(Emitter, Serializer, BaseRepresenter, BaseResolver):
 
@@ -59,4 +59,3 @@ class Dumper(Emitter, Serializer, Representer, Resolver):
         Representer.__init__(self, default_style=default_style,
                 default_flow_style=default_flow_style)
         Resolver.__init__(self)
-

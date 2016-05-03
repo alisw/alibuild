@@ -1,12 +1,12 @@
 
 __all__ = ['BaseLoader', 'SafeLoader', 'Loader']
 
-from reader import *
-from scanner import *
-from parser import *
-from composer import *
-from constructor import *
-from resolver import *
+from .reader import *
+from .scanner import *
+from .parser import *
+from .composer import *
+from .constructor import *
+from .resolver import *
 
 class BaseLoader(Reader, Scanner, Parser, Composer, BaseConstructor, BaseResolver):
 
@@ -37,4 +37,3 @@ class Loader(Reader, Scanner, Parser, Composer, Constructor, Resolver):
         Composer.__init__(self)
         Constructor.__init__(self)
         Resolver.__init__(self)
-
