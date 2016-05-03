@@ -99,7 +99,7 @@ CACHED_TARBALL=%(cachedTarball)s
 if [[ "$CACHED_TARBALL" == "" && ! -f $BUILDROOT/log ]]; then
   set -o pipefail
   bash -ex "$WORK_DIR/SPECS/$ARCHITECTURE/$PKGNAME/$PKGVERSION-$PKGREVISION/$PKGNAME.sh" 2>&1 | tee "$BUILDROOT/log"
-elif [[ "$CACHED_TARBALL" == "" && $INCREMENTAL_BUILD_HASH != "0" ]]; then
+elif [[ "$CACHED_TARBALL" == "" && $INCREMENTAL_BUILD_HASH != "0" && -f "$BUILDDIR/.build_succeeded" ]]; then
   set -o pipefail
   (%(incremental_recipe)s) | tee -a "$BUILDROOT/log"
 elif [[ "$CACHED_TARBALL" == "" ]]; then
@@ -190,3 +190,7 @@ ln -snf $PKGVERSION-$PKGREVISION $ARCHITECTURE/$PKGNAME/latest
 if [[ $DEVEL_PREFIX ]]; then
   ln -snf $PKGVERSION-$PKGREVISION $ARCHITECTURE/$PKGNAME/latest-$DEVEL_PREFIX
 fi
+
+# Mark the build as successful with a placeholder. Allows running incremental
+# recipe in case the package is in development mode.
+touch "$BUILDDIR/.build_succeeded"
