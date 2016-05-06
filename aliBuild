@@ -507,16 +507,16 @@ if __name__ == "__main__":
   if args.noDevel:
     args.noDevel = args.noDevel.split(",")
 
-  if args.action in ["build", "init"] and not args.pkgname:
+  if args.action == "build" and not args.pkgname:
     parser.error("Please provide at least one package to build.")
 
   # Setup build environment.
   if args.action == "init":
     setdir = args.develPrefix if "develPrefix" in args else "."
     args.configDir = format(args.configDir, prefix=setdir+"/")
-    pkgs = args.pkgname
+    pkgs = args.pkgname if args.pkgname else ""
     pkgs = [ dict(zip(["name","ver"], y.split("@")[0:2]))
-                           for y in [ x+"@" for x in pkgs.split(",") ] ]
+             for y in [ x+"@" for x in list(filter(lambda y: y, pkgs.split(","))) ] ]
     if args.dryRun:
       info("--dry-run / -n specified. Doing nothing.")
       exit(0)
@@ -556,8 +556,8 @@ if __name__ == "__main__":
                            cd=dest))
       dieOnError(err!=0, "cannot clone %s%s" %
                          (spec["package"], " version "+p["ver"] if p["ver"] else ""))
-    print format("Development clones for %(pkgs)s created under %(d)s",
-                 pkgs=", ".join([ x["name"].lower() for x in pkgs ]),
+    print format("Development directory %(d)s created%(pkgs)s",
+                 pkgs=" for "+", ".join([ x["name"].lower() for x in pkgs ]) if pkgs else "",
                  d=setdir)
     exit(0)
   elif args.action == "clean":
