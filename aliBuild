@@ -840,12 +840,15 @@ if __name__ == "__main__":
       h(specs[dep]["hash"])
     if bool(spec.get("force_rebuild", False)):
       h(str(time.time()))
-    if spec["package"] in develPkgs and "incremental_recipe" in spec:
-      h(spec["incremental_recipe"])
-      incremental_hash = hashlib.sha1(spec["incremental_recipe"]).hexdigest()
-      spec["incremental_hash"] = "INCREMENTAL_BUILD_HASH=%s" % incremental_hash
-    elif p in develPkgs:
-      h(spec.get("devel_hash"))
+    if p in develPkgs:
+      if "incremental_recipe" in spec:
+        h(spec["incremental_recipe"])
+        incremental_hash = hashlib.sha1(spec["incremental_recipe"]).hexdigest()
+        spec["incremental_hash"] = "INCREMENTAL_BUILD_HASH=%s" % incremental_hash
+      else:
+        h(spec.get("devel_hash"))
+      if "develPrefix" in args:
+        h(args.develPrefix)
     spec["hash"] = h.hexdigest()
     debug("Hash for recipe %s is %s" % (p, spec["hash"]))
 
