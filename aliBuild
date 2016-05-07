@@ -828,24 +828,27 @@ if __name__ == "__main__":
   debug("Calculating hashes.")
   for p in buildOrder:
     spec = specs[p]
-    h = hashlib.sha1()
+    h = Hasher()
     for x in ["recipe", "version", "package", "commit_hash",
               "env", "append_path", "prepend_path"]:
-      h.update(str(spec.get(x, "none")))
+      h(str(spec.get(x, "none")))
     if spec["commit_hash"] == spec.get("tag", "0"):
-      h.update(spec.get("source", "none"))
+      h(spec.get("source", "none"))
       if "source" in spec:
-        h.update(spec["tag"])
+        h(spec["tag"])
     for dep in spec.get("requires", []):
-      h.update(specs[dep]["hash"])
+      h(specs[dep]["hash"])
     if bool(spec.get("force_rebuild", False)):
-      h.update(str(time.time()))
-    if spec["package"] in develPkgs and "incremental_recipe" in spec:
-      h.update(spec["incremental_recipe"])
-      incremental_hash = hashlib.sha1(spec["incremental_recipe"]).hexdigest()
-      spec["incremental_hash"] = "INCREMENTAL_BUILD_HASH=%s" % incremental_hash
-    elif p in develPkgs:
-      h.update(spec.get("devel_hash"))
+      h(str(time.time()))
+    if p in develPkgs:
+      if "incremental_recipe" in spec:
+        h(spec["incremental_recipe"])
+        incremental_hash = hashlib.sha1(spec["incremental_recipe"]).hexdigest()
+        spec["incremental_hash"] = "INCREMENTAL_BUILD_HASH=%s" % incremental_hash
+      else:
+        h(spec.get("devel_hash"))
+      if "develPrefix" in args:
+        h(args.develPrefix)
     spec["hash"] = h.hexdigest()
     debug("Hash for recipe %s is %s" % (p, spec["hash"]))
 
