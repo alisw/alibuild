@@ -829,7 +829,7 @@ if __name__ == "__main__":
   if args.debug:
     logger_handler.setFormatter(
         LogFormatter("%%(levelname)s:%s:%s: %%(message)s" %
-                     (mainPackage, mainHash[0:8])))
+                     (mainPackage, args.develPrefix if "develPrefix" in args else mainHash[0:8])))
 
   # Now that we have the main package set, we can print out Useful information
   # which we will be able to associate with this build.
