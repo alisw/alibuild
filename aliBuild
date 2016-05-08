@@ -647,7 +647,7 @@ if __name__ == "__main__":
                     cd=abspath(args.configDir))
                   )
     if err:
-      info("Unable to download default %sdist" % star())
+      error("Unable to download default %sdist" % star())
       exit(1)
 
   if "develPrefix" in args and args.develPrefix == None:
@@ -733,8 +733,10 @@ if __name__ == "__main__":
     x["build_requires"] = [r for r in x["build_requires"] if not r in args.disable]
     x["runtime_requires"] = [r for r in x["runtime_requires"] if not r in args.disable]
 
-  info("\n".join(["Using package %s from the system as preferred choice." % x for x in systemPackages]))
-  info("\n".join(["System package %s cannot be used. Building our own copy." % x for x in ownPackages]))
+  banner("%sBuild can take the following packages from the system and will not build them:\n  %s" %
+         (star(), ", ".join(systemPackages)))
+  banner("The following packages cannot be taken from the system and will be built:\n  %s" %
+         ", ".join(ownPackages))
 
   # Do topological sort to have the correct build order even in the 
   # case of non-tree like dependencies..
@@ -775,13 +777,15 @@ if __name__ == "__main__":
                  pkgs=", ".join(set(x.strip() for (x,y) in develPkgsUpper) - set(develPkgs))))
     exit(1)
 
+  banner("Packages will be built in the following order:\n - %s" %
+         "\n - ".join([ x+" (development package)" if x in develPkgs else x for x in buildOrder ]))
+
   if develPkgs:
-    info("Write store disabled since some packages will be picked up from local checkout.")
-    info("Local packages: %s" % " ".join(develPkgs))
+    debug("Write store disabled since some packages will be picked up from local checkout.")
     syncHelper.writeStore = ""
     for dp in develPkgs:
       # Update Git repositories and print status message
-      info(format("\n**** Git status for development package %(pkg)s ****\n", pkg=dp))
+      banner("Git status for development package %s" % dp)
       execute(format("cd \"%(pkgsrc)s\" && ( git remote update --prune; git fetch --tags )", pkgsrc=dp))
       execute(format("cd \"%(pkgsrc)s\" && git status", pkgsrc=dp), printer=info)
       warning(format("Package %(pkg)s is a development package.\n"
@@ -857,7 +861,7 @@ if __name__ == "__main__":
   # If one of the special packages is in the list of packages to be built,
   # we use it as main package, rather than the last one.
   if not buildOrder:
-    info("Nothing to be done.")
+    banner("Nothing to be done.")
     exit(0)
   mainPackage = buildOrder[-1]
   mainPackage = "AliRoot" if "AliRoot" in buildOrder else mainPackage
@@ -1026,7 +1030,8 @@ if __name__ == "__main__":
         if spec["package"] in develPkgs and "incremental_recipe" in spec:
           spec["obsolete_tarball"] = d
         else:
-          info("Package %s with hash %s is already found in %s. Not building." % (p, h, d))
+          debug("Package %s with hash %s is already found in %s. Not building." % (p, h, d))
+          info("Using cached build for %s" % p)
         break
       else:
         busyRevisions.append(revision)
@@ -1254,7 +1259,9 @@ if __name__ == "__main__":
     writeAll("%s/build.sh" % scriptDir, cmd)
     writeAll("%s/%s.sh" % (scriptDir, spec["package"]), spec["recipe"])
 
-    info("Building %s@%s" % (spec["package"], spec["version"]))
+    banner("Building %s@%s" % (spec["package"],
+                               args.develPrefix if "develPrefix" in args and spec["package"]  in develPkgs
+                                                else spec["version"]))
     # In case the --docker options is passed, we setup a docker container which
     # will perform the actual build. Otherwise build as usual using bash.
     if dockerImage:
@@ -1303,10 +1310,11 @@ if __name__ == "__main__":
       progress.end("failed" if err else "ok", err)
 
     buildErrMsg = "Error while executing %(sd)s/build.sh on `%(h)s'.\n" \
-                  "Log can be found in %(w)s/BUILD/%(p)s-latest/log.\n" \
-                  "Please attach this file if you intend to request support."
+                  "Log can be found in %(w)s/BUILD/%(p)s-latest%(devSuffix)s/log.\n" \
+                  "Please attach this file if you intend to request support.\n"      \
+                  "Build directory is %(w)s/BUILD/%(p)s-latest%(devSuffix)s/%(p)s."
     if spec["package"] in develPkgs:
-      buildErrMsg += "\n" \
+      buildErrMsg += "\n\n" \
                      "Note that this package is in devel mode, along with %(develNoCurr)s.\n"   \
                      "Devel sources are not updated automatically, you must do it by hand.\n"   \
                      "This problem might be due to one or more outdated devel source.\n"        \
@@ -1318,15 +1326,21 @@ if __name__ == "__main__":
                            sd=scriptDir,
                            w=abspath(args.workDir),
                            p=spec["package"],
+                           devSuffix="-" + args.develPrefix if "develPrefix" in args and spec["package"] in develPkgs else "",
                            develNoCurr=", ".join([ x for x in develPkgs if x != spec["package"] ])))
 
     syncHelper.syncToRemote(p, spec)
-  info(format("Build successfully completed on `%(h)s'.\n"
+  banner(format("Build of %(mainPackage)s successfully completed on `%(h)s'.\n"
               "Your software installation is at:"
-              "\n\n%(wp)s",
+              "\n\n  %(wp)s\n\n"
+              "You can use this package by loading the environment:"
+              "\n\n  alienv enter %(mainPackage)s/%(pkgVer)s",
+              mainPackage=mainPackage,
               h=socket.gethostname(),
+              pkgVer="latest-"+args.develPrefix if mainPackage in develPkgs and "develPrefix" in args else "latest",
               wp=abspath(join(args.workDir, args.architecture))))
   for x in develPkgs:
-    info(format("\nBuild directory for package %(p)s is %(w)s/BUILD/%(p)s-latest/%(p)s",
-                p=x,
-                w=abspath(args.workDir)))
+    banner(format("Build directory for devel package %(p)s:\n%(w)s/BUILD/%(p)s/latest%(devSuffix)s/%(p)s",
+                  p=x,
+                  devSuffix="-"+args.develPrefix if "develPrefix" in args else "",
+                  w=abspath(args.workDir)))
