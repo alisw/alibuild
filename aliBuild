@@ -94,11 +94,17 @@ def execute(command, printer=debug):
 class LogFormatter(logging.Formatter):
   def __init__(self, fmtstr):
     self.fmtstr = fmtstr
+    self.COLOR_RESET = "\033[m" if sys.stdout.isatty() else ""
+    self.LEVEL_COLORS = { logging.WARNING:  "\033[4;33m",
+                          logging.ERROR:    "\033[4;31m",
+                          logging.CRITICAL: "\033[1;37;41m" } if sys.stdout.isatty() else {}
   def format(self, record):
     if record.levelno == logging.INFO:
       return record.msg
     return "\n".join([ format(self.fmtstr,
-                              levelname=record.levelname,
+                              levelname=self.LEVEL_COLORS.get(record.levelno, self.COLOR_RESET) +
+                                        record.levelname +
+                                        self.COLOR_RESET,
                               message=x)
                        for x in str(record.msg).split("\n") ])
 
