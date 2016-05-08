@@ -99,8 +99,12 @@ class LogFormatter(logging.Formatter):
                           logging.ERROR:    "\033[4;31m",
                           logging.CRITICAL: "\033[1;37;41m" } if sys.stdout.isatty() else {}
   def format(self, record):
-    if record.levelno == logging.INFO:
-      return record.msg
+    if record.levelno == logging.BANNER and sys.stdout.isatty():
+      lines = str(record.msg).split("\n")
+      return "\n\033[1;34m==>\033[m \033[1m%s\033[m" % lines[0] + \
+             "".join([ "\n    \033[1m%s\033[m" % x for x in lines[1:] ])
+    elif record.levelno == logging.INFO or record.levelno == logging.BANNER:
+      return str(record.msg)
     return "\n".join([ format(self.fmtstr,
                               levelname=self.LEVEL_COLORS.get(record.levelno, self.COLOR_RESET) +
                                         record.levelname +
@@ -472,6 +476,15 @@ if __name__ == "__main__":
     parser.error("cannot use --docker as docker executable is not found")
 
   args.disable = [x for x in ",".join(args.disable).split(",") if x]
+
+  # Add loglevel BANNER (same as INFO but with more emphasis on ttys)
+  logging.BANNER = 25
+  logging.addLevelName(logging.BANNER, "BANNER")
+  def log_banner(self, message, *args, **kws):
+    if self.isEnabledFor(logging.BANNER):
+      self._log(logging.BANNER, message, args, **kws)
+  logging.Logger.banner = log_banner
+
   logger = logging.getLogger('alibuild')
   logger_handler = logging.StreamHandler()
   logger.addHandler(logger_handler)
@@ -483,6 +496,7 @@ if __name__ == "__main__":
   error = logger.error
   warning = logger.warning
   info = logger.info
+  banner = logger.banner
 
   riemannStream = RiemannStream(host=getenv("RIEMANN_HOST"),
                                 port=getenv("RIEMANN_PORT", "5555"))
