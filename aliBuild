@@ -120,6 +120,32 @@ class Hasher:
   def hexdigest(self):
     return self.h.hexdigest()
 
+class ProgressPrint:
+  def __init__(self, begin_msg=""):
+    self.count = -1
+    self.lasttime = 0
+    self.STAGES = [ ".", "..", "...", "....", ".....", "....", "...", ".." ]
+    self.begin_msg = begin_msg
+  def __call__(self, txt):
+    if time.time()-self.lasttime < 0.5:
+      return
+    if self.count == -1 and self.begin_msg:
+      sys.stderr.write("\033[1;35m==>\033[m "+self.begin_msg)
+    self.erase()
+    self.count = (self.count+1) % len(self.STAGES)
+    sys.stderr.write(self.STAGES[self.count])
+    self.lasttime = time.time()
+  def erase(self):
+    nerase = len(self.STAGES[self.count]) if self.count > -1 else 0
+    sys.stderr.write("\b"*nerase+" "*nerase+"\b"*nerase)
+  def end(self, msg="", error=False):
+    if self.count == -1:
+      return
+    self.erase()
+    if msg:
+      sys.stderr.write(": %s%s\033[m" % ("\033[31m" if error else "\033[32m", msg))
+    sys.stderr.write("\n")
+
 def dieOnError(err, msg):
   if err:
     riemannStream.setState('critical')
@@ -1271,7 +1297,10 @@ if __name__ == "__main__":
       debug(dockerWrapper)
       err = execute(dockerWrapper)
     else:
-      err = execute("/bin/bash -e -x %s/build.sh 2>&1" % scriptDir)
+      progress = ProgressPrint("%s is being built (use --debug for full output)" % spec["package"])
+      err = execute("/bin/bash -e -x %s/build.sh 2>&1" % scriptDir,
+                    printer=debug if args.debug or not sys.stdout.isatty() else progress)
+      progress.end("failed" if err else "ok", err)
 
     buildErrMsg = "Error while executing %(sd)s/build.sh on `%(h)s'.\n" \
                   "Log can be found in %(w)s/BUILD/%(p)s-latest/log.\n" \
