@@ -17,6 +17,37 @@ current terminal.
 
 ## Common issues:
 
+### What are the system prerequisites of alibuild?
+
+In principle aliBuild should now notify you for missing required system
+dependencies and complain with a clear message if that is not the case. For
+example if you lack bz2 it will now tell you with the following message:
+
+    Please install bzip2 development package on your system
+
+Moreover it will try to reuse as much as possible from your system, so
+if you have a system CMake which is compatible with the one required by
+AliRoot it will also pick up your version. Failing that it will build it
+for you. You can have a look at what AliRoot will do by adding the `--dry-run`
+option to your build command, e.g.:
+
+    alibuild --dry-run <additional options you might have> build AliRoot
+
+will tell you something like:
+
+    Using package CMake from the system as preferred choice.
+    Using package libxml2 from the system as preferred choice.
+    Using package SWIG from the system as preferred choice.
+    Using package zlib from the system as preferred choice.
+    Using package autotools from the system as preferred choice.
+    Using package GSL from the system as preferred choice.
+    System package boost cannot be used. Building our own copy.
+    We will build packages in the following order: defaults-release AliEn-CAs GMP UUID gSOAP ApMon-CPP GEANT4 boost MPFR MonALISA-gSOAP-client cgal XRootD fastjet xalienfs AliEn-Runtime ROOT vgm GEANT3 GEANT4_VMC AliRoot
+
+If you have a system package which you think should be used but it's not,
+you can run `aliDoctor` to try to understand why that was the case (or you
+can open a bug report with its output and we will look at it.
+
 ### AliEn broken after building with aliBuild
 
 If you are migrating from other ALICE build instructions to use aliBuild
