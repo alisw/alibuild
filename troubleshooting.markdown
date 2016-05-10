@@ -15,7 +15,7 @@ build failed is `boost`, you will find its log under:
 Note that when running `aliBuild --debug` the output is also echoed in your
 current terminal.
 
-## Common issues:
+## Common issues
 
 ### What are the system prerequisites of alibuild?
 
@@ -48,6 +48,7 @@ If you have a system package which you think should be used but it's not,
 you can run `aliDoctor` to try to understand why that was the case (or you
 can open a bug report with its output and we will look at it.
 
+
 ### AliEn broken after building with aliBuild
 
 If you are migrating from other ALICE build instructions to use aliBuild
@@ -79,9 +80,10 @@ incompatible with the old one. You can fix this issue by doing:
 2. Get a new token
 3. Source `/tmp/gclient_env*` file
 
+
 and trying again.
 
-### aliBuild does not work with python shipped with ANACONDA
+### aliBuild does not work on OSX with Python shipped with ANACONDA
 
 If you are using ANACONDA (`which python` to verify), the old version of
 aliBuild had troubles with it. Upgrading to the latest version via:
@@ -89,6 +91,7 @@ aliBuild had troubles with it. Upgrading to the latest version via:
     pip install --upgrade alibuild
 
 or by doing `git pull` should fix the issue.
+
 
 ### aliBuild does not pick up tool X from the sytem
 
@@ -100,6 +103,7 @@ be compatible with the one provided by the recipe. You can verify what
 happens during the system tool detection by running:
 
     aliDoctor
+
 
 ### I do not have privileges and I cannot install via pip
 
@@ -119,10 +123,11 @@ fails, you have two options:
 
   and simply run alibuild by invoking `alibuild/aliBuild`.
 
-### Fastjet fails to compile on my brand new Mac
+
+### FastJet fails to compile on my brand new Mac
 
 A common problem is that whenever you try to compile FastJet on a brand
-new mac you get an error like:
+new Mac (from OSX 10.11 "El Capitan") you get an error like:
 
     checking whether we are cross compiling... configure: error: in `/Users/me/alice/sw/BUILD/c07a643b35e78fb6e4e289bdb3d5ec7a800a702d/fastjet/fastjet':
     configure: error: cannot run C compiled programs.
@@ -153,3 +158,42 @@ To turn SIP off:
 **Notice that we are not liable for any damage caused by turning System
 Integrity Protection off. Do it only if you know what you are doing!**
 
+
+### Environment Modules is not available for my system
+
+On some legacy systems (for instance, Ubuntu 12.04) there is no way to install
+the package `environment-modules` via a package manager. This package is
+required by `alienv`, and the first time you start it you would get a message
+like:
+
+    ERROR: Environment Modules was not found on your system.
+           Get it with: apt-get install environment-modules
+
+but the suggested command does not work. In this case you need to compile it by
+hand. The only requirements are a valid C compiler and the development version
+of TCL 8.5.
+
+If you are on Ubuntu 12.04 (`environment-modules` appeared from 12.10) you can
+get the prerequisites with:
+
+```bash
+sudo apt-get install build-essential tcl8.5-dev
+```
+
+Download the [tarball for version 3.2.10](http://downloads.sourceforge.net/project/modules/Modules/modules-3.2.10/modules-3.2.10.tar.gz), unpack it, configure and build
+it:
+
+```bash
+curl -LO http://downloads.sourceforge.net/project/modules/Modules/modules-3.2.10/modules-3.2.10.tar.gz
+tar xzf modules-3.2.10.tar.gz
+cd modules-3.2.10/
+./configure --disable-versioning --exec-prefix=/usr/local
+make && sudo make install
+```
+
+You might want to slightly change the command above to do the installation in
+a user directory (specify a different prefix and do not use `sudo`).
+
+`alienv` needs the `modulecmd` in the `$PATH` in order to work. Just fire
+`alienv` right afterwards, and if you get the help screen instead of the error
+above then you are set.
