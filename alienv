@@ -4,7 +4,7 @@
 PROG=$(basename "$0")
 
 # Detect parent shell (fall back to bash)
-[[ -z "$MODULES_SHELL" ]] && MODULES_SHELL=$(ps -e -o pid,command | grep -E "^\s*$PPID\s+" | awk '{print $2}' | sed -e 's/^-\?\(.*\)$/\1/')
+[[ -z "$MODULES_SHELL" ]] && MODULES_SHELL=$(ps -e -o pid,command | grep -E "^\s*$PPID\s+" | awk '{print $2}' | sed -e 's/^-\{0,1\}\(.*\)$/\1/')
 case "$MODULES_SHELL" in
   sh)                                      ;;
   csh|tcsh) SHELL_NORC_PARAM=-f            ;;
