@@ -9,7 +9,7 @@ import subprocess
 
 def execute(command, prefix):
   print prefix + ":" + command.strip("\n")
-  popen = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE)
+  popen = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
   lines_iterator = iter(popen.stdout.readline, "")
   for line in lines_iterator:
     print prefix + ":" +line.strip("\n")  # yield line
