@@ -17,6 +17,38 @@ current terminal.
 
 ## Common issues
 
+### I have an error while compiling AliPhysics / AliRoot.
+
+Notice that in general this kind of errors are not really aliBuild
+related, but they are genuine issues in either AliRoot and AliPhysics.
+To get the accurate and fastest feedback, the "best practice" is to do
+the following:
+
+- Make sure you have the latest version of both AliPhysics **and** AliRoot. If
+  not, update to it and rebuild. Most likely someone else has already noticed
+  your problem and fixed it. aliBuild will actually remind you of doing so if
+  you are using master.
+- If you still have a message, read what the error log for your package
+  is saying and try to extract the first error. In general you can simply
+  look for the first occurrence of `***` or `error:` and try to read a few
+  lines around there.
+- Try to find out who modified the files with an error last. This can be done by
+  cd-ing into `AliRoot` / `AliPhysics`, issuing:
+
+      git log @{yesterday}.. -- <name-of-the-file-with-error>
+
+  and reading who was the author of the last few commits.
+- Write a message to `alice-project-analysis-task-force@cern.ch`
+  explaining the error. Make sure you report the first few lines of it you
+  have identified above, and to include the author of the last changes in
+  the problematic file.
+- Make sure you do **not** attach big log files since they will cause a
+  traffic storm since the list has many participants and each one of them
+  will get a copy of the attachment, even if not interested. A much better
+  approach is to use a service like [CERNBox](https://cernbox.cern.ch),
+  Dropbox or alikes which allow to share files by providing a link to them,
+  rather than by attachment.
+
 ### What are the system prerequisites of alibuild?
 
 In principle aliBuild should now notify you for missing required system
