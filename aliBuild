@@ -733,10 +733,12 @@ if __name__ == "__main__":
     x["build_requires"] = [r for r in x["build_requires"] if not r in args.disable]
     x["runtime_requires"] = [r for r in x["runtime_requires"] if not r in args.disable]
 
-  banner("%sBuild can take the following packages from the system and will not build them:\n  %s" %
-         (star(), ", ".join(systemPackages)))
-  banner("The following packages cannot be taken from the system and will be built:\n  %s" %
-         ", ".join(ownPackages))
+  if systemPackages:
+    banner("%sBuild can take the following packages from the system and will not build them:\n  %s" %
+           (star(), ", ".join(systemPackages)))
+  if ownPackages:
+    banner("The following packages cannot be taken from the system and will be built:\n  %s" %
+           ", ".join(ownPackages))
 
   # Do topological sort to have the correct build order even in the 
   # case of non-tree like dependencies..
