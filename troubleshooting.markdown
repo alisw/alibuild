@@ -80,6 +80,18 @@ If you have a system package which you think should be used but it's not,
 you can run `aliDoctor` to try to understand why that was the case (or you
 can open a bug report with its output and we will look at it.
 
+### What is PIP ? How do I install it?
+
+[PIP](https://pip.pypa.io/en/stable/) is the de-facto standard package manager
+for python. While it is usually installed by default on modern distributions,
+it can happen this is not the case. If so, you can usually get it via:
+
+    sudo yum install python-pip     # (Centos / Fedora / SLC derivatives)
+    sudo dnf install python-pip     # (Fedora 22+)
+    sudo apt-get install python-pip # (Ubuntu / Debian alikes)
+
+Alternatively you can try to install it by hand by following the [instructions
+here](https://pip.pypa.io/en/stable/installing/#installing-with-get-pip-py).
 
 ### AliEn broken after building with aliBuild
 
