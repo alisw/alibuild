@@ -18,6 +18,8 @@ export REQUIRES="%(requires)s"
 export BUILD_REQUIRES="%(build_requires)s"
 export RUNTIME_REQUIRES="%(runtime_requires)s"
 export DEVEL_PREFIX="%(develPrefix)s"
+DEVEL_HASH="%(develHash)s"
+DEPS_HASH="%(depsHash)s"
 
 export PKG_NAME="$PKGNAME"
 export PKG_VERSION="$PKGVERSION"
@@ -193,4 +195,4 @@ fi
 
 # Mark the build as successful with a placeholder. Allows running incremental
 # recipe in case the package is in development mode.
-touch "$BUILDDIR/.build_succeeded"
+echo "${DEVEL_HASH}${DEPS_HASH}" > "$BUILDDIR/.build_succeeded"
