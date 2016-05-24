@@ -796,20 +796,15 @@ if __name__ == "__main__":
          "\n - ".join([ x+" (development package)" if x in develPkgs else x for x in buildOrder ]))
 
   if develPkgs:
+    banner(format("You have packages in development mode.\n"
+                  "This means their source code can be freely modified under:\n\n"
+                  "  %(pwd)s/<package_name>\n\n"
+                  "%(star)sBuild does not automatically update such packages to avoid work loss.\n"
+                  "In most cases this is achieved by doing in the package source directory:\n\n"
+                  "  git pull --rebase\n",
+                  pwd=os.getcwd(), star=star()))
     debug("Write store disabled since some packages will be picked up from local checkout.")
     syncHelper.writeStore = ""
-    for dp in develPkgs:
-      # Update Git repositories and print status message
-      banner("Git status for development package %s" % dp)
-      execute(format("cd \"%(pkgsrc)s\" && ( git remote update --prune; git fetch --tags )", pkgsrc=dp))
-      execute(format("cd \"%(pkgsrc)s\" && git status", pkgsrc=dp), printer=info)
-      warning(format("Package %(pkg)s is a development package.\n"
-                     "This means its source code can be freely modified under %(pwd)s/%(pkg)s.\n"
-                     "%(star)sBuild does not update %(pkg)s in devel mode to avoid work loss.\n"
-                     "If the status above says your branch is behind you may want to update it.\n"
-                     "In most cases this is achieved by doing from the current directory:\n\n"
-                     "  ( cd %(pkg)s && git pull --rebase )",
-                     pkg=dp, pwd=os.getcwd(), star=star()))
 
   # Resolve the tag to the actual commit ref, so that
   for p in buildOrder:
@@ -1324,25 +1319,32 @@ if __name__ == "__main__":
                     printer=debug if args.debug or not sys.stdout.isatty() else progress)
       progress.end("failed" if err else "ok", err)
 
-    buildErrMsg = "Error while executing %(sd)s/build.sh on `%(h)s'.\n" \
-                  "Log can be found in %(w)s/BUILD/%(p)s-latest%(devSuffix)s/log.\n" \
-                  "Please attach this file if you intend to request support.\n"      \
-                  "Build directory is %(w)s/BUILD/%(p)s-latest%(devSuffix)s/%(p)s."
+    updatablePkgs = [ x for x in spec["requires"] if x in develPkgs ]
     if spec["package"] in develPkgs:
-      buildErrMsg += "\n\n" \
-                     "Note that this package is in devel mode, along with %(develNoCurr)s.\n"   \
-                     "Devel sources are not updated automatically, you must do it by hand.\n"   \
-                     "This problem might be due to one or more outdated devel source.\n"        \
-                     "To update all the development packages it is usually sufficient to do:\n" \
-                     "\n  "
-      buildErrMsg += "\n  ".join(["( cd %s && git pull --rebase )" % dp for dp in develPkgs])
-    dieOnError(err, format(buildErrMsg,
-                           h=socket.gethostname(),
-                           sd=scriptDir,
-                           w=abspath(args.workDir),
-                           p=spec["package"],
-                           devSuffix="-" + args.develPrefix if "develPrefix" in args and spec["package"] in develPkgs else "",
-                           develNoCurr=", ".join([ x for x in develPkgs if x != spec["package"] ])))
+      updatablePkgs.append(spec["package"])
+
+    buildErrMsg = format("Error while executing %(sd)s/build.sh on `%(h)s'.\n"
+                         "Log can be found in %(w)s/BUILD/%(p)s-latest%(devSuffix)s/log.\n"
+                         "Please attach this file if you intend to request support.\n"
+                         "Build directory is %(w)s/BUILD/%(p)s-latest%(devSuffix)s/%(p)s.",
+                         h=socket.gethostname(),
+                         sd=scriptDir,
+                         w=abspath(args.workDir),
+                         p=spec["package"],
+                         devSuffix="-" + args.develPrefix
+                                   if "develPrefix" in args and spec["package"] in develPkgs
+                                   else "")
+    if updatablePkgs:
+      buildErrMsg += format("\n\n"
+                            "Note that you have packages in development mode.\n"
+                            "Devel sources are not updated automatically, you must do it by hand.\n"
+                            "This problem might be due to one or more outdated devel sources.\n"
+                            "To update all development packages required for this build "
+                            "it is usually sufficient to do:\n%(updatablePkgs)s",
+                            updatablePkgs="".join(["\n  ( cd %s && git pull --rebase )" % dp
+                                                   for dp in updatablePkgs]))
+
+    dieOnError(err, buildErrMsg)
 
     syncHelper.syncToRemote(p, spec)
   banner(format("Build of %(mainPackage)s successfully completed on `%(h)s'.\n"
