@@ -838,7 +838,7 @@ if __name__ == "__main__":
           # We are in development mode, we need to rebuild if the commit hash
           # is different and if there are extra changes on to.
           if spec["package"] in develPkgs:
-            cmd = "cd %s && git diff -r HEAD" % spec["source"]
+            cmd = "cd %s && git diff -r HEAD && git status --porcelain" % spec["source"]
             h = Hasher()
             err = execute(cmd, h)
             dieOnError(err, "Unable to detect source code changes.")
