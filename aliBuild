@@ -73,6 +73,12 @@ def writeAll(fn, txt):
   f.write(txt)
   f.close()
 
+def readHashFile(fn):
+  try:
+    return open(fn).read().strip("\n")
+  except IOError:
+    return "0"
+
 def star():
   return basename(sys.argv[0]).lower().replace("build", "")
 
@@ -904,6 +910,7 @@ if __name__ == "__main__":
   for p in buildOrder:
     spec = specs[p]
     h = Hasher()
+    dh = Hasher()
     for x in ["recipe", "version", "package", "commit_hash",
               "env", "append_path", "prepend_path"]:
       h(str(spec.get(x, "none")))
@@ -913,6 +920,7 @@ if __name__ == "__main__":
         h(spec["tag"])
     for dep in spec.get("requires", []):
       h(specs[dep]["hash"])
+      dh(specs[dep]["hash"] + specs[dep].get("devel_hash", ""))
     if bool(spec.get("force_rebuild", False)):
       h(str(time.time()))
     if spec["package"] in develPkgs and "incremental_recipe" in spec:
@@ -922,6 +930,7 @@ if __name__ == "__main__":
     elif p in develPkgs:
       h(spec.get("devel_hash"))
     spec["hash"] = h.hexdigest()
+    spec["deps_hash"] = dh.hexdigest()
     debug("Hash for recipe %s is %s" % (p, spec["hash"]))
 
   # This adds to the spec where it should find, locally or remotely the
@@ -929,20 +938,22 @@ if __name__ == "__main__":
   for p in buildOrder:
     spec = specs[p]
     pkgSpec = {
-      "repo": workDir,
+      "workDir": workDir,
       "package": spec["package"],
       "version": spec["version"],
       "hash": spec["hash"],
       "prefix": spec["hash"][0:2],
       "architecture": args.architecture
     }
-    tarSpecs = [
+    varSpecs = [
       ("storePath", "TARS/%(architecture)s/store/%(prefix)s/%(hash)s"),
       ("linksPath", "TARS/%(architecture)s/%(package)s"),
-      ("tarballHashDir", "%(repo)s/TARS/%(architecture)s/store/%(prefix)s/%(hash)s"),
-      ("tarballLinkDir", "%(repo)s/TARS/%(architecture)s/%(package)s")
+      ("tarballHashDir", "%(workDir)s/TARS/%(architecture)s/store/%(prefix)s/%(hash)s"),
+      ("tarballLinkDir", "%(workDir)s/TARS/%(architecture)s/%(package)s"),
+      ("buildDir", "%(workDir)s/BUILD/%(hash)s/%(package)s")
     ]
-    spec.update(dict([(x, format(y, **pkgSpec)) for (x, y) in tarSpecs]))
+    spec.update(dict([(x, format(y, **pkgSpec)) for (x, y) in varSpecs]))
+    spec["old_devel_hash"] = readHashFile(spec["buildDir"]+"/.build_succeeded")
 
   # We recursively calculate the full set of requires "full_requires"
   # including build_requires and the subset of them which are needed at
@@ -1051,6 +1062,14 @@ if __name__ == "__main__":
     elif not "revision" in spec:
       spec["revision"] = "1"
 
+    # Check if this development package needs to be rebuilt.
+    if spec["package"] in develPkgs:
+      debug("Checking if devel package %s needs rebuild" % spec["package"])
+      if spec["devel_hash"]+spec["deps_hash"] == spec["old_devel_hash"]:
+        info("Development package %s does not need rebuild" % spec["package"])
+        buildOrder.pop(0)
+        continue
+
     # Now that we have all the information about the package we want to build, let's
     # check if it wasn't built / unpacked already.
     hashFile = "%s/%s/%s/%s-%s/.build-hash" % (workDir, 
@@ -1058,10 +1077,7 @@ if __name__ == "__main__":
                                                spec["package"],
                                                spec["version"],
                                                spec["revision"])
-    try:
-      fileHash = open(hashFile).read().strip("\n")
-    except:
-      fileHash = "0"
+    fileHash = readHashFile(hashFile)
     if fileHash != spec["hash"]:
       if fileHash != "0":
         debug("Mismatch between local area and the one which I should build. Redoing.")
@@ -1235,6 +1251,8 @@ if __name__ == "__main__":
                  dependencies=dependencies,
                  dependenciesInit=dependenciesInit,
                  develPrefix=develPrefix,
+                 develHash=spec.get("devel_hash", ""),
+                 depsHash=spec.get("deps_hash", ""),
                  environment=environment,
                  workDir=workDir,
                  configDir=abspath(args.configDir),
@@ -1357,7 +1375,7 @@ if __name__ == "__main__":
               pkgVer="latest-"+args.develPrefix if mainPackage in develPkgs and "develPrefix" in args else "latest",
               wp=abspath(join(args.workDir, args.architecture))))
   for x in develPkgs:
-    banner(format("Build directory for devel package %(p)s:\n%(w)s/BUILD/%(p)s/latest%(devSuffix)s/%(p)s",
+    banner(format("Build directory for devel package %(p)s:\n%(w)s/BUILD/%(p)s-latest%(devSuffix)s/%(p)s",
                   p=x,
                   devSuffix="-"+args.develPrefix if "develPrefix" in args else "",
                   w=abspath(args.workDir)))
