@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import os, subprocess
+import os, subprocess, sys
 from commands import getstatusoutput
 from urllib import urlopen
 from alibuild_helpers.log import debug, error, banner, info, logger_handler
@@ -63,8 +63,17 @@ def report(eventType, **metadata):
     "t": eventType
   }
   opts.update(metadata)
+  architecture = os.environ["ALIBUILD_ARCHITECTURE"]
+  ostype = "Macintosh" if architecture.startswith("osx") else "Linux"
+  osversion, osprocessor = architecture.split("_", 1)
   args = ["curl", "--max-time", "5",
-          "--user-agent", "aliBuild/%s (Unknown)" % os.environ["ALIBUILD_VERSION"]
+          "--user-agent", "aliBuild/%s (%s; %s %s) Python/%s" % (
+                                                    os.environ["ALIBUILD_VERSION"],
+                                                    ostype,
+                                                    osprocessor,
+                                                    osversion,
+                                                    ".".join([str(x) for x in sys.version_info[:3]])
+                                                   )
          ]
   for k,v in opts.items():
     if not v:

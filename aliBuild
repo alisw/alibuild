@@ -380,6 +380,7 @@ def doMain():
   args = parser.parse_args()
   cmdDisable = args.disable
 
+  os.environ["ALIBUILD_ARCHITECTURE"] = args.architecture
   report_screenview(args.action)
 
   if args.action == "version":
@@ -436,13 +437,12 @@ def doMain():
     syncHelper = RsyncRemoteSync(args.remoteStore, args.writeStore, args.architecture, args.workDir, "")
   else:
     syncHelper = NoRemoteSync()
- 
+
   if args.noDevel:
     args.noDevel = args.noDevel.split(",")
 
   if args.action == "build" and not args.pkgname:
     parser.error("Please provide at least one package to build.")
-
 
   # Setup build environment.
   if args.action == "init":

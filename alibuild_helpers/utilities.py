@@ -52,6 +52,6 @@ def getVersion():
   try:
     return pkg_resources.require("alibuild")[0].version
   except:
-    cmd = "GIT_DIR=\'%s/.git\' git describe --tags" % dirname(__file__)
+    cmd = "GIT_DIR=\'%s/.git\' git describe --tags" % dirname(dirname(__file__))
     err, version = getstatusoutput(cmd)
     return version if not err else "Unknown version."
