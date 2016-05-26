@@ -12,6 +12,14 @@ before_install: |
 script: |
   set -e
   alibuild/aliBuild analytics off
+  test -e ~/.config/alibuild/disable-analytics
+  test ! -e ~/.config/alibuild/analytics-uuid
+  alibuild/aliBuild analytics on
+  test ! -e ~/.config/alibuild/disable-analytics
+  test -e ~/.config/alibuild/analytics-uuid
+  alibuild/aliBuild analytics off
+  test -e ~/.config/alibuild/disable-analytics
+  test -e ~/.config/alibuild/analytics-uuid
   time alibuild/aliBuild --help
   time alibuild/aliBuild -z test-init init zlib
   pushd test-init/alidist && git status && popd

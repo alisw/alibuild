@@ -6,16 +6,8 @@ from alibuild_helpers.log import debug, error, banner, info, logger_handler
 from os.path import exists, expanduser
 from os import unlink
 
-def askForAnalytics():
-  banner("In order to improve user experience, aliBuild would like to gather "
-         "analytics about your builds.\nYou can find all the details at:\n\n"
-         "  https://github.com/alisw/alibuild/blob/master/Analytics.md\n")
-  a = raw_input("Is that ok for you [YES/no]? ")
+def generate_analytics_id():
   getstatusoutput("mkdir -p  ~/.config/alibuild")
-  if a.strip() and a.strip().lower().startswith("n"):
-    debug("User requsted disabling analytics.")
-    getstatusoutput("touch ~/.config/alibuild/disable-analytics")
-    return False
   err, output = getstatusoutput("uuidgen >  ~/.config/alibuild/analytics-uuid")
   # If an error is found while generating the unique user ID, we disable
   # the analytics on the machine.
@@ -24,6 +16,16 @@ def askForAnalytics():
     getstatusoutput("touch ~/.config/alibuild/disable-analytics")
     return False
   return True
+
+def askForAnalytics():
+  banner("In order to improve user experience, aliBuild would like to gather "
+         "analytics about your builds.\nYou can find all the details at:\n\n"
+         "  https://github.com/alisw/alibuild/blob/master/Analytics.md\n")
+  a = raw_input("Is that ok for you [YES/no]? ")
+  if a.strip() and a.strip().lower().startswith("n"):
+    debug("User requsted disabling analytics.")
+    return disable_analytics()
+  return generate_analytics_id()
 
 # Helper function to decide whether or not we should run analytics.
 # It's done this way so that we can easily test all the alternatives.
@@ -101,9 +103,12 @@ def report_exception(e):
 def enable_analytics():
   if exists(expanduser("~/.config/alibuild/disable-analytics")):
     unlink(expanduser("~/.config/alibuild/disable-analytics"))
+  if not exists(expanduser("~/.config/alibuild/analytics-uuid")):
+    generate_analytics_id()
 
 # We do it in getstatusoutput because python makedirs can actually fail
 # if one of the intermediate directories is not writeable.
 def disable_analytics():
   getstatusoutput("mkdir -p ~/.config/alibuild && touch ~/.config/alibuild/disable-analytics")
+  return False
 

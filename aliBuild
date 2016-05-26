@@ -520,8 +520,6 @@ def doMain():
   elif args.action == "analytics":
     if not args.pkgname in ["on", "off"]:
       parser.error("Please specify [on/off].")
-    if args.pkgname == "on": enable_analytics()
-    if args.pkgname == "off": disable_analytics()
     exit(0)
   elif not args.action == "build":
     parser.error("Action %s unsupported" % args.action)
@@ -1278,6 +1276,14 @@ if __name__ == "__main__":
   logger.setLevel(logging.DEBUG if "--debug" in sys.argv or "-d" in sys.argv else logging.INFO)
   os.environ["ALIBUILD_ANALYTICS_ID"] = "UA-77346950-1"
   os.environ["ALIBUILD_VERSION"] = getVersion()
+  analyticsTuple = [x for x in sys.argv if x in ["analytics", "off", "on"]]
+  if analyticsTuple == ["analytics", "off"]:
+    disable_analytics()
+    exit(0)
+  elif analyticsTuple == ["analytics", "on"]:
+    enable_analytics()
+    exit(0)
+
   if not decideAnalytics(exists(expanduser("~/.config/alibuild/disable-analytics")),
                          exists(expanduser("~/.config/alibuild/analytics-uuid")),
                          sys.stdout.isatty(),
