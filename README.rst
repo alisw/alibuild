@@ -7,10 +7,10 @@ for the externals and ALICE software are stored in
 
 Instant gratification with::
 
-    git clone https://github.com/alisw/alibuild.git
+    pip install alibuild
     git clone https://github.com/alisw/alidist.git
-    alibuild/aliBuild build AliRoot
-    alibuild/alienv enter AliRoot/latest
+    aliBuild build AliRoot
+    alienv enter AliRoot/latest
     aliroot -b
 
 Full documentation at:
