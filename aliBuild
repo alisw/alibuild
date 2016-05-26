@@ -1,72 +1,20 @@
 #!/usr/bin/env python
-import os, logging, time, re, yaml, hashlib, argparse
+import os, time, re, yaml, hashlib, argparse
 import sys, shutil, subprocess, socket
 from commands import getstatusoutput
-from os.path import basename, dirname, abspath, exists, realpath, join, islink
+from os.path import basename, dirname, abspath, exists, realpath, join, islink, expanduser
 from os import makedirs, unlink, readlink, getenv, sysconf, rmdir
 from glob import glob
 from datetime import datetime
 from urllib2 import urlopen, URLError
 import ssl
 import json
-from alibuild_helpers.utilities import doDetectArch, format
-
-debug, error, warning, info, riemannStream = (None, None, None, None, None)
-
-# A stream object which will end up pushing data to a riemann server
-class RiemannStream(object):
-  def __init__(self, host, port):
-    self.currentHost = socket.gethostname()
-    self.buffer = ""
-    self.state = None
-    self.enabled = False
-    self.attributes = {}
-    self.begin = time.time()
-    if not host:
-      return
-    try:
-      import bernhard
-      self.client = bernhard.Client(host=host, port=port)
-      self.client.send({'host': self.currentHost, 'state': 'ok', 'service': "alibuild started"})
-      self.enabled = True
-      info("Sending log data to %s:%s" % (host, port))
-    except Exception, e:
-      info("RIEMANN_HOST %s:%s specified, however there was a problem initialising:"  % (host, port))
-      info(e)
-
-  def setAttributes(self, **attributes):
-    self.attributes = attributes
-    self.begin = time.time()
-    self.attributes["start_time"] = self.begin
-
-  def setState(self, state):
-    self.state = state
-
-  def write(self, s):
-    self.buffer += s
-
-  def flush(self):
-    for x in self.buffer.strip("\n").split("\n"):
-      serviceLabel = ""
-      if "package" in self.attributes:
-        serviceLabel += " %(package)s@%(package_hash)s" % self.attributes
-      if "architecture" in self.attributes:
-        serviceLabel += " " + self.attributes["architecture"]
-      payload = {'host': self.currentHost,
-                 'service': 'alibuild_log%s' % serviceLabel,
-                 'description': x.decode('utf-8').encode('ascii','ignore'),
-                 'ttl': getenv("RIEMANN_TTL", 60),
-                 'metric': time.time() - self.begin
-                }
-      payload.update({'attributes': self.attributes})
-      if self.state:
-        payload['state'] = self.state
-      try:
-        self.client.send(payload)
-      except:
-        pass
-    self.buffer = ""
-
+import logging
+from alibuild_helpers.log import debug, error, banner, info
+from alibuild_helpers.log import logger_handler, logger, LogFormatter, ProgressPrint, riemannStream
+from alibuild_helpers.utilities import doDetectArch, format, getVersion
+from alibuild_helpers.analytics import decideAnalytics, askForAnalytics, report_screenview, report_exception, report_event
+from alibuild_helpers.analytics import enable_analytics, disable_analytics
 
 def writeAll(fn, txt):
   f = open(fn, "w")
@@ -97,27 +45,6 @@ def execute(command, printer=debug):
   exitCode = popen.returncode
   return exitCode
 
-class LogFormatter(logging.Formatter):
-  def __init__(self, fmtstr):
-    self.fmtstr = fmtstr
-    self.COLOR_RESET = "\033[m" if sys.stdout.isatty() else ""
-    self.LEVEL_COLORS = { logging.WARNING:  "\033[4;33m",
-                          logging.ERROR:    "\033[4;31m",
-                          logging.CRITICAL: "\033[1;37;41m" } if sys.stdout.isatty() else {}
-  def format(self, record):
-    if record.levelno == logging.BANNER and sys.stdout.isatty():
-      lines = str(record.msg).split("\n")
-      return "\n\033[1;34m==>\033[m \033[1m%s\033[m" % lines[0] + \
-             "".join([ "\n    \033[1m%s\033[m" % x for x in lines[1:] ])
-    elif record.levelno == logging.INFO or record.levelno == logging.BANNER:
-      return str(record.msg)
-    return "\n".join([ format(self.fmtstr,
-                              levelname=self.LEVEL_COLORS.get(record.levelno, self.COLOR_RESET) +
-                                        record.levelname +
-                                        self.COLOR_RESET,
-                              message=x)
-                       for x in str(record.msg).split("\n") ])
-
 class Hasher:
   def __init__(self):
     self.h = hashlib.sha1()
@@ -125,32 +52,6 @@ class Hasher:
     self.h.update(txt)
   def hexdigest(self):
     return self.h.hexdigest()
-
-class ProgressPrint:
-  def __init__(self, begin_msg=""):
-    self.count = -1
-    self.lasttime = 0
-    self.STAGES = [ ".", "..", "...", "....", ".....", "....", "...", ".." ]
-    self.begin_msg = begin_msg
-  def __call__(self, txt):
-    if time.time()-self.lasttime < 0.5:
-      return
-    if self.count == -1 and self.begin_msg:
-      sys.stderr.write("\033[1;35m==>\033[m "+self.begin_msg)
-    self.erase()
-    self.count = (self.count+1) % len(self.STAGES)
-    sys.stderr.write(self.STAGES[self.count])
-    self.lasttime = time.time()
-  def erase(self):
-    nerase = len(self.STAGES[self.count]) if self.count > -1 else 0
-    sys.stderr.write("\b"*nerase+" "*nerase+"\b"*nerase)
-  def end(self, msg="", error=False):
-    if self.count == -1:
-      return
-    self.erase()
-    if msg:
-      sys.stderr.write(": %s%s\033[m" % ("\033[31m" if error else "\033[32m", msg))
-    sys.stderr.write("\n")
 
 def dieOnError(err, msg):
   if err:
@@ -204,7 +105,7 @@ def getDirectoryHash(d):
 
 # Creates a directory in the store which contains symlinks to the package
 # and its direct / indirect dependencies
-def createDistLinks(spec, args, repoType, requiresType):
+def createDistLinks(spec, specs, args, repoType, requiresType):
   target = format("TARS/%(a)s/%(rp)s/%(p)s/%(p)s-%(v)s-%(r)s",
                   a=args.architecture,
                   rp=repoType,
@@ -426,22 +327,21 @@ def prunePaths(workDir):
     workDirEscaped = re.escape("%s" % workDir) + "[^:]*:?"
     os.environ[x] = re.sub(workDirEscaped, "", os.environ[x])
 
-if __name__ == "__main__":
-
+def doMain():
   os.environ["LANG"] = "C"
   os.environ["LC_ALL"] = "C"
   parser = argparse.ArgumentParser(epilog="For complete documentation please refer to https://alisw.github.io/alibuild")
-  parser.add_argument("action", choices=["init", "build", "clean", "version"], help="what alibuild should do")
+  parser.add_argument("action", choices=["init", "build", "clean", "version", "analytics"], help="what alibuild should do")
   parser.add_argument("pkgname", nargs="?", help="One (or more) of the packages in `alidist'")
   parser.add_argument("--config-dir", "-c", dest="configDir", default="%%(prefix)s%sdist" % star())
   parser.add_argument("--no-local", dest="noDevel", default=[],
                       help="Do not pick up the following packages from a local checkout.")
   parser.add_argument("--docker", dest="docker", action="store_true", default=False)
   parser.add_argument("--work-dir", "-w", dest="workDir", default="sw")
-  parser.add_argument("--architecture", "-a", dest="architecture", 
+  parser.add_argument("--architecture", "-a", dest="architecture",
                       default=detectArch())
   parser.add_argument("-e", dest="environment", action='append', default=[])
-  parser.add_argument("-v", dest="volumes", action='append', default=[], 
+  parser.add_argument("-v", dest="volumes", action='append', default=[],
                       help="Specify volumes to be used in Docker")
   parser.add_argument("--jobs", "-j", dest="jobs", type=int, default=detectJobs())
   parser.add_argument("--reference-sources", dest="referenceSources", default="%(workDir)s/MIRROR")
@@ -478,19 +378,14 @@ if __name__ == "__main__":
   parser.add_argument("--dry-run", "-n", dest="dryRun", default=False,
                       action="store_true", help="Prints what would happen, without actually doing the build.")
   args = parser.parse_args()
+  cmdDisable = args.disable
+
+  os.environ["ALIBUILD_ARCHITECTURE"] = args.architecture
+  report_screenview(args.action)
 
   if args.action == "version":
-    import pkg_resources  # part of setuptools
-    try:
-      version = pkg_resources.require("alibuild")[0].version
-    except:
-      cmd = "GIT_DIR=\'%s/.git\' git describe --tags" % dirname(__file__)
-      err, version = getstatusoutput(cmd)
-      if err:
-        version = "Unknown version."
-    print "aliBuild version: %s" % version
+    print "aliBuild version: %s" % getVersion()
     sys.exit(0)
-
 
   args.referenceSources = format(args.referenceSources, workDir=args.workDir)
   args.dist = args.dist if "@" in args.dist else "alisw/%sdist@%s" % (star(),args.dist)
@@ -522,34 +417,8 @@ if __name__ == "__main__":
 
   args.disable = [x for x in ",".join(args.disable).split(",") if x]
 
-  # Add loglevel BANNER (same as INFO but with more emphasis on ttys)
-  logging.BANNER = 25
-  logging.addLevelName(logging.BANNER, "BANNER")
-  def log_banner(self, message, *args, **kws):
-    if self.isEnabledFor(logging.BANNER):
-      self._log(logging.BANNER, message, args, **kws)
-  logging.Logger.banner = log_banner
-
-  logger = logging.getLogger('alibuild')
-  logger_handler = logging.StreamHandler()
-  logger.addHandler(logger_handler)
-
   logger.setLevel(logging.DEBUG if args.debug else logging.INFO)
-  logger_handler.setFormatter(LogFormatter("%(levelname)s: %(message)s"))
 
-  debug = logger.debug
-  error = logger.error
-  warning = logger.warning
-  info = logger.info
-  banner = logger.banner
-
-  riemannStream = RiemannStream(host=getenv("RIEMANN_HOST"),
-                                port=getenv("RIEMANN_PORT", "5555"))
-  # If the RiemannStreamer can be used, we add it to those use during
-  # printout.
-  if riemannStream.enabled:
-    logger.addHandler(logging.StreamHandler(riemannStream))
-  
   # The docker image is given by the first part of the architecture we want to
   # build for.
   dockerImage = ""
@@ -568,7 +437,7 @@ if __name__ == "__main__":
     syncHelper = RsyncRemoteSync(args.remoteStore, args.writeStore, args.architecture, args.workDir, "")
   else:
     syncHelper = NoRemoteSync()
- 
+
   if args.noDevel:
     args.noDevel = args.noDevel.split(",")
 
@@ -648,6 +517,10 @@ if __name__ == "__main__":
     for x in toDelete:
       shutil.rmtree(x)
     exit(0)
+  elif args.action == "analytics":
+    if not args.pkgname in ["on", "off"]:
+      parser.error("Please specify [on/off].")
+    exit(0)
   elif not args.action == "build":
     parser.error("Action %s unsupported" % args.action)
 
@@ -657,7 +530,8 @@ if __name__ == "__main__":
   buildOrder = []
   workDir = abspath(args.workDir)
   prunePaths(workDir)
-  
+
+
   if not exists(args.configDir):
     err = execute(format(
                     "git clone https://github.com/%(repo)s%(branch)s %(cd)s",
@@ -798,8 +672,9 @@ if __name__ == "__main__":
                  pkgs=", ".join(set(x.strip() for (x,y) in develPkgsUpper) - set(develPkgs))))
     exit(1)
 
-  banner("Packages will be built in the following order:\n - %s" %
-         "\n - ".join([ x+" (development package)" if x in develPkgs else x for x in buildOrder ]))
+  if buildOrder:
+    banner("Packages will be built in the following order:\n - %s" %
+           "\n - ".join([ x+" (development package)" if x in develPkgs else x for x in buildOrder ]))
 
   if develPkgs:
     banner(format("You have packages in development mode.\n"
@@ -983,6 +858,17 @@ if __name__ == "__main__":
   # single one of them. This is done this way so that the second time we run we
   # can check if the build was consistent and if it is, we bail out.
   packageIterations = 0
+  report_event("install",
+               format("%(p)s disabled=%(dis)s devel=%(dev)s system=%(sys)s own=%(own)s deps=%(deps)s",
+                      p=args.pkgname,
+                      dis=",".join(sorted(cmdDisable)),
+                      dev=",".join(sorted(develPkgs)),
+                      sys=",".join(sorted(systemPackages)),
+                      own=",".join(sorted(ownPackages)),
+                      deps=",".join(buildOrder[:-1])
+                     ),
+               args.architecture)
+
   while buildOrder:
     packageIterations += 1
     if packageIterations > 20:
@@ -1098,9 +984,9 @@ if __name__ == "__main__":
       # We need to create 2 sets of links, once with the full requires,
       # once with only direct dependencies, since that's required to
       # register packages in Alien.
-      createDistLinks(spec, args, "dist", "full_requires")
-      createDistLinks(spec, args, "dist-direct", "requires")
-      createDistLinks(spec, args, "dist-runtime", "full_runtime_requires")
+      createDistLinks(spec, specs, args, "dist", "full_requires")
+      createDistLinks(spec, specs, args, "dist-direct", "requires")
+      createDistLinks(spec, specs, args, "dist-runtime", "full_runtime_requires")
       buildOrder.pop(0)
       packageIterations = 0
       # We can now delete the INSTALLROOT and BUILD directories,
@@ -1336,6 +1222,12 @@ if __name__ == "__main__":
       err = execute("/bin/bash -e -x %s/build.sh 2>&1" % scriptDir,
                     printer=debug if args.debug or not sys.stdout.isatty() else progress)
       progress.end("failed" if err else "ok", err)
+    report_event("BuildError" if err else "BuildSuccess",
+                 spec["package"],
+                 format("%(a)s %(v)s %(c)s",
+                        a = args.architecture,
+                        v = spec["version"],
+                        c = spec["commit_hash"]))
 
     updatablePkgs = [ x for x in spec["requires"] if x in develPkgs ]
     if spec["package"] in develPkgs:
@@ -1379,3 +1271,32 @@ if __name__ == "__main__":
                   p=x,
                   devSuffix="-"+args.develPrefix if "develPrefix" in args else "",
                   w=abspath(args.workDir)))
+
+if __name__ == "__main__":
+  logger.setLevel(logging.DEBUG if "--debug" in sys.argv or "-d" in sys.argv else logging.INFO)
+  os.environ["ALIBUILD_ANALYTICS_ID"] = "UA-77346950-1"
+  os.environ["ALIBUILD_VERSION"] = getVersion()
+  analyticsTuple = [x for x in sys.argv if x in ["analytics", "off", "on"]]
+  if analyticsTuple == ["analytics", "off"]:
+    disable_analytics()
+    exit(0)
+  elif analyticsTuple == ["analytics", "on"]:
+    enable_analytics()
+    exit(0)
+
+  if not decideAnalytics(exists(expanduser("~/.config/alibuild/disable-analytics")),
+                         exists(expanduser("~/.config/alibuild/analytics-uuid")),
+                         sys.stdout.isatty(),
+                         askForAnalytics):
+    os.environ["ALIBUILD_NO_ANALYTICS"] = "1"
+  else:
+    os.environ["ALIBUILD_ANALYTICS_USER_UUID"] = open(expanduser("~/.config/alibuild/analytics-uuid")).read().strip()
+  try:
+    doMain()
+  except KeyboardInterrupt, e:
+    info(str(e))
+    report_event("user", "ctrlc")
+    exit(1)
+  except Exception, e:
+    report_exception(e)
+    raise e

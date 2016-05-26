@@ -1,5 +1,8 @@
 #!/usr/bin/env python
 import subprocess
+import pkg_resources  # part of setuptools
+from commands import getstatusoutput
+from os.path import dirname
 
 def format(s, **kwds):
   return s % kwds
@@ -44,3 +47,11 @@ def doDetectArch(hasOsRelease, osReleaseLines, platformTuple, platformSystem, pl
                 d=distribution.lower(),
                 v=version.split(".")[0],
                 c=processor.replace("_", "-"))
+
+def getVersion():
+  try:
+    return pkg_resources.require("alibuild")[0].version
+  except:
+    cmd = "GIT_DIR=\'%s/.git\' git describe --tags" % dirname(dirname(__file__))
+    err, version = getstatusoutput(cmd)
+    return version if not err else "Unknown version."
