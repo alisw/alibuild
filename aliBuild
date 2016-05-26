@@ -14,6 +14,7 @@ from alibuild_helpers.log import debug, error, banner, info
 from alibuild_helpers.log import logger_handler, logger, LogFormatter, ProgressPrint, riemannStream
 from alibuild_helpers.utilities import doDetectArch, format, getVersion
 from alibuild_helpers.analytics import decideAnalytics, askForAnalytics, report_screenview, report_exception, report_event
+from alibuild_helpers.analytics import enable_analytics, disable_analytics
 
 def writeAll(fn, txt):
   f = open(fn, "w")
@@ -330,7 +331,7 @@ def doMain():
   os.environ["LANG"] = "C"
   os.environ["LC_ALL"] = "C"
   parser = argparse.ArgumentParser(epilog="For complete documentation please refer to https://alisw.github.io/alibuild")
-  parser.add_argument("action", choices=["init", "build", "clean", "version"], help="what alibuild should do")
+  parser.add_argument("action", choices=["init", "build", "clean", "version", "analytics"], help="what alibuild should do")
   parser.add_argument("pkgname", nargs="?", help="One (or more) of the packages in `alidist'")
   parser.add_argument("--config-dir", "-c", dest="configDir", default="%%(prefix)s%sdist" % star())
   parser.add_argument("--no-local", dest="noDevel", default=[],
@@ -442,6 +443,7 @@ def doMain():
   if args.action == "build" and not args.pkgname:
     parser.error("Please provide at least one package to build.")
 
+
   # Setup build environment.
   if args.action == "init":
     setdir = args.develPrefix if "develPrefix" in args else "."
@@ -514,6 +516,12 @@ def doMain():
       exit(0)
     for x in toDelete:
       shutil.rmtree(x)
+    exit(0)
+  elif args.action == "analytics":
+    if not args.pkgname in ["on", "off"]:
+      parser.error("Please specify [on/off].")
+    if args.pkgname == "on": enable_analytics()
+    if args.pkgname == "off": disable_analytics()
     exit(0)
   elif not args.action == "build":
     parser.error("Action %s unsupported" % args.action)

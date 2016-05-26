@@ -3,6 +3,8 @@ import os, subprocess
 from commands import getstatusoutput
 from urllib import urlopen
 from alibuild_helpers.log import debug, error, banner, info, logger_handler
+from os.path import exists, expanduser
+from os import unlink
 
 def askForAnalytics():
   banner("In order to improve user experience, aliBuild would like to gather "
@@ -86,3 +88,13 @@ def report_exception(e):
   report("exception",
     exd = e.__class__.__name__,
     exf = "1")
+
+def enable_analytics():
+  if exists(expanduser("~/.config/alibuild/disable-analytics")):
+    unlink(expanduser("~/.config/alibuild/disable-analytics"))
+
+# We do it in getstatusoutput because python makedirs can actually fail
+# if one of the intermediate directories is not writeable.
+def disable_analytics():
+  getstatusoutput("mkdir -p ~/.config/alibuild && touch ~/.config/alibuild/disable-analytics")
+

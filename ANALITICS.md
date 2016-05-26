@@ -95,7 +95,8 @@ export ALIBUILD_NO_ANALYTICS=1
 
 Alternatively, this will prevent analytics from ever being sent:
 
-```sh
-mkdir ~/.alibuild
-touch ~/.alibuild/no-analytics
-```
+  aliBuild analytics off
+
+In case you decide you want to turn analytics back on:
+
+  aliBuild analytics on
