@@ -1,15 +1,17 @@
 # aliBuild's Anonymous Aggregate User Behaviour Analytics
 
-aliBuild has begun gathering anonymous aggregate user behaviour analytics and
-reporting these to Google Analytics. You will be notified the first time you
-run an aliBuild with this feature enabled.
+aliBuild has begun gathering **anonymous** aggregate user behaviour
+analytics. You will be notified the first time you run an aliBuild with
+this feature enabled, and you will be able to opt out. Read below for
+all the details.
 
 ## Why?
-Resources which we can dedicate to support multiple architectures and compilers are
-limited. As a result, we do not have the resources to do detailed user
-studies of aliBuild users to decide on how best to design future features and
-prioritise current work. Anonymous aggregate user analytics allow us to
-prioritise fixes and features based on how, where and when people use aliBuild.
+Resources which we can dedicate to support multiple architectures and
+compilers are limited. As a result, we do not have the resources to do
+detailed user studies of aliBuild users to decide on how best to design
+future features and prioritise current work. Anonymous aggregate user
+analytics allow us to prioritise fixes and features based on how, where
+and when people use aliBuild.
 For example:
 
 - if a recipe is widely used and is failing often it will enable us to
