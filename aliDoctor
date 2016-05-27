@@ -32,13 +32,21 @@ if __name__ == "__main__":
   args = parser.parse_args()
   if not exists(args.config):
     parser.error("Wrong path to alidist specified: %s" % args.config)
-  
+
   prunePaths(abspath(args.workDir))
-  
+
+  # Decide if we can use homebrew. If not, we replace it with "true" so
+  # that we do not get spurious messages on linux
+  homebrew_replacement = "brew"
+  err, output = getstatusoutput("which brew")
+  if err:
+    homebrew_replacement = "true"
+
   for x in glob("%s/*.sh" % args.config):
     print "Reading", x
     txt = file(x).read()
     header, body = txt.split("---", 1)
     spec = yaml.safe_load(header)
     if "prefer_system_check" in spec:
-      execute(spec["prefer_system_check"], spec["package"])
+      execute(spec["prefer_system_check"].replace("brew", homebrew_replacement),
+              spec["package"])
