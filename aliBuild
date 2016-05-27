@@ -10,7 +10,7 @@ from urllib2 import urlopen, URLError
 import ssl
 import json
 import logging
-from alibuild_helpers.log import debug, error, banner, info
+from alibuild_helpers.log import debug, error, warning, banner, info
 from alibuild_helpers.log import logger_handler, logger, LogFormatter, ProgressPrint, riemannStream
 from alibuild_helpers.utilities import doDetectArch, format, getVersion
 from alibuild_helpers.analytics import decideAnalytics, askForAnalytics, report_screenview, report_exception, report_event
