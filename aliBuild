@@ -714,6 +714,11 @@ def doMain():
           # We are in development mode, we need to rebuild if the commit hash
           # is different and if there are extra changes on to.
           if spec["package"] in develPkgs:
+            # Devel package: we get the commit hash from the checked source, not from remote.
+            cmd = "cd %s && git rev-parse HEAD" % spec["source"]
+            err, out = getstatusoutput(cmd)
+            dieOnError(err, "Unable to detect current commit hash.")
+            spec["commit_hash"] = out.strip()
             cmd = "cd %s && git diff -r HEAD && git status --porcelain" % spec["source"]
             h = Hasher()
             err = execute(cmd, h)
