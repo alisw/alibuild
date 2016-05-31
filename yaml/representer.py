@@ -24,11 +24,9 @@ except ImportError:
 class RepresenterError(YAMLError):
     pass
 
-if 'unicode' not in globals():
-    unicode = str
+unicode = getattr(__builtins__, 'unicode', str)
+long = getattr(__builtins__, 'long', int)
 
-if 'long' not in globals():
-    long = int
 
 class BaseRepresenter(object):
 
