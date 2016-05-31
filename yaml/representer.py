@@ -1,4 +1,7 @@
 
+from __future__ import unicode_literals
+
+
 __all__ = ['BaseRepresenter', 'SafeRepresenter', 'Representer',
     'RepresenterError']
 
@@ -20,6 +23,12 @@ except ImportError:
 
 class RepresenterError(YAMLError):
     pass
+
+if 'unicode' not in globals():
+    unicode = str
+
+if 'long' not in globals():
+    long = int
 
 class BaseRepresenter(object):
 
@@ -473,8 +482,16 @@ Representer.add_representer(tuple,
 Representer.add_representer(type,
         Representer.represent_name)
 
-Representer.add_representer(types.ClassType,
-        Representer.represent_name)
+# python3 removes types.ClassType & types.InstanceType
+# - ignore if not present
+try:
+    Representer.add_representer(types.ClassType,
+            Representer.represent_name)
+
+    Representer.add_multi_representer(types.InstanceType,
+            Representer.represent_instance)
+except AttributeError:
+    pass
 
 Representer.add_representer(types.FunctionType,
         Representer.represent_name)
@@ -484,9 +501,6 @@ Representer.add_representer(types.BuiltinFunctionType,
 
 Representer.add_representer(types.ModuleType,
         Representer.represent_module)
-
-Representer.add_multi_representer(types.InstanceType,
-        Representer.represent_instance)
 
 Representer.add_multi_representer(object,
         Representer.represent_object)
