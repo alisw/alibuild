@@ -24,6 +24,8 @@ except ImportError:
   from urllib.request import urlopen
   from urllib.error import URLError
 
+basestring = getattr(__builtins__, 'basestring', str)
+
 def writeAll(fn, txt):
   f = open(fn, "w")
   f.write(txt)

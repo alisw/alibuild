@@ -48,10 +48,10 @@ if __name__ == "__main__":
   if err:
     homebrew_replacement = "true"
 
-  for x in glob("%s/*.sh" % args.config):
-    print("Reading", x)
-    txt = file(x).read()
-    header, body = txt.split("---", 1)
+  for filename in glob("%s/*.sh" % args.config):
+    print("Reading", filename)
+    with open(filename, 'r') as f:
+        header, body = f.read().split("---", 1)
     spec = yaml.safe_load(header)
     if "prefer_system_check" in spec:
       execute(spec["prefer_system_check"].replace("brew", homebrew_replacement),
