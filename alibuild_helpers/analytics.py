@@ -1,10 +1,18 @@
 #!/usr/bin/env python
 import os, subprocess, sys
-from commands import getstatusoutput
-from urllib import urlopen
 from alibuild_helpers.log import debug, error, banner, info, logger_handler
 from os.path import exists, expanduser
 from os import unlink
+try:
+  from commands import getstatusoutput
+  from urllib import urlopen
+except ImportError:
+  from subprocess import getstatusoutput
+  from urllib.request import urlopen
+
+# py2/py3 compatibility - use either raw_input or input function
+input = getattr(__builtins__, 'raw_input', input)
+
 
 def generate_analytics_id():
   getstatusoutput("mkdir -p  ~/.config/alibuild")
@@ -21,7 +29,7 @@ def askForAnalytics():
   banner("In order to improve user experience, aliBuild would like to gather "
          "analytics about your builds.\nYou can find all the details at:\n\n"
          "  https://github.com/alisw/alibuild/blob/master/Analytics.md\n")
-  a = raw_input("Is that ok for you [YES/no]? ")
+  a = input("Is that ok for you [YES/no]? ")
   if a.strip() and a.strip().lower().startswith("n"):
     debug("User requsted disabling analytics.")
     return disable_analytics()
@@ -111,4 +119,3 @@ def enable_analytics():
 def disable_analytics():
   getstatusoutput("mkdir -p ~/.config/alibuild && touch ~/.config/alibuild/disable-analytics")
   return False
-

@@ -1,8 +1,11 @@
 #!/usr/bin/env python
 import subprocess
 import pkg_resources  # part of setuptools
-from commands import getstatusoutput
 from os.path import dirname
+try:
+  from commands import getstatusoutput
+except ImportError:
+  from subprocess import getstatusoutput
 
 def format(s, **kwds):
   return s % kwds

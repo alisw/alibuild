@@ -1,4 +1,7 @@
 # Dummy file to package build_template.sh
-import utilities as utilities
-import analytics as analytics
-import log as log
+
+from __future__ import absolute_import
+
+from . import utilities
+from . import analytics
+from . import log
