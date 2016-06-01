@@ -12,7 +12,7 @@ import json
 import logging
 from alibuild_helpers.log import debug, error, warning, banner, info
 from alibuild_helpers.log import logger_handler, logger, LogFormatter, ProgressPrint, riemannStream
-from alibuild_helpers.utilities import doDetectArch, format, getVersion
+from alibuild_helpers.utilities import format, getVersion, detectArch
 from alibuild_helpers.analytics import decideAnalytics, askForAnalytics, report_screenview, report_exception, report_event
 from alibuild_helpers.analytics import enable_analytics, disable_analytics
 
@@ -148,26 +148,6 @@ def filterByArchitecture(arch, requires):
 VALID_ARCHS_RE = ["slc[5-9]+_(x86-64|ppc64)",
                   "(ubuntu|ubt|osx)[0-9]*_x86-64",
                  ]
-
-# Try to guess a good platform. This does not try to cover all the
-# possibly compatible linux distributions, but tries to get right the
-# common one, obvious one. If you use a Unknownbuntu which is compatible
-# with Ubuntu 15.10 you will still have to give an explicit platform
-# string. 
-#
-# FIXME: we should have a fallback for lsb_release, since platform.dist
-# is going away.
-def detectArch():
-  hasOsRelease = exists("/etc/os-release")
-  osReleaseLines = open("/etc/os-release").readlines() if hasOsRelease else []
-  try:
-    import platform
-    platformTuple = platform.dist()
-    platformSystem = platform.system()
-    platformProcessor = platform.processor()
-    return doDetectArch(hasOsRelease, osReleaseLines, platformTuple, platformSystem, platformProcessor)
-  except:
-    return None
 
 # Detect number of available CPUs. Fallback to 1.
 def detectJobs():

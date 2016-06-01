@@ -4,7 +4,7 @@ from os import getenv
 import socket, time
 from alibuild_helpers.utilities import format
 
-debug, error, warning, info, riemannStream = (None, None, None, None, None)
+debug, error, warning, info, success, riemannStream = (None, None, None, None, None, None)
 
 # A stream object which will end up pushing data to a riemann server
 class RiemannStream(object):
@@ -66,7 +66,8 @@ class LogFormatter(logging.Formatter):
     self.COLOR_RESET = "\033[m" if sys.stdout.isatty() else ""
     self.LEVEL_COLORS = { logging.WARNING:  "\033[4;33m",
                           logging.ERROR:    "\033[4;31m",
-                          logging.CRITICAL: "\033[1;37;41m" } if sys.stdout.isatty() else {}
+                          logging.CRITICAL: "\033[1;37;41m",
+                          logging.SUCCESS:  "\033[1;32m" } if sys.stdout.isatty() else {}
   def format(self, record):
     if record.levelno == logging.BANNER and sys.stdout.isatty():
       lines = str(record.msg).split("\n")
@@ -115,6 +116,14 @@ def log_banner(self, message, *args, **kws):
     self._log(logging.BANNER, message, args, **kws)
 logging.Logger.banner = log_banner
 
+# Add loglevel SUCCESS (same as ERROR, but green)
+logging.SUCCESS = 45
+logging.addLevelName(logging.SUCCESS, "SUCCESS")
+def log_success(self, message, *args, **kws):
+  if self.isEnabledFor(logging.SUCCESS):
+    self._log(logging.SUCCESS, message, args, **kws)
+logging.Logger.success = log_success
+
 logger = logging.getLogger('alibuild')
 logger_handler = logging.StreamHandler()
 logger.addHandler(logger_handler)
@@ -125,6 +134,7 @@ error = logger.error
 warning = logger.warning
 info = logger.info
 banner = logger.banner
+success = logger.success
 
 riemannStream = RiemannStream(host=getenv("RIEMANN_HOST"),
                               port=getenv("RIEMANN_PORT", "5555"))
