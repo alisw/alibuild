@@ -76,9 +76,9 @@ will tell you something like:
     System package boost cannot be used. Building our own copy.
     We will build packages in the following order: defaults-release AliEn-CAs GMP UUID gSOAP ApMon-CPP GEANT4 boost MPFR MonALISA-gSOAP-client cgal XRootD fastjet xalienfs AliEn-Runtime ROOT vgm GEANT3 GEANT4_VMC AliRoot
 
-If you have a system package which you think should be used but it's not,
-you can run `aliDoctor` to try to understand why that was the case (or you
-can open a bug report with its output and we will look at it.
+If you have a system package which you think should be used but it's not, you
+can run `aliDoctor <package-name>` to try to understand why that was the case
+(or you can open a bug report with its output and we will look at it).
 
 ### What is PIP ? How do I install it?
 
@@ -146,7 +146,7 @@ it means that aliBuild does not consider you system tool good enough to
 be compatible with the one provided by the recipe. You can verify what
 happens during the system tool detection by running:
 
-    aliDoctor
+    aliDoctor <package name>
 
 
 ### I do not have privileges and I cannot install via pip
