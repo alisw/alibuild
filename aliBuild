@@ -537,6 +537,8 @@ def doMain():
   if not exists(specDir):
     makedirs(specDir)
 
+  os.environ["ALIBUILD_ALIDIST_HASH"] = getDirectoryHash(args.configDir)
+
   debug("Building for architecture %s" % args.architecture)
   debug("Number of parallel builds: %d" % args.jobs)
   debug(format("Using %(star)sBuild from "
@@ -544,7 +546,7 @@ def doMain():
                "in %(star)sdist@%(distHash)s",
                star=star(),
                toolHash=getDirectoryHash(dirname(__file__)),
-               distHash=getDirectoryHash(args.configDir)))
+               distHash=os.environ["ALIBUILD_ALIDIST_HASH"]))
 
   systemPackages = set()
   ownPackages = set()
@@ -1209,10 +1211,11 @@ def doMain():
       progress.end("failed" if err else "ok", err)
     report_event("BuildError" if err else "BuildSuccess",
                  spec["package"],
-                 format("%(a)s %(v)s %(c)s",
+                 format("%(a)s %(v)s %(c)s %(h)s",
                         a = args.architecture,
                         v = spec["version"],
-                        c = spec["commit_hash"]))
+                        c = spec["commit_hash"],
+                        h = os.environ["ALIBUILD_ALIDIST_HASH"][0:10]))
 
     updatablePkgs = [ x for x in spec["requires"] if x in develPkgs ]
     if spec["package"] in develPkgs:
