@@ -20,7 +20,7 @@ def generate_analytics_id():
 def askForAnalytics():
   banner("In order to improve user experience, aliBuild would like to gather "
          "analytics about your builds.\nYou can find all the details at:\n\n"
-         "  https://github.com/alisw/alibuild/blob/master/Analytics.md\n")
+         "  https://github.com/alisw/alibuild/blob/master/ANALYTICS.md\n")
   a = raw_input("Is that ok for you [YES/no]? ")
   if a.strip() and a.strip().lower().startswith("n"):
     debug("User requsted disabling analytics.")
