@@ -108,10 +108,13 @@ you can even do:
     make install
 
 and it will correctly install everything in `sw/<arch>/ROOT/latest`.
+This of course mean that for each development package you might end up
+with one or more build directories which might increase the used disk
+space.
 
 It's also important to notice that if you use your own checkout of a
 package, you will not be able to write to any store and the generated
-tgz will be empty. 
+tgz will be empty.
 
 If you wish to temporary compile with the package as specified by
 alidist, you can use the `--no-local <PACKAGE>` option.
