@@ -480,8 +480,11 @@ def doMain():
     # Schedule a directory for deletion if it does not have a symlink
     # Delete scheduled directories
     symlinksBuild = [readlink(x) for x in glob("%s/BUILD/*-latest*" % args.workDir)]
-    toDelete = [x for x in glob("%s/BUILD/*" % args.workDir)
-                if not islink(x) and not basename(x) in symlinksBuild]
+    # $WORK_DIR/TMP should always be cleaned up. This does not happen only
+    # in the case we run out of space while unpacking.
+    toDelete = ["%s/TMP" % args.workDir]
+    toDelete += [x for x in glob("%s/BUILD/*" % args.workDir)
+                 if not islink(x) and not basename(x) in symlinksBuild]
     installGlob ="%s/%s/*/" % (args.workDir, args.architecture)
     symlinksInstall = [readlink(x) for x in glob(installGlob + "latest*")]
     toDelete += [x for x in glob(installGlob+ "*")
