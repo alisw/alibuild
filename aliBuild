@@ -482,13 +482,19 @@ def doMain():
     symlinksBuild = [readlink(x) for x in glob("%s/BUILD/*-latest*" % args.workDir)]
     # $WORK_DIR/TMP should always be cleaned up. This does not happen only
     # in the case we run out of space while unpacking.
+    # $WORK_DIR/<architecture>/store can be cleaned up as well, because
+    # we do not need the actual tarballs after they have been built.
     toDelete = ["%s/TMP" % args.workDir]
+    if args.aggressiveCleanup:
+      toDelete += ["%s/TARS/%s/store" % (args.workDir, args.architecture),
+                   "%s/SOURCES" % (args.workDir)]
     toDelete += [x for x in glob("%s/BUILD/*" % args.workDir)
                  if not islink(x) and not basename(x) in symlinksBuild]
     installGlob ="%s/%s/*/" % (args.workDir, args.architecture)
     symlinksInstall = [readlink(x) for x in glob(installGlob + "latest*")]
     toDelete += [x for x in glob(installGlob+ "*")
                  if not islink(x) and not basename(x) in symlinksInstall]
+    toDelete = [x for x in toDelete if exists(x)]
     if not toDelete:
       print "Nothing to delete."
       exit(0)
