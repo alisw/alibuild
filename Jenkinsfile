@@ -33,7 +33,8 @@ node {
           # Changes in alibuild_helpers can we tested in isolation, so we
           # do so.
           alibuild_helpers|tests)
-            PYTHONPATH=alibuild python alibuild/tests/test_*.py
+            PYTHONPATH=alibuild python alibuild/tests/test_utilities.py
+            PYTHONPATH=alibuild python alibuild/tests/test_analytics.py
             ;;
           # Changes to alibuild require a full rebuild to be validated. The
           # goal as usual is to fail fast.
