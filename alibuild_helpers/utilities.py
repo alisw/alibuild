@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 import subprocess, re, yaml
-import pkg_resources  # part of setuptools
 from commands import getstatusoutput
 from os.path import dirname, exists
 import platform
@@ -71,6 +70,7 @@ def detectArch():
 
 def getVersion():
   try:
+    import pkg_resources  # part of setuptools
     return pkg_resources.require("alibuild")[0].version
   except:
     cmd = "GIT_DIR=\'%s/.git\' git describe --tags" % dirname(dirname(__file__))
