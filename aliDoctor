@@ -73,6 +73,20 @@ def checkRequirements(spec, cmd, homebrew_replacement):
                  help=spec.get("system_requirement_missing")))
     return (err, "")
 
+def systemInfo():
+  _,out = getstatusoutput("env")
+  debug("Environment:\n"+out)
+  _,out = getstatusoutput("uname -a")
+  debug("uname -a: "+out)
+  _,out = getstatusoutput("mount")
+  debug("Mounts:\n"+out)
+  _,out = getstatusoutput("df")
+  debug("Disk free:\n"+out)
+  for f in ["/etc/lsb-release", "/etc/redhat-release", "/etc/os-release"]:
+    err,out = getstatusoutput("cat "+f)
+    if not err:
+      debug(f+":\n"+out)
+
 if __name__ == "__main__":
   parser = argparse.ArgumentParser()
   parser.add_argument("-a", "--architecture", help="force architecture",
@@ -104,12 +118,16 @@ if __name__ == "__main__":
 
   specs = {}
   packages = []
+  exitcode = 0
   for p in args.packages:
     path = "%s/%s.sh" % (args.config, p.lower())
     if not exists(path):
       error("Cannot find recipe %s for package %s." % (path, p))
+      exitcode = 1
       continue
     packages.append(p)
+
+  systemInfo()
 
   specs = {}
   def unreachable():
@@ -138,4 +156,5 @@ if __name__ == "__main__":
     banner("The following packages are system dependencies and could not be found:\n\n- "+
           "\n- ".join(failed)
          )
-    exit(1)
+    exitcode = 1
+  exit(exitcode)
