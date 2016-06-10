@@ -15,6 +15,7 @@ from alibuild_helpers.log import logger_handler, logger, LogFormatter, ProgressP
 from alibuild_helpers.utilities import format, getVersion, detectArch
 from alibuild_helpers.analytics import decideAnalytics, askForAnalytics, report_screenview, report_exception, report_event
 from alibuild_helpers.analytics import enable_analytics, disable_analytics
+import traceback
 
 def writeAll(fn, txt):
   f = open(fn, "w")
@@ -1296,4 +1297,5 @@ if __name__ == "__main__":
     exit(1)
   except Exception, e:
     report_exception(e)
-    raise e
+    traceback.print_exc()
+    exit(1)
