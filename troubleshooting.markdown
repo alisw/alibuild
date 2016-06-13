@@ -241,3 +241,21 @@ a user directory (specify a different prefix and do not use `sudo`).
 `alienv` needs the `modulecmd` in the `$PATH` in order to work. Just fire
 `alienv` right afterwards, and if you get the help screen instead of the error
 above then you are set.
+
+### How do I set compilation options for AliRoot and / or AliPhysics?
+
+If you want to change the compilation options for AliRoot, AliPhysics,
+or as a matter of fact any packages you have two options:
+
+- If the package itself is one which you are developing locally, i.e.
+  you have the checkout available, you can modify its CMakeFile, add
+  whatever options you like there and then issue again your aliBuild
+  command.
+- On contrary, if you do not have a local checkout but you still want to
+  modify it's compiler flags, you can edit the `alidist/aliroot.sh` recipe
+  and add the options there.
+
+Finally, for certain common options, e.g. debug flags, we provide a
+precooked configuration using so called [defaults](user.html#defaults).
+Simply add `--defaults debug` to your aliBuild flags and it will add
+debug flags to all your packages.
