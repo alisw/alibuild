@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Build script for %(pkgname)s -- automatically generated
+# Automatically generated build script
 
 set -e
 set +h
@@ -9,29 +9,34 @@ export WORK_DIR="${WORK_DIR_OVERRIDE:-%(workDir)s}"
 # From our dependencies
 %(dependencies)s
 
-export CAN_DELETE="%(can_delete)s"
-export PKGNAME="%(pkgname)s"
-export PKGHASH="%(hash)s"
-export PKGVERSION="%(version)s"
-export PKGREVISION="%(revision)s"
-export REQUIRES="%(requires)s"
-export BUILD_REQUIRES="%(build_requires)s"
-export RUNTIME_REQUIRES="%(runtime_requires)s"
-export DEVEL_PREFIX="%(develPrefix)s"
-DEVEL_HASH="%(develHash)s"
-DEPS_HASH="%(depsHash)s"
+# The following environment variables are setup by
+# the aliBuild script itself
+#
+# - ARCHITECTURE
+# - BUILD_REQUIRES
+# - CACHED_TARBALL
+# - CAN_DELETE
+# - COMMIT_HASH
+# - DEPS_HASH
+# - DEVEL_HASH
+# - DEVEL_PREFIX
+# - GIT_TAG
+# - INCREMENTAL_BUILD_HASH
+# - JOBS
+# - PKGHASH
+# - PKGNAME
+# - PKGREVISION
+# - PKGVERSION
+# - REQUIRES
+# - RUNTIME_REQUIRES
+# - WRITE_REPO
 
 export PKG_NAME="$PKGNAME"
 export PKG_VERSION="$PKGVERSION"
 export PKG_BUILDNUM="$PKGREVISION"
 
-export ARCHITECTURE="%(architecture)s"
 export SOURCE0="${SOURCE0_DIR_OVERRIDE:-%(sourceDir)s}%(sourceName)s"
-export GIT_TAG="%(tag)s"
-export JOBS=${JOBS-%(jobs)s}
 export PKGPATH=${ARCHITECTURE}/${PKGNAME}/${PKGVERSION}-${PKGREVISION}
-%(incremental_hash)s
-INCREMENTAL_BUILD_HASH=${INCREMENTAL_BUILD_HASH:-0}
 mkdir -p "$WORK_DIR/BUILD" "$WORK_DIR/SOURCES" "$WORK_DIR/TARS" \
          "$WORK_DIR/SPECS" "$WORK_DIR/INSTALLROOT"
 export BUILDROOT="$WORK_DIR/BUILD/$PKGHASH"
@@ -44,15 +49,15 @@ if [ "${SOURCE0:0:1}" == "/" ]; then
 else
   export INSTALLROOT="$WORK_DIR/INSTALLROOT/$PKGHASH/$PKGPATH"
 fi
-export SOURCEDIR="$WORK_DIR/SOURCES/$PKGNAME/$PKGVERSION/%(commit_hash)s"
+export SOURCEDIR="$WORK_DIR/SOURCES/$PKGNAME/$PKGVERSION/$COMMIT_HASH"
 export BUILDDIR="$BUILDROOT/$PKGNAME"
 
 SHORT_TAG=${GIT_TAG:0:10}
 mkdir -p $(dirname $SOURCEDIR)
-if [[ %(commit_hash)s != ${GIT_TAG} && "${SHORT_TAG:-0}" != %(commit_hash)s ]]; then
+if [[ ${COMMIT_HASH} != ${GIT_TAG} && "${SHORT_TAG:-0}" != ${COMMIT_HASH} ]]; then
   GIT_TAG_DIR=${GIT_TAG:-0}
   GIT_TAG_DIR=${GIT_TAG_DIR//\//_}
-  ln -snf %(commit_hash)s "$WORK_DIR/SOURCES/$PKGNAME/$PKGVERSION/${GIT_TAG_DIR}"
+  ln -snf ${COMMIT_HASH} "$WORK_DIR/SOURCES/$PKGNAME/$PKGVERSION/${GIT_TAG_DIR}"
 fi
 rm -fr "$WORK_DIR/INSTALLROOT/$PKGHASH"
 # We remove the build directory only if we are not in incremental mode.
@@ -75,7 +80,7 @@ if [[ ! "$SOURCE0" == '' && "${SOURCE0:0:1}" != "/" && ! -d "$SOURCEDIR" ]]; the
   git clone ${GIT_REFERENCE:+--reference $GIT_REFERENCE} "$SOURCE0" "$SOURCEDIR"
   cd $SOURCEDIR
   git checkout "${GIT_TAG}"
-  git remote set-url --push origin %(write_repo)s
+  git remote set-url --push origin $WRITE_REPO
 elif [[ ! "$SOURCE0" == '' && "${SOURCE0:0:1}" == "/" ]]; then
   ln -snf $SOURCE0 $SOURCEDIR
 fi
@@ -84,7 +89,6 @@ mkdir -p "$SOURCEDIR"
 cd "$BUILDDIR"
 
 # Actual build script, as defined in the recipe
-CACHED_TARBALL=%(cachedTarball)s
 
 # This actually does the build, taking in to account shortcuts like
 # having a pre build tarball or having an incremental recipe (in the
@@ -112,7 +116,7 @@ else
   # files.
   rm -rf "$BUILDROOT/log"
   mkdir -p $WORK_DIR/TMP/$PKGHASH
-  %(gzip)s -dc $CACHED_TARBALL | tar -C $WORK_DIR/TMP/$PKGHASH -x
+  $MY_GZIP -dc $CACHED_TARBALL | tar -C $WORK_DIR/TMP/$PKGHASH -x
   mkdir -p $(dirname $INSTALLROOT)
   rm -rf $INSTALLROOT
   mv $WORK_DIR/TMP/$PKGHASH/$ARCHITECTURE/$PKGNAME/$PKGVERSION-* $INSTALLROOT
@@ -137,7 +141,7 @@ export ${BIGPKGNAME}_ROOT=$INSTALLROOT
 export ${BIGPKGNAME}_VERSION=$PKGVERSION
 export ${BIGPKGNAME}_REVISION=$PKGREVISION
 export ${BIGPKGNAME}_HASH=$PKGHASH
-export ${BIGPKGNAME}_COMMIT=%(commit_hash)s
+export ${BIGPKGNAME}_COMMIT=${COMMIT_HASH}
 EOF
 
 # Environment
