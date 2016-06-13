@@ -98,7 +98,7 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
       continue
     try:
       d = open("%s/%s.sh" % (configDir, p.lower())).read()
-    except IOError,e:
+    except IOError as e:
       dieOnError(True, str(e))
     header, recipe = d.split("---", 1)
     spec = yaml.safe_load(header)

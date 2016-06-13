@@ -218,10 +218,10 @@ class HttpRemoteSync:
       else:
         hashList = json.loads(urlopen(hashListUrl).read())
         pkgList = json.loads(urlopen(pkgListUrl).read())
-    except URLError, e:
+    except URLError as e:
       debug("Cannot find precompiled package for %s@%s" % (p, spec["hash"]))
       pass
-    except Exception, e:
+    except Exception as e:
       info(e)
       error("Unknown response from server")
 
@@ -478,7 +478,7 @@ def doMain():
     try:
       os.path.exists(setdir) or os.mkdir(setdir)
       os.path.exists(args.referenceSources) or makedirs(args.referenceSources)
-    except OSError, e:
+    except OSError as e:
       dieOnError(True, str(e))
 
     for p in [{"name":"stardist","ver":args.dist["ver"]}] + pkgs:
@@ -1257,7 +1257,6 @@ def doMain():
     else:
       progress = ProgressPrint("%s is being built (use --debug for full output)" % spec["package"])
       for k,v in buildEnvironment:
-        print (k,v)
         os.environ[k] = str(v)
       err = execute("/bin/bash -e -x %s/build.sh 2>&1" % scriptDir,
                     printer=debug if args.debug or not sys.stdout.isatty() else progress)
@@ -1334,11 +1333,11 @@ if __name__ == "__main__":
     os.environ["ALIBUILD_ANALYTICS_USER_UUID"] = open(expanduser("~/.config/alibuild/analytics-uuid")).read().strip()
   try:
     doMain()
-  except KeyboardInterrupt, e:
+  except KeyboardInterrupt as e:
     info(str(e))
     report_event("user", "ctrlc")
     exit(1)
-  except Exception, e:
+  except Exception as e:
     report_exception(e)
     traceback.print_exc()
     exit(1)
