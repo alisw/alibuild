@@ -60,7 +60,7 @@ def deps(recipesDir, topPackage, outFile, buildRequires, transitiveRed, disable)
 
   with NamedTemporaryFile(delete=False) as fp:
     fp.write("digraph {\n")
-    for p,deps in dot.iteritems():
+    for p,deps in list(dot.items()):
       if selected and not p in selected: continue
       fp.write("  \"%s\";\n" % p)
       for d in deps:
