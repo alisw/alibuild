@@ -10,6 +10,8 @@ from alibuild_helpers.log import debug, error, banner, info, logger_handler
 from os.path import exists, expanduser
 from os import unlink
 
+input = getattr(__builtins__, 'raw_input', input)
+
 def generate_analytics_id():
   getstatusoutput("mkdir -p  ~/.config/alibuild")
   err, output = getstatusoutput("uuidgen >  ~/.config/alibuild/analytics-uuid")
@@ -25,7 +27,7 @@ def askForAnalytics():
   banner("In order to improve user experience, aliBuild would like to gather "
          "analytics about your builds.\nYou can find all the details at:\n\n"
          "  https://github.com/alisw/alibuild/blob/master/ANALYTICS.md\n")
-  a = raw_input("Is that ok for you [YES/no]? ")
+  a = input("Is that ok for you [YES/no]? ")
   if a.strip() and a.strip().lower().startswith("n"):
     debug("User requsted disabling analytics.")
     return disable_analytics()
