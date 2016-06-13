@@ -2,12 +2,17 @@
 from __future__ import print_function
 import os, time, re, yaml, hashlib, argparse
 import sys, shutil, subprocess, socket
-from commands import getstatusoutput
+try:
+ from commands import getstatusoutput
+ from urllib2 import urlopen, URLError
+except ImportError:
+  from subprocess import getstatusoutput
+  from urllib.request import urlopen
+  from urllib.error import URLError
 from os.path import basename, dirname, abspath, exists, realpath, join, islink, expanduser
 from os import makedirs, unlink, readlink, getenv, sysconf, rmdir
 from glob import glob
 from datetime import datetime
-from urllib2 import urlopen, URLError
 import ssl
 import json
 import logging

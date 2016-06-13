@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 import subprocess, re, yaml
-from commands import getstatusoutput
+try:
+  from commands import getstatusoutput
+except ImportError:
+  from subprocess import getstatusoutput
 from os.path import dirname, exists
 import platform
 

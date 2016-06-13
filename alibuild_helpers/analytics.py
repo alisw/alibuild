@@ -1,7 +1,11 @@
 #!/usr/bin/env python
 import os, subprocess, sys
-from commands import getstatusoutput
-from urllib import urlopen
+try:
+  from commands import getstatusoutput
+  from urllib import urlopen
+except ImportError:
+  from subprocess import getstatusoutput
+  from urllib.request import urlopen
 from alibuild_helpers.log import debug, error, banner, info, logger_handler
 from os.path import exists, expanduser
 from os import unlink
