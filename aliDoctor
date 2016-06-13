@@ -4,7 +4,10 @@ import os, re
 from os.path import exists, abspath, expanduser
 from glob import glob
 import yaml
-from commands import getstatusoutput
+try:
+  from commands import getstatusoutput
+except ImportError:
+  from subprocess import getstatusoutput
 import logging
 from alibuild_helpers.log import debug, error, banner, info, success, warning
 from alibuild_helpers.log import logger_handler, logger, LogFormatter, ProgressPrint
