@@ -12,7 +12,7 @@ def format(s, **kwds):
   return s % kwds
 
 def execute(command):
-  popen = Popen(command, shell=(isinstance(command, basestring)), stdout=PIPE, stderr=STDOUT)
+  popen = Popen(command, shell=(isinstance(command, str)), stdout=PIPE, stderr=STDOUT)
   linesIterator = iter(popen.stdout.readline, "")
   for line in linesIterator:
     debug(line.strip("\n"))  # yield line
@@ -60,7 +60,7 @@ def deps(recipesDir, topPackage, outFile, buildRequires, transitiveRed, disable)
 
   with NamedTemporaryFile(delete=False) as fp:
     fp.write("digraph {\n")
-    for p,deps in dot.iteritems():
+    for p,deps in list(dot.items()):
       if selected and not p in selected: continue
       fp.write("  \"%s\";\n" % p)
       for d in deps:

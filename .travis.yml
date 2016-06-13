@@ -1,5 +1,9 @@
 sudo: required
 dist: trusty
+python:
+  - "2.6"
+  - "2.7"
+  - "3.5"
 services:
   - docker
 cache:
@@ -10,6 +14,7 @@ before_install: |
   cd ..
   git clone -b IB/v5-06/next https://github.com/alisw/alidist
 install: |
+    pip install --user pyyaml
     pip install --user codecov
     pip install --user coverage
 script: |

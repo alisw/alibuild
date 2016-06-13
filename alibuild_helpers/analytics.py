@@ -1,7 +1,11 @@
 #!/usr/bin/env python
 import os, subprocess, sys
-from commands import getstatusoutput
-from urllib import urlopen
+try:
+  from commands import getstatusoutput
+  from urllib import urlopen
+except ImportError:
+  from subprocess import getstatusoutput
+  from urllib.request import urlopen
 from alibuild_helpers.log import debug, error, banner, info, logger_handler
 from os.path import exists, expanduser
 from os import unlink
@@ -21,7 +25,10 @@ def askForAnalytics():
   banner("In order to improve user experience, aliBuild would like to gather "
          "analytics about your builds.\nYou can find all the details at:\n\n"
          "  https://github.com/alisw/alibuild/blob/master/ANALYTICS.md\n")
-  a = raw_input("Is that ok for you [YES/no]? ")
+  # raw_input and input are different between python 2 and 3
+  try: input = raw_input
+  except NameError: pass
+  a = input("Is that ok for you [YES/no]? ")
   if a.strip() and a.strip().lower().startswith("n"):
     debug("User requsted disabling analytics.")
     return disable_analytics()
