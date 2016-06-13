@@ -830,7 +830,7 @@ def doMain():
     if spec["package"] in develPkgs and "incremental_recipe" in spec:
       h(spec["incremental_recipe"])
       incremental_hash = hashlib.sha1(spec["incremental_recipe"]).hexdigest()
-      spec["incremental_hash"] = "INCREMENTAL_BUILD_HASH=%s" % incremental_hash
+      spec["incremental_hash"] = incremental_hash
     elif p in develPkgs:
       h(spec.get("devel_hash"))
     spec["hash"] = h.hexdigest()
@@ -1162,34 +1162,20 @@ def doMain():
       develPrefix = args.develPrefix if "develPrefix" in args else develPackageBranch
 
     cmd = format(cmd_raw,
-                 can_delete = args.aggressiveCleanup,
                  dependencies=dependencies,
                  dependenciesInit=dependenciesInit,
                  develPrefix=develPrefix,
-                 develHash=spec.get("devel_hash", ""),
-                 depsHash=spec.get("deps_hash", ""),
                  environment=environment,
                  workDir=workDir,
                  configDir=abspath(args.configDir),
-                 pkgname=spec["package"],
-                 hash=spec["hash"],
-                 incremental_hash=spec.get("incremental_hash", ""),
                  incremental_recipe=spec.get("incremental_recipe", ":"),
-                 version=spec["version"],
-                 revision=spec["revision"],
-                 architecture=args.architecture,
-                 jobs=args.jobs,
                  sourceDir=source and (dirname(source) + "/") or "",
                  sourceName=source and basename(source) or "",
-                 write_repo=spec.get("write_repo", source),
-                 tag=spec["tag"],
-                 commit_hash=commit_hash,
                  referenceStatement=referenceStatement,
-                 cachedTarball=cachedTarball,
                  requires=" ".join(spec["requires"]),
                  build_requires=" ".join(spec["build_requires"]),
-                 runtime_requires=" ".join(spec["runtime_requires"]),
-                 gzip=gzip())
+                 runtime_requires=" ".join(spec["runtime_requires"])
+                )
 
     commonPath = "%s/%%s/%s/%s/%s-%s" % (workDir,
                                          args.architecture,
@@ -1205,6 +1191,32 @@ def doMain():
     banner("Building %s@%s" % (spec["package"],
                                args.develPrefix if "develPrefix" in args and spec["package"]  in develPkgs
                                                 else spec["version"]))
+    # Define the environment so that it can be passed up to the
+    # actual build script
+    buildEnvironment = [
+      ("ARCHITECTURE", args.architecture),
+      ("BUILD_REQUIRES", " ".join(spec["build_requires"])),
+      ("CACHED_TARBALL", cachedTarball),
+      ("CAN_DELETE", args.aggressiveCleanup and "1" or ""),
+      ("COMMIT_HASH", commit_hash),
+      ("DEPS_HASH", spec.get("deps_hash", "")),
+      ("DEVEL_HASH", spec.get("devel_hash", "")),
+      ("DEVEL_PREFIX", develPrefix),
+      ("GIT_TAG", spec["tag"]),
+      ("MY_GZIP", gzip()),
+      ("INCREMENTAL_BUILD_HASH", spec.get("incremental_hash", "0")),
+      ("JOBS", args.jobs),
+      ("PKGHASH", spec["hash"]),
+      ("PKGNAME", spec["package"]),
+      ("PKGREVISION", spec["revision"]),
+      ("PKGVERSION", spec["version"]),
+      ("REQUIRES", " ".join(spec["requires"])),
+      ("RUNTIME_REQUIRES", " ".join(spec["runtime_requires"])),
+      ("WRITE_REPO", spec.get("write_repo", source)),
+    ]
+    # Add the extra environment as passed from the command line.
+    for e in [x.split("=", "1") for x in args.environment]:
+      buildEnvironment.append(e)
     # In case the --docker options is passed, we setup a docker container which
     # will perform the actual build. Otherwise build as usual using bash.
     if dockerImage:
@@ -1216,7 +1228,7 @@ def doMain():
 
       for devel in develPkgs:
         develVolumes += " -v $PWD/`readlink %s || echo %s`:/%s:ro " % (devel, devel, devel)
-      for env in args.environment:
+      for env in buildEnvironment:
         additionalEnv = "-e %s" % env
       for volume in args.volumes:
         additionalVolumes = "-v %s" % volume
@@ -1227,27 +1239,26 @@ def doMain():
               " %(develVolumes)s"
               " %(additionalEnv)s"
               " %(additionalVolumes)s"
-              " -e ARCHITECTURE=%(architecture)s"
               " -e GIT_REFERENCE_OVERRIDE=/mirror"
-              " -e JOBS=%(jobs)s"
               " %(overrideSource)s"
               " -e WORK_DIR_OVERRIDE=/sw"
               " %(image)s"
               " /bin/bash -e -x /build.sh",
               additionalEnv=additionalEnv,
               additionalVolumes=additionalVolumes,
-              architecture=args.architecture,
               develVolumes=develVolumes,
               workdir=abspath(args.workDir),
               image=dockerImage,
               mirrorVolume=mirrorVolume,
-              jobs=args.jobs,
               overrideSource=overrideSource,
               scriptDir=scriptDir)
       debug(dockerWrapper)
       err = execute(dockerWrapper)
     else:
       progress = ProgressPrint("%s is being built (use --debug for full output)" % spec["package"])
+      for k,v in buildEnvironment:
+        print (k,v)
+        os.environ[k] = str(v)
       err = execute("/bin/bash -e -x %s/build.sh 2>&1" % scriptDir,
                     printer=debug if args.debug or not sys.stdout.isatty() else progress)
       progress.end("failed" if err else "ok", err)
