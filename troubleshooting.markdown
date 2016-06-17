@@ -259,3 +259,24 @@ Finally, for certain common options, e.g. debug flags, we provide a
 precooked configuration using so called [defaults](user.html#defaults).
 Simply add `--defaults debug` to your aliBuild flags and it will add
 debug flags to all your packages.
+
+### AliPhysics takes very long time to build and builds things like autotools, GCC
+
+In order to build AliPhysics, a number of externals are required,
+including working autotools, boost, and GCC. While aliBuild tries it
+best to reuse whatever comes from the system, it will not complain when
+building unless one of the system dependencies is absolutely required
+(e.g. X11, perl). This might lead to the fact it will rebuild large
+tool, where simply installing them might be a better option. For this
+reason we suggest that users run:
+
+    aliDoctor AliPhysics
+
+in the same path where their `alidist` folder is, before actually
+starting to build, so that they can get an overview of what will be
+picked up from the system and what not.
+
+Notice that if you change (either add or remove) your set of system
+dependencies, aliBuild will trigger a rebuild of whatever depends on
+them, taking additional time, so make sure you do this when not pressed
+for a deadline.
