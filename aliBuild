@@ -307,6 +307,9 @@ def prunePaths(workDir):
       continue
     workDirEscaped = re.escape("%s" % workDir) + "[^:]*:?"
     os.environ[x] = re.sub(workDirEscaped, "", os.environ[x])
+  for x in list(os.environ.keys()):
+    if x.endswith("_VERSION") and x != "ALIBUILD_VERSION":
+      os.environ.pop(x)
 
 def doMain():
   os.environ["LANG"] = "C"
