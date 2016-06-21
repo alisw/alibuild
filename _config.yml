@@ -10,13 +10,16 @@ menu:
   -
     name: extra.html
     label: EXTRA TOOLS
-  - 
+  -
     name: reference.html
     label: REFERENCE
   -
     name: troubleshooting.html
     label: TROUBLESHOOTING
-defaults: 
+  -
+    name: tutorial.html
+    label: TUTORIAL
+defaults:
   -
     scope:
       path: "basic/"
