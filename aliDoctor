@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import argparse
 import os, re
-from os.path import exists, abspath
+from os.path import exists, abspath, expanduser
 from glob import glob
 import yaml
 from commands import getstatusoutput
@@ -105,6 +105,11 @@ if __name__ == "__main__":
 
   prunePaths(abspath(args.workDir))
 
+  if exists(expanduser("~/.rootlogon.C")):
+    warning("You have a ~/.rootlogon.C notice that this might"
+            " interphere with your environment in hidden ways.\n"
+            "Please review it an make sure you are not force loading any library"
+            " which might interphere with the rest of the setup.")
   # Decide if we can use homebrew. If not, we replace it with "true" so
   # that we do not get spurious messages on linux
   homebrew_replacement = ""
