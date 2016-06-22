@@ -208,11 +208,12 @@ else
 fi
 
 export MODULEPATH="$WORK_DIR/MODULES/$ARCHITECTURE:$MODULEPATH"
+IGNORE_ERR="Unable to locate a modulefile for 'Toolchain/"
 case "$ACTION" in
   enter)
     MODULES=$(normModules "${ARGS[@]}")
     existModules $MODULES
-    eval $($MODULECMD bash add $MODULES)
+    eval $($MODULECMD bash add $MODULES 2> >(grep -v "$IGNORE_ERR" >&2))
     if [[ ! -z "$CLEAN_ENV" ]]; then
       case $MODULES_SHELL in
         sh|bash) export PS1="[$MODULES]"' \w $> '   ;;
@@ -230,13 +231,14 @@ case "$ACTION" in
     MODULES=$(normModules "${ARGS[@]}")
     [[ $ACTION == load ]] && existModules $MODULES
     [[ $VERBOSE == 1 ]] && printf "\033[36mUse \033[35malienv list\033[36m to list loaded modules.\033[m\n" >&2
-    exec $MODULECMD $MODULES_SHELL $ACTION $MODULES
+    $MODULECMD $MODULES_SHELL $ACTION $MODULES 2> >(grep -v "$IGNORE_ERR" >&2)
+    exit 0
   ;;
   setenv)
     [[ -z "${COMMAND_IN_ENV[*]}" ]] && { printHelp "No command specified with -c"; false; }
     MODULES=$(normModules "${ARGS[@]}")
     existModules $MODULES
-    eval $($MODULECMD bash add $MODULES)
+    eval $($MODULECMD bash add $MODULES 2> >(grep -v "$IGNORE_ERR" >&2))
     exec "${COMMAND_IN_ENV[@]}"
   ;;
   q|query)
