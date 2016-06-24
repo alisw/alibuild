@@ -311,6 +311,41 @@ def prunePaths(workDir):
     if x.endswith("_VERSION") and x != "ALIBUILD_VERSION":
       os.environ.pop(x)
 
+class SpecError(Exception):
+  pass
+
+def validateSpec(spec):
+  if not spec:
+    raise SpecError("Empty recipe.")
+  if type(spec) != dict:
+    raise SpecError("Not a YAML key / value.")
+  if not "package" in spec:
+    raise SpecError("Missing package field in header.")
+
+
+def parseRecipe(filename):
+  try:
+    d = open(filename).read()
+  except IOError as e:
+    dieOnError(True, str(e))
+  try:
+    header,recipe = d.split("---", 1)
+    spec = yaml.safe_load(header)
+    validateSpec(spec)
+  except SpecError, e:
+    error(("Malformed header for %s\n" + str(e)) % filename)
+    exit(1)
+  except yaml.scanner.ScannerError, e:
+    error(("Unable to parse %s\n" + str(e)) % filename)
+    exit(1)
+  except yaml.parser.ParserError, e:
+    error(("Unable to parse %s\n" + str(e)) % filename)
+    exit(1)
+  except ValueError, e:
+    error("Unable to parse %s. Header missing." % filename)
+    exit(1)
+  return (spec, recipe)
+
 def doMain():
   os.environ["LANG"] = "C"
   os.environ["LC_ALL"] = "C"
@@ -450,12 +485,8 @@ def doMain():
                  "package": basename(args.configDir), "version": None }
         dest = args.configDir
       else:
-        try:
-          d = open("%s/%s.sh" % (args.configDir, p["name"].lower())).read()
-        except IOError,e:
-          dieOnError(True, str(e))
-        header,_ = d.split("---", 1)
-        spec = yaml.safe_load(header)
+        filename = "%s/%s.sh" % (args.configDir, p["name"].lower())
+        spec,_ = parseRecipe(filename)
         dest = join(setdir, spec["package"])
       writeRepo = spec.get("write_repo", spec.get("source"))
       dieOnError(not writeRepo, "Package %s has no source field and cannot be developed" % spec["package"])
@@ -567,12 +598,8 @@ def doMain():
     p = packages.pop(0)
     if p in specs:
       continue
-    try:
-      d = open("%s/%s.sh" % (args.configDir, p.lower())).read()
-    except IOError,e:
-      dieOnError(True, str(e))
-    header, recipe = d.split("---", 1)
-    spec = yaml.safe_load(header)
+    filename = "%s/%s.sh" % (args.configDir, p.lower())
+    spec, recipe = parseRecipe(filename)
     dieOnError(spec["package"].lower() != p.lower(),
                "%s.sh has different package field: %s" % (p, spec["package"]))
     # If --always-prefer-system is passed or if prefer_system is set to true
