@@ -112,6 +112,9 @@ Once you have your area setup, you can start the build of the software via
     cd $HOME/alice
     aliBuild build AliPhysics
 
+Notice that aliBuild automatically takes care of dependencies, so you
+only need to specify the toplevel package.
+
 Depending on your setup, this should take between 30 minutes to 1 hour
 on reasonably modern hardware. If it takes more, you might want to read
 again the previous step and try to fix more warnings.
@@ -125,9 +128,12 @@ where architecture is a string identifying your OS, most likely
 `osx_x86-64` if you are running on Mac or `ubuntu1404_x86-64` if you are
 on the Long Term Support Ubuntu 14.04.
 
-Notice that while you can use the `aliBuild build ` command as many
-time as you want, you can also do it only once and then do subsequent
-rebuilds by doing:
+Notice that while you can use the
+
+    aliBuild build AliPhysics
+
+command as many times as you want. However, you can also do it just once
+and then do subsequent rebuilds by doing:
 
     cd sw/BUILD/AliPhysics-latest/AliPhysics
 
@@ -137,7 +143,11 @@ and then invoking by hand:
 
 as you would normally do without aliBuild. This means you can simply use
 `aliBuild` to setup your area once and then build by hand. This approach
-has the advantage of being slightly faster under normal conditions.
+has the advantage of being slightly faster under normal conditions. The
+`-j10` option simply specifies how many parallel processes should be
+used for the build. This should be roughly twice the amount of available
+cores on your machine and `-j10` is a reasonably safe default on modern
+hardware.
 
 # Setting up the environment and using the builds
 
