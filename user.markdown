@@ -247,3 +247,15 @@ ever build for a given development package you can use the
 
 subcommand which will do its best to clean up your build and
 installation area.
+
+## Upgrading aliBuild
+
+aliBuild is installed via `pip`. In order to upgrade it on most laptops (in
+particular Macs) do:
+
+    pip install --upgrade alibuild
+
+or in case you need to be root (_e.g._ on Ubuntu and most Linux distributions
+for convenience):
+
+    sudo pip install --upgrade alibuild
