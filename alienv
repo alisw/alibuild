@@ -147,7 +147,7 @@ alienv() {
   fi
   ALICE_ALIENV__="$ALICE_ALIENV"
   if test -z "$ALICE_ALIENV__"; then
-    ALICE_ALIENV__=`unset alienv; type -p alienv 2> /dev/null`
+    ALICE_ALIENV__=`unset alienv; export LC_ALL=C; export LANG=C; type -p alienv | sed -e 's/^alienv is //g' 2> /dev/null`
     test -z "$ALICE_ALIENV__" && ALICE_ALIENV__="$ALICE_WORK_DIR/../alibuild/alienv"
   fi
   for A in "$@"; do
