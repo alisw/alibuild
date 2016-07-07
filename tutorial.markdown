@@ -120,9 +120,9 @@ on reasonably modern hardware. If it takes more, you might want to read
 again the previous step and try to fix more warnings.
 
 Once the build is completed you should get a message and you should be back
-at the prompt. You should have AliPhysics installed in:
+at the prompt. You should have AliPhysics installed under:
 
-    sw/<architecture>/AliPhysics/latest
+    $HOME/alice/sw/<architecture>/AliPhysics/latest
 
 where architecture is a string identifying your OS, most likely
 `osx_x86-64` if you are running on Mac or `ubuntu1404_x86-64` if you are
@@ -135,7 +135,7 @@ Notice that while you can use the
 command as many times as you want. However, you can also do it just once
 and then do subsequent rebuilds by doing:
 
-    cd sw/BUILD/AliPhysics-latest/AliPhysics
+    cd $HOME/alice/sw/BUILD/AliPhysics-latest/AliPhysics
 
 and then invoking by hand:
 
@@ -164,3 +164,10 @@ Alternatively you can use:
     alienv enter AliPhysics/latest
 
 to launch a new shell which will have the correct environment.
+
+Within the AliPhysics environment you have access to `root`, `aliroot` and all
+the AliPhysics libraries, which allow you to run your analyses. You can also run
+the library loading test by running:
+
+    cd $HOME/alice/sw/BUILD/AliPhysics-latest/AliPhysics
+    ctest
