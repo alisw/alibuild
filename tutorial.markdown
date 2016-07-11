@@ -151,12 +151,19 @@ hardware.
 
 # Setting up the environment and using the builds
 
-Once you have a complete installation of AliPhysics, you can use it by
-doing:
+Once you have a complete installation of AliPhysics, you can use it via
+`alienv`, just like on lxplus.
 
-    eval $(alienv load AliPhysics/latest)
+To do so, you need to add to your `.bashrc` the `alienv` alias by
+appending the line:
 
-This will setup your environment so that `aliroot` and all the required
+    ALICE_WORK_DIR=$HOME/alice/sw; eval "`alienv shell-helper`"
+
+You can then open a new shell and use:
+
+    alienv load AliPhysics/latest
+
+to setup your environment so that `aliroot` and all the required
 libraries are correctly picked up.
 
 Alternatively you can use:
