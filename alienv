@@ -184,6 +184,11 @@ WORK_DIR=$(cd "$WORK_DIR"; pwd)
 MODULECMD=$(PATH="$PATH:`brew --prefix modules 2>/dev/null || true`/Modules/bin" which modulecmd || true)
 [[ -z "$MODULECMD" ]] && { installHint; false; }
 
+if [[ -d $WORK_DIR/MODULES/$ARCHITECTURE ]]; then
+  touch $WORK_DIR/MODULES/$ARCHITECTURE/.testwrite 2> /dev/null || NO_REFRESH=1
+  rm -f $WORK_DIR/MODULES/$ARCHITECTURE/.testwrite 2> /dev/null || true
+fi
+
 if [[ -z "$NO_REFRESH" ]]; then
   # Collect all modulefiles in one place
   rm -rf $WORK_DIR/MODULES/$ARCHITECTURE
