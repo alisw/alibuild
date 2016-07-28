@@ -64,6 +64,8 @@ def detectArch():
     platformTuple = platform.dist()
     platformSystem = platform.system()
     platformProcessor = platform.processor()
+    if " " in platformProcessor:
+      platformProcessor = platform.machine()
     return doDetectArch(hasOsRelease, osReleaseLines, platformTuple, platformSystem, platformProcessor)
   except:
     return None
