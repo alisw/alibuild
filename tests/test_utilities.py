@@ -74,6 +74,16 @@ SUPPORT_URL="http://www.debian.org/support"
 BUG_REPORT_URL="https://bugs.debian.org/"
 """
 
+SABAYON2_OS_RELEASE = """
+NAME=Sabayon
+ID=sabayon
+PRETTY_NAME="Sabayon/Linux"
+ANSI_COLOR="1;32"
+HOME_URL="http://www.sabayon.org/"
+SUPPORT_URL="http://forum.sabayon.org/"
+BUG_REPORT_URL="https://bugs.sabayon.org/"
+"""
+
 architecturePayloads = [
   ['osx_x86-64', False, [], ('','',''), 'Darwin', 'x86-64'],
   ['slc5_x86-64', False, [], ('redhat', '5.XX', 'Boron'), 'Linux', 'x86-64'],
@@ -87,7 +97,8 @@ architecturePayloads = [
   ['ubuntu1404_x86-64', True, UBUNTU_1404_OS_RELEASE.split("\n"), ('', '', ''), 'Linux', 'x86-64'],
   ['ubuntu1404_x86-64', True, LINUX_MINT_OS_RELEASE.split("\n"), ('LinuxMint', '17.3', 'rosa'), 'Linux', 'x86-64'], # LinuxMint
   ['ubuntu1204_x86-64', True, DEBIAN_7_OS_RELEASE.split("\n"), ('Debian', '7', 'wheezy'), 'Linux', 'x86-64'],
-  ['ubuntu1404_x86-64', True, DEBIAN_8_OS_RELEASE.split("\n"), ('Debian', '8', 'jessie'), 'Linux', 'x86-64']
+  ['ubuntu1404_x86-64', True, DEBIAN_8_OS_RELEASE.split("\n"), ('Debian', '8', 'jessie'), 'Linux', 'x86-64'],
+  ['sabayon2_x86-64', True, SABAYON2_OS_RELEASE.split("\n"), ('gentoo', '2.2', ''), 'Linux', 'x86_64']
 ]
 
 class TestArchitectures(unittest.TestCase):
