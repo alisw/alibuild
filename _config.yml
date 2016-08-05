@@ -18,7 +18,10 @@ menu:
     label: TROUBLESHOOTING
   -
     name: tutorial.html
-    label: TUTORIAL
+    label: TUTORIAL (AliPhysics)
+  -
+    name: o2-tutorial.html
+    label: TUTORIAL (O2)
 defaults:
   -
     scope:
