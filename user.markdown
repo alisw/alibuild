@@ -196,10 +196,34 @@ If you want to add your own default, you should at least provide:
 - **LDFLAGS**: the LDFLAGS tos use
 - **CMAKE_BUILD_TYPE**: the build type which needs to be used by cmake projects
 
+Besides specifying extra global variables, starting from aliBuild
+1.4.0, it's also possible to use defaults to override metadata of other
+packages . This is done by specifying the `overrides` dictionary in the
+metadata of your defaults file. For example to switch between ROOT6 and
+ROOT5 you should do something like:
+
+    ...
+    overrides:
+      ROOT:
+        version: "v6-06-04"
+        tag: "v6-06-04"
+    ...
+
+this will replace the `version` and `tag` metadata of `root.sh` with the
+one specified in the override. For a more complete example see
+[defaults-o2.sh](https://github.com/alisw/alidist/blob/IB/v5-08/next/defaults-o2.sh).
+
 ## Disabling packages
 
 You can optionally disable certain packages by specifying them as a comma
 separated list with the `--disable` option.
+
+Moreover, starting from aliBuild 1.4.0, it will also be
+possible to disable packages by adding them to the `disable`
+keyword of your defaults file (see previous paragraph). See the
+[defaults-o2.sh](https://github.com/alisw/alidist/blob/IB/v5-08/next/defaults-o2.sh)
+file for an example of how to disable `AliEn-Runtime` and `AliRoot`
+when passing `--defaults o2`.
 
 ## Controlling which system packages are picked up
 
