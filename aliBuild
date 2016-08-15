@@ -563,7 +563,6 @@ def doMain():
   workDir = abspath(args.workDir)
   prunePaths(workDir)
 
-
   if not exists(args.configDir):
     err = execute(format(
                     "git clone https://github.com/%(repo)s%(branch)s %(cd)s",
@@ -578,12 +577,29 @@ def doMain():
   if "develPrefix" in args and args.develPrefix == None:
     args.develPrefix = basename(dirname(abspath(args.configDir)))
 
-  if not exists("%s/defaults-%s.sh" % (args.configDir, args.defaults)):
+  defaultsFilename = "%s/defaults-%s.sh" % (args.configDir, args.defaults)
+  if not exists(defaultsFilename):
     viableDefaults = ["- " + basename(x).replace("defaults-","").replace(".sh", "")
                       for x in glob("%s/defaults-*.sh" % args.configDir)]
     parser.error(format("Default `%(d)s' does not exists. Viable options:\n%(v)s",
                  d=args.defaults or "<no defaults specified>",
                  v="\n".join(viableDefaults)))
+
+  # Defaults are actually special packages. They can override metadata
+  # of any other package and they can disable other packages. For
+  # example they could decide to switch from ROOT 5 to ROOT 6 and they
+  # could disable alien for O2. For this reason we need to parse their
+  # metadata early and extract the override and disable data.
+  defaultsMeta, defaultsBody = parseRecipe(defaultsFilename)
+  for x in defaultsMeta.get("disable", []):
+    debug("Package %s has beed disable by the current default." % x)
+  args.disable.extend(defaultsMeta.get("disable", []))
+  if type(defaultsMeta.get("overrides", {})) != dict:
+    error("overrides should be a dictionary")
+    exit(1)
+  overrides = {}
+  for k, v in defaultsMeta.get("overrides", {}).items():
+    overrides[k.lower()] = v
 
   specDir = "%s/SPECS" % workDir
   if not exists(specDir):
@@ -610,6 +626,13 @@ def doMain():
     spec, recipe = parseRecipe(filename)
     dieOnError(spec["package"].lower() != p.lower(),
                "%s.sh has different package field: %s" % (p, spec["package"]))
+
+    # If the package has overrides, we apply them.
+    lowerPkg = spec["package"].lower()
+    if lowerPkg in overrides:
+      debug("Overrides for package %s: %s" % (spec["package"], overrides[lowerPkg]))
+      spec.update(overrides.get(lowerPkg, {}))
+
     # If --always-prefer-system is passed or if prefer_system is set to true
     # inside the recipe, use the script specified in the prefer_system_check
     # stanza to see if we can use the system version of the package.
@@ -663,7 +686,7 @@ def doMain():
     banner("The following packages cannot be taken from the system and will be built:\n  %s" %
            ", ".join(ownPackages))
 
-  # Do topological sort to have the correct build order even in the 
+  # Do topological sort to have the correct build order even in the
   # case of non-tree like dependencies..
   # The actual algorith used can be found at:
   #
@@ -704,7 +727,7 @@ def doMain():
 
   if buildOrder:
     banner("Packages will be built in the following order:\n - %s" %
-           "\n - ".join([ x+" (development package)" if x in develPkgs else x for x in buildOrder ]))
+           "\n - ".join([ x+" (development package)" if x in develPkgs else "%s@%s" % (x, specs[x]["tag"]) for x in buildOrder ]))
 
   if develPkgs:
     banner(format("You have packages in development mode.\n"
@@ -885,7 +908,6 @@ def doMain():
 
   debug("We will build packages in the following order: %s" % " ".join(buildOrder))
   if args.dryRun:
-    info("We will build packages in the following order: %s" % " ".join(buildOrder))
     info("--dry-run / -n specified. Not building.")
     exit(0)
 
