@@ -592,7 +592,7 @@ def doMain():
   # metadata early and extract the override and disable data.
   defaultsMeta, defaultsBody = parseRecipe(defaultsFilename)
   for x in defaultsMeta.get("disable", []):
-    debug("Package %s has beed disable by the current default." % x)
+    debug("Package %s has been disabled by current default." % x)
   args.disable.extend(defaultsMeta.get("disable", []))
   if type(defaultsMeta.get("overrides", {})) != dict:
     error("overrides should be a dictionary")
@@ -645,7 +645,7 @@ def doMain():
       else:
         ownPackages.update([spec["package"]])
 
-    dieOnError(("system_requirement" in spec) and recipe.strip("\n\t "), 
+    dieOnError(("system_requirement" in spec) and recipe.strip("\n\t "),
                "System requirements %s cannot have a recipe" % spec["package"])
     if re.match(spec.get("system_requirement", "(?!.*)"), args.architecture):
       cmd = spec.get("system_requirement_check", "false")
@@ -660,7 +660,7 @@ def doMain():
     # For the moment we treat build_requires just as requires.
     fn = lambda what: filterByArchitecture(args.architecture, spec.get(what, []))
     spec["requires"] = [x for x in fn("requires") if not x in args.disable]
-    spec["build_requires"] = [x for x in fn("build_requires") if not x in args.disable] 
+    spec["build_requires"] = [x for x in fn("build_requires") if not x in args.disable]
     if spec["package"] != "defaults-" + args.defaults:
       spec["build_requires"].append("defaults-" + args.defaults)
     spec["runtime_requires"] = spec["requires"]
@@ -758,7 +758,7 @@ def doMain():
       spec["tag"] = format(spec["tag"], **nowKwds)
       # By default we assume tag is a commit hash. We then try to find
       # out if the tag is actually a branch and we use the tip of the branch
-      # as commit_hash. Finally if the package is a development one, we use the 
+      # as commit_hash. Finally if the package is a development one, we use the
       # name of the branch as commit_hash.
       spec["commit_hash"] = spec["tag"]
       for l in out.split("\n"):
@@ -1015,8 +1015,8 @@ def doMain():
 
     # Now that we have all the information about the package we want to build, let's
     # check if it wasn't built / unpacked already.
-    hashFile = "%s/%s/%s/%s-%s/.build-hash" % (workDir, 
-                                               args.architecture, 
+    hashFile = "%s/%s/%s/%s-%s/.build-hash" % (workDir,
+                                               args.architecture,
                                                spec["package"],
                                                spec["version"],
                                                spec["revision"])
@@ -1050,7 +1050,7 @@ def doMain():
       # assuming the package is not a development one. We also can
       # delete the SOURCES in case we have aggressive-cleanup enabled.
       if not spec["package"] in develPkgs and args.autoCleanup:
-        cleanupDirs = [format("%(w)s/BUILD/%(h)s", 
+        cleanupDirs = [format("%(w)s/BUILD/%(h)s",
                               w=workDir,
                               h=spec["hash"]),
                        format("%(w)s/INSTALLROOT/%(h)s",
