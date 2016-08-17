@@ -6,6 +6,7 @@ except ImportError:
   from subprocess import getstatusoutput
 from os.path import dirname, exists
 import platform
+import base64
 
 def format(s, **kwds):
   return s % kwds
@@ -157,3 +158,11 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
     specs[spec["package"]] = spec
     packages += spec["requires"]
   return (systemPackages, ownPackages, failedRequirements)
+
+def dockerStatusOutput(cmd, dockerImage=None):
+  if dockerImage:
+    DOCKER_WRAPPER = """docker run %(di)s bash -c 'eval "$(echo %(c)s | base64 --decode)"'"""
+    cmd = format(DOCKER_WRAPPER,
+                 di=dockerImage,
+                 c=base64.b64encode(cmd))
+  return getstatusoutput(cmd)
