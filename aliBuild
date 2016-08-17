@@ -3,8 +3,8 @@ from __future__ import print_function
 import os, time, re, yaml, hashlib, argparse
 import sys, shutil, subprocess, socket
 try:
- from commands import getstatusoutput
- from urllib2 import urlopen, URLError
+  from commands import getstatusoutput
+  from urllib2 import urlopen, URLError
 except ImportError:
   from subprocess import getstatusoutput
   from urllib.request import urlopen
@@ -18,7 +18,7 @@ import json
 import logging
 from alibuild_helpers.log import debug, error, warning, banner, info
 from alibuild_helpers.log import logger_handler, logger, LogFormatter, ProgressPrint, riemannStream
-from alibuild_helpers.utilities import format, getVersion, detectArch
+from alibuild_helpers.utilities import format, getVersion, detectArch, dockerStatusOutput
 from alibuild_helpers.analytics import decideAnalytics, askForAnalytics, report_screenview, report_exception, report_event
 from alibuild_helpers.analytics import enable_analytics, disable_analytics
 import traceback
@@ -637,8 +637,8 @@ def doMain():
     # inside the recipe, use the script specified in the prefer_system_check
     # stanza to see if we can use the system version of the package.
     if not args.noSystem and (args.preferSystem or re.match(spec.get("prefer_system", "(?!.*)"), args.architecture)):
-      cmd = spec.get("prefer_system_check", "false")
-      err, output = getstatusoutput(cmd.strip())
+      cmd = spec.get("prefer_system_check", "false").strip()
+      err, output = dockerStatusOutput(cmd, dockerImage)
       if not err:
         systemPackages.update([spec["package"]])
         args.disable.append(spec["package"])
@@ -649,7 +649,7 @@ def doMain():
                "System requirements %s cannot have a recipe" % spec["package"])
     if re.match(spec.get("system_requirement", "(?!.*)"), args.architecture):
       cmd = spec.get("system_requirement_check", "false")
-      err, output = getstatusoutput(cmd.strip())
+      err, output = dockerStatusOutput(cmd.strip(), dockerImage)
       dieOnError(err, spec.get("system_requirement_missing",
                                "%s not found on system" % spec["package"]))
       args.disable.append(spec["package"])
@@ -1257,9 +1257,9 @@ def doMain():
       for devel in develPkgs:
         develVolumes += " -v $PWD/`readlink %s || echo %s`:/%s:ro " % (devel, devel, devel)
       for env in buildEnvironment:
-        additionalEnv = "-e %s=%s" % env
+        additionalEnv += " -e %s=%s " % env
       for volume in args.volumes:
-        additionalVolumes = "-v %s" % volume
+        additionalVolumes += " -v %s " % volume
       dockerWrapper = format("docker run --rm -it"
               " -v %(workdir)s:/sw"
               " -v %(scriptDir)s/build.sh:/build.sh:ro"
