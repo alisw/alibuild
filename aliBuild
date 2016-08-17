@@ -364,6 +364,8 @@ def doMain():
   parser.add_argument("--no-local", dest="noDevel", default=[],
                       help="Do not pick up the following packages from a local checkout.")
   parser.add_argument("--docker", dest="docker", action="store_true", default=False)
+  parser.add_argument("--docker-image", dest="dockerImage",
+                      help="Image to use in case you build with docker (implies --docker-image)")
   parser.add_argument("--work-dir", "-w", dest="workDir", default="sw")
   parser.add_argument("--architecture", "-a", dest="architecture",
                       default=detectArch())
@@ -436,6 +438,9 @@ def doMain():
   if args.preferSystem and args.noSystem:
     parser.error("choose either --always-prefer-system or --no-system")
 
+  if args.dockerImage:
+    args.docker = True
+
   if args.docker and args.architecture.startswith("osx"):
     parser.error("cannot use `-a %s` and --docker" % args.architecture)
 
@@ -446,10 +451,11 @@ def doMain():
 
   logger.setLevel(logging.DEBUG if args.debug else logging.INFO)
 
-  # The docker image is given by the first part of the architecture we want to
-  # build for.
-  dockerImage = ""
-  if args.docker:
+  # If specified, used the docker image requested, otherwise, if running
+  # in docker the docker image is given by the first part of the
+  # architecture we want to build for.
+  dockerImage = args.dockerImage if "dockerImage" in args else ""
+  if args.docker and not dockerImage:
     dockerImage = "alisw/%s-builder" % args.architecture.split("_")[0]
 
   dieOnError(args.remoteStore.endswith("::rw") and args.writeStore,
@@ -576,6 +582,9 @@ def doMain():
 
   if "develPrefix" in args and args.develPrefix == None:
     args.develPrefix = basename(dirname(abspath(args.configDir)))
+
+  if dockerImage:
+    args.develPrefix = "%s-%s" % (args.develPrefix, args.architecture) if "develPrefix" in args else args.architecture
 
   defaultsFilename = "%s/defaults-%s.sh" % (args.configDir, args.defaults)
   if not exists(defaultsFilename):
