@@ -1266,7 +1266,7 @@ def doMain():
       for devel in develPkgs:
         develVolumes += " -v $PWD/`readlink %s || echo %s`:/%s:ro " % (devel, devel, devel)
       for env in buildEnvironment:
-        additionalEnv += " -e %s=%s " % env
+        additionalEnv += " -e %s='%s' " % env
       for volume in args.volumes:
         additionalVolumes += " -v %s " % volume
       dockerWrapper = format("docker run --rm -it"
