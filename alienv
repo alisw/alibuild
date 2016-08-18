@@ -114,6 +114,9 @@ function existModules() {
   done
 }
 
+ARCHITECTURE=
+WORK_DIR=
+NO_REFRESH=
 DEFAULT_WORK_DIRS=( sw ../sw )
 ARGS=()
 COMMAND_IN_ENV=()
