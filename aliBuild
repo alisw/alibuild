@@ -329,11 +329,22 @@ def validateSpec(spec):
     raise SpecError("Missing package field in header.")
 
 
-def parseRecipe(filename):
-  try:
-    d = open(filename).read()
-  except IOError as e:
-    dieOnError(True, str(e))
+def parseRecipe(filename, distdir=None):
+  m = re.search(r'^dist:(.*)@([^@]+)$', filename)
+  if m:
+    fn,gh = m.groups()
+    err,d = getstatusoutput(format("GIT_DIR=%(dist)s/.git git show %(gh)s:%(fn)s.sh",
+                                   dist=distdir, gh=gh, fn=fn.lower()))
+    dieOnError(err, format("Cannot read recipe %(fn)s from reference %(gh)s.\n" +
+                           "Make sure you run first (this will not alter your recipes):\n" +
+                           "  cd %(dist)s && git remote update -p && git fetch --tags",
+                           dist=distdir, gh=gh, fn=fn))
+    warning("Overriding %s from reference %s" % (fn,gh))
+  else:
+    try:
+      d = open(filename).read()
+    except IOError as e:
+      dieOnError(True, str(e))
   try:
     header,recipe = d.split("---", 1)
     spec = yaml.safe_load(header)
@@ -607,8 +618,12 @@ def doMain():
     error("overrides should be a dictionary")
     exit(1)
   overrides = {}
+  taps = {}
   for k, v in defaultsMeta.get("overrides", {}).items():
-    overrides[k.lower()] = v
+    f = k.split("@", 1)[0].lower()
+    if "@" in k:
+      taps[f] = "dist:"+k
+    overrides[f] = v
 
   specDir = "%s/SPECS" % workDir
   if not exists(specDir):
@@ -631,16 +646,16 @@ def doMain():
     p = packages.pop(0)
     if p in specs:
       continue
-    filename = "%s/%s.sh" % (args.configDir, p.lower())
-    spec, recipe = parseRecipe(filename)
-    dieOnError(spec["package"].lower() != p.lower(),
+    lowerPkg = p.lower()
+    filename = taps.get(lowerPkg, "%s/%s.sh" % (args.configDir, lowerPkg))
+    spec, recipe = parseRecipe(filename, args.configDir)
+    dieOnError(spec["package"].lower() != lowerPkg,
                "%s.sh has different package field: %s" % (p, spec["package"]))
 
     # If the package has overrides, we apply them.
-    lowerPkg = spec["package"].lower()
     if lowerPkg in overrides:
       debug("Overrides for package %s: %s" % (spec["package"], overrides[lowerPkg]))
-      spec.update(overrides.get(lowerPkg, {}))
+      spec.update(overrides.get(lowerPkg, {}) or {})
 
     # If --always-prefer-system is passed or if prefer_system is set to true
     # inside the recipe, use the script specified in the prefer_system_check
