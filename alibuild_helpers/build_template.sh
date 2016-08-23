@@ -192,9 +192,12 @@ cd "$WORK_DIR"
 tar xzf "$WORK_DIR/TARS/$HASH_PATH/$PACKAGE_WITH_REV"
 [ "X$CAN_DELETE" = X1 ] && rm "$WORK_DIR/TARS/$HASH_PATH/$PACKAGE_WITH_REV"
 bash -ex "$ARCHITECTURE/$PKGNAME/$PKGVERSION-$PKGREVISION/relocate-me.sh"
+# Last package built gets a "latest" mark.
 ln -snf $PKGVERSION-$PKGREVISION $ARCHITECTURE/$PKGNAME/latest
-if [[ $DEVEL_PREFIX ]]; then
-  ln -snf $PKGVERSION-$PKGREVISION $ARCHITECTURE/$PKGNAME/latest-$DEVEL_PREFIX
+
+# Latest package built for a given devel prefix gets latest-$BUILD_FAMILY
+if [[ $BUILD_FAMILY ]]; then
+  ln -snf $PKGVERSION-$PKGREVISION $ARCHITECTURE/$PKGNAME/latest-$BUILD_FAMILY
 fi
 
 # Mark the build as successful with a placeholder. Allows running incremental

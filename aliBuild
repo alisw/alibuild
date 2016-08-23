@@ -1000,6 +1000,27 @@ def doMain():
     # - Use the latest number in the version, to decide its revision
     debug("Packages already built using this version\n%s" % "\n".join(packages))
     busyRevisions = []
+
+    # Calculate the build_family for the package
+    #
+    # If the package is a devel package, we need to associate it a devel
+    # prefix, either via the -z option or using its checked out branch. This
+    # affects its build hash.
+    #
+    # Moreover we need to define a global "buildFamily" which is used
+    # to tag all the packages incurred in the build, this way we can have
+    # a latest-<buildFamily> link for all of them an we will not incur in the
+    # flip - flopping described in https://github.com/alisw/alibuild/issues/325.
+    develPrefix = ""
+    possibleDevelPrefix = getattr(args, "develPrefix", develPackageBranch)
+    if spec["package"] in develPkgs:
+      develPrefix = possibleDevelPrefix
+
+    if possibleDevelPrefix:
+      spec["build_family"] = "%s-%s" % (possibleDevelPrefix, args.defaults)
+    else:
+      spec["build_family"] = args.defaults
+
     for d in packages:
       realPath = readlink(d)
       matcher = format("../../%(a)s/store/[0-9a-f]{2}/([0-9a-f]*)/%(p)s-%(v)s-([0-9]*).%(a)s.tar.gz",
@@ -1011,6 +1032,7 @@ def doMain():
         continue
       h, revision = m.groups()
       revision = int(revision)
+
       # If we have an hash match, we use the old revision for the package
       # and we do not need to build it.
       if h == spec["hash"]:
@@ -1019,6 +1041,22 @@ def doMain():
           spec["obsolete_tarball"] = d
         else:
           debug("Package %s with hash %s is already found in %s. Not building." % (p, h, d))
+          src = format("%(v)s-%(r)s",
+                       w=workDir,
+                       v=spec["version"],
+                       r=spec["revision"])
+          dst1 = format("%(w)s/%(a)s/%(p)s/latest-%(bf)s",
+                        w=workDir,
+                        a=args.architecture,
+                        p=spec["package"],
+                        bf=spec["build_family"])
+          dst2 = format("%(w)s/%(a)s/%(p)s/latest",
+                        w=workDir,
+                        a=args.architecture,
+                        p=spec["package"])
+
+          getstatusoutput("ln -snf %s %s" % (src, dst1))
+          getstatusoutput("ln -snf %s %s" % (src, dst2))
           info("Using cached build for %s" % p)
         break
       else:
@@ -1209,9 +1247,6 @@ def doMain():
     else:
       cachedTarball = spec["cachedTarball"]
 
-    develPrefix = ""
-    if spec["package"] in develPkgs:
-      develPrefix = args.develPrefix if "develPrefix" in args else develPackageBranch
 
     cmd = format(cmd_raw,
                  dependencies=dependencies,
@@ -1254,6 +1289,7 @@ def doMain():
       ("DEPS_HASH", spec.get("deps_hash", "")),
       ("DEVEL_HASH", spec.get("devel_hash", "")),
       ("DEVEL_PREFIX", develPrefix),
+      ("BUILD_FAMILY", spec["build_family"]),
       ("GIT_TAG", spec["tag"]),
       ("MY_GZIP", gzip()),
       ("INCREMENTAL_BUILD_HASH", spec.get("incremental_hash", "0")),
