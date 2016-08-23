@@ -71,11 +71,11 @@ aliBuild init O2@dev
 ```
 
 Notice that O2 uses the `dev` branch, not the `master` for developments,
-so you should the above will it. If you need to use master simply switch
+so we directly switch to the `dev` branch. If you need to use master simply switch
 `dev` with `master` in the above code.
 
 Once the above command returns, you should have a copy of the current
-master of `O2` in `$HOME/alice` which you can modify at will.
+dev of `O2` in `$HOME/alice` which you can modify at will.
 
 Moreover you will have an `alidist` folder which contains the recipes
 used by aliBuild to actually build the software. While you do not need
@@ -112,10 +112,15 @@ Once you have your area setup, you can start the build of the software via
 `aliBuild`.
 
     cd $HOME/alice
-    aliBuild build O2
+    aliBuild --defaults o2 build O2
 
 Notice that aliBuild automatically takes care of dependencies, so you
-only need to specify the toplevel package.
+only need to specify the toplevel package. We specify here that we will build 
+for o2 and aliBuild will choose ROOT6 and a new CMake as opposed to the versions used
+for AliRoot. For those not interested in the simulation and analysis, the defaults 
+`o2-daq` can be used 
+
+    aliBuild --defaults o2-daq build O2
 
 Depending on your setup, this should take between 30 minutes to 1 hour
 on reasonably modern hardware. If it takes more, you might want to read
