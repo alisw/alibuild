@@ -1023,7 +1023,7 @@ def doMain():
 
     for d in packages:
       realPath = readlink(d)
-      matcher = format("../../%(a)s/store/[0-9a-f]{2}/([0-9a-f]*)/%(p)s-%(v)s-([0-9]*).%(a)s.tar.gz",
+      matcher = format("../../%(a)s/store/[0-9a-f]{2}/([0-9a-f]*)/%(p)s-%(v)s-([0-9]*).%(a)s.tar.gz$",
                        a=args.architecture,
                        p=spec["package"],
                        v=spec["version"])
@@ -1149,7 +1149,10 @@ def doMain():
     #        as I only used the tarballs as reusable binary blobs.
     spec["cachedTarball"] = ""
     if not spec["package"] in develPkgs:
-      spec["cachedTarball"] = (glob("%s/*" % spec["tarballHashDir"]) or [""])[0]
+      tarballs = [x
+                  for x in glob("%s/*" % spec["tarballHashDir"])
+                  if x.endswith("gz")]
+      spec["cachedTarball"] = tarballs[0] if len(tarballs) else ""
       debug(spec["cachedTarball"] and
             "Found tarball in %s" % spec["cachedTarball"] or
             "No cache tarballs found")
