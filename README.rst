@@ -16,3 +16,9 @@ Instant gratification with::
 Full documentation at:
 
 https://alisw.github.io/alibuild
+
+Pre-requisites
+==============
+
+If you are using aliBuild directly from git clone, you should make sure
+you have `pyyaml` and `argparse` in your python distribution.
