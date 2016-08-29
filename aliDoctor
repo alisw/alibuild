@@ -11,7 +11,8 @@ except ImportError:
 import logging
 from alibuild_helpers.log import debug, error, banner, info, success, warning
 from alibuild_helpers.log import logger_handler, logger, LogFormatter, ProgressPrint
-from alibuild_helpers.utilities import getPackageList, format, detectArch
+from alibuild_helpers.utilities import getPackageList, format, detectArch, parseDefaults, readDefaults
+from alibuild_helpers.utilities import dockerStatusOutput
 import subprocess
 
 def execute(command):
@@ -30,12 +31,12 @@ def prunePaths(workDir):
     workDirEscaped = re.escape("%s" % workDir) + "[^:]*:?"
     os.environ[x] = re.sub(workDirEscaped, "", os.environ[x])
 
-def checkPreferSystem(spec, cmd, homebrew_replacement):
+def checkPreferSystem(spec, cmd, homebrew_replacement, dockerImage):
     if cmd == "false":
       debug("Package %s can only be managed via alibuild." % spec["package"])
       return (1, "")
     cmd = homebrew_replacement + cmd
-    err, out = execute(cmd)
+    err, out = dockerStatusOutput(cmd, dockerImage=dockerImage, executor=execute)
     if not err:
       success("Package %s will be picked up from the system." % spec["package"])
       for x in out.split("\n"):
@@ -52,12 +53,12 @@ def checkPreferSystem(spec, cmd, homebrew_replacement):
                    error="\n".join(["%s: %s" % (spec["package"],x) for x in out.split("\n")])))
     return (err, "")
 
-def checkRequirements(spec, cmd, homebrew_replacement):
+def checkRequirements(spec, cmd, homebrew_replacement, dockerImage):
     if cmd == "false":
       debug("Package %s is not a system requirement." % spec["package"])
       return (0, "")
     cmd = homebrew_replacement + cmd
-    err, out = execute(cmd)
+    err, out = dockerStatusOutput(cmd, dockerImage=dockerImage, executor=execute)
     if not err:
       success("Required package %s will be picked up from the system." % spec["package"])
       debug(cmd)
@@ -95,16 +96,29 @@ if __name__ == "__main__":
   parser.add_argument("-a", "--architecture", help="force architecture",
                       dest="architecture", default=detectArch())
   parser.add_argument("-c", "--config", help="path to alidist",
-                      dest="config", default="alidist")
+                      dest="configDir", default="alidist")
   parser.add_argument("-w", "--work-dir", help="path to work dir",
                       dest="workDir", default="workDir")
   parser.add_argument("-d", "--debug", help="Show also successful tests.",
                       dest="debug", action="store_true", default=False)
+  parser.add_argument("--defaults", default="release",
+                      dest="defaults", help="Specify default to use")
+  parser.add_argument("--disable", dest="disable", default=[],
+                      metavar="PACKAGE", action="append",
+                      help="Do not build PACKAGE and all its (unique) dependencies.")
+  parser.add_argument("--always-prefer-system", dest="preferSystem", default=False,
+                      action="store_true", help="Always use system packages when compatible")
+  parser.add_argument("--no-system", dest="noSystem", default=False,
+                      action="store_true", help="Never use system packages")
   parser.add_argument("packages", nargs="+", help="Package to test",
                       default=[])
+  parser.add_argument("--docker", dest="docker", action="store_true", default=False)
+  parser.add_argument("--docker-image", dest="dockerImage",
+                      help="Image to use in case you build with docker (implies --docker-image)")
+
   args = parser.parse_args()
-  if not exists(args.config):
-    parser.error("Wrong path to alidist specified: %s" % args.config)
+  if not exists(args.configDir):
+    parser.error("Wrong path to alidist specified: %s" % args.configDir)
 
   prunePaths(abspath(args.workDir))
 
@@ -120,6 +134,11 @@ if __name__ == "__main__":
   if err:
     homebrew_replacement = "brew() { true; }; "
 
+
+  dockerImage = args.dockerImage if "dockerImage" in args else ""
+  if args.docker and not dockerImage:
+    dockerImage = "alisw/%s-builder" % args.architecture.split("_")[0]
+
   logger.setLevel(logging.BANNER)
   if args.debug:
     logger.setLevel(logging.DEBUG)
@@ -128,29 +147,36 @@ if __name__ == "__main__":
   packages = []
   exitcode = 0
   for p in args.packages:
-    path = "%s/%s.sh" % (args.config, p.lower())
+    path = "%s/%s.sh" % (args.configDir, p.lower())
     if not exists(path):
       error("Cannot find recipe %s for package %s." % (path, p))
       exitcode = 1
       continue
     packages.append(p)
-
   systemInfo()
 
   specs = {}
   def unreachable():
     assert(False)
+  defaultsReader = lambda : readDefaults(args.configDir, args.defaults, parser.error)
+  (err, overrides, taps) = parseDefaults(args.disable, defaultsReader, info)
+  if err:
+    error(err)
+    exit(1)
   (fromSystem, own, failed) = getPackageList(packages=packages,
                                          specs=specs,
-                                         configDir=args.config,
-                                         preferSystem=False,
-                                         noSystem=False,
+                                         configDir=args.configDir,
+                                         preferSystem=args.preferSystem,
+                                         noSystem=args.noSystem,
                                          architecture=args.architecture,
-                                         disable=[],
-                                         defaults="release",
+                                         disable=args.disable,
+                                         defaults=args.defaults,
                                          dieOnError=lambda x, y : unreachable,
-                                         performPreferCheck=lambda pkg, cmd : checkPreferSystem(pkg, cmd, homebrew_replacement),
-                                         performRequirementCheck=lambda pkg, cmd : checkRequirements(pkg, cmd, homebrew_replacement))
+                                         performPreferCheck=lambda pkg, cmd : checkPreferSystem(pkg, cmd, homebrew_replacement, dockerImage),
+                                         performRequirementCheck=lambda pkg, cmd : checkRequirements(pkg, cmd, homebrew_replacement, dockerImage),
+                                         overrides=overrides,
+                                         taps=taps,
+                                         log=info)
 
   if fromSystem:
     banner("The following packages will be picked up from the system:\n\n- " +
