@@ -1,0 +1,32 @@
+highlighter: rouge
+baseurl: /alibuild
+menu_header: ALIBUILD
+menu:
+  - name: quick.html
+    label: QUICKSTART
+  -
+    name: user.html
+    label: USER MANUAL
+  -
+    name: extra.html
+    label: EXTRA TOOLS
+  -
+    name: reference.html
+    label: REFERENCE
+  -
+    name: troubleshooting.html
+    label: TROUBLESHOOTING
+  -
+    name: tutorial.html
+    label: TUTORIAL (AliPhysics)
+  -
+    name: o2-tutorial.html
+    label: TUTORIAL (O2)
+defaults:
+  -
+    scope:
+      path: "basic/"
+      type: "posts"
+    values:
+      category: "basic"
+      layout: "main"
