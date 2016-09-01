@@ -1218,6 +1218,7 @@ def doMain():
       for volume in args.volumes:
         additionalVolumes += " -v %s " % volume
       dockerWrapper = format("docker run --rm -it"
+              " -u %(uid)d:%(gid)d"
               " -v %(workdir)s:/sw"
               " -v %(scriptDir)s/build.sh:/build.sh:ro"
               " %(mirrorVolume)s"
@@ -1229,6 +1230,8 @@ def doMain():
               " -e WORK_DIR_OVERRIDE=/sw"
               " %(image)s"
               " /bin/bash -e -x /build.sh",
+              uid=os.getuid(),
+              gid=os.getgid(),
               additionalEnv=additionalEnv,
               additionalVolumes=additionalVolumes,
               develVolumes=develVolumes,
