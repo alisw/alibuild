@@ -23,7 +23,7 @@ class RiemannStream(object):
       self.client.send({'host': self.currentHost, 'state': 'ok', 'service': "alibuild started"})
       self.enabled = True
       info("Sending log data to %s:%s" % (host, port))
-    except Exception, e:
+    except Exception as e:
       info("RIEMANN_HOST %s:%s specified, however there was a problem initialising:"  % (host, port))
       info(e)
 

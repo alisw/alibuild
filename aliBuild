@@ -1,18 +1,25 @@
 #!/usr/bin/env python
+from __future__ import print_function
 import os, time, re, yaml, hashlib, argparse
 import sys, shutil, subprocess, socket
-from commands import getstatusoutput
+try:
+  from commands import getstatusoutput
+  from urllib2 import urlopen, URLError
+except ImportError:
+  from subprocess import getstatusoutput
+  from urllib.request import urlopen
+  from urllib.error import URLError
 from os.path import basename, dirname, abspath, exists, realpath, join, islink, expanduser
 from os import makedirs, unlink, readlink, getenv, sysconf, rmdir
 from glob import glob
 from datetime import datetime
-from urllib2 import urlopen, URLError
 import ssl
 import json
 import logging
 from alibuild_helpers.log import debug, error, warning, banner, info
 from alibuild_helpers.log import logger_handler, logger, LogFormatter, ProgressPrint, riemannStream
-from alibuild_helpers.utilities import format, getVersion, detectArch
+from alibuild_helpers.utilities import format, getVersion, detectArch, dockerStatusOutput, parseDefaults, readDefaults
+from alibuild_helpers.utilities import parseRecipe, getPackageList, getRecipeReader
 from alibuild_helpers.analytics import decideAnalytics, askForAnalytics, report_screenview, report_exception, report_event
 from alibuild_helpers.analytics import enable_analytics, disable_analytics
 import traceback
@@ -218,10 +225,10 @@ class HttpRemoteSync:
       else:
         hashList = json.loads(urlopen(hashListUrl).read())
         pkgList = json.loads(urlopen(pkgListUrl).read())
-    except URLError, e:
+    except URLError as e:
       debug("Cannot find precompiled package for %s@%s" % (p, spec["hash"]))
       pass
-    except Exception, e:
+    except Exception as e:
       info(e)
       error("Unknown response from server")
 
@@ -311,41 +318,6 @@ def prunePaths(workDir):
     if x.endswith("_VERSION") and x != "ALIBUILD_VERSION":
       os.environ.pop(x)
 
-class SpecError(Exception):
-  pass
-
-def validateSpec(spec):
-  if not spec:
-    raise SpecError("Empty recipe.")
-  if type(spec) != dict:
-    raise SpecError("Not a YAML key / value.")
-  if not "package" in spec:
-    raise SpecError("Missing package field in header.")
-
-
-def parseRecipe(filename):
-  try:
-    d = open(filename).read()
-  except IOError as e:
-    dieOnError(True, str(e))
-  try:
-    header,recipe = d.split("---", 1)
-    spec = yaml.safe_load(header)
-    validateSpec(spec)
-  except SpecError, e:
-    error(("Malformed header for %s\n" + str(e)) % filename)
-    exit(1)
-  except yaml.scanner.ScannerError, e:
-    error(("Unable to parse %s\n" + str(e)) % filename)
-    exit(1)
-  except yaml.parser.ParserError, e:
-    error(("Unable to parse %s\n" + str(e)) % filename)
-    exit(1)
-  except ValueError, e:
-    error("Unable to parse %s. Header missing." % filename)
-    exit(1)
-  return (spec, recipe)
-
 def doMain():
   for x in ["LANG", "LANGUAGE", "LC_ALL", "LC_COLLATE",
             "LC_CTYPE", "LC_MESSAGES", "LC_MONETARY",
@@ -358,6 +330,8 @@ def doMain():
   parser.add_argument("--no-local", dest="noDevel", default=[],
                       help="Do not pick up the following packages from a local checkout.")
   parser.add_argument("--docker", dest="docker", action="store_true", default=False)
+  parser.add_argument("--docker-image", dest="dockerImage",
+                      help="Image to use in case you build with docker (implies --docker-image)")
   parser.add_argument("--work-dir", "-w", dest="workDir", default="sw")
   parser.add_argument("--architecture", "-a", dest="architecture",
                       default=detectArch())
@@ -405,7 +379,7 @@ def doMain():
   report_screenview(args.action)
 
   if args.action == "version":
-    print "aliBuild version: %s" % getVersion()
+    print("aliBuild version: %s" % getVersion())
     sys.exit(0)
 
   args.referenceSources = format(args.referenceSources, workDir=args.workDir)
@@ -416,19 +390,22 @@ def doMain():
     args.noSystem = True
 
   if not args.architecture:
-    print format("Cannot determine architecture. "
-                 "Please pass it explicitly.\n\n%s" % ARCHITECTURE_TABLE[0])
+    print(format("Cannot determine architecture. "
+                 "Please pass it explicitly.\n\n%s" % ARCHITECTURE_TABLE[0]))
     exit(1)
   if not args.forceUnknownArch and not matchValidArch(args.architecture):
-    print format("Unknown / unsupported architecture: %(architecture)s.\n\n"
+    print(format("Unknown / unsupported architecture: %(architecture)s.\n\n"
                 "%(table)s"
                 "Alternatively, you can use the `--force-unknown-architecture' option.",
                 table=ARCHITECTURE_TABLE[0],
-                architecture=args.architecture)
+                architecture=args.architecture))
     exit(1)
 
   if args.preferSystem and args.noSystem:
     parser.error("choose either --always-prefer-system or --no-system")
+
+  if args.dockerImage:
+    args.docker = True
 
   if args.docker and args.architecture.startswith("osx"):
     parser.error("cannot use `-a %s` and --docker" % args.architecture)
@@ -440,10 +417,11 @@ def doMain():
 
   logger.setLevel(logging.DEBUG if args.debug else logging.INFO)
 
-  # The docker image is given by the first part of the architecture we want to
-  # build for.
-  dockerImage = ""
-  if args.docker:
+  # If specified, used the docker image requested, otherwise, if running
+  # in docker the docker image is given by the first part of the
+  # architecture we want to build for.
+  dockerImage = args.dockerImage if "dockerImage" in args else ""
+  if args.docker and not dockerImage:
     dockerImage = "alisw/%s-builder" % args.architecture.split("_")[0]
 
   dieOnError(args.remoteStore.endswith("::rw") and args.writeStore,
@@ -478,7 +456,7 @@ def doMain():
     try:
       os.path.exists(setdir) or os.mkdir(setdir)
       os.path.exists(args.referenceSources) or makedirs(args.referenceSources)
-    except OSError, e:
+    except OSError as e:
       dieOnError(True, str(e))
 
     for p in [{"name":"stardist","ver":args.dist["ver"]}] + pkgs:
@@ -488,7 +466,8 @@ def doMain():
         dest = args.configDir
       else:
         filename = "%s/%s.sh" % (args.configDir, p["name"].lower())
-        spec,_ = parseRecipe(filename)
+        err, spec, _ = parseRecipe(getRecipeReader(filename))
+        dieOnError(err, err)
         dest = join(setdir, spec["package"])
       writeRepo = spec.get("write_repo", spec.get("source"))
       dieOnError(not writeRepo, "Package %s has no source field and cannot be developed" % spec["package"])
@@ -507,9 +486,9 @@ def doMain():
                            cd=dest))
       dieOnError(err!=0, "cannot clone %s%s" %
                          (spec["package"], " version "+p["ver"] if p["ver"] else ""))
-    print format("Development directory %(d)s created%(pkgs)s",
+    print(format("Development directory %(d)s created%(pkgs)s",
                  pkgs=" for "+", ".join([ x["name"].lower() for x in pkgs ]) if pkgs else "",
-                 d=setdir)
+                 d=setdir))
     exit(0)
   elif args.action == "clean":
     # Find all the symlinks in "BUILD"
@@ -533,12 +512,12 @@ def doMain():
                  if not islink(x) and not basename(x) in symlinksInstall]
     toDelete = [x for x in toDelete if exists(x)]
     if not toDelete:
-      print "Nothing to delete."
+      print("Nothing to delete.")
       exit(0)
-    print "This will delete the following directories"
-    print "\n".join(toDelete)
+    print("This will delete the following directories")
+    print("\n".join(toDelete))
     if args.dryRun:
-      print "--dry-run / -n specified. Doing nothing."
+      print("--dry-run / -n specified. Doing nothing.")
       exit(0)
     for x in toDelete:
       shutil.rmtree(x)
@@ -557,7 +536,6 @@ def doMain():
   workDir = abspath(args.workDir)
   prunePaths(workDir)
 
-
   if not exists(args.configDir):
     err = execute(format(
                     "git clone https://github.com/%(repo)s%(branch)s %(cd)s",
@@ -572,12 +550,13 @@ def doMain():
   if "develPrefix" in args and args.develPrefix == None:
     args.develPrefix = basename(dirname(abspath(args.configDir)))
 
-  if not exists("%s/defaults-%s.sh" % (args.configDir, args.defaults)):
-    viableDefaults = ["- " + basename(x).replace("defaults-","").replace(".sh", "")
-                      for x in glob("%s/defaults-*.sh" % args.configDir)]
-    parser.error(format("Default `%(d)s' does not exists. Viable options:\n%(v)s",
-                 d=args.defaults or "<no defaults specified>",
-                 v="\n".join(viableDefaults)))
+  if dockerImage:
+    args.develPrefix = "%s-%s" % (args.develPrefix, args.architecture) if "develPrefix" in args else args.architecture
+
+  defaultsReader = lambda : readDefaults(args.configDir, args.defaults, parser.error)
+  (err, overrides, taps) = parseDefaults(args.disable,
+                                         defaultsReader, debug)
+  dieOnError(err, err)
 
   specDir = "%s/SPECS" % workDir
   if not exists(specDir):
@@ -594,56 +573,24 @@ def doMain():
                toolHash=getDirectoryHash(dirname(__file__)),
                distHash=os.environ["ALIBUILD_ALIDIST_HASH"]))
 
-  systemPackages = set()
-  ownPackages = set()
-  while packages:
-    p = packages.pop(0)
-    if p in specs:
-      continue
-    filename = "%s/%s.sh" % (args.configDir, p.lower())
-    spec, recipe = parseRecipe(filename)
-    dieOnError(spec["package"].lower() != p.lower(),
-               "%s.sh has different package field: %s" % (p, spec["package"]))
-    # If --always-prefer-system is passed or if prefer_system is set to true
-    # inside the recipe, use the script specified in the prefer_system_check
-    # stanza to see if we can use the system version of the package.
-    if not args.noSystem and (args.preferSystem or re.match(spec.get("prefer_system", "(?!.*)"), args.architecture)):
-      cmd = spec.get("prefer_system_check", "false")
-      err, output = getstatusoutput(cmd.strip())
-      if not err:
-        systemPackages.update([spec["package"]])
-        args.disable.append(spec["package"])
-      else:
-        ownPackages.update([spec["package"]])
-
-    dieOnError(("system_requirement" in spec) and recipe.strip("\n\t "), 
-               "System requirements %s cannot have a recipe" % spec["package"])
-    if re.match(spec.get("system_requirement", "(?!.*)"), args.architecture):
-      cmd = spec.get("system_requirement_check", "false")
-      err, output = getstatusoutput(cmd.strip())
-      dieOnError(err, spec.get("system_requirement_missing",
-                               "%s not found on system" % spec["package"]))
-      args.disable.append(spec["package"])
-
-    if spec["package"] in args.disable:
-      continue
-
-    # For the moment we treat build_requires just as requires.
-    fn = lambda what: filterByArchitecture(args.architecture, spec.get(what, []))
-    spec["requires"] = [x for x in fn("requires") if not x in args.disable]
-    spec["build_requires"] = [x for x in fn("build_requires") if not x in args.disable] 
-    if spec["package"] != "defaults-" + args.defaults:
-      spec["build_requires"].append("defaults-" + args.defaults)
-    spec["runtime_requires"] = spec["requires"]
-    spec["requires"] = spec["runtime_requires"] + spec["build_requires"]
-    # Check that version is a string
-    dieOnError(not isinstance(spec["version"], basestring),
-               "In recipe \"%s\": version must be a string" % p)
-    spec["tag"] = spec.get("tag", spec["version"])
-    spec["version"] = spec["version"].replace("/", "_")
-    spec["recipe"] = recipe.strip("\n")
-    specs[spec["package"]] = spec
-    packages += spec["requires"]
+  (systemPackages, ownPackages, failed) = getPackageList(packages=packages,
+                                         specs=specs,
+                                         configDir=args.configDir,
+                                         preferSystem=args.preferSystem,
+                                         noSystem=args.noSystem,
+                                         architecture=args.architecture,
+                                         disable=args.disable,
+                                         defaults=args.defaults,
+                                         dieOnError=dieOnError,
+                                         performPreferCheck=lambda pkg, cmd : dockerStatusOutput(cmd, dockerImage),
+                                         performRequirementCheck=lambda pkg, cmd : dockerStatusOutput(cmd, dockerImage),
+                                         overrides=overrides,
+                                         taps=taps,
+                                         log=debug)
+  if failed:
+    error("The following packages are system requirements and could not be found:\n\n- " + "\n- ".join(sorted(list(failed))))
+    error("\nPlease run:\n\n\taliDoctor %s\n\nto get a full diagnosis." % args.pkgname)
+    sys.exit(1)
 
   for x in specs.values():
     x["requires"] = [r for r in x["requires"] if not r in args.disable]
@@ -657,7 +604,7 @@ def doMain():
     banner("The following packages cannot be taken from the system and will be built:\n  %s" %
            ", ".join(ownPackages))
 
-  # Do topological sort to have the correct build order even in the 
+  # Do topological sort to have the correct build order even in the
   # case of non-tree like dependencies..
   # The actual algorith used can be found at:
   #
@@ -698,7 +645,7 @@ def doMain():
 
   if buildOrder:
     banner("Packages will be built in the following order:\n - %s" %
-           "\n - ".join([ x+" (development package)" if x in develPkgs else x for x in buildOrder ]))
+           "\n - ".join([ x+" (development package)" if x in develPkgs else "%s@%s" % (x, specs[x]["tag"]) for x in buildOrder ]))
 
   if develPkgs:
     banner(format("You have packages in development mode.\n"
@@ -729,7 +676,7 @@ def doMain():
       spec["tag"] = format(spec["tag"], **nowKwds)
       # By default we assume tag is a commit hash. We then try to find
       # out if the tag is actually a branch and we use the tip of the branch
-      # as commit_hash. Finally if the package is a development one, we use the 
+      # as commit_hash. Finally if the package is a development one, we use the
       # name of the branch as commit_hash.
       spec["commit_hash"] = spec["tag"]
       for l in out.split("\n"):
@@ -830,7 +777,7 @@ def doMain():
     if spec["package"] in develPkgs and "incremental_recipe" in spec:
       h(spec["incremental_recipe"])
       incremental_hash = hashlib.sha1(spec["incremental_recipe"]).hexdigest()
-      spec["incremental_hash"] = "INCREMENTAL_BUILD_HASH=%s" % incremental_hash
+      spec["incremental_hash"] = incremental_hash
     elif p in develPkgs:
       h(spec.get("devel_hash"))
     spec["hash"] = h.hexdigest()
@@ -879,7 +826,6 @@ def doMain():
 
   debug("We will build packages in the following order: %s" % " ".join(buildOrder))
   if args.dryRun:
-    info("We will build packages in the following order: %s" % " ".join(buildOrder))
     info("--dry-run / -n specified. Not building.")
     exit(0)
 
@@ -948,9 +894,30 @@ def doMain():
     # - Use the latest number in the version, to decide its revision
     debug("Packages already built using this version\n%s" % "\n".join(packages))
     busyRevisions = []
+
+    # Calculate the build_family for the package
+    #
+    # If the package is a devel package, we need to associate it a devel
+    # prefix, either via the -z option or using its checked out branch. This
+    # affects its build hash.
+    #
+    # Moreover we need to define a global "buildFamily" which is used
+    # to tag all the packages incurred in the build, this way we can have
+    # a latest-<buildFamily> link for all of them an we will not incur in the
+    # flip - flopping described in https://github.com/alisw/alibuild/issues/325.
+    develPrefix = ""
+    possibleDevelPrefix = getattr(args, "develPrefix", develPackageBranch)
+    if spec["package"] in develPkgs:
+      develPrefix = possibleDevelPrefix
+
+    if possibleDevelPrefix:
+      spec["build_family"] = "%s-%s" % (possibleDevelPrefix, args.defaults)
+    else:
+      spec["build_family"] = args.defaults
+
     for d in packages:
       realPath = readlink(d)
-      matcher = format("../../%(a)s/store/[0-9a-f]{2}/([0-9a-f]*)/%(p)s-%(v)s-([0-9]*).%(a)s.tar.gz",
+      matcher = format("../../%(a)s/store/[0-9a-f]{2}/([0-9a-f]*)/%(p)s-%(v)s-([0-9]*).%(a)s.tar.gz$",
                        a=args.architecture,
                        p=spec["package"],
                        v=spec["version"])
@@ -959,6 +926,7 @@ def doMain():
         continue
       h, revision = m.groups()
       revision = int(revision)
+
       # If we have an hash match, we use the old revision for the package
       # and we do not need to build it.
       if h == spec["hash"]:
@@ -967,6 +935,22 @@ def doMain():
           spec["obsolete_tarball"] = d
         else:
           debug("Package %s with hash %s is already found in %s. Not building." % (p, h, d))
+          src = format("%(v)s-%(r)s",
+                       w=workDir,
+                       v=spec["version"],
+                       r=spec["revision"])
+          dst1 = format("%(w)s/%(a)s/%(p)s/latest-%(bf)s",
+                        w=workDir,
+                        a=args.architecture,
+                        p=spec["package"],
+                        bf=spec["build_family"])
+          dst2 = format("%(w)s/%(a)s/%(p)s/latest",
+                        w=workDir,
+                        a=args.architecture,
+                        p=spec["package"])
+
+          getstatusoutput("ln -snf %s %s" % (src, dst1))
+          getstatusoutput("ln -snf %s %s" % (src, dst2))
           info("Using cached build for %s" % p)
         break
       else:
@@ -987,8 +971,8 @@ def doMain():
 
     # Now that we have all the information about the package we want to build, let's
     # check if it wasn't built / unpacked already.
-    hashFile = "%s/%s/%s/%s-%s/.build-hash" % (workDir, 
-                                               args.architecture, 
+    hashFile = "%s/%s/%s/%s-%s/.build-hash" % (workDir,
+                                               args.architecture,
                                                spec["package"],
                                                spec["version"],
                                                spec["revision"])
@@ -1022,7 +1006,7 @@ def doMain():
       # assuming the package is not a development one. We also can
       # delete the SOURCES in case we have aggressive-cleanup enabled.
       if not spec["package"] in develPkgs and args.autoCleanup:
-        cleanupDirs = [format("%(w)s/BUILD/%(h)s", 
+        cleanupDirs = [format("%(w)s/BUILD/%(h)s",
                               w=workDir,
                               h=spec["hash"]),
                        format("%(w)s/INSTALLROOT/%(h)s",
@@ -1059,7 +1043,10 @@ def doMain():
     #        as I only used the tarballs as reusable binary blobs.
     spec["cachedTarball"] = ""
     if not spec["package"] in develPkgs:
-      spec["cachedTarball"] = (glob("%s/*" % spec["tarballHashDir"]) or [""])[0]
+      tarballs = [x
+                  for x in glob("%s/*" % spec["tarballHashDir"])
+                  if x.endswith("gz")]
+      spec["cachedTarball"] = tarballs[0] if len(tarballs) else ""
       debug(spec["cachedTarball"] and
             "Found tarball in %s" % spec["cachedTarball"] or
             "No cache tarballs found")
@@ -1094,7 +1081,7 @@ def doMain():
     environment = ""
     dieOnError(not isinstance(spec.get("env", {}), dict),
                "Tag `env' in %s should be a dict." % p)
-    for key,value in spec.get("env", {}).iteritems():
+    for key,value in spec.get("env", {}).items():
       environment += format("echo 'export %(key)s=\"%(value)s\"' >> $INSTALLROOT/etc/profile.d/init.sh\n",
                             key=key,
                             value=value)
@@ -1103,7 +1090,7 @@ def doMain():
     pathDict = spec.get("append_path", {})
     dieOnError(not isinstance(pathDict, dict),
                "Tag `append_path' in %s should be a dict." % p)
-    for pathName,pathVal in pathDict.iteritems():
+    for pathName,pathVal in pathDict.items():
       pathVal = isinstance(pathVal, list) and pathVal or [ pathVal ]
       environment += format("\ncat << \EOF >> \"$INSTALLROOT/etc/profile.d/init.sh\"\nexport %(key)s=$%(key)s:%(value)s\nEOF",
                             key=pathName,
@@ -1116,11 +1103,11 @@ def doMain():
     pathDict = spec.get("prepend_path", {})
     dieOnError(not isinstance(pathDict, dict),
                "Tag `prepend_path' in %s should be a dict." % p)
-    for pathName,pathVal in pathDict.iteritems():
+    for pathName,pathVal in pathDict.items():
       pathDict[pathName] = isinstance(pathVal, list) and pathVal or [ pathVal ]
-    for pathName,pathVal in defaultPrependPaths.iteritems():
+    for pathName,pathVal in defaultPrependPaths.items():
       pathDict[pathName] = [ pathVal ] + pathDict.get(pathName, [])
-    for pathName,pathVal in pathDict.iteritems():
+    for pathName,pathVal in pathDict.items():
       environment += format("\ncat << \EOF >> \"$INSTALLROOT/etc/profile.d/init.sh\"\nexport %(key)s=%(value)s:$%(key)s\nEOF",
                             key=pathName,
                             value=":".join(pathVal))
@@ -1157,39 +1144,22 @@ def doMain():
     else:
       cachedTarball = spec["cachedTarball"]
 
-    develPrefix = ""
-    if spec["package"] in develPkgs:
-      develPrefix = args.develPrefix if "develPrefix" in args else develPackageBranch
 
     cmd = format(cmd_raw,
-                 can_delete = args.aggressiveCleanup,
                  dependencies=dependencies,
                  dependenciesInit=dependenciesInit,
                  develPrefix=develPrefix,
-                 develHash=spec.get("devel_hash", ""),
-                 depsHash=spec.get("deps_hash", ""),
                  environment=environment,
                  workDir=workDir,
                  configDir=abspath(args.configDir),
-                 pkgname=spec["package"],
-                 hash=spec["hash"],
-                 incremental_hash=spec.get("incremental_hash", ""),
                  incremental_recipe=spec.get("incremental_recipe", ":"),
-                 version=spec["version"],
-                 revision=spec["revision"],
-                 architecture=args.architecture,
-                 jobs=args.jobs,
                  sourceDir=source and (dirname(source) + "/") or "",
                  sourceName=source and basename(source) or "",
-                 write_repo=spec.get("write_repo", source),
-                 tag=spec["tag"],
-                 commit_hash=commit_hash,
                  referenceStatement=referenceStatement,
-                 cachedTarball=cachedTarball,
                  requires=" ".join(spec["requires"]),
                  build_requires=" ".join(spec["build_requires"]),
-                 runtime_requires=" ".join(spec["runtime_requires"]),
-                 gzip=gzip())
+                 runtime_requires=" ".join(spec["runtime_requires"])
+                )
 
     commonPath = "%s/%%s/%s/%s/%s-%s" % (workDir,
                                          args.architecture,
@@ -1205,6 +1175,33 @@ def doMain():
     banner("Building %s@%s" % (spec["package"],
                                args.develPrefix if "develPrefix" in args and spec["package"]  in develPkgs
                                                 else spec["version"]))
+    # Define the environment so that it can be passed up to the
+    # actual build script
+    buildEnvironment = [
+      ("ARCHITECTURE", args.architecture),
+      ("BUILD_REQUIRES", " ".join(spec["build_requires"])),
+      ("CACHED_TARBALL", cachedTarball),
+      ("CAN_DELETE", args.aggressiveCleanup and "1" or ""),
+      ("COMMIT_HASH", commit_hash),
+      ("DEPS_HASH", spec.get("deps_hash", "")),
+      ("DEVEL_HASH", spec.get("devel_hash", "")),
+      ("DEVEL_PREFIX", develPrefix),
+      ("BUILD_FAMILY", spec["build_family"]),
+      ("GIT_TAG", spec["tag"]),
+      ("MY_GZIP", gzip()),
+      ("INCREMENTAL_BUILD_HASH", spec.get("incremental_hash", "0")),
+      ("JOBS", args.jobs),
+      ("PKGHASH", spec["hash"]),
+      ("PKGNAME", spec["package"]),
+      ("PKGREVISION", spec["revision"]),
+      ("PKGVERSION", spec["version"]),
+      ("REQUIRES", " ".join(spec["requires"])),
+      ("RUNTIME_REQUIRES", " ".join(spec["runtime_requires"])),
+      ("WRITE_REPO", spec.get("write_repo", source)),
+    ]
+    # Add the extra environment as passed from the command line.
+    for e in [x.split("=", "1") for x in args.environment]:
+      buildEnvironment.append(e)
     # In case the --docker options is passed, we setup a docker container which
     # will perform the actual build. Otherwise build as usual using bash.
     if dockerImage:
@@ -1216,10 +1213,10 @@ def doMain():
 
       for devel in develPkgs:
         develVolumes += " -v $PWD/`readlink %s || echo %s`:/%s:ro " % (devel, devel, devel)
-      for env in args.environment:
-        additionalEnv = "-e %s" % env
+      for env in buildEnvironment:
+        additionalEnv += " -e %s='%s' " % env
       for volume in args.volumes:
-        additionalVolumes = "-v %s" % volume
+        additionalVolumes += " -v %s " % volume
       dockerWrapper = format("docker run --rm -it"
               " -v %(workdir)s:/sw"
               " -v %(scriptDir)s/build.sh:/build.sh:ro"
@@ -1227,27 +1224,25 @@ def doMain():
               " %(develVolumes)s"
               " %(additionalEnv)s"
               " %(additionalVolumes)s"
-              " -e ARCHITECTURE=%(architecture)s"
               " -e GIT_REFERENCE_OVERRIDE=/mirror"
-              " -e JOBS=%(jobs)s"
               " %(overrideSource)s"
               " -e WORK_DIR_OVERRIDE=/sw"
               " %(image)s"
               " /bin/bash -e -x /build.sh",
               additionalEnv=additionalEnv,
               additionalVolumes=additionalVolumes,
-              architecture=args.architecture,
               develVolumes=develVolumes,
               workdir=abspath(args.workDir),
               image=dockerImage,
               mirrorVolume=mirrorVolume,
-              jobs=args.jobs,
               overrideSource=overrideSource,
               scriptDir=scriptDir)
       debug(dockerWrapper)
       err = execute(dockerWrapper)
     else:
       progress = ProgressPrint("%s is being built (use --debug for full output)" % spec["package"])
+      for k,v in buildEnvironment:
+        os.environ[k] = str(v)
       err = execute("/bin/bash -e -x %s/build.sh 2>&1" % scriptDir,
                     printer=debug if args.debug or not sys.stdout.isatty() else progress)
       progress.end("failed" if err else "ok", err)
@@ -1323,11 +1318,11 @@ if __name__ == "__main__":
     os.environ["ALIBUILD_ANALYTICS_USER_UUID"] = open(expanduser("~/.config/alibuild/analytics-uuid")).read().strip()
   try:
     doMain()
-  except KeyboardInterrupt, e:
+  except KeyboardInterrupt as e:
     info(str(e))
     report_event("user", "ctrlc")
     exit(1)
-  except Exception, e:
+  except Exception as e:
     report_exception(e)
     traceback.print_exc()
     exit(1)
