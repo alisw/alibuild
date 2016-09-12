@@ -280,3 +280,22 @@ Notice that if you change (either add or remove) your set of system
 dependencies, aliBuild will trigger a rebuild of whatever depends on
 them, taking additional time, so make sure you do this when not pressed
 for a deadline.
+
+### Permission denied when running alienv on shared (farm) installations
+
+When attempting to do `alienv` operations on shared (farm) installations you
+might get a number of `Permission denied` errors. In order to fix this problem
+you need to make sure that shared builds with `aliBuild` are always made by the
+same user. In addition after every `aliBuild` run the person who has run it has
+to run the following command in order to generate all the correct modulefiles
+as seen by the users:
+
+    alienv q
+
+Users have to append the `--no-refresh` option to every `alienv` operation, for
+instance:
+
+    alienv --no-refresh enter AliPhysics/latest
+
+Note that the `--no-refresh` option is not necessary anymore starting from
+`v1.4.0.rc1`.
