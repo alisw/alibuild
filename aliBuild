@@ -507,9 +507,12 @@ def doMain():
     toDelete += [x for x in glob("%s/BUILD/*" % args.workDir)
                  if not islink(x) and not basename(x) in symlinksBuild]
     installGlob ="%s/%s/*/" % (args.workDir, args.architecture)
-    symlinksInstall = [readlink(x) for x in glob(installGlob + "latest*")]
+    installedPackages = set([dirname(x) for x in glob(installGlob)])
+    symlinksInstall = []
+    for x in installedPackages:
+      symlinksInstall += [realpath(y) for y in glob(x + "/latest*")]
     toDelete += [x for x in glob(installGlob+ "*")
-                 if not islink(x) and not basename(x) in symlinksInstall]
+                 if not islink(x) and not realpath(x) in symlinksInstall]
     toDelete = [x for x in toDelete if exists(x)]
     if not toDelete:
       print("Nothing to delete.")
