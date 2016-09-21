@@ -150,9 +150,9 @@ class GitReader(object):
 
 def parseRecipe(reader):
   assert(reader.__call__)
+  err, spec, recipe = (None, None, None)
   try:
     d = reader()
-    err, spec, recipe = (None, None, None)
     header,recipe = d.split("---", 1)
     spec = yaml.safe_load(header)
     validateSpec(spec)
