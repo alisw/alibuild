@@ -160,13 +160,13 @@ def parseRecipe(reader):
     err = str(e)
   except IOError as e:
     err = str(e)
-  except SpecError, e:
+  except SpecError as e:
     err = "Malformed header for %s\n%s" % (reader.url, str(e))
-  except yaml.scanner.ScannerError, e:
+  except yaml.scanner.ScannerError as e:
     err = "Unable to parse %s\n%s" % (reader.url, str(e))
-  except yaml.parser.ParserError, e:
+  except yaml.parser.ParserError as e:
     err = "Unable to parse %s\n%s" % (reader.url, str(e))
-  except ValueError, e:
+  except ValueError as e:
     err = "Unable to parse %s. Header missing." % reader.url
   return err, spec, recipe
 
