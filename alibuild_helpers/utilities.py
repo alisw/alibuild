@@ -7,6 +7,7 @@ except ImportError:
 from os.path import dirname, exists
 import platform
 import base64
+import hashlib
 from glob import glob
 from os.path import basename
 
@@ -278,3 +279,11 @@ def dockerStatusOutput(cmd, dockerImage=None, executor=getstatusoutput):
                  di=dockerImage,
                  c=base64.b64encode(cmd))
   return executor(cmd)
+
+class Hasher:
+  def __init__(self):
+    self.h = hashlib.sha1()
+  def __call__(self, txt):
+    self.h.update(txt.encode('utf-8', 'ignore'))
+  def hexdigest(self):
+    return self.h.hexdigest()

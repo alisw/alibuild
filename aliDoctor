@@ -20,8 +20,9 @@ def execute(command):
   lines_iterator = iter(popen.stdout.readline, "")
   txt = ""
   for line in lines_iterator:
-    txt += line # yield line
-  txt += popen.communicate()[0]
+    if not line: break
+    txt += line.decode('utf-8', "ignore") # yield line
+  txt += popen.communicate()[0].decode('utf-8', 'ignore')
   return (popen.returncode, txt)
 
 def prunePaths(workDir):

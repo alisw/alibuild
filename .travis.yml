@@ -43,6 +43,7 @@ script: |
   time coverage run -a alibuild/aliBuild -c alibuild/tests/testdist build broken6 --no-system --disable GCC-Toolchain 2>&1 | grep scanning
   pushd alibuild
     time coverage run -a tests/test_parseRecipe.py
+    time coverage run -a tests/test_utilities.py
   popd
   time coverage run -a alibuild/aliBuild build zlib --no-system --disable GCC-Toolchain
   alibuild/alienv q
