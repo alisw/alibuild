@@ -1,6 +1,7 @@
 import unittest
 import platform
 from alibuild_helpers.utilities import doDetectArch
+from alibuild_helpers.utilities import Hasher
 
 UBUNTU_1510_OS_RELEASE = """
 NAME="Ubuntu"
@@ -101,11 +102,29 @@ architecturePayloads = [
   ['sabayon2_x86-64', True, SABAYON2_OS_RELEASE.split("\n"), ('gentoo', '2.2', ''), 'Linux', 'x86_64']
 ]
 
-class TestArchitectures(unittest.TestCase):
+class TestUtilities(unittest.TestCase):
   def test_osx(self):
     for payload in architecturePayloads:
       result, hasOsRelease, osReleaseLines, platformTuple, platformSystem, platformProcessor = payload
       self.assertEqual(result, doDetectArch(hasOsRelease, osReleaseLines, platformTuple, platformSystem, platformProcessor))
+  def test_Hasher(self):
+    h = Hasher()
+    h("foo")
+    self.assertEqual("0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33", h.hexdigest())
+    h("")
+    self.assertEqual("0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33", h.hexdigest())
+    self.assertRaises(AttributeError, h, 1)
+    h("bar")
+    self.assertEqual("8843d7f92416211de9ebb963ff4ce28125932878", h.hexdigest())
+
+  def test_UTF8_Hasher(self):
+    h1 = Hasher()
+    h2 = Hasher()
+    h1(u'\ua000')
+    h2(u'\ua001')
+    self.assertEqual(h1.hexdigest(), "2af8e41129115eb231a0af76ec5465d3a9184fc4")
+    self.assertEqual(h2.hexdigest(), "1619bcdbeff6828138ad9b6e43cc17e856457603")
+    self.assertNotEqual(h1.hexdigest(), h2.hexdigest())
 
 if __name__ == '__main__':
     unittest.main()

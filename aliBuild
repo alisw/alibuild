@@ -20,6 +20,7 @@ from alibuild_helpers.log import debug, error, warning, banner, info
 from alibuild_helpers.log import logger_handler, logger, LogFormatter, ProgressPrint, riemannStream
 from alibuild_helpers.utilities import format, getVersion, detectArch, dockerStatusOutput, parseDefaults, readDefaults
 from alibuild_helpers.utilities import parseRecipe, getPackageList, getRecipeReader
+from alibuild_helpers.utilities import Hasher
 from alibuild_helpers.analytics import decideAnalytics, askForAnalytics, report_screenview, report_exception, report_event
 from alibuild_helpers.analytics import enable_analytics, disable_analytics
 import traceback
@@ -47,19 +48,13 @@ def execute(command, printer=debug):
   popen = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE)
   lines_iterator = iter(popen.stdout.readline, "")
   for line in lines_iterator:
-    printer(line.strip("\n"))  # yield line
+    if not line: break
+    printer(line.decode('utf-8', 'ignore').strip("\n"))  # yield line
   output = popen.communicate()[0]
   printer(output)
   exitCode = popen.returncode
   return exitCode
 
-class Hasher:
-  def __init__(self):
-    self.h = hashlib.sha1()
-  def __call__(self, txt):
-    self.h.update(txt)
-  def hexdigest(self):
-    return self.h.hexdigest()
 
 def dieOnError(err, msg):
   if err:
