@@ -284,6 +284,8 @@ class Hasher:
   def __init__(self):
     self.h = hashlib.sha1()
   def __call__(self, txt):
-    self.h.update(txt.encode('utf-8', 'ignore'))
+    if not type(txt) == bytes:
+      txt = txt.encode('utf-8', 'ignore')
+    self.h.update(txt)
   def hexdigest(self):
     return self.h.hexdigest()

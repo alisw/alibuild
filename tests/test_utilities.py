@@ -120,10 +120,13 @@ class TestUtilities(unittest.TestCase):
   def test_UTF8_Hasher(self):
     h1 = Hasher()
     h2 = Hasher()
+    h3 = Hasher()
     h1(u'\ua000')
     h2(u'\ua001')
+    h3(b'foo')
     self.assertEqual(h1.hexdigest(), "2af8e41129115eb231a0af76ec5465d3a9184fc4")
     self.assertEqual(h2.hexdigest(), "1619bcdbeff6828138ad9b6e43cc17e856457603")
+    self.assertEqual(h3.hexdigest(), "0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33")
     self.assertNotEqual(h1.hexdigest(), h2.hexdigest())
 
 if __name__ == '__main__':
