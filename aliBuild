@@ -318,6 +318,10 @@ def doMain():
             "LC_CTYPE", "LC_MESSAGES", "LC_MONETARY",
             "LC_NUMERIC", "LC_TIME", "LC_ALL"]:
     os.environ[x] = "C"
+  # We need to unset BASH_ENV because in certain environments (e.g.
+  # NERSC) this is used to source a (non -e safe) bashrc, effectively
+  # breaking aliBuild.
+  os.environ["BASH_ENV"] = ""
   parser = argparse.ArgumentParser(epilog="For complete documentation please refer to https://alisw.github.io/alibuild")
   parser.add_argument("action", choices=["init", "build", "clean", "version", "analytics"], help="what alibuild should do")
   parser.add_argument("pkgname", nargs="?", help="One (or more) of the packages in `alidist'")
