@@ -23,6 +23,8 @@ def validateSpec(spec):
     raise SpecError("Missing package field in header.")
 
 def format(s, **kwds):
+  if type(s) == bytes:
+    s = s.decode()
   return s % kwds
 
 def doDetectArch(hasOsRelease, osReleaseLines, platformTuple, platformSystem, platformProcessor):

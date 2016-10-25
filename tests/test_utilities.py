@@ -2,6 +2,7 @@ import unittest
 import platform
 from alibuild_helpers.utilities import doDetectArch
 from alibuild_helpers.utilities import Hasher
+from alibuild_helpers.utilities import format
 
 UBUNTU_1510_OS_RELEASE = """
 NAME="Ubuntu"
@@ -128,6 +129,11 @@ class TestUtilities(unittest.TestCase):
     self.assertEqual(h2.hexdigest(), "1619bcdbeff6828138ad9b6e43cc17e856457603")
     self.assertEqual(h3.hexdigest(), "0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33")
     self.assertNotEqual(h1.hexdigest(), h2.hexdigest())
+
+  def test_format(self):
+    self.assertEqual(format("%(foo)s", foo="foo"), "foo")
+    self.assertEqual(format(b"%(foo)s", foo="foo"), "foo")
+    self.assertRaises(KeyError, format, "%(foo)s", bar="foo")
 
 if __name__ == '__main__':
     unittest.main()
