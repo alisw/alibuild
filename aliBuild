@@ -682,7 +682,7 @@ def doMain():
       # name of the branch as commit_hash.
       spec["commit_hash"] = spec["tag"]
       for l in out.split("\n"):
-        if l.endswith("refs/heads/%s" % spec["tag"]) or spec["package"] in develPkgs:
+        if l.endswith("refs/heads/{0}".format(spec["tag"])) or spec["package"] in develPkgs:
           spec["commit_hash"] = l.split("\t", 1)[0]
           # We are in development mode, we need to rebuild if the commit hash
           # is different and if there are extra changes on to.
