@@ -1022,7 +1022,7 @@ def doMain():
         debug("Cleaning up:\n" + "\n".join(cleanupDirs))
 
         for d in cleanupDirs:
-          shutil.rmtree(d, True)
+          shutil.rmtree(d.encode("utf8"), True)
         try:
           unlink(format("%(w)s/BUILD/%(p)s-latest",
                  w=workDir, p=spec["package"]))
