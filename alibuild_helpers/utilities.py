@@ -142,13 +142,12 @@ class GitReader(object):
     m = re.search(r'^dist:(.*)@([^@]+)$', self.url)
     fn,gh = m.groups()
     err,d = getstatusoutput(format("GIT_DIR=%(dist)s/.git git show %(gh)s:%(fn)s.sh",
-                                   dist=distdir, gh=gh, fn=fn.lower()))
+                                   dist=self.configDir, gh=gh, fn=fn.lower()))
     if err:
       raise RuntimeError(format("Cannot read recipe %(fn)s from reference %(gh)s.\n" +
                                 "Make sure you run first (this will not alter your recipes):\n" +
                                 "  cd %(dist)s && git remote update -p && git fetch --tags",
                                 dist=self.configDir, gh=gh, fn=fn))
-    warning("Overriding %s from reference %s" % (fn,gh))
     return d
 
 def parseRecipe(reader):
