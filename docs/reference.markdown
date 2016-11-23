@@ -176,3 +176,60 @@ uppercased):
  - `<PACKAGE>_REVISION`: package build number.
  - `<PACKAGE>_HASH`: hash of the recipe used to build the package.
 
+### Defaults
+
+aliBuild uses a special file, called `defaults-release.sh` which will be
+included as a build requires of any recipe. This is in general handy to
+specify common options like `CXXFLAGS` or dependencies. It's up to the
+recipe handle correctly the presence of these options.
+
+It is also possible to specify on the command line a different set of
+defaults, for example if you want to include code coverage. This is
+done via the `--defaults <default-name>` option which will change the
+defaults included to be `defaults-<default-name>.sh`.
+
+An extra variable `%(defaults_upper)s` can be used to form the version
+string accordingly. For example you could trigger a debug build by
+adding `--defaults debug`, which will pick up `defaults-debug.sh`, and
+then have:
+
+    version: %(tag)s%(defaults_upper)s
+
+in one of your recipes, which will expand to:
+
+    version: SOME_TAG_DEBUG
+
+If you want to add your own default, you should at least provide:
+
+- **CXXFLAGS**: the CXXFLAGS to use
+- **CFLAGS**: the CFLAGS to use
+- **LDFLAGS**: the LDFLAGS tos use
+- **CMAKE_BUILD_TYPE**: the build type which needs to be used by cmake projects
+
+Besides specifying extra global variables, starting from aliBuild
+1.4.0, it's also possible to use defaults to override metadata of other
+packages . This is done by specifying the `overrides` dictionary in the
+metadata of your defaults file. For example to switch between ROOT6 and
+ROOT5 you should do something like:
+
+    ...
+    overrides:
+      ROOT:
+        version: "v6-06-04"
+        tag: "v6-06-04"
+    ...
+
+this will replace the `version` and `tag` metadata of `root.sh` with the
+one specified in the override. Notice that is also possible to override
+completely a recipe, picking it up from a given commit hash, branch or
+tag in alidist. You can do so by adding such git reference after the name
+of the external to override. E.g.:
+
+    ...
+    overrides:
+      ROOT@abcedf123456:
+
+will pick `root.sh` as found in the commit `abcedf123456`.
+
+For a more complete example see
+[defaults-o2.sh](https://github.com/alisw/alidist/blob/IB/v5-08/next/defaults-o2.sh).
