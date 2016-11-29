@@ -178,3 +178,46 @@ Alternatively you can use:
     alienv enter O2/latest
 
 to launch a new shell which will have the correct environment.
+
+# Example
+Development of a couple of related modules in the AliceO2Group github 
+group. The first module is called Configuration, the second ABC.
+
+## Setup
+    pip install alibuild==1.4.0
+    mkdir -p $HOME/alice
+    ALICE_WORK_DIR=$HOME/alice/sw; eval "`alienv shell-helper`" 
+
+## Build and develop Configuration
+    cd $HOME/alice 
+    aliBuild init Configuration@master # checkout the code of 
+                                       # Configuration, branch master
+    aliDoctor Configuration            # To make sure that we are good.
+    aliBuild --defaults o2 build Configuration 
+    alienv load Configuration/latest
+    
+    # At this stage, modify the project.
+     
+    # Re-build by doing either
+    aliBuild --defaults o2 build Configuration
+    # or (faster compilation)
+    cd sw/BUILD/Configuration-latest/Configuration
+    make -j install
+
+## Build and launch ABC binaries
+
+ABC depends on Configuration. We also want to work on it and test the 
+latest changes of Configuration.
+
+    cd $HOME/alice
+    aliBuild init ABC@master
+    aliDoctor ABC
+    aliBuild --defaults o2 build ABC
+    # --> picks up all the packages we already built for Configuration
+    #     and Configuration itself
+
+    # Call binary with the environment of ABC and its dependencies.
+    alienv setenv ABC/latest -c <call binary>
+
+    # Or you could load the environment in the terminal
+    alienv load ABC/latest
