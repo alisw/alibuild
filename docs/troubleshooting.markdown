@@ -299,3 +299,9 @@ instance:
 
 Note that the `--no-refresh` option is not necessary anymore starting from
 `v1.4.0.rc1`.
+
+### Building on Windows Ubuntu environment does not work
+
+At the time of writing, neither Windows native nor the Ubuntu environment 
+on Windows are supported and most likely this will stay the same unless some
+third party does the work and provides a pull request.
