@@ -657,8 +657,6 @@ def doMain():
                   "In most cases this is achieved by doing in the package source directory:\n\n"
                   "  git pull --rebase\n",
                   pwd=os.getcwd(), star=star()))
-    debug("Write store disabled since some packages will be picked up from local checkout.")
-    syncHelper.writeStore = ""
 
   # Resolve the tag to the actual commit ref, so that
   for p in buildOrder:
@@ -854,6 +852,10 @@ def doMain():
       exit(1)
     p = buildOrder[0]
     spec = specs[p]
+    if spec["package"] in develPkgs and getattr(syncHelper, "writeStore", None):
+      warning("Disabling remote write store from now since %s is a development package." % spec["package"])
+      syncHelper.writeStore = ""
+
     # Since we can execute this multiple times for a given package, in order to
     # ensure consistency, we need to reset things and make them pristine.
     spec.pop("revision", None)
