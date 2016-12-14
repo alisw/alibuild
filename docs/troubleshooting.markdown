@@ -149,6 +149,21 @@ happens during the system tool detection by running:
     aliDoctor <package name>
 
 
+### AliBuild fails with `cannot open file "AvailabilityMacros.h`
+
+If your build fails with:
+
+```
+Error: cannot open file "AvailabilityMacros.h" sw/BUILD/.../ROOT/include/RConfig.h:384:
+```
+
+and you are on macOS, this most likely means you have an incomplete XCode installation,
+e.g. due to an upgrade. You can fix this with:
+
+```
+xcode-select --install
+```
+
 ### I do not have privileges and I cannot install via pip
 
 If you do not have root privileges on your machine and `pip install alibuild`
