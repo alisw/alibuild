@@ -41,10 +41,8 @@ script: |
   time coverage run -a alibuild/aliBuild -c alibuild/tests/testdist build broken4 --no-system --disable GCC-Toolchain 2>&1 | grep "Malformed header"
   time coverage run -a alibuild/aliBuild -c alibuild/tests/testdist build broken5 --no-system --disable GCC-Toolchain 2>&1 | grep "Missing package"
   time coverage run -a alibuild/aliBuild -c alibuild/tests/testdist build broken6 --no-system --disable GCC-Toolchain 2>&1 | grep scanning
-  pushd alibuild
-    time coverage run -a tests/test_parseRecipe.py
-    time coverage run -a tests/test_utilities.py
-  popd
+  PYTHONPATH=alibuild time coverage run -a alibuild/tests/test_parseRecipe.py
+  PYTHONPATH=alibuild time coverage run -a alibuild/tests/test_utilities.py
   time coverage run -a alibuild/aliBuild build zlib --no-system --disable GCC-Toolchain
   alibuild/alienv q
   alibuild/alienv setenv zlib/latest -c bash -c '[[ $LD_LIBRARY_PATH == */zlib/* ]]'

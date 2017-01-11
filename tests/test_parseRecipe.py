@@ -2,6 +2,7 @@ import unittest
 import platform
 from alibuild_helpers.utilities import parseRecipe, getRecipeReader, parseDefaults
 from alibuild_helpers.utilities import FileReader, GitReader
+from alibuild_helpers.utilities import validateDefaults, SpecError
 
 TEST1="""package: foo
 version: bar
@@ -103,6 +104,25 @@ class TestRecipes(unittest.TestCase):
     assert(taps == {'root': 'dist:ROOT@master'})
     print err, overrides, taps
     print disable
+
+  def test_validateDefault(self):
+    ok, valid = validateDefaults({"something": True}, "release")
+    self.assertEqual(ok, True)
+    ok, valid = validateDefaults({"package": "foo","valid_defaults": ["o2", "o2-daq"]}, "release")
+    self.assertEqual(ok, False)
+    self.assertEqual(valid, 'Cannot compile foo with `release\' default. Valid defaults are\n - o2\n - o2-daq')
+    ok, valid = validateDefaults({"package": "foo","valid_defaults": ["o2", "o2-daq"]}, "o2")
+    self.assertEqual(ok, True)
+    ok, valid = validateDefaults({"package": "foo","valid_defaults": "o2-daq"}, "o2")
+    self.assertEqual(ok, False)
+    ok, valid = validateDefaults({"package": "foo","valid_defaults": "o2"}, "o2")
+    self.assertEqual(ok, True)
+    ok, valid = validateDefaults({"package": "foo","valid_defaults": 1}, "o2")
+    self.assertEqual(ok, False)
+    self.assertEqual(valid, 'valid_defaults needs to be a string or a list of strings. Found [1].')
+    ok, valid = validateDefaults({"package": "foo", "valid_defaults": {}}, "o2")
+    self.assertEqual(ok, False)
+    self.assertEqual(valid, 'valid_defaults needs to be a string or a list of strings. Found [{}].')
 
 if __name__ == '__main__':
     unittest.main()
