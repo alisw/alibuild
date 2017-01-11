@@ -22,6 +22,23 @@ def validateSpec(spec):
   if not "package" in spec:
     raise SpecError("Missing package field in header.")
 
+# Use this to check if a given spec is compatible with the given default
+def validateDefaults(finalPkgSpec, defaults):
+  if not "valid_defaults" in finalPkgSpec:
+    return (True, "")
+  validDefaults = finalPkgSpec["valid_defaults"]
+  if not type(validDefaults) == list:
+    validDefaults = [validDefaults]
+  nonStringDefaults = [x for x in validDefaults if not type(x) == str]
+  if nonStringDefaults:
+    return (False, "valid_defaults needs to be a string or a list of strings. Found %s." % nonStringDefaults)
+  if defaults in validDefaults:
+    return (True, "")
+  return (False, "Cannot compile %s with `%s' default. Valid defaults are\n%s" % 
+                  (finalPkgSpec["package"],
+                   defaults,
+                   "\n".join([" - " + x for x in validDefaults])))
+
 def format(s, **kwds):
   if type(s) == bytes:
     s = s.decode()

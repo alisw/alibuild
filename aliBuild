@@ -21,6 +21,7 @@ from alibuild_helpers.log import logger_handler, logger, LogFormatter, ProgressP
 from alibuild_helpers.utilities import format, getVersion, detectArch, dockerStatusOutput, parseDefaults, readDefaults
 from alibuild_helpers.utilities import parseRecipe, getPackageList, getRecipeReader
 from alibuild_helpers.utilities import Hasher
+from alibuild_helpers.utilities import validateDefaults
 from alibuild_helpers.analytics import decideAnalytics, askForAnalytics, report_screenview, report_exception, report_event
 from alibuild_helpers.analytics import enable_analytics, disable_analytics
 import traceback
@@ -657,6 +658,13 @@ def doMain():
                   "In most cases this is achieved by doing in the package source directory:\n\n"
                   "  git pull --rebase\n",
                   pwd=os.getcwd(), star=star()))
+
+  # Determine if the default is ok for the given package
+  finalPkgSpec = specs[buildOrder[-1]]
+  ok, out = validateDefaults(finalPkgSpec, args.defaults)
+  if not ok:
+    error(out)
+    exit(1)
 
   # Resolve the tag to the actual commit ref, so that
   for p in buildOrder:
