@@ -21,6 +21,7 @@ from alibuild_helpers.log import logger_handler, logger, LogFormatter, ProgressP
 from alibuild_helpers.utilities import format, getVersion, detectArch, dockerStatusOutput, parseDefaults, readDefaults
 from alibuild_helpers.utilities import parseRecipe, getPackageList, getRecipeReader
 from alibuild_helpers.utilities import Hasher
+from alibuild_helpers.utilities import validateDefaults
 from alibuild_helpers.analytics import decideAnalytics, askForAnalytics, report_screenview, report_exception, report_event
 from alibuild_helpers.analytics import enable_analytics, disable_analytics
 import traceback
@@ -658,6 +659,7 @@ def doMain():
                   "  git pull --rebase\n",
                   pwd=os.getcwd(), star=star()))
 
+
   # Resolve the tag to the actual commit ref, so that
   for p in buildOrder:
     spec = specs[p]
@@ -746,11 +748,16 @@ def doMain():
                      (mainPackage, args.develPrefix if "develPrefix" in args else mainHash[0:8])))
 
   # Now that we have the main package set, we can print out Useful information
-  # which we will be able to associate with this build.
+  # which we will be able to associate with this build. Also lets make sure each package
+  # we need to build can be built with the current default.
   for p in buildOrder:
     spec = specs[p]
     if "source" in spec:
       debug("Commit hash for %s@%s is %s" % (spec["source"], spec["tag"], spec["commit_hash"]))
+    ok, out = validateDefaults(spec, args.defaults)
+    if not ok:
+      error(out)
+      exit(1)
 
   # Calculate the hashes. We do this in build order so that we can guarantee
   # that the hashes of the dependencies are calculated first.  Also notice that
