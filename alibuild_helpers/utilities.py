@@ -14,6 +14,8 @@ from os.path import basename
 class SpecError(Exception):
   pass
 
+asList = lambda x : x if type(x) == list else [x]
+
 def validateSpec(spec):
   if not spec:
     raise SpecError("Empty recipe.")
@@ -26,9 +28,7 @@ def validateSpec(spec):
 def validateDefaults(finalPkgSpec, defaults):
   if not "valid_defaults" in finalPkgSpec:
     return (True, "")
-  validDefaults = finalPkgSpec["valid_defaults"]
-  if not type(validDefaults) == list:
-    validDefaults = [validDefaults]
+  validDefaults = asList(finalPkgSpec["valid_defaults"])
   nonStringDefaults = [x for x in validDefaults if not type(x) == str]
   if nonStringDefaults:
     return (False, "valid_defaults needs to be a string or a list of strings. Found %s." % nonStringDefaults)
@@ -198,9 +198,7 @@ def parseDefaults(disable, defaultsGetter, log):
   # example they could decide to switch from ROOT 5 to ROOT 6 and they
   # could disable alien for O2. For this reason we need to parse their
   # metadata early and extract the override and disable data.
-  defaultsDisable = defaultsMeta.get("disable", [])
-  if type(defaultsDisable) == str:
-    defaultsDisable = [defaultsDisable]
+  defaultsDisable = asList(defaultsMeta.get("disable", []))
   for x in defaultsDisable:
     log("Package %s has been disabled by current default." % x)
   disable.extend(defaultsDisable)

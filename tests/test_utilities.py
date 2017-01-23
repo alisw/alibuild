@@ -3,6 +3,7 @@ import platform
 from alibuild_helpers.utilities import doDetectArch
 from alibuild_helpers.utilities import Hasher
 from alibuild_helpers.utilities import format
+from alibuild_helpers.utilities import asList
 
 UBUNTU_1510_OS_RELEASE = """
 NAME="Ubuntu"
@@ -134,6 +135,11 @@ class TestUtilities(unittest.TestCase):
     self.assertEqual(format("%(foo)s", foo="foo"), "foo")
     self.assertEqual(format(b"%(foo)s", foo="foo"), "foo")
     self.assertRaises(KeyError, format, "%(foo)s", bar="foo")
+
+  def test_asList(self):
+    self.assertEqual(asList("a"), ["a"])
+    self.assertEqual(asList(["a"]), ["a"])
+    self.assertEqual(asList(None), [None])
 
 if __name__ == '__main__':
     unittest.main()
