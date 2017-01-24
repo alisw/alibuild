@@ -204,13 +204,14 @@ def parseDefaults(disable, defaultsGetter, log):
   disable.extend(defaultsDisable)
   if type(defaultsMeta.get("overrides", {})) != dict:
     return ("overrides should be a dictionary", None, None)
-  overrides = {}
-  taps = {}
+  overrides, taps = {}, {}
+  commonEnv = {"env": defaultsMeta["env"]} if "env" in defaultsMeta else {}
+  overrides["defaults-release"] = commonEnv
   for k, v in defaultsMeta.get("overrides", {}).items():
     f = k.split("@", 1)[0].lower()
     if "@" in k:
       taps[f] = "dist:"+k
-    overrides[f] = v
+    overrides[f] = dict(**(v or {}))
   return (None, overrides, taps)
 
 def getPackageList(packages, specs, configDir, preferSystem, noSystem,
@@ -232,10 +233,13 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
     dieOnError(spec["package"].lower() != lowerPkg,
                "%s.sh has different package field: %s" % (p, spec["package"]))
 
-    # If the package has overrides, we apply them.
-    if lowerPkg in overrides:
-      log("Overrides for package %s: %s" % (spec["package"], overrides[lowerPkg]))
-      spec.update(overrides.get(lowerPkg, {}) or {})
+    # If an override fully matches a package, we apply it. This means
+    # you can have multiple overrides being applied for a given package.
+    for override in overrides:
+      if not re.match("^" + override.strip("^$") + "$", lowerPkg):
+        continue
+      log("Overrides for package %s: %s" % (spec["package"], overrides[override]))
+      spec.update(overrides.get(override, {}) or {})
 
     # If --always-prefer-system is passed or if prefer_system is set to true
     # inside the recipe, use the script specified in the prefer_system_check
@@ -274,8 +278,8 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
     fn = lambda what: filterByArchitecture(architecture, spec.get(what, []))
     spec["requires"] = [x for x in fn("requires") if not x in disable]
     spec["build_requires"] = [x for x in fn("build_requires") if not x in disable]
-    if spec["package"] != "defaults-" + defaults:
-      spec["build_requires"].append("defaults-" + defaults)
+    if spec["package"] != "defaults-release":
+      spec["build_requires"].append("defaults-release")
     spec["runtime_requires"] = spec["requires"]
     spec["requires"] = spec["runtime_requires"] + spec["build_requires"]
     # Check that version is a string
