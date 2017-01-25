@@ -43,6 +43,9 @@ def star():
 def gzip():
   return getstatusoutput("which pigz")[0] and "gzip" or "pigz"
 
+def tar():
+  return getstatusoutput("tar --ignore-failed-read -cvvf /dev/null /dev/zero")[0] and "tar" or "tar --ignore-failed-read"
+
 def execute(command, printer=debug):
   if not printer:
     printer = debug
@@ -1201,6 +1204,7 @@ def doMain():
       ("BUILD_FAMILY", spec["build_family"]),
       ("GIT_TAG", spec["tag"]),
       ("MY_GZIP", gzip()),
+      ("MY_TAR", tar()),
       ("INCREMENTAL_BUILD_HASH", spec.get("incremental_hash", "0")),
       ("JOBS", args.jobs),
       ("PKGHASH", spec["hash"]),
