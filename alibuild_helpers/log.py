@@ -69,6 +69,8 @@ class LogFormatter(logging.Formatter):
                           logging.CRITICAL: "\033[1;37;41m",
                           logging.SUCCESS:  "\033[1;32m" } if sys.stdout.isatty() else {}
   def format(self, record):
+    # Replace all non-ascii characters as they aren't properly handled
+    record.msg = record.msg.encode('ascii','replace')
     if record.levelno == logging.BANNER and sys.stdout.isatty():
       lines = str(record.msg).split("\n")
       return "\n\033[1;34m==>\033[m \033[1m%s\033[m" % lines[0] + \
