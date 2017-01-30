@@ -1315,6 +1315,9 @@ def doMain():
                   w=abspath(args.workDir)))
 
 if __name__ == "__main__":
+  alibuild_work_dir = os.environ.get("ALIBUILD_WORK_DIR")
+  if alibuild_work_dir:
+    os.chdir(alibuild_work_dir)
   logger.setLevel(logging.DEBUG if "--debug" in sys.argv or "-d" in sys.argv else logging.INFO)
   os.environ["ALIBUILD_ANALYTICS_ID"] = "UA-77346950-1"
   os.environ["ALIBUILD_VERSION"] = getVersion()
