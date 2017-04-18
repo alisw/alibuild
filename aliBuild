@@ -1356,6 +1356,6 @@ if __name__ == "__main__":
     report_event("user", "ctrlc")
     exit(1)
   except Exception as e:
-    report_exception(e)
     traceback.print_exc()
+    report_exception(e)
     exit(1)
