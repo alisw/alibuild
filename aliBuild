@@ -2,6 +2,7 @@
 from __future__ import print_function
 import os, time, re, yaml, hashlib, argparse
 import sys, shutil, subprocess, socket
+import atexit
 try:
   from commands import getstatusoutput
   from urllib2 import urlopen, URLError
@@ -1339,6 +1340,21 @@ if __name__ == "__main__":
   else:
     os.environ["ALIBUILD_ANALYTICS_USER_UUID"] = open(expanduser("~/.config/alibuild/analytics-uuid")).read().strip()
   try:
+    profiler = "--profile" in sys.argv
+    if profiler:
+      print("profiler started")
+      import cProfile, pstats, StringIO
+      pr = cProfile.Profile()
+      pr.enable()
+      def profiler():
+        pr.disable()
+        print("profiler stopped")
+        s = StringIO.StringIO()
+        sortby = 'time'
+        ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
+        ps.print_stats()
+        print(s.getvalue())
+      atexit.register(profiler)
     doMain()
   except KeyboardInterrupt as e:
     info(str(e))
