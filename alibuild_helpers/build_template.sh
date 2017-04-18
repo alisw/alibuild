@@ -40,6 +40,16 @@ export PKGPATH=${ARCHITECTURE}/${PKGNAME}/${PKGVERSION}-${PKGREVISION}
 mkdir -p "$WORK_DIR/BUILD" "$WORK_DIR/SOURCES" "$WORK_DIR/TARS" \
          "$WORK_DIR/SPECS" "$WORK_DIR/INSTALLROOT"
 export BUILDROOT="$WORK_DIR/BUILD/$PKGHASH"
+case $ARCHITECTURE in
+  osx*)
+    export LIBENVNAME=DYLD_LIBRARY_PATH
+    export SONAME=dylib
+  ;;
+  *)
+    export LIBENVNAME=LD_LIBRARY_PATH
+    export SONAME=so
+  ;;
+esac
 
 # In case the repository is local, it means we are in development mode, so we
 # install directly in $WORK_DIR/$PKGPATH so that we can do make install
