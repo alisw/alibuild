@@ -792,8 +792,6 @@ def doMain():
       spec["incremental_hash"] = ih.hexdigest()
     elif p in develPkgs:
       h(spec.get("devel_hash"))
-    if args.architecture.startswith("osx"):
-      h("osx_relocation")
     spec["hash"] = h.hexdigest()
     spec["deps_hash"] = dh.hexdigest()
     debug("Hash for recipe %s is %s" % (p, spec["hash"]))
