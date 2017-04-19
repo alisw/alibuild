@@ -1,9 +1,19 @@
 import unittest
 import platform
-from alibuild_helpers.utilities import doDetectArch
+
+# Assuming you are using the mock library to ... mock things
+try:
+    from unittest.mock import patch, call  # In Python 3, mock is built-in
+except ImportError:
+    from mock import patch, call  # Python 2
+
+from alibuild_helpers.utilities import doDetectArch, filterByArchitecture
 from alibuild_helpers.utilities import Hasher
 from alibuild_helpers.utilities import format
 from alibuild_helpers.utilities import asList
+from alibuild_helpers.utilities import dockerStatusOutput
+from alibuild_helpers.utilities import prunePaths, getVersion
+import os
 
 UBUNTU_1510_OS_RELEASE = """
 NAME="Ubuntu"
@@ -140,6 +150,54 @@ class TestUtilities(unittest.TestCase):
     self.assertEqual(asList("a"), ["a"])
     self.assertEqual(asList(["a"]), ["a"])
     self.assertEqual(asList(None), [None])
+
+  def test_filterByArchitecture(self):
+    self.assertEqual(["AliRoot"], list(filterByArchitecture("osx_x86-64", ["AliRoot"])))
+    self.assertEqual([], list(filterByArchitecture("osx_x86-64", ["AliRoot:(?!osx)"])))
+    self.assertEqual(["GCC"], list(filterByArchitecture("osx_x86-64", ["AliRoot:(?!osx)", "GCC"])))
+    self.assertEqual(["AliRoot", "GCC"], list(filterByArchitecture("osx_x86-64", ["AliRoot:(?!slc6)", "GCC"])))
+    self.assertEqual(["GCC"], list(filterByArchitecture("osx_x86-64", ["AliRoot:slc6", "GCC:osx"])))
+    self.assertEqual([], list(filterByArchitecture("osx_x86-64", [])))
+
+  @patch("alibuild_helpers.utilities.getstatusoutput")
+  def test_dockerStatusOutput(self, mock_getstatusoutput):
+    cmd = dockerStatusOutput(cmd="echo foo", dockerImage="image", executor=mock_getstatusoutput)
+    self.assertEqual(mock_getstatusoutput.mock_calls,
+                     [call(u'docker run image bash -c \'eval "$(echo ZWNobyBmb28= | base64 --decode)"\'')])
+
+  def test_prunePaths(self):
+    fake_env = {
+      "PATH": "/sw/bin:/usr/local/bin",
+      "LD_LIBRARY_PATH": "/sw/lib",
+      "DYLD_LIBRARY_PATH": "/sw/lib",
+      "ALIBUILD_VERSION": "v1.0.0",
+      "ROOT_VERSION": "v1.0.0"
+    }
+    fake_env_copy = {
+      "PATH": "/sw/bin:/usr/local/bin",
+      "LD_LIBRARY_PATH": "/sw/lib",
+      "DYLD_LIBRARY_PATH": "/sw/lib",
+      "ALIBUILD_VERSION": "v1.0.0",
+      "ROOT_VERSION": "v1.0.0"
+    }
+    with patch.object(os, "environ", fake_env):
+      prunePaths("/sw")
+      self.assertTrue(not "ROOT_VERSION" in fake_env)
+      self.assertTrue(fake_env["PATH"] == "/usr/local/bin")
+      self.assertTrue(fake_env["LD_LIBRARY_PATH"] == "")
+      self.assertTrue(fake_env["DYLD_LIBRARY_PATH"] == "")
+      self.assertTrue(fake_env["ALIBUILD_VERSION"] == "v1.0.0")
+
+    with patch.object(os, "environ", fake_env_copy):
+      prunePaths("/foo")
+      self.assertTrue(not "ROOT_VERSION" in fake_env_copy)
+      self.assertTrue(fake_env_copy["PATH"] == "/sw/bin:/usr/local/bin")
+      self.assertTrue(fake_env_copy["LD_LIBRARY_PATH"] == "/sw/lib")
+      self.assertTrue(fake_env_copy["DYLD_LIBRARY_PATH"] == "/sw/lib")
+      self.assertTrue(fake_env_copy["ALIBUILD_VERSION"] == "v1.0.0")
+
+  def test_getVersion(self):
+    getVersion()
 
 if __name__ == '__main__':
     unittest.main()

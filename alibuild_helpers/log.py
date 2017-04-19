@@ -2,9 +2,15 @@ import logging
 import sys
 from os import getenv
 import socket, time
-from alibuild_helpers.utilities import format
+from alibuild_helpers.utilities import format, is_string
 
 debug, error, warning, info, success, riemannStream = (None, None, None, None, None, None)
+
+def dieOnError(err, msg):
+  if err:
+    riemannStream.setState('critical')
+    error(msg)
+    sys.exit(1)
 
 # A stream object which will end up pushing data to a riemann server
 class RiemannStream(object):
@@ -70,7 +76,8 @@ class LogFormatter(logging.Formatter):
                           logging.SUCCESS:  "\033[1;32m" } if sys.stdout.isatty() else {}
   def format(self, record):
     # Replace all non-ascii characters as they aren't properly handled
-    record.msg = record.msg.encode('ascii','replace')
+    if not is_string(record.msg):
+      record.msg = record.msg.encode('ascii','replace')
     if record.levelno == logging.BANNER and sys.stdout.isatty():
       lines = str(record.msg).split("\n")
       return "\n\033[1;34m==>\033[m \033[1m%s\033[m" % lines[0] + \
