@@ -1,20 +1,42 @@
 #!/usr/bin/env python
-import subprocess, re, yaml
+import subprocess, yaml
 try:
   from commands import getstatusoutput
 except ImportError:
   from subprocess import getstatusoutput
 from os.path import dirname, exists
-import platform
 import base64
 import hashlib
 from glob import glob
 from os.path import basename
+import sys
+import os
+import re
 
 class SpecError(Exception):
   pass
 
 asList = lambda x : x if type(x) == list else [x]
+
+def is_string(s):
+  # if we use Python 3
+  if (sys.version_info[0] >= 3):
+    return isinstance(s, str)
+  # we use Python 2
+  return isinstance(s, basestring)
+
+def normalise_multiple_options(option, sep=","):
+  return [x for x in ",".join(option).split(sep) if x]
+
+def prunePaths(workDir):
+  for x in ["PATH", "LD_LIBRARY_PATH", "DYLD_LIBRARY_PATH"]:
+    if not x in os.environ:
+      continue
+    workDirEscaped = re.escape("%s" % workDir) + "[^:]*:?"
+    os.environ[x] = re.sub(workDirEscaped, "", os.environ[x])
+  for x in list(os.environ.keys()):
+    if x.endswith("_VERSION") and x != "ALIBUILD_VERSION":
+      os.environ.pop(x)
 
 def validateSpec(spec):
   if not spec:
@@ -295,9 +317,13 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
 def dockerStatusOutput(cmd, dockerImage=None, executor=getstatusoutput):
   if dockerImage:
     DOCKER_WRAPPER = """docker run %(di)s bash -c 'eval "$(echo %(c)s | base64 --decode)"'"""
+    try:
+      encodedCommand = base64.b64encode(bytes(cmd,  encoding="ascii")).decode()
+    except TypeError:
+      encodedCommand = base64.b64encode(cmd)
     cmd = format(DOCKER_WRAPPER,
                  di=dockerImage,
-                 c=base64.b64encode(cmd))
+                 c=encodedCommand)
   return executor(cmd)
 
 class Hasher:

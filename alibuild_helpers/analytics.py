@@ -2,11 +2,9 @@
 import os, subprocess, sys
 try:
   from commands import getstatusoutput
-  from urllib import urlopen
 except ImportError:
   from subprocess import getstatusoutput
-  from urllib.request import urlopen
-from alibuild_helpers.log import debug, error, banner, info, logger_handler
+from alibuild_helpers.log import debug, banner
 from os.path import exists, expanduser
 from os import unlink
 

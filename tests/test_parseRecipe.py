@@ -27,10 +27,10 @@ TEST_BROKEN_6 = """tag: "foo
 ---
 """
 
-ERROR_MSG_3 ="""Unable to parse test_broken_3.sh
+ERROR_MSG_3 = """Unable to parse test_broken_3.sh
 while parsing a block mapping
 expected <block end>, but found ':'
-  in "<string>", line 2, column 6:
+  in "<unicode string>", line 2, column 6:
        - :
          ^"""
 
@@ -42,11 +42,11 @@ Missing package field in header."""
 
 ERROR_MSG_6 = """Unable to parse test_broken_6.sh
 while scanning a quoted scalar
-  in "<string>", line 1, column 6:
+  in "<unicode string>", line 1, column 6:
     tag: "foo
          ^
 found unexpected end of stream
-  in "<string>", line 2, column 1:
+  in "<unicode string>", line 2, column 1:
     
     ^"""
 
@@ -61,37 +61,40 @@ class BufferReader(object):
     self.url = filename
     self.buffer = recipe
   def __call__(self):
-    return self.buffer
+    if type(self.buffer) == bytes:
+      return self.buffer.decode()
+    else:
+      return self.buffer
 
 class TestRecipes(unittest.TestCase):
   def test_recipes(self):
     err, meta, body = parseRecipe(BufferReader("test1.sh", TEST1))
-    assert(err == None)
-    assert(meta["package"] == "foo")
-    assert(meta["version"] == "bar")
+    self.assertEqual(err, None)
+    self.assertEqual(meta["package"], "foo")
+    self.assertEqual(meta["version"],  "bar")
     err, meta, body = parseRecipe(BufferReader("test_broken_1.sh", TEST_BROKEN_1))
-    assert(err == "Unable to parse test_broken_1.sh. Header missing.")
+    self.assertEqual(err,  "Unable to parse test_broken_1.sh. Header missing.")
     err, meta, body = parseRecipe(BufferReader("test_broken_2.sh", TEST_BROKEN_2))
-    assert(err == "Malformed header for test_broken_2.sh\nEmpty recipe.")
-    assert(not meta and not body)
+    self.assertEqual(err, "Malformed header for test_broken_2.sh\nEmpty recipe.")
+    self.assertTrue(not meta and not body)
     err, meta, body = parseRecipe(BufferReader("test_broken_3.sh", TEST_BROKEN_3))
-    assert(err == ERROR_MSG_3)
-    assert(meta == None)
-    assert(body.strip() == "")
+    self.assertEqual(err.encode("ascii"), ERROR_MSG_3.encode("ascii"))
+    self.assertEqual(meta, None)
+    self.assertEqual(body.strip(), "")
     err, meta, body = parseRecipe(BufferReader("test_broken_4.sh", TEST_BROKEN_4))
-    assert(err == ERROR_MSG_4)
+    self.assertEqual(err, ERROR_MSG_4)
     err, meta, body = parseRecipe(BufferReader("test_broken_5.sh", TEST_BROKEN_5))
-    assert(err == ERROR_MSG_5)
+    self.assertEqual(err, ERROR_MSG_5)
     err, meta, body = parseRecipe(BufferReader("test_broken_6.sh", TEST_BROKEN_6))
-    assert(err.strip() == ERROR_MSG_6.strip())
+    self.assertEqual(err.strip(), ERROR_MSG_6.strip())
 
   def test_getRecipeReader(self):
     f = getRecipeReader("foo")
-    assert(type(f) == FileReader)
+    self.assertEqual(type(f), FileReader)
     f = getRecipeReader("dist:foo@master")
-    assert(type(f) == FileReader)
+    self.assertEqual(type(f), FileReader)
     f = getRecipeReader("dist:foo@master", "alidist")
-    assert(type(f) == GitReader)
+    self.assertEqual(type(f), GitReader)
 
   def test_parseDefaults(self):
     disable = ["bar"]
@@ -99,9 +102,9 @@ class TestRecipes(unittest.TestCase):
                                         lambda : ({"disable": "foo",
                                                    "overrides": {"ROOT@master": {"requires": "GCC"}}}, ""),
                                         Recoder())
-    assert(disable == ["bar", "foo"])
-    assert(overrides == {'defaults-release': {}, 'root': {'requires': 'GCC'}})
-    assert(taps == {'root': 'dist:ROOT@master'})
+    self.assertEqual(disable, ["bar", "foo"])
+    self.assertEqual(overrides, {'defaults-release': {}, 'root': {'requires': 'GCC'}})
+    self.assertEqual(taps, {'root': 'dist:ROOT@master'})
 
   def test_validateDefault(self):
     ok, valid = validateDefaults({"something": True}, "release")
