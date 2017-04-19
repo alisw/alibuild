@@ -6,3 +6,5 @@ dist
 alibuild.egg-info
 _site
 .rubyversion
+*,cover
+.coverage
