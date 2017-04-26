@@ -15,7 +15,7 @@ from alibuild_helpers.clean import doClean
 from alibuild_helpers.doctor import doDoctor
 from alibuild_helpers.deps import deps
 from alibuild_helpers.log import info, logger
-from alibuild_helpers.utilities import getVersion
+from alibuild_helpers.utilities import getVersion, detectArch
 from alibuild_helpers.build import doBuild, star
 
 
@@ -93,6 +93,10 @@ if __name__ == "__main__":
       disable_analytics()
     else:
       enable_analytics()
+    exit(0)
+  elif args.action == "architecture":
+    arch = detectArch()
+    print(arch if arch else "<unknown>")
     exit(0)
 
   if not decideAnalytics(exists(expanduser("~/.config/alibuild/disable-analytics")),

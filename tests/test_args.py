@@ -29,7 +29,7 @@ PARSER_ERRORS = {
   "build": [call(BUILD_MISSING_PKG_ERROR)],
   "build zlib --foo": [call('unrecognized arguments: --foo')],
   "init --docker-image": [call('unrecognized arguments: --docker-image')],
-  "builda zlib" : [call("argument action: invalid choice: 'builda' (choose from 'analytics', 'build', 'clean', 'deps', 'doctor', 'init', 'version')")],
+  "builda zlib" : [call("argument action: invalid choice: 'builda' (choose from 'analytics', 'architecture', 'build', 'clean', 'deps', 'doctor', 'init', 'version')")],
   "build zlib --no-system --always-prefer-system" : [call('argument --always-prefer-system: not allowed with argument --no-system')],
   "build zlib --architecture foo": ARCHITECTURE_ERROR,
   "clean --architecture foo": ARCHITECTURE_ERROR,
