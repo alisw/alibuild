@@ -244,6 +244,7 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
   failedRequirements = set()
   testCache = {}
   requirementsCache = {}
+  packages = packages[:]
   while packages:
     p = packages.pop(0)
     if p in specs:

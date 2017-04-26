@@ -271,7 +271,7 @@ def doBuild(args, parser):
                                          log=debug)
   if failed:
     return (error, "The following packages are system requirements and could not be found:\n\n- " + "\n- ".join(sorted(list(failed))) +
-                   "\nPlease run:\n\n\taliDoctor %s\n\nto get a full diagnosis." % args.pkgname.pop(), 1)
+                   "\n\nPlease run:\n\n\taliDoctor %s\n\nto get a full diagnosis." % args.pkgname.pop(), 1)
 
   for x in specs.values():
     x["requires"] = [r for r in x["requires"] if not r in args.disable]
