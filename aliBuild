@@ -45,7 +45,7 @@ def doMain(args, parser):
   report_screenview(args.action)
 
   if args.action == "version":
-    print("aliBuild version: %s" % getVersion())
+    print("aliBuild version: %s (%s)" % (getVersion(), args.architecture if args.architecture else "unknown"))
     sys.exit(0)
 
   if args.action == "doctor":
