@@ -25,6 +25,8 @@ class ExpectedExit(Exception):
 
 TEST_ZLIB_RECIPE = """package: zlib
 version: v1.2.3
+source: https://github.com/star-externals/zlib
+tag: master
 ---
 ./configure
 make
@@ -33,6 +35,8 @@ make install
 
 TEST_ROOT_RECIPE = """package: ROOT
 version: v6-08-30
+source: https://github.com/root-mirror/root
+tag: v6-08-00-patches
 requires:
 - zlib
 ---
@@ -55,7 +59,9 @@ def dummy_getstatusoutput(x):
       "GIT_DIR=/alidist/.git git rev-parse HEAD": (0, "6cec7b7b3769826219dfa85e5daa6de6522229a0"),
       'pip show alibuild | grep -e "^Version:" | sed -e \'s/.* //\'': (0, "v1.5.0"),
       'which pigz': (1, ""),
-      'tar --ignore-failed-read -cvvf /dev/null /dev/zero': (0, "")
+      'tar --ignore-failed-read -cvvf /dev/null /dev/zero': (0, ""),
+      'git ls-remote --heads https://github.com/root-mirror/root': (0, "87b87c4322d2a3fad315c919cb2e2dd73f2154dc\trefs/heads/master\nf7b336611753f1f4aaa94222b0d620748ae230c0\trefs/heads/v6-08-00-patches"),
+      'git ls-remote --heads https://github.com/star-externals/zlib': (0, "8822efa61f2a385e0bc83ca5819d608111b2168a\trefs/heads/master")
     }[x]
 
 TIMES_ASKED = {}
@@ -64,11 +70,11 @@ def dummy_open(x, mode="r"):
   if mode == "r":
     threshold, result = {
       "/sw/BUILD/27ce49698e818e8efb56b6eff6dd785e503df341/defaults-release/.build_succeeded": (0, StringIO("0")),
-      "/sw/BUILD/304a6928edf84202f615291f734a636b743d7397/zlib/.build_succeeded": (0, StringIO("0")),
-      "/sw/BUILD/a63e3474853662469af91be25c46b3b112a16f5a/ROOT/.build_succeeded": (0, StringIO("0")),
+      "/sw/BUILD/3e90b4e08bad439fa5f25282480d1adb9efb0c0d/zlib/.build_succeeded": (0, StringIO("0")),
+      "/sw/BUILD/8eb19d530a2508cf0162a97ed7686c593b9b795d/ROOT/.build_succeeded": (0, StringIO("0")),
       "/sw/osx_x86-64/defaults-release/v1-1/.build-hash": (1, StringIO("27ce49698e818e8efb56b6eff6dd785e503df341")),
-      "/sw/osx_x86-64/zlib/v1.2.3-1/.build-hash": (1, StringIO("304a6928edf84202f615291f734a636b743d7397")),
-      "/sw/osx_x86-64/ROOT/v6-08-30-1/.build-hash": (1, StringIO("a63e3474853662469af91be25c46b3b112a16f5a"))
+      "/sw/osx_x86-64/zlib/v1.2.3-1/.build-hash": (1, StringIO("3e90b4e08bad439fa5f25282480d1adb9efb0c0d")),
+      "/sw/osx_x86-64/ROOT/v6-08-30-1/.build-hash": (1, StringIO("8eb19d530a2508cf0162a97ed7686c593b9b795d"))
     }[x]
     if threshold > TIMES_ASKED.get(x, 0):
       result = None
@@ -120,8 +126,8 @@ class BuildTestCase(unittest.TestCase):
         "/sw/TARS/osx_x86-64/zlib/zlib-v1.2.3-*.osx_x86-64.tar.gz": [],
         "/sw/TARS/osx_x86-64/ROOT/ROOT-v6-08-30-*.osx_x86-64.tar.gz": [],
         "/sw/TARS/osx_x86-64/store/27/27ce49698e818e8efb56b6eff6dd785e503df341/*": [],
-        "/sw/TARS/osx_x86-64/store/30/304a6928edf84202f615291f734a636b743d7397/*": [],
-        "/sw/TARS/osx_x86-64/store/a6/a63e3474853662469af91be25c46b3b112a16f5a/*": [],
+        "/sw/TARS/osx_x86-64/store/3e/3e90b4e08bad439fa5f25282480d1adb9efb0c0d/*": [],
+        "/sw/TARS/osx_x86-64/store/8e/8eb19d530a2508cf0162a97ed7686c593b9b795d/*": [],
         "/sw/TARS/osx_x86-64/defaults-release/defaults-release-v1-1.osx_x86-64.tar.gz": ["../../osx_x86-64/store/27/27ce49698e818e8efb56b6eff6dd785e503df341/defaults-release-v1-1.osx_x86-64.tar.gz"],
       }[x]
     os.environ["ALIBUILD_NO_ANALYTICS"] = "1"
