@@ -20,6 +20,7 @@ from alibuild_helpers.workarea import updateReferenceRepos
 from alibuild_helpers.log import logger_handler, LogFormatter, ProgressPrint, riemannStream
 from datetime import datetime
 from glob import glob
+from multiprocessing.pool import ThreadPool
 
 import socket
 import os
@@ -336,6 +337,33 @@ def doBuild(args, parser):
                   "  git pull --rebase\n",
                   pwd=os.getcwd(), star=star()))
 
+  # Prefetch git heads in parallel
+  debug("Prefetching git heads in parallel:")
+
+  fetchers = list(filter(lambda p: "source" in specs[p], buildOrder))
+  poolConfig = {"processes": min(max(len(fetchers), 1), 16)}
+  pool = ThreadPool(**poolConfig)
+  debug("Created thread pool with config: %s" % poolConfig)
+
+  git_commands = {} # store futures
+  for p in fetchers:
+    # Replace source with local one if we are in development mode.
+    if specs[p]["package"] in develPkgs:
+      specs[p]["source"] = join(os.getcwd(), specs[p]["package"])
+
+    cmd = "git ls-remote --heads %s" % specs[p]["source"]
+    debug("Enqueued '%s'" % cmd)
+    git_commands[p] = pool.apply_async(getstatusoutput, (cmd,))
+
+  results = {}
+  for p, future in git_commands.items():
+    results[p] = future.get()
+
+  for p, result in results.items():
+    dieOnError(result[0], "Unable to fetch from %s" % specs[p]["source"])
+    specs[p]["git_heads"] = result[1].split("\n")
+
+  debug("Finished prefetching git heads")
 
   # Resolve the tag to the actual commit ref, so that
   for p in buildOrder:
@@ -343,14 +371,6 @@ def doBuild(args, parser):
     spec["commit_hash"] = "0"
     develPackageBranch = ""
     if "source" in spec:
-      # Replace source with local one if we are in development mode.
-      if spec["package"] in develPkgs:
-        spec["source"] = join(os.getcwd(), spec["package"])
-
-      cmd = format("git ls-remote --heads %(source)s",
-                   source = spec["source"])
-      err, out = getstatusoutput(cmd)
-      dieOnError(err, "Unable to fetch from %s" % spec["source"])
       # Tag may contain date params like %(year)s, %(month)s, %(day)s, %(hour).
       spec["tag"] = format(spec["tag"], **nowKwds)
       # By default we assume tag is a commit hash. We then try to find
@@ -358,9 +378,9 @@ def doBuild(args, parser):
       # as commit_hash. Finally if the package is a development one, we use the
       # name of the branch as commit_hash.
       spec["commit_hash"] = spec["tag"]
-      for l in out.split("\n"):
-        if l.endswith("refs/heads/{0}".format(spec["tag"])) or spec["package"] in develPkgs:
-          spec["commit_hash"] = l.split("\t", 1)[0]
+      for head in spec["git_heads"]:
+        if head.endswith("refs/heads/{0}".format(spec["tag"])) or spec["package"] in develPkgs:
+          spec["commit_hash"] = head.split("\t", 1)[0]
           # We are in development mode, we need to rebuild if the commit hash
           # is different and if there are extra changes on to.
           if spec["package"] in develPkgs:
