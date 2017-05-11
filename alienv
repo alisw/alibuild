@@ -181,7 +181,8 @@ if [[ -z "$WORK_DIR" ]]; then
 fi
 [[ ! -d "$WORK_DIR" ]] && { printHelp "Work dir $WORK_DIR cannot be accessed"; false; }
 WORK_DIR=$(cd "$WORK_DIR"; pwd)
-[[ -z "$ARCHITECTURE" ]] && ARCHITECTURE=$(ls -1t $WORK_DIR | grep -vE '^[A-Z]+$' | head -n1)
+[[ -z "$ARCHITECTURE" ]] && ARCHITECTURE="$("$(dirname "$0")/aliBuild" architecture 2> /dev/null || true)"
+[[ -z "$ARCHITECTURE" || "$ARCHITECTURE" == "<unknown>" ]] && ARCHITECTURE=$(ls -1t $WORK_DIR | grep -vE '^[A-Z]+$' | head -n1)
 [[ -z "$ARCHITECTURE" ]] && { printHelp "Cannot autodetect architecture"; false; }
 
 MODULECMD=$(PATH="$PATH:`brew --prefix modules 2>/dev/null || true`/Modules/bin" which modulecmd || true)

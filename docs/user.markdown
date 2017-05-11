@@ -248,3 +248,9 @@ or in case you need to be root (_e.g._ on Ubuntu and most Linux distributions
 for convenience):
 
     sudo pip install --upgrade alibuild
+
+## Usuful environment variables
+
+A few environment variables can be used to tweak aliBuild behavior:
+
+- `ALIBUILD_WORK_DIR`: directory to move to before continuing with the build.

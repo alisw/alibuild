@@ -1,20 +1,42 @@
 #!/usr/bin/env python
-import subprocess, re, yaml
+import subprocess, yaml
 try:
   from commands import getstatusoutput
 except ImportError:
   from subprocess import getstatusoutput
 from os.path import dirname, exists
-import platform
 import base64
 import hashlib
 from glob import glob
 from os.path import basename
+import sys
+import os
+import re
 
 class SpecError(Exception):
   pass
 
 asList = lambda x : x if type(x) == list else [x]
+
+def is_string(s):
+  # if we use Python 3
+  if (sys.version_info[0] >= 3):
+    return isinstance(s, str)
+  # we use Python 2
+  return isinstance(s, basestring)
+
+def normalise_multiple_options(option, sep=","):
+  return [x for x in ",".join(option).split(sep) if x]
+
+def prunePaths(workDir):
+  for x in ["PATH", "LD_LIBRARY_PATH", "DYLD_LIBRARY_PATH"]:
+    if not x in os.environ:
+      continue
+    workDirEscaped = re.escape("%s" % workDir) + "[^:]*:?"
+    os.environ[x] = re.sub(workDirEscaped, "", os.environ[x])
+  for x in list(os.environ.keys()):
+    if x.endswith("_VERSION") and x != "ALIBUILD_VERSION":
+      os.environ.pop(x)
 
 def validateSpec(spec):
   if not spec:
@@ -204,13 +226,14 @@ def parseDefaults(disable, defaultsGetter, log):
   disable.extend(defaultsDisable)
   if type(defaultsMeta.get("overrides", {})) != dict:
     return ("overrides should be a dictionary", None, None)
-  overrides = {}
-  taps = {}
+  overrides, taps = {}, {}
+  commonEnv = {"env": defaultsMeta["env"]} if "env" in defaultsMeta else {}
+  overrides["defaults-release"] = commonEnv
   for k, v in defaultsMeta.get("overrides", {}).items():
     f = k.split("@", 1)[0].lower()
     if "@" in k:
       taps[f] = "dist:"+k
-    overrides[f] = v
+    overrides[f] = dict(**(v or {}))
   return (None, overrides, taps)
 
 def getPackageList(packages, specs, configDir, preferSystem, noSystem,
@@ -221,6 +244,7 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
   failedRequirements = set()
   testCache = {}
   requirementsCache = {}
+  packages = packages[:]
   while packages:
     p = packages.pop(0)
     if p in specs:
@@ -232,10 +256,13 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
     dieOnError(spec["package"].lower() != lowerPkg,
                "%s.sh has different package field: %s" % (p, spec["package"]))
 
-    # If the package has overrides, we apply them.
-    if lowerPkg in overrides:
-      log("Overrides for package %s: %s" % (spec["package"], overrides[lowerPkg]))
-      spec.update(overrides.get(lowerPkg, {}) or {})
+    # If an override fully matches a package, we apply it. This means
+    # you can have multiple overrides being applied for a given package.
+    for override in overrides:
+      if not re.match("^" + override.strip("^$") + "$", lowerPkg):
+        continue
+      log("Overrides for package %s: %s" % (spec["package"], overrides[override]))
+      spec.update(overrides.get(override, {}) or {})
 
     # If --always-prefer-system is passed or if prefer_system is set to true
     # inside the recipe, use the script specified in the prefer_system_check
@@ -274,8 +301,8 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
     fn = lambda what: filterByArchitecture(architecture, spec.get(what, []))
     spec["requires"] = [x for x in fn("requires") if not x in disable]
     spec["build_requires"] = [x for x in fn("build_requires") if not x in disable]
-    if spec["package"] != "defaults-" + defaults:
-      spec["build_requires"].append("defaults-" + defaults)
+    if spec["package"] != "defaults-release":
+      spec["build_requires"].append("defaults-release")
     spec["runtime_requires"] = spec["requires"]
     spec["requires"] = spec["runtime_requires"] + spec["build_requires"]
     # Check that version is a string
@@ -291,9 +318,13 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
 def dockerStatusOutput(cmd, dockerImage=None, executor=getstatusoutput):
   if dockerImage:
     DOCKER_WRAPPER = """docker run %(di)s bash -c 'eval "$(echo %(c)s | base64 --decode)"'"""
+    try:
+      encodedCommand = base64.b64encode(bytes(cmd,  encoding="ascii")).decode()
+    except TypeError:
+      encodedCommand = base64.b64encode(cmd)
     cmd = format(DOCKER_WRAPPER,
                  di=dockerImage,
-                 c=base64.b64encode(cmd))
+                 c=encodedCommand)
   return executor(cmd)
 
 class Hasher:
