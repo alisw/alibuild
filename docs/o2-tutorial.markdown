@@ -35,12 +35,12 @@ needs to be done only once.
 
 On most laptops (in particular Macs) this means running:
 
-    pip install alibuild==1.4.0.rc1
+    pip install alibuild==1.4.0
 
 or, in case you need to be root to install packages (e.g. on Ubuntu and
 other Linux distributions):
 
-    sudo pip install alibuild==1.4.0.rc1
+    sudo pip install alibuild==1.4.0
 
 If you are on a system where you do not have enough privileges
 to install packages, you can also [install it in your home
@@ -181,7 +181,7 @@ to launch a new shell which will have the correct environment.
 
 # Example
 Development of a couple of related modules in the AliceO2Group github 
-group. The first module is called Configuration, the second ABC.
+group. The first module is called Configuration, the second monitoring.
 
 ## Setup
     pip install alibuild==1.4.0
@@ -204,20 +204,20 @@ group. The first module is called Configuration, the second ABC.
     cd sw/BUILD/Configuration-latest/Configuration
     make -j install
 
-## Build and launch ABC binaries
+## Build and launch monitoring binaries
 
-ABC depends on Configuration. We also want to work on it and test the 
+Monitoring depends on Configuration. We also want to work on it and test the 
 latest changes of Configuration.
 
     cd $HOME/alice
-    aliBuild init ABC@master
-    aliDoctor ABC
-    aliBuild --defaults o2 build ABC
+    aliBuild init monitoring@master
+    aliDoctor monitoring
+    aliBuild --defaults o2 build monitoring
     # --> picks up all the packages we already built for Configuration
     #     and Configuration itself
 
-    # Call binary with the environment of ABC and its dependencies.
-    alienv setenv ABC/latest -c <call binary>
+    # Call binary with the environment of monitoring and its dependencies.
+    alienv setenv monitoring/latest -c <call binary>
 
     # Or you could load the environment in the terminal
-    alienv load ABC/latest
+    alienv load monitoring/latest
