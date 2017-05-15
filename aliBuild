@@ -651,7 +651,7 @@ def doMain():
 
   if buildOrder:
     banner("Packages will be built in the following order:\n - %s" %
-           "\n - ".join([ x+" (development package)" if x in develPkgs else "%s@%s" % (x, specs[x]["tag"]) for x in buildOrder ]))
+           "\n - ".join([ x+" (development package)" if x in develPkgs else "%s@%s" % (x, specs[x]["tag"]) for x in buildOrder if x != "defaults-release" ]))
 
   if develPkgs:
     banner(format("You have packages in development mode.\n"
