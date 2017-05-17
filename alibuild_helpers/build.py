@@ -432,9 +432,6 @@ def doBuild(args, parser):
   if not buildOrder:
     return (banner, "Nothing to be done.", 0)
   mainPackage = buildOrder[-1]
-  mainPackage = "AliRoot" if "AliRoot" in buildOrder else mainPackage
-  mainPackage = "AliPhysics" if "AliPhysics" in buildOrder else mainPackage
-  mainPackage = "O2" if "O2" in buildOrder else mainPackage
   mainHash = specs[mainPackage]["commit_hash"]
 
   debug("Main package is %s@%s" % (mainPackage, mainHash))
