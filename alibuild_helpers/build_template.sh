@@ -168,14 +168,40 @@ cat "$INSTALLROOT/.original-unrelocated" | xargs -n1 -I{} echo "sed -e \"s|/[^ ]
 if [[ ! -s "$INSTALLROOT/.original-unrelocated" && -f "$INSTALLROOT/etc/modulefiles/$PKGNAME" ]]; then
   echo "mv -f \$PP/etc/modulefiles/$PKGNAME \$PP/etc/modulefiles/${PKGNAME}.forced-relocation && sed -e \"s|[@][@]PKGREVISION[@]\$PH[@][@]|$PKGREVISION|g\" \$PP/etc/modulefiles/${PKGNAME}.forced-relocation > \$PP/etc/modulefiles/$PKGNAME" >> "$INSTALLROOT/relocate-me.sh"
 fi
-# Find libraries needing relocation on macOS
-if [[ ${ARCHITECTURE:0:3} == osx ]]; then
-  find . -name '*.dylib' -o -name '*.so' | \
-    xargs -n1 -I{} sh -c "otool -D {}|tail -n1|grep -q $PKGHASH && echo {} | sed -e 's|^\.|\$PP|'" | \
-      while read LIB; do
-        echo "install_name_tool -id \`otool -D \"$LIB\"|tail -n1|sed -e \"s|/[^ ]*INSTALLROOT/\$PH/\$OP|\$WORK_DIR/\$PP|g\"\` \"$LIB\"" >> "$INSTALLROOT/relocate-me.sh"
-      done || true
+
+# Find libraries and executables needing relocation on macOS
+if [[ ${ARCHITECTURE:0:3} == "osx" ]]; then
+  find . -type f | xargs -n1 -P${JOBS:-4} file | grep -e 'Mach-O.*executable' -e 'Mach-O.*dynamically linked shared library' | cut -d':' -f1 | sed -e 's/^\.\///' | \
+  while read BIN; do
+    # Relocate LC_ID_DYLIB
+    if { file "$BIN" | grep 'Mach-O.*dynamically linked shared library' | cut -d':' -f1 | xargs -n1 otool -D | tail -n1 | grep -q $PKGHASH; }; then
+cat << EOF >> "$INSTALLROOT/relocate-me.sh"
+install_name_tool -id \$(otool -D "\$PP/$BIN" | tail -n1 | sed -e "s|/[^ ]*INSTALLROOT/\$PH/\$OP|\$WORK_DIR/\$PP|g") "\$PP/$BIN"
+EOF
+    fi
+    # Relocate LC_RPATH
+    if { otool -l "$BIN" | grep -A2 LC_RPATH | grep path | grep -q $PKGHASH; }; then
+cat << EOF >> "$INSTALLROOT/relocate-me.sh"
+OLD_RPATHS=\$(otool -l \$PP/$BIN | grep -A2 LC_RPATH | grep path | grep \$PH | sed -e 's|^.*path ||' -e 's| .*$||')
+for OLD_RPATH in \$OLD_RPATHS; do
+  NEW_RPATH=\${OLD_RPATH/#*INSTALLROOT\/\$PH\/\$OP/\$WORK_DIR/\$PP}
+  install_name_tool -rpath "\$OLD_RPATH" "\$NEW_RPATH" "\$PP/$BIN"
+done
+EOF
+    fi
+    # Relocate LC_LOAD_DYLIB
+    if { otool -l "$BIN" | grep -A2 LC_LOAD_DYLIB | grep name | grep -q $PKGHASH; }; then
+cat << EOF >> "$INSTALLROOT/relocate-me.sh"
+OLD_LOAD_DYLIBS=\$(otool -l \$PP/$BIN | grep -A2 LC_LOAD_DYLIB | grep name | grep \$PH | sed -e 's|^.*name ||' -e 's| .*$||')
+for OLD_LOAD_DYLIB in \$OLD_LOAD_DYLIBS; do
+  NEW_LOAD_DYLIB=\${OLD_LOAD_DYLIB/#*INSTALLROOT\/\$PH\/\$OP/\$WORK_DIR/\$PP}
+  install_name_tool -change "\$OLD_LOAD_DYLIB" "\$NEW_LOAD_DYLIB" "\$PP/$BIN"
+done
+EOF
+    fi
+  done || true
 fi
+
 cat "$INSTALLROOT/relocate-me.sh"
 cat "$INSTALLROOT/.original-unrelocated" | xargs -n1 -I{} cp '{}' '{}'.unrelocated
 cd "$WORK_DIR/INSTALLROOT/$PKGHASH"
