@@ -22,6 +22,9 @@ menu:
   -
     name: o2-tutorial.html
     label: TUTORIAL (O2)
+  -
+    name: o2-daq-tutorial.html
+    label: TUTORIAL (O2 DAQ)
 defaults:
   -
     scope:
