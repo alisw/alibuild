@@ -181,23 +181,18 @@ dependencies will not be rebuilt.
 
 # Using the software
 
-To use the software you need to load the environment:
-
-    cd ~/alice
-    alienv enter flpproto/latest
-
-This will open a new shell (you can clean the environment by just coming back
-to the old shell with `exit`).
-
-If you do not want to be in `~/alice` when running `alienv`, add this line to
-your `~/.bashrc`:
+To use the software you need to load the environment. First add this line to your .bashrc: 
 
     ALICE_WORK_DIR=$HOME/alice/sw; eval "`alienv shell-helper`"
-
-then open a new shell. `alienv` will work from everywhere. You will also be able
-to run:
+    
+Then execute:
 
     alienv load flpproto/latest
+    
+It loads the environment in your *current* shell. Use the `unload` command to clean the environment.
 
-as opposed to `enter`, to load the environment in your *current* shell. Use the
-`unload` command to clean the environment in such a case.
+You will also be able to open a *new* shell (you can clean the environment by just coming back
+to the old shell with `exit`): 
+
+    alienv enter flpproto/latest
+
