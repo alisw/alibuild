@@ -118,7 +118,8 @@ Run **as root**:
                    gettext-devel libtool freetype freetype-devel libpng     \
                    libpng-devel sqlite sqlite-devel ncurses-devel           \
                    mesa-libGLU-devel libX11-devel libXpm-devel              \
-                   libXext-devel libXft-devel libxml2 libxml2-devel
+                   libXext-devel libXft-devel libxml2 libxml2-devel motif   \
+                   motif-devel
 
 Before proceeding with the installation of Python packages, update your
 setuptools version **(as root)**:
