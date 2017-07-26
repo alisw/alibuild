@@ -119,7 +119,7 @@ Run **as root**:
                    libpng-devel sqlite sqlite-devel ncurses-devel           \
                    mesa-libGLU-devel libX11-devel libXpm-devel              \
                    libXext-devel libXft-devel libxml2 libxml2-devel motif   \
-                   motif-devel
+                   motif-devel kernel-devel pciutils-devel kmod-devel
 
 Before proceeding with the installation of Python packages, update your
 setuptools version **(as root)**:
