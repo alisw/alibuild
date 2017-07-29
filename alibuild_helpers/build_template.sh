@@ -168,6 +168,14 @@ cat "$INSTALLROOT/.original-unrelocated" | xargs -n1 -I{} echo "sed -e \"s|/[^ ]
 if [[ ! -s "$INSTALLROOT/.original-unrelocated" && -f "$INSTALLROOT/etc/modulefiles/$PKGNAME" ]]; then
   echo "mv -f \$PP/etc/modulefiles/$PKGNAME \$PP/etc/modulefiles/${PKGNAME}.forced-relocation && sed -e \"s|[@][@]PKGREVISION[@]\$PH[@][@]|$PKGREVISION|g\" \$PP/etc/modulefiles/${PKGNAME}.forced-relocation > \$PP/etc/modulefiles/$PKGNAME" >> "$INSTALLROOT/relocate-me.sh"
 fi
+# Find libraries needing relocation on macOS
+if [[ ${ARCHITECTURE:0:3} == osx ]]; then
+  find . -name '*.dylib' -o -name '*.so' | \
+    xargs -n1 -I{} sh -c "otool -D {}|tail -n1|grep -q $PKGHASH && echo {} | sed -e 's|^\.|\$PP|'" | \
+      while read LIB; do
+        echo "install_name_tool -id \`otool -D \"$LIB\"|tail -n1|sed -e \"s|/[^ ]*INSTALLROOT/\$PH/\$OP|\$WORK_DIR/\$PP|g\"\` \"$LIB\"" >> "$INSTALLROOT/relocate-me.sh"
+      done || true
+fi
 cat "$INSTALLROOT/relocate-me.sh"
 cat "$INSTALLROOT/.original-unrelocated" | xargs -n1 -I{} cp '{}' '{}'.unrelocated
 cd "$WORK_DIR/INSTALLROOT/$PKGHASH"
