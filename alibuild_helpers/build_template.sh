@@ -172,6 +172,45 @@ cat "$INSTALLROOT/relocate-me.sh"
 cat "$INSTALLROOT/.original-unrelocated" | xargs -n1 -I{} cp '{}' '{}'.unrelocated
 cd "$WORK_DIR/INSTALLROOT/$PKGHASH"
 
+if [[ $ARCHITECTURE =~ osx.* ]]; then
+  echo "   " >> "$INSTALLROOT/relocate-me.sh"
+  echo "# Add relocation of binaries and libraries when running on Mac OSX"  >> "$INSTALLROOT/relocate-me.sh"
+
+  if [ -d $INSTALLROOT/lib ]; then
+    cd $INSTALLROOT/lib
+    declare -a _libs=$(find . -type f -exec file -L {} \; | grep "Mach-O 64-bit" | cut -d: -f1)
+    for file in $_libs; do
+      file=$(echo $file | cut -d/ -f2-)
+      echo "install_name_tool -id \${WORK_DIR}/\$PP/lib/$file \${WORK_DIR}/\$PP/lib/$file" >> "$INSTALLROOT/relocate-me.sh"
+      for _path in $(otool -L $file | grep -v $file | grep $WORK_DIR | cut -f1 -d' ' | cut -f2 -d$'\t'); do
+        new_path=$(echo $_path | sed -e "s|$WORK_DIR/|\$WORK_DIR/|g")
+        echo "install_name_tool -change $_path $new_path \$WORK_DIR/\$PP/lib/$file" >> "$INSTALLROOT/relocate-me.sh"
+      done
+      for _path in $(otool -L $file | grep -v $file | grep INSTALLROOT | cut -f1 -d' ' | cut -f2 -d$'\t'); do
+        new_path=$(echo $_path | sed -e "s|.*/INSTALLROOT/$PKGHASH/|\$WORK_DIR/|g")
+        echo "install_name_tool -change $_path $new_path \$WORK_DIR/\$PP/lib/$file" >> "$INSTALLROOT/relocate-me.sh"
+      done
+    done
+  fi
+
+  if [ -d $INSTALLROOT/bin ]; then
+    cd $INSTALLROOT/bin
+    declare -a _binaries=$(find . -type f -exec file -L {} \; | grep "Mach-O 64-bit" | cut -d: -f1)
+    for file in $_binaries; do
+      file=$(echo $file | cut -d/ -f2-)
+      for _path in $(otool -L $file | grep $WORK_DIR | cut -f1 -d' ' | cut -f2 -d$'\t'); do
+        new_path=$(echo $_path | sed -e "s|$WORK_DIR/|\$WORK_DIR/|g")
+        echo "install_name_tool -change $_path $new_path \$WORK_DIR/\$PP/bin/$file" >> "$INSTALLROOT/relocate-me.sh"
+      done
+      for _path in $(otool -L $file | grep INSTALLROOT | cut -f1 -d' ' | cut -f2 -d$'\t'); do
+        new_path=$(echo $_path | sed -e "s|$WORK_DIR/INSTALLROOT/$PKGHASH/|\$WORK_DIR/|g")
+        echo "install_name_tool -change $_path $new_path \$WORK_DIR/\$PP/bin/$file" >> "$INSTALLROOT/relocate-me.sh"
+      done
+    done
+  fi
+  cd "$WORK_DIR/INSTALLROOT/$PKGHASH"
+fi
+
 # Archive creation
 HASHPREFIX=`echo $PKGHASH | cut -b1,2`
 HASH_PATH=$ARCHITECTURE/store/$HASHPREFIX/$PKGHASH
