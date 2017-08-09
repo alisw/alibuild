@@ -19,11 +19,18 @@ class SpecError(Exception):
 asList = lambda x : x if type(x) == list else [x]
 
 def is_string(s):
-  # if we use Python 3
-  if (sys.version_info[0] >= 3):
+  if sys.version_info[0] >= 3:
     return isinstance(s, str)
-  # we use Python 2
   return isinstance(s, basestring)
+
+def to_unicode(s):
+  if sys.version_info[0] >= 3:
+    if isinstance(s, bytes):
+      return s.decode("utf-8")  # to get newlines as such and not as escaped \n
+    return str(s)
+  elif isinstance(s, str):
+    return unicode(s, "utf-8")  # utf-8 is a safe assumption
+  return unicode(str(s))
 
 def normalise_multiple_options(option, sep=","):
   return [x for x in ",".join(option).split(sep) if x]
@@ -62,9 +69,7 @@ def validateDefaults(finalPkgSpec, defaults):
                    "\n".join([" - " + x for x in validDefaults])))
 
 def format(s, **kwds):
-  if type(s) == bytes:
-    s = s.decode()
-  return s % kwds
+  return to_unicode(s) % kwds
 
 def doDetectArch(hasOsRelease, osReleaseLines, platformTuple, platformSystem, platformProcessor):
   if platformSystem == "Darwin":

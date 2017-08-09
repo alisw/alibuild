@@ -2,7 +2,7 @@ import logging
 import sys
 from os import getenv
 import socket, time
-from alibuild_helpers.utilities import format, is_string
+from alibuild_helpers.utilities import format, to_unicode
 
 debug, error, warning, info, success, riemannStream = (None, None, None, None, None, None)
 
@@ -75,21 +75,19 @@ class LogFormatter(logging.Formatter):
                           logging.CRITICAL: "\033[1;37;41m",
                           logging.SUCCESS:  "\033[1;32m" } if sys.stdout.isatty() else {}
   def format(self, record):
-    # Replace all non-ascii characters as they aren't properly handled
-    if not is_string(record.msg):
-      record.msg = record.msg.encode('ascii','replace')
+    record.msg = to_unicode(record.msg)
     if record.levelno == logging.BANNER and sys.stdout.isatty():
-      lines = str(record.msg).split("\n")
+      lines = record.msg.split("\n")
       return "\n\033[1;34m==>\033[m \033[1m%s\033[m" % lines[0] + \
              "".join([ "\n    \033[1m%s\033[m" % x for x in lines[1:] ])
     elif record.levelno == logging.INFO or record.levelno == logging.BANNER:
-      return str(record.msg)
+      return record.msg
     return "\n".join([ format(self.fmtstr,
                               levelname=self.LEVEL_COLORS.get(record.levelno, self.COLOR_RESET) +
                                         record.levelname +
                                         self.COLOR_RESET,
                               message=x)
-                       for x in str(record.msg).split("\n") ])
+                       for x in record.msg.split("\n") ])
 
 class ProgressPrint:
   def __init__(self, begin_msg=""):
