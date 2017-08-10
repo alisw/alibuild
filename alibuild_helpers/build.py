@@ -16,11 +16,17 @@ from alibuild_helpers.utilities import format, dockerStatusOutput, parseDefaults
 from alibuild_helpers.utilities import getPackageList
 from alibuild_helpers.utilities import validateDefaults
 from alibuild_helpers.utilities import Hasher
+from alibuild_helpers.utilities import yamlDump
+import yaml
 from alibuild_helpers.workarea import updateReferenceRepos
 from alibuild_helpers.log import logger_handler, LogFormatter, ProgressPrint, riemannStream
 from datetime import datetime
 from glob import glob
 from multiprocessing.pool import ThreadPool
+try:
+  from collections import OrderedDict
+except ImportError:
+  from ordereddict import OrderedDict
 
 import socket
 import os
@@ -465,7 +471,11 @@ def doBuild(args, parser):
     dh = Hasher()
     for x in ["recipe", "version", "package", "commit_hash",
               "env", "append_path", "prepend_path"]:
-      h(str(spec.get(x, "none")))
+      if sys.version_info[0] < 3 and x in spec and type(spec[x]) == OrderedDict:
+        # Python 2: use YAML dict order to prevent changing hashes
+        h(str(yaml.safe_load(yamlDump(spec[x]))))
+      else:
+        h(str(spec.get(x, "none")))
     if spec["commit_hash"] == spec.get("tag", "0"):
       h(spec.get("source", "none"))
       if "source" in spec:

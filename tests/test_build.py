@@ -6,7 +6,10 @@ try:
 except ImportError:
     from mock import patch, call, MagicMock  # Python 2
     from StringIO import StringIO
-
+try:
+  from collections import OrderedDict
+except ImportError:
+  from ordereddict import OrderedDict
 
 from alibuild_helpers.build import doBuild, HttpRemoteSync, RsyncRemoteSync, NoRemoteSync
 from alibuild_helpers.analytics import decideAnalytics, askForAnalytics, report_screenview, report_exception, report_event
@@ -38,12 +41,35 @@ version: v6-08-30
 source: https://github.com/root-mirror/root
 tag: v6-08-00-patches
 requires:
-- zlib
+  - zlib
+env:
+  ROOT_TEST_1: "root test 1"
+  ROOT_TEST_2: "root test 2"
+  ROOT_TEST_3: "root test 3"
+  ROOT_TEST_4: "root test 4"
+  ROOT_TEST_5: "root test 5"
+  ROOT_TEST_6: "root test 6"
+prepend_path:
+  PREPEND_ROOT_1: "prepend root 1"
+  PREPEND_ROOT_2: "prepend root 2"
+  PREPEND_ROOT_3: "prepend root 3"
+  PREPEND_ROOT_4: "prepend root 4"
+  PREPEND_ROOT_5: "prepend root 5"
+  PREPEND_ROOT_6: "prepend root 6"
+append_path:
+  APPEND_ROOT_1: "append root 1"
+  APPEND_ROOT_2: "append root 2"
+  APPEND_ROOT_3: "append root 3"
+  APPEND_ROOT_4: "append root 4"
+  APPEND_ROOT_5: "append root 5"
+  APPEND_ROOT_6: "append root 6"
 ---
 ./configure
 make
 make install
 """
+TEST_ROOT_BUILD_HASH = "2cb80ea18ac9ec56b94c4d9a865caa1f7e03a8f0" if sys.version_info[0] < 3 else \
+                       "1fc9be611d016280a2a66519923965839d0d009b"
 
 TEST_DEFAULT_RELEASE = """package: defaults-release
 version: v1
@@ -71,10 +97,10 @@ def dummy_open(x, mode="r"):
     threshold, result = {
       "/sw/BUILD/27ce49698e818e8efb56b6eff6dd785e503df341/defaults-release/.build_succeeded": (0, StringIO("0")),
       "/sw/BUILD/3e90b4e08bad439fa5f25282480d1adb9efb0c0d/zlib/.build_succeeded": (0, StringIO("0")),
-      "/sw/BUILD/8eb19d530a2508cf0162a97ed7686c593b9b795d/ROOT/.build_succeeded": (0, StringIO("0")),
+      "/sw/BUILD/%s/ROOT/.build_succeeded" % TEST_ROOT_BUILD_HASH: (0, StringIO("0")),
       "/sw/osx_x86-64/defaults-release/v1-1/.build-hash": (1, StringIO("27ce49698e818e8efb56b6eff6dd785e503df341")),
       "/sw/osx_x86-64/zlib/v1.2.3-1/.build-hash": (1, StringIO("3e90b4e08bad439fa5f25282480d1adb9efb0c0d")),
-      "/sw/osx_x86-64/ROOT/v6-08-30-1/.build-hash": (1, StringIO("8eb19d530a2508cf0162a97ed7686c593b9b795d"))
+      "/sw/osx_x86-64/ROOT/v6-08-30-1/.build-hash": (1, StringIO(TEST_ROOT_BUILD_HASH))
     }[x]
     if threshold > TIMES_ASKED.get(x, 0):
       result = None
@@ -127,7 +153,7 @@ class BuildTestCase(unittest.TestCase):
         "/sw/TARS/osx_x86-64/ROOT/ROOT-v6-08-30-*.osx_x86-64.tar.gz": [],
         "/sw/TARS/osx_x86-64/store/27/27ce49698e818e8efb56b6eff6dd785e503df341/*": [],
         "/sw/TARS/osx_x86-64/store/3e/3e90b4e08bad439fa5f25282480d1adb9efb0c0d/*": [],
-        "/sw/TARS/osx_x86-64/store/8e/8eb19d530a2508cf0162a97ed7686c593b9b795d/*": [],
+        "/sw/TARS/osx_x86-64/store/%s/%s/*" % (TEST_ROOT_BUILD_HASH[0:2], TEST_ROOT_BUILD_HASH): [],
         "/sw/TARS/osx_x86-64/defaults-release/defaults-release-v1-1.osx_x86-64.tar.gz": ["../../osx_x86-64/store/27/27ce49698e818e8efb56b6eff6dd785e503df341/defaults-release-v1-1.osx_x86-64.tar.gz"],
       }[x]
     os.environ["ALIBUILD_NO_ANALYTICS"] = "1"
@@ -141,7 +167,7 @@ class BuildTestCase(unittest.TestCase):
     mock_exists.side_effect = dummy_exists
     mock_getstatusoutput.side_effect = dummy_getstatusoutput
     mock_parser = MagicMock()
-    mock_read_defaults.return_value = ({"package": "defaults-release", "disable": []}, "")
+    mock_read_defaults.return_value = (OrderedDict({"package": "defaults-release", "disable": []}), "")
     args = Namespace(
       remoteStore="",
       writeStore="",
@@ -164,6 +190,7 @@ class BuildTestCase(unittest.TestCase):
       autoCleanup=False,
       noDevel=[]
     )
+    mock_sys.version_info = sys.version_info
     fmt, msg, code = doBuild(args, mock_parser)
     mock_glob.assert_called_with("/sw/TARS/osx_x86-64/ROOT/ROOT-v6-08-30-*.osx_x86-64.tar.gz")
     self.assertEqual(msg, "Everything done")

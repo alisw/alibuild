@@ -12,6 +12,10 @@ from os.path import basename
 import sys
 import os
 import re
+try:
+  from collections import OrderedDict
+except ImportError:
+  from ordereddict import OrderedDict
 
 class SpecError(Exception):
   pass
@@ -48,7 +52,7 @@ def prunePaths(workDir):
 def validateSpec(spec):
   if not spec:
     raise SpecError("Empty recipe.")
-  if type(spec) != dict:
+  if type(spec) != OrderedDict:
     raise SpecError("Not a YAML key / value.")
   if not "package" in spec:
     raise SpecError("Missing package field in header.")
@@ -199,13 +203,36 @@ class GitReader(object):
                                 dist=self.configDir, gh=gh, fn=fn))
     return d
 
+def yamlLoad(s):
+  class YamlSafeOrderedLoader(yaml.SafeLoader):
+    pass
+  def construct_mapping(loader, node):
+    loader.flatten_mapping(node)
+    return OrderedDict(loader.construct_pairs(node))
+  YamlSafeOrderedLoader.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG,
+                                        construct_mapping)
+  return yaml.load(s, YamlSafeOrderedLoader)
+
+def yamlDump(s):
+  class YamlOrderedDumper(yaml.SafeDumper):
+    pass
+  def represent_ordereddict(dumper, data):
+    rep = []
+    for k,v in data.items():
+      k = dumper.represent_data(k)
+      v = dumper.represent_data(v)
+      rep.append((k, v))
+    return yaml.nodes.MappingNode(u'tag:yaml.org,2002:map', rep)
+  YamlOrderedDumper.add_representer(OrderedDict, represent_ordereddict)
+  return yaml.dump(s, Dumper=YamlOrderedDumper)
+
 def parseRecipe(reader):
   assert(reader.__call__)
   err, spec, recipe = (None, None, None)
   try:
     d = reader()
     header,recipe = d.split("---", 1)
-    spec = yaml.safe_load(header)
+    spec = yamlLoad(header)
     validateSpec(spec)
   except RuntimeError as e:
     err = str(e)
@@ -234,9 +261,9 @@ def parseDefaults(disable, defaultsGetter, log):
   for x in defaultsDisable:
     log("Package %s has been disabled by current default." % x)
   disable.extend(defaultsDisable)
-  if type(defaultsMeta.get("overrides", {})) != dict:
+  if type(defaultsMeta.get("overrides", OrderedDict())) != OrderedDict:
     return ("overrides should be a dictionary", None, None)
-  overrides, taps = {}, {}
+  overrides, taps = OrderedDict(), {}
   commonEnv = {"env": defaultsMeta["env"]} if "env" in defaultsMeta else {}
   overrides["defaults-release"] = commonEnv
   for k, v in defaultsMeta.get("overrides", {}).items():
