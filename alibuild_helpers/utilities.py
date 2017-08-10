@@ -121,8 +121,13 @@ def doDetectArch(hasOsRelease, osReleaseLines, platformTuple, platformSystem, pl
 # FIXME: we should have a fallback for lsb_release, since platform.dist
 # is going away.
 def detectArch():
-  hasOsRelease = exists("/etc/os-release")
-  osReleaseLines = open("/etc/os-release").readlines() if hasOsRelease else []
+  try:
+    with open("/etc/os-release") as osr:
+      osReleaseLines = osr.readlines()
+    hasOsRelease = True
+  except (IOError,OSError):
+    osReleaseLines = []
+    hasOsRelease = False
   try:
     import platform
     platformTuple = platform.dist()
