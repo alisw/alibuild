@@ -4,11 +4,14 @@ from alibuild_helpers.utilities import parseRecipe, getRecipeReader
 from alibuild_helpers.log import debug, error, warning, banner, info
 from alibuild_helpers.log import dieOnError
 from alibuild_helpers.workarea import updateReferenceRepos
-from os.path import basename, join
 
+from os.path import basename, join
 import os.path as path
 import os
-
+try:
+  from collections import OrderedDict
+except ImportError:
+  from ordereddict import OrderedDict
 
 def parsePackagesDefinition(pkgname):
   return [ dict(zip(["name","ver"], y.split("@")[0:2]))
@@ -33,8 +36,8 @@ def doInit(setdir, configDir, pkgname, referenceSources, dist, dryRun):
 
   for p in [{"name":"stardist","ver":dist["ver"]}] + pkgs:
     if p["name"] == "stardist":
-      spec = { "source": "https://github.com/"+dist["repo"],
-               "package": basename(configDir), "version": None }
+      spec = OrderedDict({ "source": "https://github.com/"+dist["repo"],
+                           "package": basename(configDir), "version": None })
       dest = configDir
     else:
       filename = "%s/%s.sh" % (configDir, p["name"].lower())

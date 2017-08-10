@@ -4,6 +4,10 @@ try:
     from unittest.mock import patch, call  # In Python 3, mock is built-in
 except ImportError:
     from mock import patch, call  # Python 2
+try:
+  from collections import OrderedDict
+except ImportError:
+  from ordereddict import OrderedDict
 
 from alibuild_helpers.workarea import updateReferenceRepos
 from os.path import abspath
@@ -54,7 +58,7 @@ class WorkareaTestCase(unittest.TestCase):
       # The reference repo is set nethertheless but not updated
       mock_path.exists.return_value = reference_sources_exists
       mock_os.access.side_effect = reference_sources_cannot_be_written
-      spec ={"source": "https://github.com/alisw/AliRoot"}
+      spec = OrderedDict({"source": "https://github.com/alisw/AliRoot"})
       referenceSources = "sw/MIRROR"
       reference = abspath(referenceSources) + "/aliroot"
       updateReferenceRepos(referenceSources=referenceSources,  p="AliRoot", spec=spec)
@@ -77,7 +81,7 @@ class WorkareaTestCase(unittest.TestCase):
       mock_os.access.side_effect = reference_sources_can_be_written
       mock_getstatusoutput.side_effect = allow_directory_creation
       mock_execute.side_effect = allow_git_clone
-      spec ={"source": "https://github.com/alisw/AliRoot"}
+      spec = OrderedDict({"source": "https://github.com/alisw/AliRoot"})
       referenceSources = "sw/MIRROR"
       reference = abspath(referenceSources) + "/aliroot"
       updateReferenceRepos(referenceSources=referenceSources,  p="AliRoot", spec=spec)
@@ -102,7 +106,7 @@ class WorkareaTestCase(unittest.TestCase):
       mock_os.access.side_effect = reference_sources_can_be_written
       mock_getstatusoutput.side_effect = allow_directory_creation
       mock_execute.side_effect = allow_git_clone
-      spec ={"source": "https://github.com/alisw/AliRoot"}
+      spec = OrderedDict({"source": "https://github.com/alisw/AliRoot"})
       referenceSources = "sw/MIRROR"
       reference = abspath(referenceSources) + "/aliroot"
       updateReferenceRepos(referenceSources=referenceSources,  p="AliRoot", spec=spec)
@@ -125,7 +129,7 @@ class WorkareaTestCase(unittest.TestCase):
       mock_os.access.side_effect = reference_sources_can_be_written
       mock_getstatusoutput.side_effect = allow_directory_creation
       mock_execute.side_effect = allow_git_clone
-      spec ={"source": "https://github.com/alisw/AliRoot"}
+      spec = OrderedDict({"source": "https://github.com/alisw/AliRoot"})
       referenceSources = "sw/MIRROR"
       reference = abspath(referenceSources) + "/aliroot"
       updateReferenceRepos(referenceSources=referenceSources,  p="AliRoot", spec=spec)
@@ -148,7 +152,7 @@ class WorkareaTestCase(unittest.TestCase):
       mock_os.access.side_effect = reference_sources_can_be_written
       mock_getstatusoutput.side_effect = allow_directory_creation
       mock_execute.side_effect = allow_git_clone
-      spec ={"source": "https://github.com/alisw/AliRoot"}
+      spec = OrderedDict({"source": "https://github.com/alisw/AliRoot"})
       referenceSources = "sw/MIRROR"
       reference = abspath(referenceSources) + "/aliroot"
       updateReferenceRepos(referenceSources=referenceSources,  p="AliRoot", spec=spec)

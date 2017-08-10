@@ -9,6 +9,10 @@ from alibuild_helpers.utilities import format
 
 import os
 import os.path as path
+try:
+  from collections import OrderedDict
+except ImportError:
+  from ordereddict import OrderedDict
 
 def updateReferenceRepos(referenceSources, p, spec):
   """
@@ -22,7 +26,7 @@ def updateReferenceRepos(referenceSources, p, spec):
   @p: the name of the package (?) to be updated
   @spec: the spec of the package to be updated
   """
-  assert(type(spec) == dict)
+  assert(type(spec) == OrderedDict)
   debug("Updating references.")
   referenceRepo = "%s/%s" % (abspath(referenceSources), p.lower())
   if os.access(dirname(referenceSources), os.W_OK):

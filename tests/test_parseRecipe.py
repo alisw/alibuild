@@ -3,6 +3,10 @@ import platform
 from alibuild_helpers.utilities import parseRecipe, getRecipeReader, parseDefaults
 from alibuild_helpers.utilities import FileReader, GitReader
 from alibuild_helpers.utilities import validateDefaults, SpecError
+try:
+  from collections import OrderedDict
+except ImportError:
+  from ordereddict import OrderedDict
 
 TEST1="""package: foo
 version: bar
@@ -99,8 +103,9 @@ class TestRecipes(unittest.TestCase):
   def test_parseDefaults(self):
     disable = ["bar"]
     err, overrides, taps = parseDefaults(disable,
-                                        lambda : ({"disable": "foo",
-                                                   "overrides": {"ROOT@master": {"requires": "GCC"}}}, ""),
+                                        lambda: ({ "disable": "foo",
+                                                   "overrides": OrderedDict({"ROOT@master": {"requires": "GCC"}})},
+                                                 ""),
                                         Recoder())
     self.assertEqual(disable, ["bar", "foo"])
     self.assertEqual(overrides, {'defaults-release': {}, 'root': {'requires': 'GCC'}})
