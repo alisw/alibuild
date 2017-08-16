@@ -69,7 +69,7 @@ def doMain(args, parser):
   if args.action == "init":
     doInit(setdir=args.develPrefix, configDir=args.configDir,
            pkgname=args.pkgname, referenceSources=args.referenceSources,
-           dist=args.dist, dryRun=args.dryRun)
+           dist=args.dist, defaults=args.defaults, dryRun=args.dryRun)
     exit(0)
 
   if args.action == "build":
