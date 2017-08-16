@@ -2,11 +2,15 @@ from __future__ import print_function
 # Assuming you are using the mock library to ... mock things
 try:
     from unittest.mock import patch, call  # In Python 3, mock is built-in
+    from io import StringIO
 except ImportError:
     from mock import patch, call  # Python 2
-
+    from StringIO import StringIO
+try:
+  from collections import OrderedDict
+except ImportError:
+  from ordereddict import OrderedDict
 from alibuild_helpers.init import doInit,parsePackagesDefinition
-
 import mock
 import unittest
 import traceback
@@ -25,9 +29,8 @@ def valid_recipe(x):
                 "version": "master"}, "")
 
 CLONE_EVERYTHING = [
- call(u'git clone https://github.com/alisw/alidist -b master --reference sw/MIRROR/alidist alidist && cd alidist && git remote set-url --push origin https://github.com/alisw/alidist'),
- call(u'git clone https://github.com/alisw/zlib -b v1.0 --reference sw/MIRROR/zlib ./zlib && cd ./zlib && git remote set-url --push origin https://github.com/alisw/zlib'),
- call(u'git clone https://github.com/alisw/AliRoot -b v5-08-00 --reference sw/MIRROR/aliroot ./AliRoot && cd ./AliRoot && git remote set-url --push origin https://github.com/alisw/AliRoot')
+ call(u'git clone https://github.com/alisw/alidist -b master /alidist'),
+ call(u'git clone https://github.com/alisw/AliRoot -b v5-08-00 --reference /sw/MIRROR/aliroot ./AliRoot && cd ./AliRoot && git remote set-url --push origin https://github.com/alisw/AliRoot')
 ]
 
 class InitTestCase(unittest.TestCase):
@@ -45,10 +48,11 @@ class InitTestCase(unittest.TestCase):
     def test_doDryRunInit(self, mock_os, mock_path,  mock_info):
       fake_dist = {"repo": "alisw/alidist", "ver": "master"}
       self.assertRaises(SystemExit, doInit, setdir=".",
-                                            configDir="alidist",
+                                            configDir="/alidist",
                                             pkgname="zlib,AliRoot@v5-08-00",
-                                            referenceSources="sw/MIRROR",
+                                            referenceSources="/sw/MIRROR",
                                             dist=fake_dist,
+                                            defaults="release",
                                             dryRun=True)
       self.assertEqual(mock_info.mock_calls, [call('This will initialise local checkouts for zlib,AliRoot\n--dry-run / -n specified. Doing nothing.')])
 
@@ -58,19 +62,28 @@ class InitTestCase(unittest.TestCase):
     @mock.patch("alibuild_helpers.init.execute")
     @mock.patch("alibuild_helpers.init.parseRecipe")
     @mock.patch("alibuild_helpers.init.updateReferenceRepos")
-    def test_doRealInit(self, mock_update_reference, mock_parse_recipe, mock_execute, mock_os, mock_path,  mock_info):
+    @mock.patch("alibuild_helpers.utilities.open")
+    @mock.patch("alibuild_helpers.init.readDefaults")
+    def test_doRealInit(self, mock_read_defaults, mock_open, mock_update_reference, mock_parse_recipe, mock_execute, mock_os, mock_path,  mock_info):
       fake_dist = {"repo": "alisw/alidist", "ver": "master"}
+      mock_open.side_effect = lambda x: {
+        "/alidist/defaults-release.sh": StringIO("package: defaults-release\nversion: v1\n---"),
+        "/alidist/aliroot.sh": StringIO("package: AliRoot\nversion: master\nsource: https://github.com/alisw/AliRoot\n---")
+      }[x]
       mock_execute.side_effect = can_do_git_clone
       mock_parse_recipe.side_effect = valid_recipe
       mock_path.exists.side_effect = lambda x : False
       mock_os.mkdir.return_value = None
+      mock_read_defaults.return_value = (OrderedDict({"package": "defaults-release", "disable": []}), "")
       doInit(setdir=".",
-             configDir="alidist",
-             pkgname="zlib,AliRoot@v5-08-00",
-             referenceSources="sw/MIRROR",
+             configDir="/alidist",
+             pkgname="AliRoot@v5-08-00",
+             referenceSources="/sw/MIRROR",
              dist=fake_dist,
+             defaults="release",
              dryRun=False)
-      mock_execute.assert_called_with("git clone https://github.com/alisw/AliRoot -b v5-08-00 --reference sw/MIRROR/aliroot ./AliRoot && cd ./AliRoot && git remote set-url --push origin https://github.com/alisw/AliRoot")
+      mock_execute.side_effect = lambda x: print(x)
+      mock_execute.assert_called_with("git clone https://github.com/alisw/AliRoot -b v5-08-00 --reference /sw/MIRROR/aliroot ./AliRoot && cd ./AliRoot && git remote set-url --push origin https://github.com/alisw/AliRoot")
       self.assertEqual(mock_execute.mock_calls, CLONE_EVERYTHING)
       mock_path.exists.assert_called_with("./AliRoot")
 

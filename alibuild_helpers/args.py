@@ -40,7 +40,7 @@ def csv_list(s):
 # - A repository spec in the for org/repo@tag
 def alidist_string(s, star):
   expanded = s if "@" in s else "alisw/%sdist@%s" % (star, s)
-  return dict(zip(["repo","ver"], expanded.split("@", 2)))
+  return dict(zip(["repo","ver"], expanded.split("@", 1)))
 
 def doParseArgs(star):
   parser = argparse.ArgumentParser(epilog="For help about each option, specify --help after the option itself.\nFor complete documentation please refer to https://alisw.github.io/alibuild")
@@ -103,7 +103,7 @@ def doParseArgs(star):
                       dest="develPrefix", default=argparse.SUPPRESS)
 
   build_parser.add_argument("--dist", dest="dist", default="", type=lambda x : alidist_string(x, star),
-                      help="Prepdare development mode by downloading the given recipes set ([user/repo@]branch)")
+                      help="Prepare development mode by downloading the given recipes set ([user/repo@]branch)")
 
   group = build_parser.add_mutually_exclusive_group()
   group.add_argument("--always-prefer-system", dest="preferSystem", default=False,
@@ -141,6 +141,8 @@ def doParseArgs(star):
   init_parser.add_argument("--reference-sources", dest="referenceSources", default="%(workDir)s/MIRROR")
   init_parser.add_argument("--dist", dest="dist", default="", type=lambda x : alidist_string(x, star),
                            help="Prepare development mode by downloading the given recipes set ([user/repo@]branch)")
+  init_parser.add_argument("--defaults", dest="defaults", default="release",
+                            metavar="FILE", help="Specify which defaults to use")
 
   # Options for the version subcommand
   version_parser.add_argument("--architecture", "-a", dest="architecture",
