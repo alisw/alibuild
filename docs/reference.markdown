@@ -30,7 +30,7 @@ An example recipe for `zlib` is the following:
     source: https://github.com/star-externals/zlib
     tag: v1.2.8
     ---
-    #!/bin/sh
+    #!/bin/bash -ex
     ./configure --prefix=$INSTALLROOT
     make ${JOBS+-j $JOBS}
     make install
@@ -88,7 +88,7 @@ The following entries are optional in the header:
   - `append_path`: same as `prepend_path` but paths are appended rather than
     prepended.
   - `requires`: a list of run-time and build-time dependency for the package. E.g.:
-    
+
         package: AliRoot
         requires:
           - ROOT
@@ -99,7 +99,7 @@ The following entries are optional in the header:
     the dependency name. Such a reqular expression will be matched against the
     architecture provided via `--architecture` and if it does not match it will
     not be included. For instance:
-    
+
         package: AliRoot-test
         requires:
           - "igprof:(?!osx).*"
@@ -127,6 +127,9 @@ The following entries are optional in the header:
     does not match, the check is skipped and the recipe is run. Using the switch
     `--always-prefer-system` runs the check always (even when the regular
     expression for the architecture does not match).
+  - `relocate_paths`: a list of toplevel paths scanned recursively to perform
+    relocation of executables and dynamic libraries **on macOS only**. If not
+    specified defaults to `bin`, `lib` and `lib64`.
 
 ### The body
 

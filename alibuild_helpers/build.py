@@ -492,6 +492,8 @@ def doBuild(args, parser):
       spec["incremental_hash"] = ih.hexdigest()
     elif p in develPkgs:
       h(spec.get("devel_hash"))
+    if args.architecture.startswith("osx") and "relocate_paths" in spec:
+        h("relocate:"+" ".join(sorted(spec["relocate_paths"])))
     spec["hash"] = h.hexdigest()
     spec["deps_hash"] = dh.hexdigest()
     debug("Hash for recipe %s is %s" % (p, spec["hash"]))
@@ -910,6 +912,7 @@ def doBuild(args, parser):
       ("PKGNAME", spec["package"]),
       ("PKGREVISION", spec["revision"]),
       ("PKGVERSION", spec["version"]),
+      ("RELOCATE_PATHS", " ".join(spec.get("relocate_paths", []))),
       ("REQUIRES", " ".join(spec["requires"])),
       ("RUNTIME_REQUIRES", " ".join(spec["runtime_requires"])),
       ("WRITE_REPO", spec.get("write_repo", source)),
