@@ -183,11 +183,12 @@ def doDoctor(args, parser):
   if own:
     banner("The following packages will be build by aliBuild because they couldn't be picked up from the system:\n\n- " +
            "\n- ".join(own) +
-           "\n\nThis is not a real issue, but it might take longer the first time you invoke aliBuild.")
+           "\n\nThis is not a real issue, but it might take longer the first time you invoke aliBuild." +
+           "\nLook at the error messages above to get hints on what packages you need to install separately.")
   if failed:
     banner("The following packages are system dependencies and could not be found:\n\n- "+
-          "\n- ".join(failed)
-         )
+          "\n- ".join(failed) +
+          "\n\nLook at the error messages above to get hints on what packages you need to install separately.")
     exitcode = 1
   exit(exitcode)
 
