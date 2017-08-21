@@ -138,6 +138,7 @@ done
 
 ACTION="${ARGS[0]}"
 ARGS=("${ARGS[@]:1}")
+export ALIENVLVL=$((ALIENVLVL+1))
 
 if [[ "$ACTION" == "shell-helper" ]]; then
 cat <<\EOF
@@ -220,6 +221,8 @@ export MODULEPATH="$WORK_DIR/MODULES/$ARCHITECTURE:$MODULEPATH"
 IGNORE_ERR="Unable to locate a modulefile for 'Toolchain/"
 case "$ACTION" in
   enter)
+    [[ $ALIENVLVL == 1 ]] || \
+      { printf "\033[31mERROR: already in an alienv environment\033[m\n" >&2; exit 1; }
     MODULES=$(normModules "${ARGS[@]}")
     existModules $MODULES
     eval $($MODULECMD bash add $MODULES 2> >(grep -v "$IGNORE_ERR" >&2))
