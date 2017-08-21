@@ -14,6 +14,9 @@ except ImportError:
 from os.path import abspath, dirname, basename
 import sys
 
+# Default workdir: fall back on "sw" if env is not set
+DEFAULT_WORK_DIR = os.environ.get("ALIBUILD_WORK_DIR", os.environ.get("ALICE_WORK_DIR", "sw"))
+
 # Detect number of available CPUs. Fallback to 1.
 def detectJobs():
   # Python 2.6+
@@ -71,7 +74,7 @@ def doParseArgs(star):
   build_parser.add_argument("--docker", dest="docker", action="store_true", default=False)
   build_parser.add_argument("--docker-image", dest="dockerImage", default=argparse.SUPPRESS,
                             help="Image to use in case you build with docker (implies --docker)")
-  build_parser.add_argument("--work-dir", "-w", dest="workDir", default="sw")
+  build_parser.add_argument("--work-dir", "-w", dest="workDir", default=DEFAULT_WORK_DIR)
   build_parser.add_argument("--architecture", "-a", dest="architecture",
                       default=detectArch())
   build_parser.add_argument("-e", dest="environment", action='append', default=[])
@@ -112,7 +115,7 @@ def doParseArgs(star):
                             default=detectArch())
   clean_parser.add_argument("--force-unknown-architecture", dest="forceUnknownArch", default=False,
                             action="store_true", help="Do not check for valid architecture")
-  clean_parser.add_argument("--work-dir", "-w", dest="workDir", default="sw")
+  clean_parser.add_argument("--work-dir", "-w", dest="workDir", default=DEFAULT_WORK_DIR)
   clean_parser.add_argument("--aggressive-cleanup", dest="aggressiveCleanup", default=False,
                             action="store_true", help="Perform additional cleanups")
   clean_parser.add_argument("--disable", dest="disable", default=[],
@@ -130,7 +133,7 @@ def doParseArgs(star):
   init_parser.add_argument("pkgname", nargs="?", default="", help="One (or more) of the packages in `alidist'")
   init_parser.add_argument("--architecture", "-a", dest="architecture",
                             default=detectArch())
-  init_parser.add_argument("--work-dir", "-w", dest="workDir", default="sw")
+  init_parser.add_argument("--work-dir", "-w", dest="workDir", default=DEFAULT_WORK_DIR)
   init_parser.add_argument("--devel-prefix", "-z", nargs="?", default=".", help="Version name to use for development packages. Defaults to branch name.",
                            dest="develPrefix")
   init_parser.add_argument("--config-dir", "-c", dest="configDir", default="%%(prefix)s%sdist" % star)

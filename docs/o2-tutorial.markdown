@@ -115,10 +115,10 @@ Once you have your area setup, you can start the build of the software via
     aliBuild --defaults o2 build O2
 
 Notice that aliBuild automatically takes care of dependencies, so you
-only need to specify the toplevel package. We specify here that we will build 
+only need to specify the toplevel package. We specify here that we will build
 for o2 and aliBuild will choose ROOT6 and a new CMake as opposed to the versions used
-for AliRoot. For those not interested in the simulation and analysis, the defaults 
-`o2-daq` can be used 
+for AliRoot. For those not interested in the simulation and analysis, the defaults
+`o2-daq` can be used
 
     aliBuild --defaults o2-daq build O2
 
@@ -164,7 +164,7 @@ Once you have a complete installation of AliPhysics, you can use it via
 To do so, you need to add to your `.bashrc` the `alienv` alias by
 appending the line:
 
-    ALICE_WORK_DIR=$HOME/alice/sw; eval "`alienv shell-helper`"
+    export ALIBUILD_WORK_DIR=$HOME/alice/sw; eval "`alienv shell-helper`"
 
 You can then open a new shell and use:
 
@@ -180,24 +180,24 @@ Alternatively you can use:
 to launch a new shell which will have the correct environment.
 
 # Example
-Development of a couple of related modules in the AliceO2Group github 
+Development of a couple of related modules in the AliceO2Group github
 group. The first module is called Configuration, the second monitoring.
 
 ## Setup
     pip install alibuild==1.4.0
     mkdir -p $HOME/alice
-    ALICE_WORK_DIR=$HOME/alice/sw; eval "`alienv shell-helper`" 
+    export ALIBUILD_WORK_DIR=$HOME/alice/sw; eval "`alienv shell-helper`"
 
 ## Build and develop Configuration
-    cd $HOME/alice 
-    aliBuild init Configuration@master # checkout the code of 
+    cd $HOME/alice
+    aliBuild init Configuration@master # checkout the code of
                                        # Configuration, branch master
     aliDoctor Configuration            # To make sure that we are good.
-    aliBuild --defaults o2 build Configuration 
+    aliBuild --defaults o2 build Configuration
     alienv load Configuration/latest
-    
+
     # At this stage, modify the project.
-     
+
     # Re-build by doing either
     aliBuild --defaults o2 build Configuration
     # or (faster compilation)
@@ -206,7 +206,7 @@ group. The first module is called Configuration, the second monitoring.
 
 ## Build and launch monitoring binaries
 
-Monitoring depends on Configuration. We also want to work on it and test the 
+Monitoring depends on Configuration. We also want to work on it and test the
 latest changes of Configuration.
 
     cd $HOME/alice

@@ -157,7 +157,7 @@ Once you have a complete installation of AliPhysics, you can use it via
 To do so, you need to add to your `.bashrc` the `alienv` alias by
 appending the line:
 
-    ALICE_WORK_DIR=$HOME/alice/sw; eval "`alienv shell-helper`"
+    export ALIBUILD_WORK_DIR=$HOME/alice/sw; eval "`alienv shell-helper`"
 
 You can then open a new shell and use:
 

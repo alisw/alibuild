@@ -184,7 +184,7 @@ dependencies will not be rebuilt.
 
 To use the software you need to load the environment. First add this line to your .bashrc: 
 
-    ALICE_WORK_DIR=$HOME/alice/sw; eval "`alienv shell-helper`"
+    export ALIBUILD_WORK_DIR=$HOME/alice/sw; eval "`alienv shell-helper`"
     
 Then execute:
 

@@ -78,11 +78,11 @@ Usage: $0 \\
     ${EM}shell-helper${EZ}
       Returns a script to be ${ET}eval${EZ}d in your shell rc file to allow easier loading/unloading.
       In your shell rc put:
-        ${ET}ALICE_WORK_DIR=<path_to_alibuild_sw_dir>${EZ}
+        ${ET}ALIBUILD_WORK_DIR=<path_to_alibuild_sw_dir>${EZ}
         ${ET}eval "\`alienv shell-helper\`"${EZ}
 
 EoF
-[[ -z "$1" ]] || printf "\033[31mERROR: $1\033[m\n" >&2
+[[ -z "$1" ]] || printf "\033[31mERROR: $*\033[m\n" >&2
 }
 
 function installHint() {
@@ -117,7 +117,7 @@ function existModules() {
 ARCHITECTURE=
 WORK_DIR=
 NO_REFRESH=
-DEFAULT_WORK_DIRS=( sw ../sw )
+DEFAULT_WORK_DIRS=( "$ALIBUILD_WORK_DIR" "$ALICE_WORK_DIR" sw ../sw )
 ARGS=()
 COMMAND_IN_ENV=()
 CLEAN_ENV=1
@@ -143,22 +143,20 @@ export ALIENVLVL=$((ALIENVLVL+1))
 if [[ "$ACTION" == "shell-helper" ]]; then
 cat <<\EOF
 # Source this file from your .bashrc, .zshrc or .kshrc.
-# Do not forget to export ALICE_WORK_DIR first.
+ALIBUILD_ALIENV__="$ALIBUILD_ALIENV"
+if test -z "$ALIBUILD_ALIENV__"; then
+  ALIBUILD_ALIENV__=`unset alienv; export LC_ALL=C; export LANG=C; type -p alienv | sed -e 's/^alienv is //g' 2> /dev/null`
+fi
 alienv() {
-  if test -z "$ALICE_WORK_DIR"; then
-    echo "Export ALICE_WORK_DIR to make the alienv shortcut work." >&2
+  if test -z "$ALIBUILD_ALIENV__"; then
+    echo "alienv not found"
     return 1
-  fi
-  ALICE_ALIENV__="$ALICE_ALIENV"
-  if test -z "$ALICE_ALIENV__"; then
-    ALICE_ALIENV__=`unset alienv; export LC_ALL=C; export LANG=C; type -p alienv | sed -e 's/^alienv is //g' 2> /dev/null`
-    test -z "$ALICE_ALIENV__" && ALICE_ALIENV__="$ALICE_WORK_DIR/../alibuild/alienv"
   fi
   for A in "$@"; do
     if ! test `echo "$A" | cut -b1` = -; then
       if test "$A" = load || test "$A" = unload; then
         unset A
-        eval `"$ALICE_ALIENV__" -w "$ALICE_WORK_DIR" "$@"`
+        eval `"$ALIBUILD_ALIENV__" "$@"`
         return $?
       else
         break
@@ -168,7 +166,7 @@ alienv() {
     fi
   done
   unset A
-  "$ALICE_ALIENV__" -w "$ALICE_WORK_DIR" "$@"
+  "$ALIBUILD_ALIENV__" "$@"
 }
 EOF
   exit 0
@@ -178,7 +176,9 @@ if [[ -z "$WORK_DIR" ]]; then
   for WORK_DIR in "${DEFAULT_WORK_DIRS[@]}"; do
     [[ -d "$WORK_DIR" ]] && break || WORK_DIR=
   done
-  [[ -z "$WORK_DIR" ]] && { printHelp "No default work dir (${DEFAULT_WORK_DIRS[*]}) can be accessed"; false; }
+  [[ -z "$WORK_DIR" ]] && { printHelp "No default work dir can be accessed:"                      \
+                                      "export \$ALIBUILD_WORK_DIR or run alienv from a directory" \
+                                      "containing the \"sw\" dir"; false; }
 fi
 [[ ! -d "$WORK_DIR" ]] && { printHelp "Work dir $WORK_DIR cannot be accessed"; false; }
 WORK_DIR=$(cd "$WORK_DIR"; pwd)
