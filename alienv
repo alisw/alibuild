@@ -217,6 +217,12 @@ else
   printf "\033[33mWARNING: not updating modulefiles\033[m\n" >&2
 fi
 
+if type csrutil &> /dev/null; then
+  csrutil status | grep -q disabled || \
+    { printf "\033[33mWARNING: System Integrity Protection is enabled. " >&2;
+      printf "You might run into environment problems if you do not disable it.\033[m\n" >&2; }
+fi
+
 export MODULEPATH="$WORK_DIR/MODULES/$ARCHITECTURE:$MODULEPATH"
 IGNORE_ERR="Unable to locate a modulefile for 'Toolchain/"
 case "$ACTION" in
