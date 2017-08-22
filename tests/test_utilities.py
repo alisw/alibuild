@@ -207,6 +207,9 @@ class TestUtilities(unittest.TestCase):
     t2 = u"\u0924\u093e\u0921\u093c\u093f\u0926\u094d\u0926\u093e"
     self.assertTrue(to_unicode(t1) == t2)
     self.assertTrue(to_unicode(t1) == to_unicode(t2))
+    self.assertTrue(to_unicode([1,2,3]) == u"[1, 2, 3]")
+    self.assertTrue(to_unicode({"a":-1}) == u"{'a': -1}")
+    self.assertTrue(to_unicode(123456) == u"123456")
 
 if __name__ == '__main__':
     unittest.main()
