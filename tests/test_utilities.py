@@ -1,3 +1,5 @@
+# vim: set fileencoding=utf-8 :
+
 import unittest
 import platform
 
@@ -13,6 +15,7 @@ from alibuild_helpers.utilities import format
 from alibuild_helpers.utilities import asList
 from alibuild_helpers.utilities import dockerStatusOutput
 from alibuild_helpers.utilities import prunePaths, getVersion
+from alibuild_helpers.utilities import to_unicode
 import os
 
 UBUNTU_1510_OS_RELEASE = """
@@ -199,6 +202,11 @@ class TestUtilities(unittest.TestCase):
   def test_getVersion(self):
     getVersion()
 
+  def test_to_unicode(self):
+    t1 = "ताड़िद्दा"
+    t2 = u"\u0924\u093e\u0921\u093c\u093f\u0926\u094d\u0926\u093e"
+    self.assertTrue(to_unicode(t1) == t2)
+    self.assertTrue(to_unicode(t1) == to_unicode(t2))
+
 if __name__ == '__main__':
     unittest.main()
-

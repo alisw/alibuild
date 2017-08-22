@@ -34,7 +34,9 @@ def to_unicode(s):
     return str(s)
   elif isinstance(s, str):
     return unicode(s, "utf-8")  # utf-8 is a safe assumption
-  return unicode(str(s))
+  elif not isinstance(s, unicode):
+    return unicode(str(s))
+  return s
 
 def normalise_multiple_options(option, sep=","):
   return [x for x in ",".join(option).split(sep) if x]
