@@ -563,6 +563,10 @@ def doBuild(args, parser):
       return (error, "Too many attempts at building %s. Something wrong with the repository?" % spec["package"], 1)
     p = buildOrder[0]
     spec = specs[p]
+    if args.debug:
+      logger_handler.setFormatter(
+          LogFormatter("%%(levelname)s:%s:%s:%s: %%(message)s" %
+                       (mainPackage, p, args.develPrefix if "develPrefix" in args else mainHash[0:8])))
     if spec["package"] in develPkgs and getattr(syncHelper, "writeStore", None):
       warning("Disabling remote write store from now since %s is a development package." % spec["package"])
       syncHelper.writeStore = ""
