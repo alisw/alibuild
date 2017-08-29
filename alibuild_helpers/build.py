@@ -233,14 +233,9 @@ def doBuild(args, parser):
   prunePaths(workDir)
 
   if not exists(args.configDir):
-    err = execute(format(
-                    "git clone https://github.com/%(repo)s%(branch)s %(cd)s",
-                    repo=args.dist["repo"],
-                    branch=" -b "+args.dist["ver"] if args.dist["ver"] else "",
-                    cd=abspath(args.configDir))
-                  )
-    if err:
-      return (error, "Unable to download default %sdist" % star(), 1)
+    return (error, ("Cannot find %sdist recipes under directory \"%s\".\n" +
+                    "Maybe you need to \"cd\" to the right directory or " +
+                    "you forgot to run \"aliBuild init\"?") % (star(), args.configDir), 1)
 
   defaultsReader = lambda : readDefaults(args.configDir, args.defaults, parser.error)
   (err, overrides, taps) = parseDefaults(args.disable,

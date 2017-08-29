@@ -96,14 +96,10 @@ def doParseArgs(star):
                             action="store_true", help="Do not check for valid certificates")
   build_parser.add_argument("--aggressive-cleanup", dest="aggressiveCleanup", default=False,
                             action="store_true", help="Perform additional cleanups")
-
   build_parser.add_argument("--no-auto-cleanup", help="Do not cleanup build by products automatically",
                       dest="autoCleanup", action="store_false", default=True)
   build_parser.add_argument("--devel-prefix", "-z", nargs="?", help="Version name to use for development packages. Defaults to branch name.",
                       dest="develPrefix", default=argparse.SUPPRESS)
-
-  build_parser.add_argument("--dist", dest="dist", default="", type=lambda x : alidist_string(x, star),
-                      help="Prepare development mode by downloading the given recipes set ([user/repo@]branch)")
 
   group = build_parser.add_mutually_exclusive_group()
   group.add_argument("--always-prefer-system", dest="preferSystem", default=False,
