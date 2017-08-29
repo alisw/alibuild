@@ -177,7 +177,6 @@ class BuildTestCase(unittest.TestCase):
       workDir="/sw",
       pkgname=["root"],
       configDir="/alidist",
-      dist={"repo": "alisw/alidist", "ver": "master"},
       disable=[],
       defaults="release",
       jobs=2,
