@@ -88,5 +88,5 @@ def depsArgsParser(parser):
   parser.add_argument("--disable", dest="disable", default=[],
                       help="List of packages to ignore")
   parser.add_argument("--chdir", "-C", help="Change to the specified directory first",
-                      metavar="DIR", dest="chdir", default=os.environ.get("ALIBUILD_CHDIR"))
+                      metavar="DIR", dest="chdir", default=os.environ.get("ALIBUILD_CHDIR", "."))
   return parser
