@@ -1,36 +1,7 @@
 #!/usr/bin/env python
-
-from __future__ import print_function
-from argparse import ArgumentParser
-from glob import glob
-from tempfile import NamedTemporaryFile
-import logging, sys, yaml
-from logging import debug, error, info
-from os import remove
-from alibuild_helpers.utilities import format
-from alibuild_helpers.cmd import execute
-from alibuild_helpers.utilities import normalise_multiple_options
-from alibuild_helpers.deps import deps, depsArgsParser
-
-def main():
-  parser = depsArgsParser(ArgumentParser())
-  args = parser.parse_args()
-  args.disable = normalise_multiple_options(args.disable)
-
-  logger = logging.getLogger()
-  loggerHandler = logging.StreamHandler()
-  logger.addHandler(loggerHandler)
-
-  loggerHandler.setFormatter(logging.Formatter('%(levelname)-5s: %(message)s'))
-  if args.debug: logger.setLevel(logging.DEBUG)
-  else: logger.setLevel(logging.INFO)
-
-  deps(recipesDir=args.distDir,
-       topPackage=args.topPackage,
-       outFile=args.outFile,
-       buildRequires=args.buildRequires,
-       transitiveRed=args.neat,
-       disable=args.disable) or sys.exit(1)
-
+import sys
+import os
+from os.path import dirname, join, abspath
 if __name__ == "__main__":
-  main()
+  aliBuild = join(dirname(abspath(sys.argv[0])), "aliBuild")
+  os.execv(aliBuild, [ aliBuild, "deps" ] + sys.argv[1:])
