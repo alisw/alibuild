@@ -14,7 +14,7 @@ from alibuild_helpers.init import doInit
 from alibuild_helpers.clean import doClean
 from alibuild_helpers.doctor import doDoctor
 from alibuild_helpers.deps import deps
-from alibuild_helpers.log import info, logger
+from alibuild_helpers.log import info, warning, debug, logger
 from alibuild_helpers.utilities import getVersion, detectArch
 from alibuild_helpers.build import doBuild, star
 
@@ -43,6 +43,14 @@ def doMain(args, parser):
   }
   os.environ.update(ENVIRONMENT_OVERRIDES)
   report_screenview(args.action)
+
+  # Move to the specified working directory before doing anything else
+  if "chdir" in args:
+    try:
+      os.chdir(os.path.expanduser(args.chdir))
+      debug("Current working directory is %s" % os.getcwd())
+    except Exception as e:
+      warning("Cannot change to directory \"%s\", is it readable by you?" % args.chdir)
 
   if args.action == "version":
     print("aliBuild version: %s (%s)" % (getVersion(), args.architecture if args.architecture else "unknown"))

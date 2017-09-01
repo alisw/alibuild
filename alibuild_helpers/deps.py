@@ -3,7 +3,7 @@
 from __future__ import print_function
 from glob import glob
 from tempfile import NamedTemporaryFile
-import sys
+import os, sys
 from alibuild_helpers.log import debug, error, info
 from os import remove
 from alibuild_helpers.utilities import format
@@ -87,4 +87,6 @@ def depsArgsParser(parser):
                       help="Neat graph with transitive reduction")
   parser.add_argument("--disable", dest="disable", default=[],
                       help="List of packages to ignore")
+  parser.add_argument("--chdir", "-C", help="Change to the specified directory first",
+                      metavar="DIR", dest="chdir", default=os.environ.get("ALIBUILD_CHDIR"))
   return parser

@@ -17,6 +17,9 @@ import sys
 # Default workdir: fall back on "sw" if env is not set
 DEFAULT_WORK_DIR = os.environ.get("ALIBUILD_WORK_DIR", os.environ.get("ALICE_WORK_DIR", "sw"))
 
+# cd to this directory before start
+DEFAULT_CHDIR = os.environ.get("ALIBUILD_CHDIR", ".")
+
 # Detect number of available CPUs. Fallback to 1.
 def detectJobs():
   # Python 2.6+
@@ -99,6 +102,8 @@ def doParseArgs(star):
                             action="store_true", help="Do not check for valid certificates")
   build_parser.add_argument("--aggressive-cleanup", dest="aggressiveCleanup", default=False,
                             action="store_true", help="Perform additional cleanups")
+  build_parser.add_argument("--chdir", "-C", help="Change to the specified directory first",
+                            metavar="DIR", dest="chdir", default=DEFAULT_CHDIR)
   build_parser.add_argument("--no-auto-cleanup", help="Do not cleanup build by products automatically",
                       dest="autoCleanup", action="store_false", default=True)
   build_parser.add_argument("--devel-prefix", "-z", nargs="?", help="Version name to use for development packages. Defaults to branch name.",
@@ -122,6 +127,8 @@ def doParseArgs(star):
                             metavar="PACKAGE", action="append",
                             help="Do not build PACKAGE and all its (unique) dependencies.")
   clean_parser.add_argument("--reference-sources", dest="referenceSources", default="%(workDir)s/MIRROR")
+  clean_parser.add_argument("--chdir", "-C", help="Change to the specified directory first",
+                            metavar="DIR", dest="chdir", default=DEFAULT_CHDIR)
 
   # Options for the deps subcommand
   deps_parser = depsArgsParser(deps_parser)
@@ -142,6 +149,8 @@ def doParseArgs(star):
                            help="Prepare development mode by downloading the given recipes set ([user/repo@]branch)")
   init_parser.add_argument("--defaults", dest="defaults", default="release",
                             metavar="FILE", help="Specify which defaults to use")
+  init_parser.add_argument("--chdir", "-C", help="Change to the specified directory first",
+                           metavar="DIR", dest="chdir", default=DEFAULT_CHDIR)
 
   # Options for the version subcommand
   version_parser.add_argument("--architecture", "-a", dest="architecture",
@@ -235,7 +244,10 @@ def finaliseArgs(args, parser, star):
 
   if args.action in ["build", "init"]:
     if "develPrefix" in args and args.develPrefix == None:
-      args.develPrefix = basename(dirname(abspath(args.configDir)))
+      if "chdir" in args:
+        args.develPrefix = basename(abspath(args.chdir))
+      else:
+        args.develPrefix = basename(dirname(abspath(args.configDir)))
     if "dockerImage" in args:
       args.develPrefix = "%s-%s" % (args.develPrefix, args.architecture) if "develPrefix" in args else args.architecture
 
