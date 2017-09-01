@@ -1,9 +1,7 @@
 #!/usr/bin/env python
-import argparse
-from alibuild_helpers.doctor import doDoctor, doctorArgParser
-
+import sys
+import os
+from os.path import dirname, join, abspath
 if __name__ == "__main__":
-  parser = doctorArgParser(argparse.ArgumentParser())
-  args = parser.parse_args()
-  doDoctor(args, parser)
-
+  aliBuild = join(dirname(abspath(sys.argv[0])), "aliBuild")
+  os.execv(aliBuild, [ aliBuild, "doctor" ] + sys.argv[1:])
