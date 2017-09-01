@@ -98,8 +98,8 @@ def doctorArgParser(parser):
                       dest="workDir", default="workDir")
   parser.add_argument("-d", "--debug", help="Show also successful tests.",
                       dest="debug", action="store_true", default=False)
-  parser.add_argument("--defaults", default="release",
-                      dest="defaults", help="Specify default to use")
+  parser.add_argument("--defaults", dest="defaults", default=["release"], type=lambda x: str(x).split(","),
+                       metavar="FILE", help="Specify which defaults to use")
   parser.add_argument("--disable", dest="disable", default=[],
                       metavar="PACKAGE", action="append",
                       help="Do not build PACKAGE and all its (unique) dependencies.")

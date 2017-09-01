@@ -94,7 +94,7 @@ def doParseArgs(star):
   build_parser.add_argument("--disable", dest="disable", default=[],
                             metavar="PACKAGE", action="append",
                             help="Do not build PACKAGE and all its (unique) dependencies.")
-  build_parser.add_argument("--defaults", dest="defaults", default="release",
+  build_parser.add_argument("--defaults", dest="defaults", default=["release"], type=lambda x: str(x).split(","),
                             metavar="FILE", help="Specify which defaults to use")
   build_parser.add_argument("--force-unknown-architecture", dest="forceUnknownArch", default=False,
                             action="store_true", help="Do not check for valid architecture")
@@ -147,7 +147,7 @@ def doParseArgs(star):
   init_parser.add_argument("--reference-sources", dest="referenceSources", default="%(workDir)s/MIRROR")
   init_parser.add_argument("--dist", dest="dist", default="", type=lambda x : alidist_string(x, star),
                            help="Prepare development mode by downloading the given recipes set ([user/repo@]branch)")
-  init_parser.add_argument("--defaults", dest="defaults", default="release",
+  init_parser.add_argument("--defaults", dest="defaults", default=["release"], type=lambda x: str(x).split(","),
                             metavar="FILE", help="Specify which defaults to use")
   init_parser.add_argument("--chdir", "-C", help="Change to the specified directory first",
                            metavar="DIR", dest="chdir", default=DEFAULT_CHDIR)

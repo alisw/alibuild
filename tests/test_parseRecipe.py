@@ -2,7 +2,13 @@ import unittest
 import platform
 from alibuild_helpers.utilities import parseRecipe, getRecipeReader, parseDefaults
 from alibuild_helpers.utilities import FileReader, GitReader
-from alibuild_helpers.utilities import validateDefaults, SpecError
+from alibuild_helpers.utilities import validateDefaults, SpecError, readDefaults
+try:
+    from unittest.mock import patch, call, MagicMock  # In Python 3, mock is built-in
+    from io import StringIO
+except ImportError:
+    from mock import patch, call, MagicMock  # Python 2
+    from StringIO import StringIO
 try:
   from collections import OrderedDict
 except ImportError:
@@ -54,6 +60,29 @@ found unexpected end of stream
     
     ^"""
 
+TEST_OVERRIDE_1 = """package: defaults-release
+version: v1
+---
+"""
+TEST_OVERRIDE_2 = """package: defaults-override2
+version: v1
+disable:
+  - dis2
+overrides:
+  dummy:
+    version: vOverride2
+---
+"""
+TEST_OVERRIDE_3 = """package: defaults-override3
+version: v1
+disable:
+  - dis3
+overrides:
+  dummy:
+    version: vOverride3
+---
+"""
+
 class Recoder(object):
   def __init__(self):
     self.buffer = ""
@@ -99,6 +128,20 @@ class TestRecipes(unittest.TestCase):
     self.assertEqual(type(f), FileReader)
     f = getRecipeReader("dist:foo@master", "alidist")
     self.assertEqual(type(f), GitReader)
+
+  @patch("alibuild_helpers.utilities.exists")
+  @patch("alibuild_helpers.utilities.open")
+  def test_readDefaults(self, mock_open, mock_exists):
+    mock_exists.side_effect = lambda x: True
+    mock_open.side_effect = lambda x: { "/dist/defaults-release.sh"  : StringIO(TEST_OVERRIDE_1),
+                                        "/dist/defaults-override2.sh": StringIO(TEST_OVERRIDE_2),
+                                        "/dist/defaults-override3.sh": StringIO(TEST_OVERRIDE_3) }[x]
+    meta,body = readDefaults("/dist", ["release", "override2", "override3"], lambda x: None)
+    self.assertEqual(meta["overrides"]["dummy"]["version"], "vOverride3")
+    self.assertEqual(meta["disable"], ["dis3"])
+    meta,body = readDefaults("/dist", ["release", "override3", "override2"], lambda x: None)
+    self.assertEqual(meta["overrides"]["dummy"]["version"], "vOverride2")
+    self.assertEqual(meta["disable"], ["dis2"])
 
   def test_parseDefaults(self):
     disable = ["bar"]

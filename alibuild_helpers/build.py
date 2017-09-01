@@ -409,8 +409,9 @@ def doBuild(args, parser):
           break
 
     # Version may contain date params like tag, plus %(commit_hash)s,
-    # %(short_hash)s and %(tag)s.
-    defaults_upper = args.defaults != "release" and "_" + args.defaults.upper().replace("-", "_") or ""
+    # %(short_hash)s and %(tag)s. When multiple defaults are available use the
+    # first one for the name.
+    defaults_upper = args.defaults[0] != "release" and "_" + args.defaults[0].upper().replace("-", "_") or ""
     spec["version"] = format(spec["version"],
                              commit_hash=spec["commit_hash"],
                              short_hash=spec["commit_hash"][0:10],
@@ -448,7 +449,7 @@ def doBuild(args, parser):
     spec = specs[p]
     if "source" in spec:
       debug("Commit hash for %s@%s is %s" % (spec["source"], spec["tag"], spec["commit_hash"]))
-    ok, out = validateDefaults(spec, args.defaults)
+    ok, out = validateDefaults(spec, args.defaults[0])  # validate wrt/first default only
     if not ok:
       return (error, out, 1)
 
@@ -572,7 +573,7 @@ def doBuild(args, parser):
     riemannStream.setAttributes(package = spec["package"],
                                 package_hash = spec["version"],
                                 architecture = args.architecture,
-                                defaults = args.defaults)
+                                defaults = ",".join(args.defaults))
     riemannStream.setState("warning")
 
     debug("Updating from tarballs")
@@ -626,9 +627,9 @@ def doBuild(args, parser):
       develPrefix = possibleDevelPrefix
 
     if possibleDevelPrefix:
-      spec["build_family"] = "%s-%s" % (possibleDevelPrefix, args.defaults)
+      spec["build_family"] = "%s-%s" % (possibleDevelPrefix, "-".join(args.defaults))
     else:
-      spec["build_family"] = args.defaults
+      spec["build_family"] = "-".join(args.defaults)
 
     for d in packages:
       realPath = readlink(d)
