@@ -629,6 +629,8 @@ def doBuild(args, parser):
       spec["build_family"] = "%s-%s" % (possibleDevelPrefix, args.defaults)
     else:
       spec["build_family"] = args.defaults
+    if spec["package"] == mainPackage:
+      mainBuildFamily = spec["build_family"]
 
     for d in packages:
       realPath = readlink(d)
@@ -1003,10 +1005,10 @@ def doBuild(args, parser):
               "Your software installation is at:"
               "\n\n  %(wp)s\n\n"
               "You can use this package by loading the environment:"
-              "\n\n  alienv enter %(mainPackage)s/%(pkgVer)s-%(defaults)s",
+              "\n\n  alienv enter %(mainPackage)s/latest-%(buildFamily)s",
               mainPackage=mainPackage,
+              buildFamily=mainBuildFamily,
               h=socket.gethostname(),
-              pkgVer="latest-"+args.develPrefix if mainPackage in develPkgs and "develPrefix" in args else "latest",
               defaults=args.defaults,
               wp=abspath(join(args.workDir, args.architecture))))
   for x in develPkgs:
