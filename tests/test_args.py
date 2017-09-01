@@ -5,7 +5,8 @@ try:
 except ImportError:
     from mock import patch, call  # Python 2
 
-from alibuild_helpers.args import doParseArgs, matchValidArch, finaliseArgs
+import alibuild_helpers.args
+from alibuild_helpers.args import doParseArgs, matchValidArch, finaliseArgs, DEFAULT_WORK_DIR, DEFAULT_CHDIR
 import argparse
 import sys
 import os
@@ -52,29 +53,36 @@ INVALID_ARCHS = [
 class FakeExit(Exception):
   pass
 
-CORRECT_BEHAVIOR = {
-  "build zlib": [("action", "build"), ("workDir", "sw"), ("referenceSources", "sw/MIRROR")],
-  "init": [("action", "init"), ("workDir", "sw"), ("referenceSources", "sw/MIRROR")],
-  "version": [("action", "version")],
-  "clean": [("action", "clean"), ("workDir", "sw"), ("referenceSources", "sw/MIRROR")],
-  "build -j 10 zlib": [("action", "build"), ("jobs", 10), ("pkgname", ["zlib"])],
-  "build -j 10 zlib --disable gcc --disable foo": [("disable", ["gcc", "foo"])],
-  "build -j 10 zlib --disable gcc --disable foo,bar": [("disable", ["gcc", "foo", "bar"])],
-  "init zlib --dist master": [("dist", {"repo": "alisw/alidist", "ver": "master"})],
-  "init zlib --dist ktf/alidist@dev": [("dist", {"repo": "ktf/alidist", "ver": "dev"})],
-  "build zlib --remote-store rsync://test.local/": [("noSystem", True)],
-  "build zlib --remote-store rsync://test.local/::rw": [("noSystem", True), ("remoteStore", "rsync://test.local/"), ("writeStore", "rsync://test.local/")],
-  "build zlib -a slc7_x86-64 --docker-image alisw/slc7-builder": [("docker", True), ("dockerImage", "alisw/slc7-builder")],
-  "build zlib -a slc7_x86-64 --docker": [("docker", True), ("dockerImage", "alisw/slc7-builder")],
-  "build zlib --devel-prefix -a slc7_x86-64 --docker": [("docker", True), ("dockerImage", "alisw/slc7-builder"), ("develPrefix", "%s-slc7_x86-64" % os.path.basename(os.getcwd()))],
-  "build zlib --devel-prefix -a slc7_x86-64 --docker-image someimage": [("docker", True), ("dockerImage", "someimage"), ("develPrefix", "%s-slc7_x86-64" % os.path.basename(os.getcwd()))],
-  "--debug build --defaults o2 O2": [("debug", True), ("action",  "build"), ("defaults", "o2"), ("pkgname", ["O2"])],
-  "build --debug --defaults o2 O2": [("debug", True), ("action",  "build"), ("defaults", "o2"), ("pkgname", ["O2"])],
-  "init -z test zlib": [("configDir", "test/alidist")],
-  "build -z test zlib": [("configDir", "alidist")],
-  "analytics off": [("state", "off")],
-  "analytics on": [("state", "on")],
-}
+CORRECT_BEHAVIOR = [
+  ((), "build zlib"                                                       , [("action", "build"), ("workDir", "sw"), ("referenceSources", "sw/MIRROR")]),
+  ((), "init"                                                             , [("action", "init"), ("workDir", "sw"), ("referenceSources", "sw/MIRROR")]),
+  ((), "version"                                                          , [("action", "version")]),
+  ((), "clean"                                                            , [("action", "clean"), ("workDir", "sw"), ("referenceSources", "sw/MIRROR")]),
+  ((), "build -j 10 zlib"                                                 , [("action", "build"), ("jobs", 10), ("pkgname", ["zlib"])]),
+  ((), "build -j 10 zlib --disable gcc --disable foo"                     , [("disable", ["gcc", "foo"])]),
+  ((), "build -j 10 zlib --disable gcc --disable foo,bar"                 , [("disable", ["gcc", "foo", "bar"])]),
+  ((), "init zlib --dist master"                                          , [("dist", {"repo": "alisw/alidist", "ver": "master"})]),
+  ((), "init zlib --dist ktf/alidist@dev"                                 , [("dist", {"repo": "ktf/alidist", "ver": "dev"})]),
+  ((), "build zlib --remote-store rsync://test.local/"                    , [("noSystem", True)]),
+  ((), "build zlib --remote-store rsync://test.local/::rw"                , [("noSystem", True), ("remoteStore", "rsync://test.local/"), ("writeStore", "rsync://test.local/")]),
+  ((), "build zlib -a slc7_x86-64 --docker-image alisw/slc7-builder"      , [("docker", True), ("dockerImage", "alisw/slc7-builder")]),
+  ((), "build zlib -a slc7_x86-64 --docker"                               , [("docker", True), ("dockerImage", "alisw/slc7-builder")]),
+  ((), "build zlib --devel-prefix -a slc7_x86-64 --docker"                , [("docker", True), ("dockerImage", "alisw/slc7-builder"), ("develPrefix", "%s-slc7_x86-64" % os.path.basename(os.getcwd()))]),
+  ((), "build zlib --devel-prefix -a slc7_x86-64 --docker-image someimage", [("docker", True), ("dockerImage", "someimage"), ("develPrefix", "%s-slc7_x86-64" % os.path.basename(os.getcwd()))]),
+  ((), "--debug build --defaults o2 O2"                                   , [("debug", True), ("action",  "build"), ("defaults", "o2"), ("pkgname", ["O2"])]),
+  ((), "build --debug --defaults o2 O2"                                   , [("debug", True), ("action",  "build"), ("defaults", "o2"), ("pkgname", ["O2"])]),
+  ((), "init -z test zlib"                                                , [("configDir", "test/alidist")]),
+  ((), "build -z test zlib"                                               , [("configDir", "alidist")]),
+  ((), "analytics off"                                                    , [("state", "off")]),
+  ((), "analytics on"                                                     , [("state", "on")]),
+
+  # With ALIBUILD_WORK_DIR and ALIBUILD_CHDIR set
+  (("sw2", ".")    , "build zlib"                         , [("action", "build"), ("workDir", "sw2"), ("referenceSources", "sw2/MIRROR"), ("chdir", ".")]),
+  (("sw3", "mydir"), "init"                               , [("action", "init"), ("workDir", "sw3"), ("referenceSources", "sw3/MIRROR"), ("chdir", "mydir")]),
+  (("sw", ".")     , "clean --chdir mydir2 --work-dir sw4", [("action", "clean"), ("workDir", "sw4"), ("referenceSources", "sw4/MIRROR"), ("chdir", "mydir2")]),
+  (()              , "doctor zlib -C mydir -w sw2"        , [("action", "doctor"), ("workDir", "sw2"), ("chdir", "mydir")]),
+  (()              , "deps zlib -C mydir"                 , [("action", "deps"), ("chdir", "mydir")]),
+]
 
 GETSTATUSOUTPUT_MOCKS = {
   "which docker": (0, "/usr/local/bin/docker")
@@ -84,7 +92,10 @@ class ArgsTestCase(unittest.TestCase):
   @mock.patch('alibuild_helpers.args.commands')
   def test_actionParsing(self, mock_commands):
     mock_commands.getstatusoutput.side_effect = lambda x : GETSTATUSOUTPUT_MOCKS[x]
-    for (cmd, effects) in CORRECT_BEHAVIOR.items():
+    for (env, cmd, effects) in CORRECT_BEHAVIOR:
+      env = env if env else ("sw", ".")
+      alibuild_helpers.args.DEFAULT_WORK_DIR = env[0]
+      alibuild_helpers.args.DEFAULT_CHDIR = env[1]
       with patch.object(sys, "argv", ["alibuild"] + shlex.split(cmd)):
         args, parser = doParseArgs("ali")
         args = vars(args)
