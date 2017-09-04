@@ -161,17 +161,23 @@ def filterByArchitecture(arch, requires):
       yield require
 
 def readDefaults(configDir, defaults, error):
-  defaultsFilename = "%s/defaults-%s.sh" % (configDir, defaults)
-  if not exists(defaultsFilename):
-    viableDefaults = ["- " + basename(x).replace("defaults-","").replace(".sh", "")
-                      for x in glob("%s/defaults-*.sh" % configDir)]
-    error(format("Default `%(d)s' does not exists. Viable options:\n%(v)s",
-                 d=defaults or "<no defaults specified>",
-                 v="\n".join(viableDefaults)))
-  err, defaultsMeta, defaultsBody = parseRecipe(getRecipeReader(defaultsFilename))
-  if err:
-    error(err)
-    exit(1)
+  defaultsMeta = OrderedDict({"overrides": OrderedDict()})
+  for d in defaults:
+    defaultsFilename = "%s/defaults-%s.sh" % (configDir, d)
+    if not exists(defaultsFilename):
+      viableDefaults = ["- " + basename(x).replace("defaults-","").replace(".sh", "")
+                        for x in glob("%s/defaults-*.sh" % configDir)]
+      error(format("Default `%(d)s' does not exists. Viable options:\n%(v)s",
+                   d=d or "<no defaults specified>",
+                   v="\n".join(viableDefaults)))
+    err, thisDefaultsMeta, defaultsBody = parseRecipe(getRecipeReader(defaultsFilename))
+    if err:
+      error(err)
+      exit(1)
+    if "overrides" in thisDefaultsMeta:
+      defaultsMeta["overrides"].update(thisDefaultsMeta["overrides"])
+      del defaultsMeta["overrides"]
+    defaultsMeta.update(thisDefaultsMeta)
   return (defaultsMeta, defaultsBody)
 
 # Get the appropriate recipe reader depending on th filename
