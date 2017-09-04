@@ -332,3 +332,18 @@ ERROR: Cannot autodetect architecture
 ```
 
 if you still want to try, you can use the `--force-unknown-architecture` option and while we strive our best to help you out also in this case, sometimes priorities force us to simply ignore support requests.
+
+### How do I run on a system where I do not have global install rights?
+
+If you want to run on a system where you do not have global install rights, and
+the PyYAML package is not installed (e.g. lxplus), you can still do so by using
+the `--user` flag when you install with `pip`. This will install alibuild under
+`~/.local/bin`.
+
+This means that you need to do (only once):
+
+    pip install --user --upgrade alibuild
+
+and then adapt you PATH to pickup the local installation, e.g. via:
+
+    export PATH=~/.local/bin:$PATH
