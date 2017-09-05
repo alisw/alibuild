@@ -56,6 +56,7 @@ class InitTestCase(unittest.TestCase):
                                             dryRun=True)
       self.assertEqual(mock_info.mock_calls, [call('This will initialise local checkouts for zlib,AliRoot\n--dry-run / -n specified. Doing nothing.')])
 
+    @mock.patch("alibuild_helpers.init.banner")
     @mock.patch("alibuild_helpers.init.info")
     @mock.patch("alibuild_helpers.init.path")
     @mock.patch("alibuild_helpers.init.os")
@@ -64,7 +65,7 @@ class InitTestCase(unittest.TestCase):
     @mock.patch("alibuild_helpers.init.updateReferenceRepos")
     @mock.patch("alibuild_helpers.utilities.open")
     @mock.patch("alibuild_helpers.init.readDefaults")
-    def test_doRealInit(self, mock_read_defaults, mock_open, mock_update_reference, mock_parse_recipe, mock_execute, mock_os, mock_path,  mock_info):
+    def test_doRealInit(self, mock_read_defaults, mock_open, mock_update_reference, mock_parse_recipe, mock_execute, mock_os, mock_path,  mock_info, mock_banner):
       fake_dist = {"repo": "alisw/alidist", "ver": "master"}
       mock_open.side_effect = lambda x: {
         "/alidist/defaults-release.sh": StringIO("package: defaults-release\nversion: v1\n---"),

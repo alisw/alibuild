@@ -62,17 +62,17 @@ def validateSpec(spec):
 # Use this to check if a given spec is compatible with the given default
 def validateDefaults(finalPkgSpec, defaults):
   if not "valid_defaults" in finalPkgSpec:
-    return (True, "")
+    return (True, "", [])
   validDefaults = asList(finalPkgSpec["valid_defaults"])
   nonStringDefaults = [x for x in validDefaults if not type(x) == str]
   if nonStringDefaults:
-    return (False, "valid_defaults needs to be a string or a list of strings. Found %s." % nonStringDefaults)
+    return (False, "valid_defaults needs to be a string or a list of strings. Found %s." % nonStringDefaults, [])
   if defaults in validDefaults:
-    return (True, "")
+    return (True, "", validDefaults)
   return (False, "Cannot compile %s with `%s' default. Valid defaults are\n%s" % 
                   (finalPkgSpec["package"],
                    defaults,
-                   "\n".join([" - " + x for x in validDefaults])))
+                   "\n".join([" - " + x for x in validDefaults])), validDefaults)
 
 def format(s, **kwds):
   return to_unicode(s) % kwds
@@ -277,13 +277,14 @@ def parseDefaults(disable, defaultsGetter, log):
 
 def getPackageList(packages, specs, configDir, preferSystem, noSystem,
                    architecture, disable, defaults, dieOnError, performPreferCheck, performRequirementCheck,
-                   overrides, taps, log):
+                   performValidateDefaults, overrides, taps, log):
   systemPackages = set()
   ownPackages = set()
   failedRequirements = set()
   testCache = {}
   requirementsCache = {}
   packages = packages[:]
+  validDefaults = []  # empty list: all OK; None: no valid default; non-empty list: list of valid ones
   while packages:
     p = packages.pop(0)
     if p in specs:
@@ -336,6 +337,14 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
     if spec["package"] in disable:
       continue
 
+    # Check whether the package is compatible with the specified defaults
+    if validDefaults is not None:
+      (ok,msg,valid) = performValidateDefaults(spec)
+      if valid:
+        validDefaults = [ v for v in validDefaults if v in valid ] if validDefaults else valid[:]
+        if not validDefaults:
+          validDefaults = None  # no valid default works for all current packages
+
     # For the moment we treat build_requires just as requires.
     fn = lambda what: filterByArchitecture(architecture, spec.get(what, []))
     spec["requires"] = [x for x in fn("requires") if not x in disable]
@@ -352,7 +361,7 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
     spec["recipe"] = recipe.strip("\n")
     specs[spec["package"]] = spec
     packages += spec["requires"]
-  return (systemPackages, ownPackages, failedRequirements)
+  return (systemPackages, ownPackages, failedRequirements, validDefaults)
 
 def dockerStatusOutput(cmd, dockerImage=None, executor=getstatusoutput):
   if dockerImage:

@@ -1,6 +1,6 @@
 from alibuild_helpers.cmd import execute
 from alibuild_helpers.utilities import format
-from alibuild_helpers.utilities import parseRecipe, getPackageList, getRecipeReader, parseDefaults, readDefaults
+from alibuild_helpers.utilities import parseRecipe, getPackageList, getRecipeReader, parseDefaults, readDefaults, validateDefaults
 from alibuild_helpers.log import debug, error, warning, banner, info
 from alibuild_helpers.log import dieOnError
 from alibuild_helpers.workarea import updateReferenceRepos
@@ -51,20 +51,25 @@ def doInit(setdir, configDir, pkgname, referenceSources, dist, defaults, dryRun)
   specs = {}
   defaultsReader = lambda: readDefaults(configDir, defaults, error)
   (err, overrides, taps) = parseDefaults([], defaultsReader, debug)
-  getPackageList(packages=[ p["name"] for p in pkgs ],
-                 specs=specs,
-                 configDir=configDir,
-                 preferSystem=False,
-                 noSystem=True,
-                 architecture="",
-                 disable=[],
-                 defaults=defaults,
-                 dieOnError=lambda *x, **y: None,
-                 performPreferCheck=lambda *x, **y: (1, ""),
-                 performRequirementCheck=lambda *x, **y: (0, ""),
-                 overrides=overrides,
-                 taps=taps,
-                 log=debug)
+  (_,_,_,validDefaults) = getPackageList(packages=[ p["name"] for p in pkgs ],
+                                         specs=specs,
+                                         configDir=configDir,
+                                         preferSystem=False,
+                                         noSystem=True,
+                                         architecture="",
+                                         disable=[],
+                                         defaults=defaults,
+                                         dieOnError=lambda *x, **y: None,
+                                         performPreferCheck=lambda *x, **y: (1, ""),
+                                         performRequirementCheck=lambda *x, **y: (0, ""),
+                                         performValidateDefaults=lambda spec : validateDefaults(spec, defaults),
+                                         overrides=overrides,
+                                         taps=taps,
+                                         log=debug)
+  dieOnError(validDefaults and defaults not in validDefaults,
+             "Specified default `%s' is not compatible with the packages you want to build.\n" % defaults +
+             "Valid defaults:\n\n- " +
+             "\n- ".join(sorted(validDefaults)))
 
   for p in pkgs:
     spec = specs.get(p["name"])

@@ -8,7 +8,7 @@ except ImportError:
 import logging
 from alibuild_helpers.log import debug, error, banner, info, success, warning
 from alibuild_helpers.log import logger
-from alibuild_helpers.utilities import getPackageList, format, detectArch, parseDefaults, readDefaults
+from alibuild_helpers.utilities import getPackageList, format, detectArch, parseDefaults, readDefaults, validateDefaults
 from alibuild_helpers.utilities import dockerStatusOutput
 import subprocess
 
@@ -163,20 +163,28 @@ def doDoctor(args, parser):
   if err:
     error(err)
     exit(1)
-  (fromSystem, own, failed) = getPackageList(packages=packages,
-                                         specs=specs,
-                                         configDir=args.configDir,
-                                         preferSystem=args.preferSystem,
-                                         noSystem=args.noSystem,
-                                         architecture=args.architecture,
-                                         disable=args.disable,
-                                         defaults=args.defaults,
-                                         dieOnError=lambda x, y : unreachable,
-                                         performPreferCheck=lambda pkg, cmd : checkPreferSystem(pkg, cmd, homebrew_replacement, dockerImage),
-                                         performRequirementCheck=lambda pkg, cmd : checkRequirements(pkg, cmd, homebrew_replacement, dockerImage),
-                                         overrides=overrides,
-                                         taps=taps,
-                                         log=info)
+
+  def performValidateDefaults(spec):
+    (ok,msg,valid) = validateDefaults(spec, args.defaults)
+    if not ok:
+      error(msg)
+    return (ok,msg,valid)
+
+  (fromSystem, own, failed, validDefaults) = getPackageList(packages                = packages,
+                                                            specs                   = specs,
+                                                            configDir               = args.configDir,
+                                                            preferSystem            = args.preferSystem,
+                                                            noSystem                = args.noSystem,
+                                                            architecture            = args.architecture,
+                                                            disable                 = args.disable,
+                                                            defaults                = args.defaults,
+                                                            dieOnError              = lambda x, y : unreachable,
+                                                            performPreferCheck      = lambda pkg, cmd : checkPreferSystem(pkg, cmd, homebrew_replacement, dockerImage),
+                                                            performRequirementCheck = lambda pkg, cmd : checkRequirements(pkg, cmd, homebrew_replacement, dockerImage),
+                                                            performValidateDefaults = performValidateDefaults,
+                                                            overrides               = overrides,
+                                                            taps                    = taps,
+                                                            log                     = info)
 
   if fromSystem:
     banner("The following packages will be picked up from the system:\n\n- " +
@@ -188,9 +196,20 @@ def doDoctor(args, parser):
            "\n\nThis is not a real issue, but it might take longer the first time you invoke aliBuild." +
            "\nLook at the error messages above to get hints on what packages you need to install separately.")
   if failed:
-    banner("The following packages are system dependencies and could not be found:\n\n- "+
+    banner("The following packages are system dependencies and could not be found:\n\n- " +
           "\n- ".join(failed) +
           "\n\nLook at the error messages above to get hints on what packages you need to install separately.")
     exitcode = 1
+  if validDefaults and args.defaults not in validDefaults:
+    banner("The list of packages cannot be built with the defaults you have specified.\n" +
+           "List of valid defaults:\n\n- " +
+           "\n- ".join(validDefaults) +
+           "\n\nUse the `--defaults' switch to specify one of them.")
+    exitcode = 2
+  if validDefaults is None:
+    banner("No valid defaults combination was found for the given list of packages, check your recipes!")
+    exitcode = 3
+  if exitcode:
+    error("There were errors: build cannot be performed if they are not resolved. Check the messages above.")
   exit(exitcode)
 
