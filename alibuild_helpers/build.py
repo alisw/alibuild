@@ -257,20 +257,26 @@ def doBuild(args, parser):
                toolHash=getDirectoryHash(dirname(__file__)),
                distHash=os.environ["ALIBUILD_ALIDIST_HASH"]))
 
-  (systemPackages, ownPackages, failed) = getPackageList(packages=packages,
-                                         specs=specs,
-                                         configDir=args.configDir,
-                                         preferSystem=args.preferSystem,
-                                         noSystem=args.noSystem,
-                                         architecture=args.architecture,
-                                         disable=args.disable,
-                                         defaults=args.defaults,
-                                         dieOnError=dieOnError,
-                                         performPreferCheck=lambda pkg, cmd : dockerStatusOutput(cmd, dockerImage),
-                                         performRequirementCheck=lambda pkg, cmd : dockerStatusOutput(cmd, dockerImage),
-                                         overrides=overrides,
-                                         taps=taps,
-                                         log=debug)
+  (systemPackages, ownPackages, failed, validDefaults) = getPackageList(packages                = packages,
+                                                                        specs                   = specs,
+                                                                        configDir               = args.configDir,
+                                                                        preferSystem            = args.preferSystem,
+                                                                        noSystem                = args.noSystem,
+                                                                        architecture            = args.architecture,
+                                                                        disable                 = args.disable,
+                                                                        defaults                = args.defaults,
+                                                                        dieOnError              = dieOnError,
+                                                                        performPreferCheck      = lambda pkg, cmd : dockerStatusOutput(cmd, dockerImage),
+                                                                        performRequirementCheck = lambda pkg, cmd : dockerStatusOutput(cmd, dockerImage),
+                                                                        performValidateDefaults = lambda spec : validateDefaults(spec, args.defaults),
+                                                                        overrides               = overrides,
+                                                                        taps                    = taps,
+                                                                        log                     = debug)
+  if validDefaults and args.defaults not in validDefaults:
+    return (error, "Specified default `%s' is not compatible with the packages you want to build.\n" % args.defaults +
+                   "Valid defaults:\n\n- " +
+                   "\n- ".join(sorted(validDefaults)), 1)
+
   if failed:
     return (error, "The following packages are system requirements and could not be found:\n\n- " + "\n- ".join(sorted(list(failed))) +
                    "\n\nPlease run:\n\n\taliDoctor %s\n\nto get a full diagnosis." % args.pkgname.pop(), 1)
@@ -448,9 +454,6 @@ def doBuild(args, parser):
     spec = specs[p]
     if "source" in spec:
       debug("Commit hash for %s@%s is %s" % (spec["source"], spec["tag"], spec["commit_hash"]))
-    ok, out = validateDefaults(spec, args.defaults)
-    if not ok:
-      return (error, out, 1)
 
   # Calculate the hashes. We do this in build order so that we can guarantee
   # that the hashes of the dependencies are calculated first.  Also notice that
