@@ -114,9 +114,9 @@ def dummy_execute(x, **kwds):
   if re.match(".*ln -sfn.*TARS", x):
     return 0
   return {
-    "/bin/bash -e -x /sw/SPECS/osx_x86-64/defaults-release/v1-1/build.sh 2>&1": 0,
-    '/bin/bash -e -x /sw/SPECS/osx_x86-64/zlib/v1.2.3-1/build.sh 2>&1': 0,
-    '/bin/bash -e -x /sw/SPECS/osx_x86-64/ROOT/v6-08-30-1/build.sh 2>&1': 0
+    "bash -e -x /sw/SPECS/osx_x86-64/defaults-release/v1-1/build.sh 2>&1": 0,
+    'bash -e -x /sw/SPECS/osx_x86-64/zlib/v1.2.3-1/build.sh 2>&1': 0,
+    'bash -e -x /sw/SPECS/osx_x86-64/ROOT/v6-08-30-1/build.sh 2>&1': 0
   }[x]
 
 def dummy_readlink(x):
