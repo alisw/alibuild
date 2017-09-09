@@ -950,7 +950,7 @@ def doBuild(args, parser):
               " %(overrideSource)s"
               " -e WORK_DIR_OVERRIDE=/sw"
               " %(image)s"
-              " /bin/bash -e -x /build.sh",
+              " bash -e -x /build.sh",
               additionalEnv=additionalEnv,
               additionalVolumes=additionalVolumes,
               develVolumes=develVolumes,
@@ -965,7 +965,7 @@ def doBuild(args, parser):
       progress = ProgressPrint("%s is being built (use --debug for full output)" % spec["package"])
       for k,v in buildEnvironment:
         os.environ[k] = str(v)
-      err = execute("/bin/bash -e -x %s/build.sh 2>&1" % scriptDir,
+      err = execute("bash -e -x %s/build.sh 2>&1" % scriptDir,
                     printer=debug if args.debug or not sys.stdout.isatty() else progress)
       progress.end("failed" if err else "ok", err)
     report_event("BuildError" if err else "BuildSuccess",
