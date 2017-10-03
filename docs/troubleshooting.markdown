@@ -78,7 +78,7 @@ will tell you something like:
 
 If you have a system package which you think should be used but it's not, you
 can run `aliDoctor <package-name>` to try to understand why that was the case
-(or you can open a bug report with its output and we will look at it).
+(or you can [open a bug report](https://github.com/alisw/alidist/issues) with its output and we will look at it).
 
 ### What is PIP ? How do I install it?
 
