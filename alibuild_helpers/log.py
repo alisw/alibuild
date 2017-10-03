@@ -1,5 +1,6 @@
 import logging
 import sys
+import re
 from os import getenv
 import socket, time
 from alibuild_helpers.utilities import format, to_unicode
@@ -95,17 +96,25 @@ class ProgressPrint:
     self.lasttime = 0
     self.STAGES = [ ".", "..", "...", "....", ".....", "....", "...", ".." ]
     self.begin_msg = begin_msg
+    self.percent = -1
   def __call__(self, txt):
     if time.time()-self.lasttime < 0.5:
       return
     if self.count == -1 and self.begin_msg:
       sys.stderr.write("\033[1;35m==>\033[m "+self.begin_msg)
     self.erase()
+    m = re.search("(^|[^0-9])([0-9]{1,2})%", txt)
+    if m:
+      self.percent = int(m.group(2))
+    if self.percent > -1:
+      sys.stderr.write(" [%2d%%] " % self.percent)
     self.count = (self.count+1) % len(self.STAGES)
     sys.stderr.write(self.STAGES[self.count])
     self.lasttime = time.time()
   def erase(self):
     nerase = len(self.STAGES[self.count]) if self.count > -1 else 0
+    if self.percent > -1:
+      nerase = nerase + 7
     sys.stderr.write("\b"*nerase+" "*nerase+"\b"*nerase)
   def end(self, msg="", error=False):
     if self.count == -1:
