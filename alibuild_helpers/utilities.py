@@ -293,10 +293,10 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
     filename = taps.get(lowerPkg, "%s/%s.sh" % (configDir, lowerPkg))
     err, spec, recipe = parseRecipe(getRecipeReader(filename, configDir))
     dieOnError(err, err)
-    dieOnError(spec["package"] != p,
-               "%s should be spelt %s." % (p, spec["package"]))
     dieOnError(spec["package"].lower() != lowerPkg,
                "%s.sh has different package field: %s" % (p, spec["package"]))
+    dieOnError(spec["package"] != p,
+               "%s should be spelt %s." % (p, spec["package"]))
 
     # If an override fully matches a package, we apply it. This means
     # you can have multiple overrides being applied for a given package.
