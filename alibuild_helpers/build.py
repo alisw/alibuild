@@ -447,6 +447,11 @@ def doBuild(args, parser):
         LogFormatter("%%(levelname)s:%s:%s: %%(message)s" %
                      (mainPackage, args.develPrefix if "develPrefix" in args else mainHash[0:8])))
 
+  # Given we started by enforcing /bin/bash we keep enforcing it, however if
+  # it's somewhere else on system, e.g. on NixOS, we fallback to the one in
+  # path.
+  bashInterpreter = getstatusoutput("/bin/bash --version")[0] and "bash" or "/bin/bash"
+
   # Now that we have the main package set, we can print out Useful information
   # which we will be able to associate with this build. Also lets make sure each package
   # we need to build can be built with the current default.
@@ -950,9 +955,10 @@ def doBuild(args, parser):
               " %(overrideSource)s"
               " -e WORK_DIR_OVERRIDE=/sw"
               " %(image)s"
-              " /bin/bash -e -x /build.sh",
+              " %(bash)s -e -x /build.sh",
               additionalEnv=additionalEnv,
               additionalVolumes=additionalVolumes,
+              bash=bashInterpreter,
               develVolumes=develVolumes,
               workdir=abspath(args.workDir),
               image=dockerImage,
@@ -965,7 +971,7 @@ def doBuild(args, parser):
       progress = ProgressPrint("%s is being built (use --debug for full output)" % spec["package"])
       for k,v in buildEnvironment:
         os.environ[k] = str(v)
-      err = execute("/bin/bash -e -x %s/build.sh 2>&1" % scriptDir,
+      err = execute("%s -e -x %s/build.sh 2>&1" % (bashInterpreter, scriptDir),
                     printer=debug if args.debug or not sys.stdout.isatty() else progress)
       progress.end("failed" if err else "ok", err)
     report_event("BuildError" if err else "BuildSuccess",
