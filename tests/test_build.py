@@ -77,6 +77,8 @@ version: v1
 """
 
 def dummy_getstatusoutput(x):
+  if re.match("/bin/bash --version", x):
+    return (0, "GNU bash, version 3.2.57(1)-release (x86_64-apple-darwin17)\nCopyright (C) 2007 Free Software Foundation, Inc.\n")
   if re.match("mkdir -p [^;]*$", x):
     return (0, "")
   if re.match("ln -snf[^;]*$", x):
