@@ -62,7 +62,7 @@ def getDirectoryHash(d):
     err, out = getstatusoutput("GIT_DIR=%s/.git git rev-parse HEAD" % d)
     dieOnError(err, "Impossible to find reference for %s " % d)
   else:
-    err, out = getstatusoutput("pip show alibuild | grep -e \"^Version:\" | sed -e 's/.* //'")
+    err, out = getstatusoutput("pip --disable-pip-version-check show alibuild | grep -e \"^Version:\" | sed -e 's/.* //'")
     dieOnError(err, "Impossible to find reference for %s " % d)
   return out
 

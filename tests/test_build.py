@@ -85,7 +85,7 @@ def dummy_getstatusoutput(x):
     return (0, "")
   return {
       "GIT_DIR=/alidist/.git git rev-parse HEAD": (0, "6cec7b7b3769826219dfa85e5daa6de6522229a0"),
-      'pip show alibuild | grep -e "^Version:" | sed -e \'s/.* //\'': (0, "v1.5.0"),
+      'pip --disable-pip-version-check show alibuild | grep -e "^Version:" | sed -e \'s/.* //\'': (0, "v1.5.0"),
       'which pigz': (1, ""),
       'tar --ignore-failed-read -cvvf /dev/null /dev/zero': (0, ""),
       'git ls-remote --heads https://github.com/root-mirror/root': (0, "87b87c4322d2a3fad315c919cb2e2dd73f2154dc\trefs/heads/master\nf7b336611753f1f4aaa94222b0d620748ae230c0\trefs/heads/v6-08-00-patches"),
