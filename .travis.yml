@@ -19,40 +19,11 @@ install: |
     pip install coverage
     pip install mock
     pip install pyflakes
+    gem install jekyll html-proofer
 script: |
-  set -e
-  export PATH=~/.local/bin:$PATH
-  export PYTHONPATH=~/lib/python2.7/site-packages:$PYTHONPATH
-  coverage run -a alibuild/aliBuild analytics off
-  time coverage run -a alibuild/aliBuild --help
-  coverage run -a alibuild/aliBuild analytics off
-  test -e ~/.config/alibuild/disable-analytics
-  test ! -e ~/.config/alibuild/analytics-uuid
-  coverage run -a alibuild/aliBuild analytics on
-  test ! -e ~/.config/alibuild/disable-analytics
-  test -e ~/.config/alibuild/analytics-uuid
-  coverage run -a alibuild/aliBuild analytics off
-  test -e ~/.config/alibuild/disable-analytics
-  test -e ~/.config/alibuild/analytics-uuid
-  pushd alibuild; time coverage run -a -m unittest discover tests; popd
-  time coverage run -a alibuild/aliBuild -z test-init init zlib
-  pushd test-init/alidist && git status && popd
-  pushd test-init/zlib && git status && popd
-  time coverage run -a alibuild/aliBuild -c alibuild/tests/testdist build non-existsting --no-system --disable GCC-Toolchain || true
-  time coverage run -a alibuild/aliBuild -c alibuild/tests/testdist build broken1 --no-system --disable GCC-Toolchain 2>&1 | grep "Header missing"
-  time coverage run -a alibuild/aliBuild -c alibuild/tests/testdist build broken2 --no-system --disable GCC-Toolchain 2>&1 | grep "Empty recipe"
-  time coverage run -a alibuild/aliBuild -c alibuild/tests/testdist build broken3 --no-system --disable GCC-Toolchain 2>&1 | grep "Unable to parse"
-  time coverage run -a alibuild/aliBuild -c alibuild/tests/testdist build broken4 --no-system --disable GCC-Toolchain 2>&1 | grep "Malformed header"
-  time coverage run -a alibuild/aliBuild -c alibuild/tests/testdist build broken5 --no-system --disable GCC-Toolchain 2>&1 | grep "Missing package"
-  time coverage run -a alibuild/aliBuild -c alibuild/tests/testdist build broken6 --no-system --disable GCC-Toolchain 2>&1 | grep scanning
-  time coverage run -a alibuild/aliBuild build zlib --no-system --disable GCC-Toolchain
-  alibuild/alienv q
-  alibuild/alienv setenv zlib/latest -c bash -c '[[ $LD_LIBRARY_PATH == */zlib/* ]]'
-  time coverage run -a alibuild/aliDoctor AliPhysics
-  time coverage run -a alibuild/aliBuild build zlib --dry-run
-  time coverage run -a alibuild/aliBuild --aggressive-cleanup --docker -a slc7_x86-64 -d build zlib
-  time coverage run -a alibuild/aliBuild --aggressive-cleanup --docker -a ubuntu1510_x86-64 -d build zlib
-  time coverage run -a alibuild/aliBuild init zlib
-  time coverage run -a alibuild/aliBuild version
+  alibuild/script/cibuild
 after_success:
   - bash <(curl -s https://codecov.io/bash)
+env:
+  global:
+  - NOKOGIRI_USE_SYSTEM_LIBRARIES=true # speeds up installation of html-proofer
