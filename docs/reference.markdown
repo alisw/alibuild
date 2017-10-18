@@ -235,7 +235,7 @@ of the external to override. E.g.:
 will pick `root.sh` as found in the commit `abcedf123456`.
 
 For a more complete example see
-[defaults-o2.sh](https://github.com/alisw/alidist/blob/IB/v5-08/next/defaults-o2.sh).
+[defaults-o2.sh](https://github.com/alisw/alidist/blob/master/defaults-o2.sh).
 
 You can limit which defaults can be applied to a given package by using the
 `valid_defaults` key.
