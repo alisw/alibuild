@@ -42,11 +42,11 @@ other Linux distributions):
 
     sudo pip install alibuild==1.4.0
 
-If you are on a system where you do not have enough privileges
-to install packages, you can also [install it in your home
-directory](troubleshooting.html#i-do-not-have-privileges-and-i-cannot-in
-stall-via-pip). If you do not have pip on your system you
-can install it following the [guide in the troubleshooting
+If you are on a system where you do not have enough privileges to install
+packages, you can also [install it in your home
+directory](troubleshooting.html#i-do-not-have-privileges-and-i-cannot-install-via-pip).
+If you do not have pip on your system you can install it following the [guide
+in the troubleshooting
 section](troubleshooting.html#what-is-pip--how-do-i-install-it).
 
 # Setting up your work environment

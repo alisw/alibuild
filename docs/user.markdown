@@ -176,7 +176,7 @@ validated for datataking and the choice will not change until the end of
 RUN2 of LHC. In order to change that and use, for example, a more recent
 version of ROOT you can use the `--default root6` option which will
 enable ROOT6 based builds. For a more complete description of how defaults
-works please look at [the reference manual](reference#defaults).
+works please look at [the reference manual](reference.html#defaults).
 
 ## Disabling packages
 
@@ -186,7 +186,7 @@ separated list with the `--disable` option.
 Moreover, starting from aliBuild 1.4.0, it will also be
 possible to disable packages by adding them to the `disable`
 keyword of your defaults file (see previous paragraph). See the
-[defaults-o2.sh](https://github.com/alisw/alidist/blob/IB/v5-08/next/defaults-o2.sh)
+[defaults-o2.sh](https://github.com/alisw/alidist/blob/master/defaults-o2.sh)
 file for an example of how to disable `AliEn-Runtime` and `AliRoot`
 when passing `--defaults o2`.
 
@@ -211,7 +211,7 @@ checking they are actually compatible with the one used in the recipe).
 ## Monitoring builds with Riemann
 
 aliBuild comes with support for pushing every single line produced by
-the output to a [Riemann](https://riemann.io) instance. This can be
+the output to a [Riemann](http://riemann.io) instance. This can be
 enabled by setting the two environment variables:
 
 - `RIEMANN_HOST`: the hostname Riemann server you want to push your data
