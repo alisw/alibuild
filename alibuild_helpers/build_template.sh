@@ -183,6 +183,10 @@ if [[ ${ARCHITECTURE:0:3} == "osx" ]]; then
         cat <<EOF >> "$INSTALLROOT/relocate-me.sh"
 install_name_tool -id \$(otool -D "\$PP/$BIN" | tail -n1 | sed -e "s|/[^ ]*INSTALLROOT/\$PH/\$OP|\$WORK_DIR/\$PP|g") "\$PP/$BIN"
 EOF
+      elif otool -D "$PWD/$BIN" 2> /dev/null | tail -n1 | grep -vq /; then
+        cat <<EOF >> "$INSTALLROOT/relocate-me.sh"
+install_name_tool -id "\$WORK_DIR/\$PP/$BIN" "\$PP/$BIN"
+EOF
       fi
     fi
 
