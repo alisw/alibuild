@@ -35,12 +35,12 @@ needs to be done only once.
 
 On most laptops (in particular Macs) this means running:
 
-    pip install alibuild==1.4.0
+    pip install alibuild --upgrade
 
 or, in case you need to be root to install packages (e.g. on Ubuntu and
 other Linux distributions):
 
-    sudo pip install alibuild==1.4.0
+    sudo pip install alibuild --upgrade
 
 If you are on a system where you do not have enough privileges to install
 packages, you can also [install it in your home
@@ -67,12 +67,12 @@ command:
 
 ```bash
 cd $HOME/alice
-aliBuild init O2@dev
+aliBuild init O2 --defaults o2
 ```
 
-Notice that O2 uses the `dev` branch, not the `master` for developments,
-so we directly switch to the `dev` branch. If you need to use master simply switch
-`dev` with `master` in the above code.
+Note that the `--defaults o2` tells aliBuild what are the special options
+required to compile O2. By running the command above, the `dev` branch of O2
+will be checked out: this is the default branch, not `master`.
 
 Once the above command returns, you should have a copy of the current
 dev of `O2` in `$HOME/alice` which you can modify at will.
@@ -94,7 +94,7 @@ installation troubles and include it in your bug report.
 To do so you can go in `$HOME/alice` and invoke
 
     cd $HOME/alice
-    aliDoctor O2
+    aliDoctor O2 --defaults o2
 
 This will examine your system and provide suggestions (in the form of
 warnings) or actual errors about your setup. You should fix all the
@@ -137,7 +137,7 @@ on the Long Term Support Ubuntu 14.04.
 
 Notice that while you can use the
 
-    aliBuild build AliPhysics
+    aliBuild --defaults o2 build O2
 
 command as many times as you want. However, you can also do it just once
 and then do subsequent rebuilds by doing:
@@ -170,8 +170,8 @@ You can then open a new shell and use:
 
     alienv load O2/latest
 
-to setup your environment so that `aliroot` and all the required
-libraries are correctly picked up.
+to setup your environment so that O2 and all the required libraries are
+correctly picked up.
 
 Alternatively you can use:
 
@@ -184,7 +184,7 @@ Development of a couple of related modules in the AliceO2Group github
 group. The first module is called Configuration, the second monitoring.
 
 ## Setup
-    pip install alibuild==1.4.0
+    pip install alibuild --upgrade
     mkdir -p $HOME/alice
     export ALIBUILD_WORK_DIR=$HOME/alice/sw; eval "`alienv shell-helper`"
 
