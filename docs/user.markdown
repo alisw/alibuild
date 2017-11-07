@@ -151,7 +151,7 @@ the one being used for development. The common use case is that
 development happens on a Mac while production runs on some older Linux
 distribution like SLC5 or SLC6. In order to improve the experience
 of cross platform development aliBuild now offers the ability to run
-in [Docker](http://docker.io) via the `--docker` option. When it is
+in [Docker](https://docker.io) via the `--docker` option. When it is
 specified the first part of the architecture will be used to construct
 the name of the docker container to be used for the build and the build
 itself will be performed inside that container. For example if you
