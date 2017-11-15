@@ -96,8 +96,6 @@ def doctorArgParser(parser):
                       dest="configDir", default="alidist")
   parser.add_argument("-w", "--work-dir", help="path to work dir",
                       dest="workDir", default="workDir")
-  parser.add_argument("-d", "--debug", help="Show also successful tests.",
-                      dest="debug", action="store_true", default=False)
   parser.add_argument("--defaults", default="release",
                       dest="defaults", help="Specify default to use")
   parser.add_argument("--disable", dest="disable", default=[],
@@ -124,7 +122,7 @@ def doDoctor(args, parser):
 
   if exists(expanduser("~/.rootlogon.C")):
     warning("You have a ~/.rootlogon.C notice that this might"
-            " interphere with your environment in hidden ways.\n"
+            " interfere with your environment in hidden ways.\n"
             "Please review it an make sure you are not force loading any library"
             " which might interphere with the rest of the setup.")
   # Decide if we can use homebrew. If not, we replace it with "true" so
@@ -191,7 +189,7 @@ def doDoctor(args, parser):
            "\n- ".join(fromSystem) +
            "\n\nIf this is not you want, you have to uninstall / unload them.")
   if own:
-    banner("The following packages will be build by aliBuild because they couldn't be picked up from the system:\n\n- " +
+    banner("The following packages will be built by aliBuild because they couldn't be picked up from the system:\n\n- " +
            "\n- ".join(own) +
            "\n\nThis is not a real issue, but it might take longer the first time you invoke aliBuild." +
            "\nLook at the error messages above to get hints on what packages you need to install separately.")
