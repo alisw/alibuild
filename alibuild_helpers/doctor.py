@@ -10,17 +10,8 @@ from alibuild_helpers.log import debug, error, banner, info, success, warning
 from alibuild_helpers.log import logger
 from alibuild_helpers.utilities import getPackageList, format, detectArch, parseDefaults, readDefaults, validateDefaults
 from alibuild_helpers.utilities import dockerStatusOutput
+from alibuild_helpers.cmd import getStatusOutputBash
 import subprocess
-
-def execute(command):
-  popen = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-  lines_iterator = iter(popen.stdout.readline, "")
-  txt = ""
-  for line in lines_iterator:
-    if not line: break
-    txt += line.decode('utf-8', "ignore") # yield line
-  txt += popen.communicate()[0].decode('utf-8', 'ignore')
-  return (popen.returncode, txt)
 
 def prunePaths(workDir):
   for x in ["PATH", "LD_LIBRARY_PATH", "DYLD_LIBRARY_PATH"]:
@@ -34,7 +25,7 @@ def checkPreferSystem(spec, cmd, homebrew_replacement, dockerImage):
       debug("Package %s can only be managed via alibuild." % spec["package"])
       return (1, "")
     cmd = homebrew_replacement + cmd
-    err, out = dockerStatusOutput(cmd, dockerImage=dockerImage, executor=execute)
+    err, out = dockerStatusOutput(cmd, dockerImage=dockerImage, executor=getStatusOutputBash)
     if not err:
       success("Package %s will be picked up from the system." % spec["package"])
       for x in out.split("\n"):
@@ -56,7 +47,7 @@ def checkRequirements(spec, cmd, homebrew_replacement, dockerImage):
       debug("Package %s is not a system requirement." % spec["package"])
       return (0, "")
     cmd = homebrew_replacement + cmd
-    err, out = dockerStatusOutput(cmd, dockerImage=dockerImage, executor=execute)
+    err, out = dockerStatusOutput(cmd, dockerImage=dockerImage, executor=getStatusOutputBash)
     if not err:
       success("Required package %s will be picked up from the system." % spec["package"])
       debug(cmd)

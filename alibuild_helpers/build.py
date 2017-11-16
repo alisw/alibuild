@@ -10,7 +10,7 @@ except ImportError:
 from alibuild_helpers.analytics import report_event
 from alibuild_helpers.log import debug, error, info, banner, warning
 from alibuild_helpers.log import dieOnError
-from alibuild_helpers.cmd import execute
+from alibuild_helpers.cmd import execute, getStatusOutputBash, BASH
 from alibuild_helpers.utilities import prunePaths
 from alibuild_helpers.utilities import format, dockerStatusOutput, parseDefaults, readDefaults
 from alibuild_helpers.utilities import getPackageList
@@ -266,8 +266,8 @@ def doBuild(args, parser):
                                                                         disable                 = args.disable,
                                                                         defaults                = args.defaults,
                                                                         dieOnError              = dieOnError,
-                                                                        performPreferCheck      = lambda pkg, cmd : dockerStatusOutput(cmd, dockerImage),
-                                                                        performRequirementCheck = lambda pkg, cmd : dockerStatusOutput(cmd, dockerImage),
+                                                                        performPreferCheck      = lambda pkg, cmd : dockerStatusOutput(cmd, dockerImage, executor=getStatusOutputBash),
+                                                                        performRequirementCheck = lambda pkg, cmd : dockerStatusOutput(cmd, dockerImage, executor=getStatusOutputBash),
                                                                         performValidateDefaults = lambda spec : validateDefaults(spec, args.defaults),
                                                                         overrides               = overrides,
                                                                         taps                    = taps,
@@ -446,11 +446,6 @@ def doBuild(args, parser):
     logger_handler.setFormatter(
         LogFormatter("%%(levelname)s:%s:%s: %%(message)s" %
                      (mainPackage, args.develPrefix if "develPrefix" in args else mainHash[0:8])))
-
-  # Given we started by enforcing /bin/bash we keep enforcing it, however if
-  # it's somewhere else on system, e.g. on NixOS, we fallback to the one in
-  # path.
-  bashInterpreter = getstatusoutput("/bin/bash --version")[0] and "bash" or "/bin/bash"
 
   # Now that we have the main package set, we can print out Useful information
   # which we will be able to associate with this build. Also lets make sure each package
@@ -958,7 +953,7 @@ def doBuild(args, parser):
               " %(bash)s -e -x /build.sh",
               additionalEnv=additionalEnv,
               additionalVolumes=additionalVolumes,
-              bash=bashInterpreter,
+              bash=BASH,
               develVolumes=develVolumes,
               workdir=abspath(args.workDir),
               image=dockerImage,
@@ -971,7 +966,7 @@ def doBuild(args, parser):
       progress = ProgressPrint("%s is being built (use --debug for full output)" % spec["package"])
       for k,v in buildEnvironment:
         os.environ[k] = str(v)
-      err = execute("%s -e -x %s/build.sh 2>&1" % (bashInterpreter, scriptDir),
+      err = execute("%s -e -x %s/build.sh 2>&1" % (BASH, scriptDir),
                     printer=debug if args.debug or not sys.stdout.isatty() else progress)
       progress.end("failed" if err else "ok", err)
     report_event("BuildError" if err else "BuildSuccess",
