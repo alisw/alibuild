@@ -30,7 +30,7 @@ def valid_recipe(x):
 
 CLONE_EVERYTHING = [
  call(u'git clone https://github.com/alisw/alidist -b master /alidist'),
- call(u'git clone https://github.com/alisw/AliRoot -b v5-08-00 --reference /sw/MIRROR/aliroot ./AliRoot && cd ./AliRoot && git remote set-url --push origin https://github.com/alisw/AliRoot')
+ call(u'git clone https://github.com/alisw/AliRoot -b v5-08-00 --recursive --reference /sw/MIRROR/aliroot ./AliRoot && cd ./AliRoot && git remote set-url --push origin https://github.com/alisw/AliRoot')
 ]
 
 class InitTestCase(unittest.TestCase):
@@ -84,7 +84,7 @@ class InitTestCase(unittest.TestCase):
              defaults="release",
              dryRun=False)
       mock_execute.side_effect = lambda x: print(x)
-      mock_execute.assert_called_with("git clone https://github.com/alisw/AliRoot -b v5-08-00 --reference /sw/MIRROR/aliroot ./AliRoot && cd ./AliRoot && git remote set-url --push origin https://github.com/alisw/AliRoot")
+      mock_execute.assert_called_with("git clone https://github.com/alisw/AliRoot -b v5-08-00 --recursive --reference /sw/MIRROR/aliroot ./AliRoot && cd ./AliRoot && git remote set-url --push origin https://github.com/alisw/AliRoot")
       self.assertEqual(mock_execute.mock_calls, CLONE_EVERYTHING)
       mock_path.exists.assert_called_with("./AliRoot")
 
