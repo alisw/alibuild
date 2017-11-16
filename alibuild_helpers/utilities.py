@@ -22,18 +22,6 @@ class SpecError(Exception):
 
 asList = lambda x : x if type(x) == list else [x]
 
-# Aggressive cache decorator for any function
-class cache:
-  def __init__(self, f):
-    self.f = f
-    self.res = None
-    self.res_set = False
-  def __call__(self, *x, **y):
-    if not self.res_set:
-      self.res = self.f(*x, **y)
-      self.res_set = True
-    return self.res
-
 def is_string(s):
   if sys.version_info[0] >= 3:
     return isinstance(s, str)

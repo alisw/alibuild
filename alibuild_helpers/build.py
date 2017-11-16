@@ -10,7 +10,7 @@ except ImportError:
 from alibuild_helpers.analytics import report_event
 from alibuild_helpers.log import debug, error, info, banner, warning
 from alibuild_helpers.log import dieOnError
-from alibuild_helpers.cmd import execute, getStatusOutputBash, bashInterpreter
+from alibuild_helpers.cmd import execute, getStatusOutputBash, BASH
 from alibuild_helpers.utilities import prunePaths
 from alibuild_helpers.utilities import format, dockerStatusOutput, parseDefaults, readDefaults
 from alibuild_helpers.utilities import getPackageList
@@ -953,7 +953,7 @@ def doBuild(args, parser):
               " %(bash)s -e -x /build.sh",
               additionalEnv=additionalEnv,
               additionalVolumes=additionalVolumes,
-              bash=bashInterpreter(),
+              bash=BASH,
               develVolumes=develVolumes,
               workdir=abspath(args.workDir),
               image=dockerImage,
@@ -966,7 +966,7 @@ def doBuild(args, parser):
       progress = ProgressPrint("%s is being built (use --debug for full output)" % spec["package"])
       for k,v in buildEnvironment:
         os.environ[k] = str(v)
-      err = execute("%s -e -x %s/build.sh 2>&1" % (bashInterpreter(), scriptDir),
+      err = execute("%s -e -x %s/build.sh 2>&1" % (BASH, scriptDir),
                     printer=debug if args.debug or not sys.stdout.isatty() else progress)
       progress.end("failed" if err else "ok", err)
     report_event("BuildError" if err else "BuildSuccess",
