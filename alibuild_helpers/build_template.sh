@@ -77,7 +77,7 @@ fi
 if [[ ! "$SOURCE0" == '' && "${SOURCE0:0:1}" != "/" && ! -d "$SOURCEDIR" ]]; then
   # In case there is a stale link / file, for whatever reason.
   rm -rf $SOURCEDIR
-  git clone ${GIT_REFERENCE:+--reference $GIT_REFERENCE} "$SOURCE0" "$SOURCEDIR"
+  git clone ${GIT_REFERENCE:+--reference $GIT_REFERENCE} --recursive "$SOURCE0" "$SOURCEDIR"
   cd $SOURCEDIR
   git checkout "${GIT_TAG}"
   git remote set-url --push origin $WRITE_REPO

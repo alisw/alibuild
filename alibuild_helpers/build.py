@@ -396,7 +396,7 @@ def doBuild(args, parser):
             err, out = getstatusoutput(cmd)
             dieOnError(err, "Unable to detect current commit hash.")
             spec["commit_hash"] = out.strip()
-            cmd = "cd %s && git diff -r HEAD && git status --porcelain" % spec["source"]
+            cmd = "cd %s && git diff -r HEAD --ignore-submodules && git status --porcelain" % spec["source"]
             h = Hasher()
             err = execute(cmd, h)
             debug(err, cmd)
