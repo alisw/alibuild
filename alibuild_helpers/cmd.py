@@ -13,9 +13,9 @@ def execute(command, printer=debug):
   lines_iterator = iter(popen.stdout.readline, "")
   for line in lines_iterator:
     if not line: break
-    printer(to_unicode(line.strip("\n"))) # yield line
+    printer(to_unicode(line).strip("\n")) # yield line
   out = to_unicode(popen.communicate()[0])
-  printer(out)
+  printer(out.strip("\n"))
   return popen.returncode
 
 def getStatusOutputBash(command):
