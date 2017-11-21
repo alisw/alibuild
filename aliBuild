@@ -75,9 +75,7 @@ def doMain(args, parser):
 
   # Setup build environment.
   if args.action == "init":
-    doInit(setdir=args.develPrefix, configDir=args.configDir,
-           pkgname=args.pkgname, referenceSources=args.referenceSources,
-           dist=args.dist, defaults=args.defaults, dryRun=args.dryRun)
+    doInit(args)
     exit(0)
 
   if args.action == "build":

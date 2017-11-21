@@ -108,6 +108,8 @@ def doParseArgs(star):
                       dest="autoCleanup", action="store_false", default=True)
   build_parser.add_argument("--devel-prefix", "-z", nargs="?", help="Version name to use for development packages. Defaults to branch name.",
                       dest="develPrefix", default=argparse.SUPPRESS)
+  build_parser.add_argument("--fetch-repos", "-u", dest="fetchRepos", default=False,
+                            action="store_true", help="Fetch repository updates")
 
   group = build_parser.add_mutually_exclusive_group()
   group.add_argument("--always-prefer-system", dest="preferSystem", default=False,
@@ -151,6 +153,8 @@ def doParseArgs(star):
                             metavar="FILE", help="Specify which defaults to use")
   init_parser.add_argument("--chdir", "-C", help="Change to the specified directory first",
                            metavar="DIR", dest="chdir", default=DEFAULT_CHDIR)
+  init_parser.add_argument("--fetch-repos", "-u", dest="fetchRepos", default=False,
+                           action="store_true", help="Fetch repository updates")
 
   # Options for the version subcommand
   version_parser.add_argument("--architecture", "-a", dest="architecture",

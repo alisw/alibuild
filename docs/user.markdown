@@ -17,7 +17,8 @@ For a quick start introduction, please look [here](./quick.html).
                     [--always-prefer-system] [--no-system]
                     [--force-unknown-architecture] [--insecure]
                     [--aggressive-cleanup] [--debug] [--no-auto-cleanup]
-                    [--devel-prefix [DEVELPREFIX]] [--dist DIST] [--dry-run]
+                    [--devel-prefix [DEVELPREFIX]] [--dist DIST]
+                    [--dry-run] [--fetch-repos|-u]
                     {init,build,clean} [pkgname]
 
     positional arguments:
@@ -62,6 +63,7 @@ For a quick start introduction, please look [here](./quick.html).
                             recipes set ([user/repo@]branch)
       --dry-run, -n         Prints what would happen, without actually doing the
                             build.
+      --fetch-repos, -u     Fetch repository updates
 
 
 ## Speedup build process by using a build store
