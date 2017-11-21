@@ -14,10 +14,22 @@ case "$MODULES_SHELL" in
             SHELL_NORC_PARAM=--norc        ;;
 esac
 
+# If we are on a TTY, enable colors
+if test -t 1; then
+  EM=`printf '\033[35m'`  # magenta
+  ET=`printf '\033[36m'`  # cyan
+  ER=`printf '\033[31m'`  # red
+  EY=`printf '\033[33m'`  # yellow
+  EZ=`printf '\033[m'`    # reset
+else
+  EM=
+  ET=
+  ER=
+  EY=
+  EZ=
+fi
+
 function printHelp() {
-local EM=`printf '\033[35m'`
-local ET=`printf '\033[36m'`
-local EZ=`printf '\033[m'`
 cat >&2 <<EoF
 $PROG -- load environment for aliBuild packages through modulefiles
 
@@ -82,7 +94,7 @@ Usage: $0 \\
         ${ET}eval "\`alienv shell-helper\`"${EZ}
 
 EoF
-[[ -z "$1" ]] || printf "\033[31mERROR: $*\033[m\n" >&2
+[[ -z "$1" ]] || printf "${ER}ERROR: $*${EZ}\n" >&2
 }
 
 function installHint() {
@@ -93,13 +105,13 @@ function installHint() {
   elif which yum > /dev/null 2>&1; then
     CMD='yum install environment-modules'
   fi
-  printf "\033[31mERROR: Environment Modules was not found on your system.\n" >&2
+  printf "${ER}ERROR: Environment Modules was not found on your system.\n" >&2
   if [[ -z "$CMD" ]]; then
-    printf "       The package is usually called \033[35menvironment-modules\033[31m.\n" >&2
+    printf "       The package is usually called ${EM}environment-modules${ER}.\n" >&2
   else
-    printf "       Get it with: \033[35m$CMD\n" >&2
+    printf "       Get it with: ${EM}${CMD}\n" >&2
   fi
-  printf "\033[m"
+  printf "${EZ}"
 }
 
 function normModules() {
@@ -110,7 +122,7 @@ function existModules() {
   local MODULE
   for MODULE in "$@"; do
     $MODULECMD bash -t avail 2>&1 | grep -qFx "$MODULE" || \
-      { printf "\033[31mERROR: $MODULE was not found\033[m\n" >&2; return 1; }
+      { printf "${ER}ERROR: $MODULE was not found${EZ}\n" >&2; return 1; }
   done
 }
 
@@ -214,13 +226,13 @@ EOF
     cp "$PKG/etc/modulefiles/$PKGNAME" "$WORK_DIR/MODULES/$ARCHITECTURE/$PKGNAME/$PKGVER"
   done < <(find $WORK_DIR/$ARCHITECTURE -maxdepth 2 -mindepth 2)
 else
-  printf "\033[33mWARNING: not updating modulefiles\033[m\n" >&2
+  printf "${EY}WARNING: not updating modulefiles${EZ}\n" >&2
 fi
 
 if type csrutil &> /dev/null; then
   csrutil status | grep -q disabled || \
-    { printf "\033[33mWARNING: System Integrity Protection is enabled. " >&2;
-      printf "You might run into environment problems if you do not disable it.\033[m\n" >&2; }
+    { printf "${EY}WARNING: System Integrity Protection is enabled. " >&2;
+      printf "You might run into environment problems if you do not disable it.${EZ}\n" >&2; }
 fi
 
 export MODULEPATH="$WORK_DIR/MODULES/$ARCHITECTURE:$MODULEPATH"
@@ -228,7 +240,7 @@ IGNORE_ERR="Unable to locate a modulefile for 'Toolchain/"
 case "$ACTION" in
   enter)
     [[ $ALIENVLVL == 1 ]] || \
-      { printf "\033[31mERROR: already in an alienv environment\033[m\n" >&2; exit 1; }
+      { printf "${ER}ERROR: already in an alienv environment${EZ}\n" >&2; exit 1; }
     MODULES=$(normModules "${ARGS[@]}")
     existModules $MODULES
     eval $($MODULECMD bash add $MODULES 2> >(grep -v "$IGNORE_ERR" >&2))
@@ -240,15 +252,15 @@ case "$ACTION" in
       esac
     fi
     $MODULECMD bash list
-    printf "\033[36mUse \033[35malienv list\033[36m to list loaded modules. " >&2
-    printf "Use \033[35mexit\033[36m to exit this environment.\033[m\n" >&2
+    printf "${ET}Use ${EM}alienv list${ET} to list loaded modules. " >&2
+    printf "Use ${EM}exit${ET} to exit this environment.${EZ}\n" >&2
     exec ${CLEAN_ENV:+env $SHELL_NORC_ENV} $MODULES_SHELL ${CLEAN_ENV:+$SHELL_NORC_PARAM} -i
   ;;
   printenv|load|unload)
     [[ $ACTION == printenv ]] && ACTION=load
     MODULES=$(normModules "${ARGS[@]}")
     [[ $ACTION == load ]] && existModules $MODULES
-    [[ $VERBOSE == 1 ]] && printf "\033[36mUse \033[35malienv list\033[36m to list loaded modules.\033[m\n" >&2
+    [[ $VERBOSE == 1 ]] && printf "${ET}Use ${EM}alienv list${ET} to list loaded modules.${EZ}\n" >&2
     $MODULECMD $MODULES_SHELL $ACTION $MODULES 2> >(grep -v "$IGNORE_ERR" >&2)
     exit 0
   ;;
