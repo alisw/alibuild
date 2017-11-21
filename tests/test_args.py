@@ -25,7 +25,7 @@ else:
   ANALYTICS_MISSING_STATE_ERROR = "too few arguments"
 
 # A few errors we should handle, together with the expected result
-ARCHITECTURE_ERROR = [call(u"Unknown / unsupported architecture: foo.\n\nOn Linux, x86-64:\n   RHEL5 / SLC5 compatible: slc5_x86-64\n   RHEL6 / SLC6 compatible: slc6_x86-64\n   RHEL7 / CC7 compatible: slc7_x86-64\n   Ubuntu 14.04 compatible: ubuntu1404_x86-64\n   Ubuntu 15.04 compatible: ubuntu1504_x86-64\n   Ubuntu 15.10 compatible: ubuntu1510_x86-64\n   Ubuntu 16.04 compatible: ubuntu1604_x86-64\n\nOn Linux, POWER8 / PPC64 (little endian):\n   RHEL7 / CC7 compatible: slc7_ppc64\n\nOn Mac, x86-64:\n   Yosemite and El-Captain: osx_x86-64\n\nAlternatively, you can use the `--force-unknown-architecture' option.")]
+ARCHITECTURE_ERROR = [call(u"Unknown / unsupported architecture: foo.\n\nOn Linux, x86-64:\n   RHEL5 / SLC5 compatible: slc5_x86-64\n   RHEL6 / SLC6 compatible: slc6_x86-64\n   RHEL7 / CC7 compatible: slc7_x86-64\n   Ubuntu 14.04 compatible: ubuntu1404_x86-64\n   Ubuntu 15.04 compatible: ubuntu1504_x86-64\n   Ubuntu 15.10 compatible: ubuntu1510_x86-64\n   Ubuntu 16.04 compatible: ubuntu1604_x86-64\n   Fedora 25 compatible: fedora25_x86-64\n   Fedora 26 compatible: fedora26_x86-64\n\nOn Linux, POWER8 / PPC64 (little endian):\n   RHEL7 / CC7 compatible: slc7_ppc64\n\nOn Mac, x86-64:\n   Yosemite and El-Captain: osx_x86-64\n\nAlternatively, you can use the `--force-unknown-architecture' option.")]
 PARSER_ERRORS = {
   "build": [call(BUILD_MISSING_PKG_ERROR)],
   "build zlib --foo": [call('unrecognized arguments: --foo')],

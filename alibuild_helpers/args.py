@@ -171,7 +171,7 @@ def doParseArgs(star):
   return (args, parser)
 
 VALID_ARCHS_RE = ["slc[5-9]+_(x86-64|ppc64)",
-                  "(ubuntu|ubt|osx)[0-9]*_x86-64",
+                  "(ubuntu|ubt|osx|fedora)[0-9]*_x86-64",
                  ]
 
 def matchValidArch(architecture):
@@ -185,7 +185,9 @@ ARCHITECTURE_TABLE = [
            "   Ubuntu 14.04 compatible: ubuntu1404_x86-64\n"
            "   Ubuntu 15.04 compatible: ubuntu1504_x86-64\n"
            "   Ubuntu 15.10 compatible: ubuntu1510_x86-64\n"
-           "   Ubuntu 16.04 compatible: ubuntu1604_x86-64\n\n"
+           "   Ubuntu 16.04 compatible: ubuntu1604_x86-64\n"
+           "   Fedora 25 compatible: fedora25_x86-64\n"
+           "   Fedora 26 compatible: fedora26_x86-64\n\n"
            "On Linux, POWER8 / PPC64 (little endian):\n"
            "   RHEL7 / CC7 compatible: slc7_ppc64\n\n"
            "On Mac, x86-64:\n"
