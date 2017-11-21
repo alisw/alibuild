@@ -224,7 +224,7 @@ EOF
     [[ ! -e "$PKG/etc/modulefiles/$PKGNAME" ]] && continue
     mkdir -p "$WORK_DIR/MODULES/$ARCHITECTURE/$PKGNAME"
     cp "$PKG/etc/modulefiles/$PKGNAME" "$WORK_DIR/MODULES/$ARCHITECTURE/$PKGNAME/$PKGVER"
-  done < <(find $WORK_DIR/$ARCHITECTURE -maxdepth 2 -mindepth 2)
+  done < <(find $WORK_DIR/$ARCHITECTURE -maxdepth 2 -mindepth 2 2> /dev/null)
 else
   printf "${EY}WARNING: not updating modulefiles${EZ}\n" >&2
 fi
