@@ -198,8 +198,11 @@ WORK_DIR=$(cd "$WORK_DIR"; pwd)
 [[ -z "$ARCHITECTURE" || "$ARCHITECTURE" == "<unknown>" ]] && ARCHITECTURE=$(ls -1t $WORK_DIR | grep -vE '^[A-Z]+$' | head -n1)
 [[ -z "$ARCHITECTURE" ]] && { printHelp "Cannot autodetect architecture"; false; }
 
-MODULECMD=$(PATH="$PATH:`brew --prefix modules 2>/dev/null || true`/Modules/bin" which modulecmd || true)
-[[ -z "$MODULECMD" ]] && { installHint; false; }
+# Look for modulecmd (v3) or modulecmd-compat (>= v4)
+MODULECMD=$(which modulecmd 2> /dev/null || true)
+[[ -x "$MODULECMD" ]] || MODULECMD="$(dirname $(which envml 2> /dev/null || true) 2> /dev/null || true)/../libexec/modulecmd-compat"
+[[ -x "$MODULECMD" ]] || MODULECMD="$(brew --prefix modules 2> /dev/null || true)/libexec/modulecmd-compat"
+[[ -x "$MODULECMD" ]] || { installHint; false; }
 
 if [[ -d $WORK_DIR/MODULES/$ARCHITECTURE ]]; then
   touch $WORK_DIR/MODULES/$ARCHITECTURE/.testwrite 2> /dev/null || NO_REFRESH=1
