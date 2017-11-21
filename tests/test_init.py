@@ -14,6 +14,8 @@ from alibuild_helpers.init import doInit,parsePackagesDefinition
 import mock
 import unittest
 import traceback
+from argparse import Namespace
+import os.path as path
 
 def can_do_git_clone(x):
   return 0
@@ -27,6 +29,12 @@ def valid_recipe(x):
     return (0, {"package": "AliRoot",
                 "source": "https://github.com/alisw/AliRoot",
                 "version": "master"}, "")
+
+def dummy_exists(x):
+  calls = { '/sw/MIRROR/aliroot': True }
+  if x in calls:
+    return calls[x]
+  return False
 
 CLONE_EVERYTHING = [
  call(u'git clone https://github.com/alisw/alidist -b master /alidist'),
@@ -47,13 +55,17 @@ class InitTestCase(unittest.TestCase):
     @mock.patch("alibuild_helpers.init.os")
     def test_doDryRunInit(self, mock_os, mock_path,  mock_info):
       fake_dist = {"repo": "alisw/alidist", "ver": "master"}
-      self.assertRaises(SystemExit, doInit, setdir=".",
-                                            configDir="/alidist",
-                                            pkgname="zlib,AliRoot@v5-08-00",
-                                            referenceSources="/sw/MIRROR",
-                                            dist=fake_dist,
-                                            defaults="release",
-                                            dryRun=True)
+      args = Namespace(
+        develPrefix = ".",
+        configDir = "/alidist",
+        pkgname = "zlib,AliRoot@v5-08-00",
+        referenceSources = "/sw/MIRROR",
+        dist = fake_dist,
+        defaults = "release",
+        dryRun = True,
+        fetchRepos = False
+      )
+      self.assertRaises(SystemExit, doInit, args)
       self.assertEqual(mock_info.mock_calls, [call('This will initialise local checkouts for zlib,AliRoot\n--dry-run / -n specified. Doing nothing.')])
 
     @mock.patch("alibuild_helpers.init.banner")
@@ -73,21 +85,33 @@ class InitTestCase(unittest.TestCase):
       }[x]
       mock_execute.side_effect = can_do_git_clone
       mock_parse_recipe.side_effect = valid_recipe
-      mock_path.exists.side_effect = lambda x : False
+      mock_path.exists.side_effect = dummy_exists
       mock_os.mkdir.return_value = None
+      mock_path.join.side_effect = path.join
       mock_read_defaults.return_value = (OrderedDict({"package": "defaults-release", "disable": []}), "")
-      doInit(setdir=".",
-             configDir="/alidist",
-             pkgname="AliRoot@v5-08-00",
-             referenceSources="/sw/MIRROR",
-             dist=fake_dist,
-             defaults="release",
-             dryRun=False)
-      mock_execute.side_effect = lambda x: print(x)
+      args = Namespace(
+        develPrefix = ".",
+        configDir = "/alidist",
+        pkgname = "AliRoot@v5-08-00",
+        referenceSources = "/sw/MIRROR",
+        dist = fake_dist,
+        defaults = "release",
+        dryRun = False,
+        fetchRepos = False
+      )
+      doInit(args)
       mock_execute.assert_called_with("git clone https://github.com/alisw/AliRoot -b v5-08-00 --reference /sw/MIRROR/aliroot ./AliRoot && cd ./AliRoot && git remote set-url --push origin https://github.com/alisw/AliRoot")
       self.assertEqual(mock_execute.mock_calls, CLONE_EVERYTHING)
-      mock_path.exists.assert_called_with("./AliRoot")
+      mock_path.exists.assert_has_calls([call('.'), call('/sw/MIRROR'), call('/alidist'), call('./AliRoot'), call('/sw/MIRROR/aliroot')])
 
+      # Force fetch repos
+      mock_execute.reset_mock()
+      mock_path.reset_mock()
+      args.fetchRepos = True
+      doInit(args)
+      mock_execute.assert_called_with("git clone https://github.com/alisw/AliRoot -b v5-08-00 --reference /sw/MIRROR/aliroot ./AliRoot && cd ./AliRoot && git remote set-url --push origin https://github.com/alisw/AliRoot")
+      self.assertEqual(mock_execute.mock_calls, CLONE_EVERYTHING)
+      mock_path.exists.assert_has_calls([call('.'), call('/sw/MIRROR'), call('/alidist'), call('./AliRoot')])
 
 if __name__ == '__main__':
   unittest.main()

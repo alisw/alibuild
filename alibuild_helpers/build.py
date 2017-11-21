@@ -22,7 +22,6 @@ from alibuild_helpers.workarea import updateReferenceRepos
 from alibuild_helpers.log import logger_handler, LogFormatter, ProgressPrint, riemannStream
 from datetime import datetime
 from glob import glob
-from multiprocessing.pool import ThreadPool
 try:
   from collections import OrderedDict
 except ImportError:
@@ -344,33 +343,22 @@ def doBuild(args, parser):
                   "  git pull --rebase\n",
                   pwd=os.getcwd(), star=star()))
 
-  # Prefetch git heads in parallel
-  debug("Prefetching git heads in parallel:")
+  # Clone/update repos
+  for p in [p for p in buildOrder if "source" in specs[p]]:
+    if not args.fetchRepos:
+      specs[p]["reference"] = join(abspath(args.referenceSources), p.lower())
+    if args.fetchRepos or not exists(specs[p]["reference"]):
+      updateReferenceRepos(args.referenceSources, p, specs[p])
 
-  fetchers = list(filter(lambda p: "source" in specs[p], buildOrder))
-  poolConfig = {"processes": min(max(len(fetchers), 1), 16)}
-  pool = ThreadPool(**poolConfig)
-  debug("Created thread pool with config: %s" % poolConfig)
-
-  git_commands = {} # store futures
-  for p in fetchers:
-    # Replace source with local one if we are in development mode.
+  # Retrieve git heads
+  for p in [p for p in buildOrder if "reference" in specs[p]]:
+    cmd = "git ls-remote --heads %s" % specs[p]["reference"]
     if specs[p]["package"] in develPkgs:
       specs[p]["source"] = join(os.getcwd(), specs[p]["package"])
-
-    cmd = "git ls-remote --heads %s" % specs[p]["source"]
-    debug("Enqueued '%s'" % cmd)
-    git_commands[p] = pool.apply_async(getstatusoutput, (cmd,))
-
-  results = {}
-  for p, future in git_commands.items():
-    results[p] = future.get()
-
-  for p, result in results.items():
-    dieOnError(result[0], "Unable to fetch from %s" % specs[p]["source"])
-    specs[p]["git_heads"] = result[1].split("\n")
-
-  debug("Finished prefetching git heads")
+      cmd = "git ls-remote --heads %s" % specs[p]["source"]
+    res, output = getStatusOutputBash(cmd)
+    dieOnError(res, "Error on '%s': %s" % (cmd, output))
+    specs[p]["git_heads"] = output.split("\n")
 
   # Resolve the tag to the actual commit ref, so that
   for p in buildOrder:
@@ -770,9 +758,6 @@ def doBuild(args, parser):
       debug(spec["cachedTarball"] and
             "Found tarball in %s" % spec["cachedTarball"] or
             "No cache tarballs found")
-
-    # FIXME: Why doing it here? This should really be done before anything else.
-    updateReferenceRepos(args.referenceSources, p, spec)
 
     # Generate the part which sources the environment for all the dependencies.
     # Notice that we guarantee that a dependency is always sourced before the

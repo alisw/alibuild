@@ -87,9 +87,13 @@ def dummy_getstatusoutput(x):
       "GIT_DIR=/alidist/.git git rev-parse HEAD": (0, "6cec7b7b3769826219dfa85e5daa6de6522229a0"),
       'pip --disable-pip-version-check show alibuild | grep -e "^Version:" | sed -e \'s/.* //\'': (0, "v1.5.0"),
       'which pigz': (1, ""),
-      'tar --ignore-failed-read -cvvf /dev/null /dev/zero': (0, ""),
-      'git ls-remote --heads https://github.com/root-mirror/root': (0, "87b87c4322d2a3fad315c919cb2e2dd73f2154dc\trefs/heads/master\nf7b336611753f1f4aaa94222b0d620748ae230c0\trefs/heads/v6-08-00-patches"),
-      'git ls-remote --heads https://github.com/star-externals/zlib': (0, "8822efa61f2a385e0bc83ca5819d608111b2168a\trefs/heads/master")
+      'tar --ignore-failed-read -cvvf /dev/null /dev/zero': (0, "")
+    }[x]
+
+def dummy_getStatusOutputBash(x):
+  return {
+      'git ls-remote --heads /sw/MIRROR/root': (0, "87b87c4322d2a3fad315c919cb2e2dd73f2154dc\trefs/heads/master\nf7b336611753f1f4aaa94222b0d620748ae230c0\trefs/heads/v6-08-00-patches"),
+      'git ls-remote --heads /sw/MIRROR/zlib': (0, "8822efa61f2a385e0bc83ca5819d608111b2168a\trefs/heads/master")
     }[x]
 
 TIMES_ASKED = {}
@@ -127,7 +131,17 @@ def dummy_readlink(x):
 def dummy_exists(x):
   if x.endswith("alibuild_helpers/.git"):
     return False
-  return {"/alidist": True, "/sw/SPECS": False, "/alidist/.git": True, "alibuild_helpers/.git": False}[x]
+  return {
+    "/alidist": True,
+    "/sw/SPECS": False,
+    "/alidist/.git": True,
+    "alibuild_helpers/.git": False,
+    "/sw/MIRROR/root": True,
+    "/sw/MIRROR/zlib": False}[x]
+
+def dummy_reference(referenceSources, p, spec):
+  spec["reference"] = os.path.join(os.path.abspath(referenceSources), p.lower())
+
 
 # A few errors we should handle, together with the expected result
 class BuildTestCase(unittest.TestCase):
@@ -147,7 +161,8 @@ class BuildTestCase(unittest.TestCase):
   @patch("alibuild_helpers.build.glob")
   @patch("alibuild_helpers.build.readlink")
   @patch("alibuild_helpers.build.banner")
-  def test_coverDoBuild(self, mock_banner, mock_readlink, mock_glob, mock_shutil, mock_open,  mock_utilities_open, mock_reference, mock_debug, mock_makedirs, mock_read_defaults, mock_die, mock_sys, mock_exists, mock_getstatusoutput, mock_execute, mock_urlopen):
+  @patch("alibuild_helpers.build.getStatusOutputBash")
+  def test_coverDoBuild(self, mock_getStatusOutputBash, mock_banner, mock_readlink, mock_glob, mock_shutil, mock_open,  mock_utilities_open, mock_reference, mock_debug, mock_makedirs, mock_read_defaults, mock_die, mock_sys, mock_exists, mock_getstatusoutput, mock_execute, mock_urlopen):
     mock_readlink.side_effect = dummy_readlink
     mock_glob.side_effect = lambda x : {"*": ["zlib"],
         "/sw/TARS/osx_x86-64/defaults-release/defaults-release-v1-*.osx_x86-64.tar.gz": ["/sw/TARS/osx_x86-64/defaults-release/defaults-release-v1-1.osx_x86-64.tar.gz"],
@@ -168,6 +183,7 @@ class BuildTestCase(unittest.TestCase):
     mock_execute.side_effect = dummy_execute
     mock_exists.side_effect = dummy_exists
     mock_getstatusoutput.side_effect = dummy_getstatusoutput
+    mock_getStatusOutputBash.side_effect = dummy_getStatusOutputBash
     mock_parser = MagicMock()
     mock_read_defaults.return_value = (OrderedDict({"package": "defaults-release", "disable": []}), "")
     args = Namespace(
@@ -189,12 +205,21 @@ class BuildTestCase(unittest.TestCase):
       aggressiveCleanup=False,
       environment={},
       autoCleanup=False,
-      noDevel=[]
+      noDevel=[],
+      fetchRepos=False
     )
+    mock_reference.side_effect = dummy_reference
     mock_sys.version_info = sys.version_info
+    fmt, msg, code = doBuild(args, mock_parser)
+    self.assertEqual(mock_reference.call_count, 1, "Only one repo should have been fetched")
+
+    # Force fetching repos
+    mock_reference.reset_mock()
+    args.fetchRepos = True
     fmt, msg, code = doBuild(args, mock_parser)
     mock_glob.assert_called_with("/sw/TARS/osx_x86-64/ROOT/ROOT-v6-08-30-*.osx_x86-64.tar.gz")
     self.assertEqual(msg, "Everything done")
+    self.assertEqual(mock_reference.call_count, 2, "Both repos should have been fetched")
 
   @patch("alibuild_helpers.build.urlopen")
   @patch("alibuild_helpers.build.execute")
