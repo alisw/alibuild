@@ -77,7 +77,7 @@ The following entries are optional in the header:
 
         prepend_path:
           "PATH": "$FOO_ROOT/binexec/foobar"
-          "LD_LIBRARY_PATH": [ "$FOO_ROOT/sub/lib", "$FOO_ROOT/sub/lib64 ]
+          "LD_LIBRARY_PATH": [ "$FOO_ROOT/sub/lib", "$FOO_ROOT/sub/lib64" ]
           "DYLD_LIBRARY_PATH":
             - "$FOO_ROOT/sub/lib"
             - "$FOO_ROOT/sub/lib64
@@ -105,10 +105,8 @@ The following entries are optional in the header:
           - "igprof:(?!osx).*"
         ...
 
-    will make sure that `IgProf` is only built on platforms which do not begin
-    by `osx`.
-    will make sure that IgProf is only built on architectures whose name does
-    not begin with `osx`.
+    will make sure that `IgProf` is only built on platforms whose name does not
+    begin with `osx`.
   - `build_requires`: currently behaves just like `requires` with the exception
     that packages in this list are not included in the dependency graph
     produced by alideps.
@@ -116,9 +114,9 @@ The following entries are optional in the header:
   - `prefer_system_check`: a script which is used to determine whether
     or not the system equivalent of the package can be used. See also
     `prefer_system`. If the `--no-system` option is specified, our own
-    version of the tool is used. Shell exit code is used to steer the build: in
-    case the check returns 0, the system package is used and the recipe is not
-    run. In case the check returns nonzero, our own version of the package is
+    version of the tool is used. Shell exit code is used to steer the build: if
+    the check returns 0, the system package is used and the recipe is not
+    run. If it returns non-zero, our own version of the package is
     built through the recipe.
   - `prefer_system`: a regular expression for architectures which should
     use the `prefer_system_check` by default to determine if the system
@@ -129,7 +127,7 @@ The following entries are optional in the header:
     expression for the architecture does not match).
   - `relocate_paths`: a list of toplevel paths scanned recursively to perform
     relocation of executables and dynamic libraries **on macOS only**. If not
-    specified defaults to `bin`, `lib` and `lib64`.
+    specified, defaults to `bin`, `lib` and `lib64`.
 
 ### The body
 
