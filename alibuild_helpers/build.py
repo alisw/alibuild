@@ -983,7 +983,7 @@ def doBuild(args, parser):
 
     buildErrMsg = format("Error while executing %(sd)s/build.sh on `%(h)s'.\n"
                          "Log can be found in %(w)s/BUILD/%(p)s-latest%(devSuffix)s/log.\n"
-                         "Please attach this file if you intend to request support.\n"
+                         "Please upload it to CernBox/DropBox if you intend to request support.\n"
                          "Build directory is %(w)s/BUILD/%(p)s-latest%(devSuffix)s/%(p)s.",
                          h=socket.gethostname(),
                          sd=scriptDir,
