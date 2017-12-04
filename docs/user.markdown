@@ -249,9 +249,9 @@ for convenience):
 
     sudo pip install --upgrade alibuild
 
-In general updating alibuild is safe and it should never trigger a rebuild or
+In general updating aliBuild is safe and it should never trigger a rebuild or
 break compilation of older versions of alidist (i.e. we do try to guarantee
-backward compatibility). In no case an update of alibuild will result in the
+backward compatibility). In no case an update of aliBuild will result in the
 update of `alidist`, which users will have to be done separately.
 In case some yet to appear bug in alibuild will force us to rebuild a
 previously built area, this will be widely publicized and users will get a warning
