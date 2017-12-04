@@ -248,3 +248,10 @@ or in case you need to be root (_e.g._ on Ubuntu and most Linux distributions
 for convenience):
 
     sudo pip install --upgrade alibuild
+
+In general updating alibuild is safe and should never trigger a rebuild or
+break compilation of older version of alidist (i.e. we do try to guarantee
+backward compatibility). In no case an update of alibuild will result in the
+update of `alidist`, which will have to be done separately. In case some yet to
+appear bug in alibuild will force us to rebuild a previously built area, this
+will be widely publicized and users will get a warning.
