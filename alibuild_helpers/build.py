@@ -18,7 +18,7 @@ from alibuild_helpers.utilities import validateDefaults
 from alibuild_helpers.utilities import Hasher
 from alibuild_helpers.utilities import yamlDump
 import yaml
-from alibuild_helpers.workarea import updateReferenceRepos
+from alibuild_helpers.workarea import updateReferenceRepos, is_writeable
 from alibuild_helpers.log import logger_handler, LogFormatter, ProgressPrint, riemannStream
 from datetime import datetime
 from glob import glob
@@ -100,7 +100,6 @@ class HttpRemoteSync:
         pkgList = json.loads(urlopen(pkgListUrl).read())
     except URLError as e:
       debug("Cannot find precompiled package for %s@%s" % (p, spec["hash"]))
-      pass
     except Exception as e:
       info(e)
       error("Unknown response from server")
@@ -352,13 +351,26 @@ def doBuild(args, parser):
 
   # Retrieve git heads
   for p in [p for p in buildOrder if "reference" in specs[p]]:
-    cmd = "git ls-remote --heads %s" % specs[p]["reference"]
+    ref_dir = specs[p]["reference"]
+    cmd = None
+
+    if is_writeable(ref_dir):
+      cmd = "git ls-remote --heads %s" % ref_dir
+    else:
+      m = "%s: inexistant or read-only reference dir, will not fetch git heads"
+      debug(m % ref_dir)
+
     if specs[p]["package"] in develPkgs:
       specs[p]["source"] = join(os.getcwd(), specs[p]["package"])
       cmd = "git ls-remote --heads %s" % specs[p]["source"]
-    res, output = getStatusOutputBash(cmd)
-    dieOnError(res, "Error on '%s': %s" % (cmd, output))
-    specs[p]["git_heads"] = output.split("\n")
+
+    output = []
+    if cmd:
+      res, output = getStatusOutputBash(cmd)
+      dieOnError(res, "Error on '%s': %s" % (cmd, output))
+      output = output.split("\n")
+
+    specs[p]["git_heads"] = output
 
   # Resolve the tag to the actual commit ref, so that
   for p in buildOrder:

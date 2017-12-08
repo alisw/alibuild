@@ -29,20 +29,22 @@ def updateReferenceRepos(referenceSources, p, spec):
   assert(type(spec) == OrderedDict)
   debug("Updating references.")
   referenceRepo = "%s/%s" % (abspath(referenceSources), p.lower())
-  if os.access(dirname(referenceSources), os.W_OK):
+
+  if is_writeable(dirname(referenceSources)):
     getstatusoutput("mkdir -p %s" % referenceSources)
-  writeableReference = os.access(referenceSources, os.W_OK)
-  if not writeableReference and path.exists(referenceRepo):
-    debug("Using %s as reference for %s." % (referenceRepo, p))
-    spec["reference"] = referenceRepo
-    return
-  if not writeableReference:
-    debug("Cannot create reference for %s in specified folder.", p)
+
+  if not is_writeable(referenceSources):
+    if path.exists(referenceRepo):
+      debug("Using %s as reference for %s." % (referenceRepo, p))
+      spec["reference"] = referenceRepo
+    else:
+      debug("Cannot create reference for %s in %s" % (p, referenceSources))
     return
 
   err, out = getstatusoutput("mkdir -p %s" % abspath(referenceSources))
   if not "source" in spec:
     return
+
   if not path.exists(referenceRepo):
     cmd = ["git", "clone", "--bare", spec["source"], referenceRepo]
     debug(" ".join(cmd))
@@ -56,3 +58,6 @@ def updateReferenceRepos(referenceSources, p, spec):
   dieOnError(err, "Error while updating reference repos %s." % spec["source"])
   spec["reference"] = referenceRepo
 
+
+def is_writeable(path):
+  return os.access(path, os.W_OK)
