@@ -18,7 +18,7 @@ from alibuild_helpers.utilities import validateDefaults
 from alibuild_helpers.utilities import Hasher
 from alibuild_helpers.utilities import yamlDump
 import yaml
-from alibuild_helpers.workarea import updateReferenceRepos, is_writeable
+from alibuild_helpers.workarea import updateReferenceRepos
 from alibuild_helpers.log import logger_handler, LogFormatter, ProgressPrint, riemannStream
 from datetime import datetime
 from glob import glob
@@ -344,33 +344,17 @@ def doBuild(args, parser):
 
   # Clone/update repos
   for p in [p for p in buildOrder if "source" in specs[p]]:
-    if not args.fetchRepos:
-      specs[p]["reference"] = join(abspath(args.referenceSources), p.lower())
-    if args.fetchRepos or not exists(specs[p]["reference"]):
-      updateReferenceRepos(args.referenceSources, p, specs[p])
+    updateReferenceRepos(args.referenceSources, p, specs[p], args.fetchRepos)
 
-  # Retrieve git heads
-  for p in [p for p in buildOrder if "reference" in specs[p]]:
-    ref_dir = specs[p]["reference"]
-    cmd = None
-
-    if is_writeable(ref_dir):
-      cmd = "git ls-remote --heads %s" % ref_dir
-    else:
-      m = "%s: inexistant or read-only reference dir, will not fetch git heads"
-      debug(m % ref_dir)
-
+    # Retrieve git heads
+    cmd = "git ls-remote --heads %s" % (specs[p]["reference"] if "reference" in specs[p] else specs[p]["source"])
     if specs[p]["package"] in develPkgs:
-      specs[p]["source"] = join(os.getcwd(), specs[p]["package"])
-      cmd = "git ls-remote --heads %s" % specs[p]["source"]
-
-    output = []
-    if cmd:
-      res, output = getStatusOutputBash(cmd)
-      dieOnError(res, "Error on '%s': %s" % (cmd, output))
-      output = output.split("\n")
-
-    specs[p]["git_heads"] = output
+       specs[p]["source"] = join(os.getcwd(), specs[p]["package"])
+       cmd = "git ls-remote --heads %s" % specs[p]["source"]
+    debug("Executing %s" % cmd)
+    res, output = getStatusOutputBash(cmd)
+    dieOnError(res, "Error on '%s': %s" % (cmd, output))
+    specs[p]["git_heads"] = output.split("\n")
 
   # Resolve the tag to the actual commit ref
   for p in buildOrder:
