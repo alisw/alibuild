@@ -372,7 +372,7 @@ def doBuild(args, parser):
 
     specs[p]["git_heads"] = output
 
-  # Resolve the tag to the actual commit ref, so that
+  # Resolve the tag to the actual commit ref
   for p in buildOrder:
     spec = specs[p]
     spec["commit_hash"] = "0"
@@ -980,7 +980,7 @@ def doBuild(args, parser):
 
     buildErrMsg = format("Error while executing %(sd)s/build.sh on `%(h)s'.\n"
                          "Log can be found in %(w)s/BUILD/%(p)s-latest%(devSuffix)s/log.\n"
-                         "Please upload it to CernBox/DropBox if you intend to request support.\n"
+                         "Please upload it to CERNBox/Dropbox if you intend to request support.\n"
                          "Build directory is %(w)s/BUILD/%(p)s-latest%(devSuffix)s/%(p)s.",
                          h=socket.gethostname(),
                          sd=scriptDir,
