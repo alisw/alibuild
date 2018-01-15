@@ -100,7 +100,6 @@ class HttpRemoteSync:
         pkgList = json.loads(urlopen(pkgListUrl).read())
     except URLError as e:
       debug("Cannot find precompiled package for %s@%s" % (p, spec["hash"]))
-      pass
     except Exception as e:
       info(e)
       error("Unknown response from server")
@@ -345,22 +344,19 @@ def doBuild(args, parser):
 
   # Clone/update repos
   for p in [p for p in buildOrder if "source" in specs[p]]:
-    if not args.fetchRepos:
-      specs[p]["reference"] = join(abspath(args.referenceSources), p.lower())
-    if args.fetchRepos or not exists(specs[p]["reference"]):
-      updateReferenceRepos(args.referenceSources, p, specs[p])
+    updateReferenceRepos(args.referenceSources, p, specs[p], args.fetchRepos)
 
-  # Retrieve git heads
-  for p in [p for p in buildOrder if "reference" in specs[p]]:
-    cmd = "git ls-remote --heads %s" % specs[p]["reference"]
+    # Retrieve git heads
+    cmd = "git ls-remote --heads %s" % (specs[p]["reference"] if "reference" in specs[p] else specs[p]["source"])
     if specs[p]["package"] in develPkgs:
-      specs[p]["source"] = join(os.getcwd(), specs[p]["package"])
-      cmd = "git ls-remote --heads %s" % specs[p]["source"]
+       specs[p]["source"] = join(os.getcwd(), specs[p]["package"])
+       cmd = "git ls-remote --heads %s" % specs[p]["source"]
+    debug("Executing %s" % cmd)
     res, output = getStatusOutputBash(cmd)
     dieOnError(res, "Error on '%s': %s" % (cmd, output))
     specs[p]["git_heads"] = output.split("\n")
 
-  # Resolve the tag to the actual commit ref, so that
+  # Resolve the tag to the actual commit ref
   for p in buildOrder:
     spec = specs[p]
     spec["commit_hash"] = "0"
@@ -968,7 +964,7 @@ def doBuild(args, parser):
 
     buildErrMsg = format("Error while executing %(sd)s/build.sh on `%(h)s'.\n"
                          "Log can be found in %(w)s/BUILD/%(p)s-latest%(devSuffix)s/log.\n"
-                         "Please upload it to CernBox/DropBox if you intend to request support.\n"
+                         "Please upload it to CERNBox/Dropbox if you intend to request support.\n"
                          "Build directory is %(w)s/BUILD/%(p)s-latest%(devSuffix)s/%(p)s.",
                          h=socket.gethostname(),
                          sd=scriptDir,
