@@ -9,6 +9,7 @@ from alibuild_helpers.utilities import format
 
 import os
 import os.path as path
+import tempfile
 try:
   from collections import OrderedDict
 except ImportError:
@@ -62,6 +63,9 @@ def updateReferenceRepos(referenceSources, p, spec, fetch=True):
   dieOnError(err, "Error while updating reference repos %s." % spec["source"])
   spec["reference"] = referenceRepo  # read-write
 
-
-def is_writeable(path):
-  return os.access(path, os.W_OK)
+def is_writeable(dirpath):
+  try:
+    with tempfile.NamedTemporaryFile(dir=dirpath):
+      return True
+  except:
+    return False
