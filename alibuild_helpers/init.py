@@ -83,7 +83,7 @@ def doInit(args):
     p["ver"] = p["ver"] if p["ver"] else spec.get("tag", spec["version"])
     debug("cloning %s%s for development" % (spec["package"], " version "+p["ver"] if p["ver"] else ""))
 
-    updateReferenceRepoSpec(args.referenceSources, spec["package"], spec, args.fetchRepos)
+    updateReferenceRepoSpec(args.referenceSources, spec["package"], spec, True)
     cmd = format("git clone %(readRepo)s%(branch)s --reference %(refSource)s %(cd)s && " +
                  "cd %(cd)s && git remote set-url --push origin %(writeRepo)s",
                  readRepo=spec["source"],
