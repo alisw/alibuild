@@ -74,7 +74,7 @@ class InitTestCase(unittest.TestCase):
     @mock.patch("alibuild_helpers.init.os")
     @mock.patch("alibuild_helpers.init.execute")
     @mock.patch("alibuild_helpers.init.parseRecipe")
-    @mock.patch("alibuild_helpers.init.updateReferenceRepos")
+    @mock.patch("alibuild_helpers.init.updateReferenceRepoSpec")
     @mock.patch("alibuild_helpers.utilities.open")
     @mock.patch("alibuild_helpers.init.readDefaults")
     def test_doRealInit(self, mock_read_defaults, mock_open, mock_update_reference, mock_parse_recipe, mock_execute, mock_os, mock_path,  mock_info, mock_banner):
@@ -102,7 +102,7 @@ class InitTestCase(unittest.TestCase):
       doInit(args)
       mock_execute.assert_called_with("git clone https://github.com/alisw/AliRoot -b v5-08-00 --reference /sw/MIRROR/aliroot ./AliRoot && cd ./AliRoot && git remote set-url --push origin https://github.com/alisw/AliRoot")
       self.assertEqual(mock_execute.mock_calls, CLONE_EVERYTHING)
-      mock_path.exists.assert_has_calls([call('.'), call('/sw/MIRROR'), call('/alidist'), call('./AliRoot'), call('/sw/MIRROR/aliroot')])
+      mock_path.exists.assert_has_calls([call('.'), call('/sw/MIRROR'), call('/alidist'), call('./AliRoot')])
 
       # Force fetch repos
       mock_execute.reset_mock()
