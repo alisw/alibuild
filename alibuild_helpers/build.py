@@ -18,7 +18,7 @@ from alibuild_helpers.utilities import validateDefaults
 from alibuild_helpers.utilities import Hasher
 from alibuild_helpers.utilities import yamlDump
 import yaml
-from alibuild_helpers.workarea import updateReferenceRepos
+from alibuild_helpers.workarea import updateReferenceRepoSpec
 from alibuild_helpers.log import logger_handler, LogFormatter, ProgressPrint, riemannStream
 from datetime import datetime
 from glob import glob
@@ -344,7 +344,7 @@ def doBuild(args, parser):
 
   # Clone/update repos
   for p in [p for p in buildOrder if "source" in specs[p]]:
-    updateReferenceRepos(args.referenceSources, p, specs[p], args.fetchRepos)
+    updateReferenceRepoSpec(args.referenceSources, p, specs[p], args.fetchRepos)
 
     # Retrieve git heads
     cmd = "git ls-remote --heads %s" % (specs[p]["reference"] if "reference" in specs[p] else specs[p]["source"])
