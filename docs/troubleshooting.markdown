@@ -93,6 +93,16 @@ it can happen this is not the case. If so, you can usually get it via:
 Alternatively you can try to install it by hand by following the [instructions
 here](https://pip.pypa.io/en/stable/installing/#installing-with-get-pip-py).
 
+### Package branch was updated, but aliBuild does not rebuild it
+
+Some recipes specify branches in the `tag:` field instead of an actual tag. For
+such recipes, aliBuild must contact remote servers in order to determine what is
+the latest commit for that branch. Since this is a corner case and the operation
+is expensive and slow, it is off by default, and cached information is used
+instead. Try to ask aliBuild to update its cached information by using the `-u`
+or `--fetch-repos` switch.
+
+
 ### AliEn broken after building with aliBuild
 
 If you are migrating from other ALICE build instructions to use aliBuild

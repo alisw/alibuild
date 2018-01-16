@@ -258,3 +258,20 @@ update of `alidist`, which users will have to be done separately.
 In case some yet to appear bug in alibuild will force us to rebuild a
 previously built area, this will be widely publicized and users will get a warning
 when running the command.
+
+## Rebuilding packages from branches instead of tags
+
+Generally, recipes specify a Git _tag_ name in the `tag:` field. In some cases,
+_branch names_ might be used instead (such as `tag: master` or `tag: dev`). In
+such a rare case, aliBuild needs to know what is the last branch commit to
+determine whether a rebuild is necessary.
+
+Such check by default uses cached information instead of doing very slow queries
+to remote servers. This means that aliBuild is fast in determining which
+packages to build. However, packages using branch names might not get rebuilt as
+expected when new changes are pushed to those branches.
+
+In this case, you can ask aliBuild to update cached branches information by
+adding the `-u` or `--fetch-repos` option. Note that by default this is not
+needed, it's only for very special use cases (such as centralized builds and
+server-side pull request checks).
