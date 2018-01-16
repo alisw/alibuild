@@ -3,7 +3,7 @@ from alibuild_helpers.utilities import format
 from alibuild_helpers.utilities import parseRecipe, getPackageList, getRecipeReader, parseDefaults, readDefaults, validateDefaults
 from alibuild_helpers.log import debug, error, warning, banner, info
 from alibuild_helpers.log import dieOnError
-from alibuild_helpers.workarea import updateReferenceRepos
+from alibuild_helpers.workarea import updateReferenceRepoSpec
 
 from os.path import abspath, basename, join
 import os.path as path
@@ -83,12 +83,7 @@ def doInit(args):
     p["ver"] = p["ver"] if p["ver"] else spec.get("tag", spec["version"])
     debug("cloning %s%s for development" % (spec["package"], " version "+p["ver"] if p["ver"] else ""))
 
-    if not args.fetchRepos:
-      spec["reference"] = path.join(abspath(args.referenceSources), spec["package"].lower())
-
-    if args.fetchRepos or not path.exists(spec["reference"]):
-      updateReferenceRepos(args.referenceSources, spec["package"], spec)
-
+    updateReferenceRepoSpec(args.referenceSources, spec["package"], spec, args.fetchRepos)
     cmd = format("git clone %(readRepo)s%(branch)s --reference %(refSource)s %(cd)s && " +
                  "cd %(cd)s && git remote set-url --push origin %(writeRepo)s",
                  readRepo=spec["source"],
