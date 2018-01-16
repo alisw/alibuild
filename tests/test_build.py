@@ -116,14 +116,22 @@ def dummy_open(x, mode="r"):
     return result
   return StringIO()
 
-def dummy_execute(x, **kwds):
-  if re.match(".*ln -sfn.*TARS", x):
+def dummy_execute(x, mock_git_clone, mock_git_fetch, **kwds):
+  s = " ".join(x) if isinstance(x, list) else x
+  if re.match(".*ln -sfn.*TARS", s):
+    return 0
+  if re.search("^git clone --bare", s):
+    mock_git_clone()
+  elif re.search("&& git fetch --tags", s):
+    mock_git_fetch()
     return 0
   return {
     "/bin/bash -e -x /sw/SPECS/osx_x86-64/defaults-release/v1-1/build.sh 2>&1": 0,
     '/bin/bash -e -x /sw/SPECS/osx_x86-64/zlib/v1.2.3-1/build.sh 2>&1': 0,
-    '/bin/bash -e -x /sw/SPECS/osx_x86-64/ROOT/v6-08-30-1/build.sh 2>&1': 0
-  }[x]
+    '/bin/bash -e -x /sw/SPECS/osx_x86-64/ROOT/v6-08-30-1/build.sh 2>&1': 0,
+    "git clone --bare https://github.com/star-externals/zlib /sw/MIRROR/zlib": 0,
+    "git clone --bare https://github.com/root-mirror/root /sw/MIRROR/root": 0
+  }[s]
 
 def dummy_readlink(x):
   return {"/sw/TARS/osx_x86-64/defaults-release/defaults-release-v1-1.osx_x86-64.tar.gz": "../../osx_x86-64/store/27/27ce49698e818e8efb56b6eff6dd785e503df341/defaults-release-v1-1.osx_x86-64.tar.gz"}[x]
@@ -139,22 +147,19 @@ def dummy_exists(x):
     "/sw/MIRROR/root": True,
     "/sw/MIRROR/zlib": False}[x]
 
-def dummy_reference(referenceSources, p, spec):
-  spec["reference"] = os.path.join(os.path.abspath(referenceSources), p.lower())
-
-
 # A few errors we should handle, together with the expected result
 class BuildTestCase(unittest.TestCase):
   @patch("alibuild_helpers.build.urlopen")
   @patch("alibuild_helpers.build.execute")
+  @patch("alibuild_helpers.workarea.execute")
   @patch("alibuild_helpers.build.getstatusoutput")
   @patch("alibuild_helpers.build.exists")
+  @patch("alibuild_helpers.workarea.path.exists")
   @patch("alibuild_helpers.build.sys")
   @patch("alibuild_helpers.build.dieOnError")
   @patch("alibuild_helpers.build.readDefaults")
   @patch("alibuild_helpers.build.makedirs")
   @patch("alibuild_helpers.build.debug")
-  @patch("alibuild_helpers.build.updateReferenceRepos")
   @patch("alibuild_helpers.utilities.open")
   @patch("alibuild_helpers.build.open")
   @patch("alibuild_helpers.build.shutil")
@@ -162,7 +167,12 @@ class BuildTestCase(unittest.TestCase):
   @patch("alibuild_helpers.build.readlink")
   @patch("alibuild_helpers.build.banner")
   @patch("alibuild_helpers.build.getStatusOutputBash")
-  def test_coverDoBuild(self, mock_getStatusOutputBash, mock_banner, mock_readlink, mock_glob, mock_shutil, mock_open,  mock_utilities_open, mock_reference, mock_debug, mock_makedirs, mock_read_defaults, mock_die, mock_sys, mock_exists, mock_getstatusoutput, mock_execute, mock_urlopen):
+  @patch("alibuild_helpers.workarea.is_writeable")
+  def test_coverDoBuild(self, mock_is_writeable, mock_getStatusOutputBash, mock_banner,
+                              mock_readlink, mock_glob, mock_shutil, mock_open, mock_utilities_open,
+                              mock_debug, mock_makedirs, mock_read_defaults, mock_die, mock_sys,
+                              mock_workarea_exists, mock_exists, mock_getstatusoutput,
+                              mock_workarea_execute, mock_execute, mock_urlopen):
     mock_readlink.side_effect = dummy_readlink
     mock_glob.side_effect = lambda x : {"*": ["zlib"],
         "/sw/TARS/osx_x86-64/defaults-release/defaults-release-v1-*.osx_x86-64.tar.gz": ["/sw/TARS/osx_x86-64/defaults-release/defaults-release-v1-1.osx_x86-64.tar.gz"],
@@ -179,9 +189,16 @@ class BuildTestCase(unittest.TestCase):
       "/alidist/zlib.sh": StringIO(TEST_ZLIB_RECIPE),
       "/alidist/defaults-release.sh": StringIO(TEST_DEFAULT_RELEASE)
     }[x]
+    mock_is_writeable.side_effect = lambda x: True
     mock_open.side_effect = dummy_open
-    mock_execute.side_effect = dummy_execute
+
+    mock_git_clone = MagicMock(return_value=None)
+    mock_git_fetch = MagicMock(return_value=None)
+    mock_execute.side_effect = lambda x, **kwds: dummy_execute(x, mock_git_clone, mock_git_fetch, **kwds)
+    mock_workarea_execute.side_effect = lambda x, **kwds: dummy_execute(x, mock_git_clone, mock_git_fetch, **kwds)
+
     mock_exists.side_effect = dummy_exists
+    mock_workarea_exists.side_effect = dummy_exists
     mock_getstatusoutput.side_effect = dummy_getstatusoutput
     mock_getStatusOutputBash.side_effect = dummy_getStatusOutputBash
     mock_parser = MagicMock()
@@ -208,18 +225,23 @@ class BuildTestCase(unittest.TestCase):
       noDevel=[],
       fetchRepos=False
     )
-    mock_reference.side_effect = dummy_reference
     mock_sys.version_info = sys.version_info
+
+    mock_git_clone.reset_mock()
+    mock_git_fetch.reset_mock()
     fmt, msg, code = doBuild(args, mock_parser)
-    self.assertEqual(mock_reference.call_count, 1, "Only one repo should have been fetched")
+    self.assertEqual(mock_git_clone.call_count, 1, "Expected only one call to git clone (called %d times instead)" % mock_git_clone.call_count)
+    self.assertEqual(mock_git_fetch.call_count, 0, "Expected only no calls to git fetch (called %d times instead)" % mock_git_fetch.call_count)
 
     # Force fetching repos
-    mock_reference.reset_mock()
+    mock_git_clone.reset_mock()
+    mock_git_fetch.reset_mock()
     args.fetchRepos = True
     fmt, msg, code = doBuild(args, mock_parser)
     mock_glob.assert_called_with("/sw/TARS/osx_x86-64/ROOT/ROOT-v6-08-30-*.osx_x86-64.tar.gz")
     self.assertEqual(msg, "Everything done")
-    self.assertEqual(mock_reference.call_count, 2, "Both repos should have been fetched")
+    self.assertEqual(mock_git_clone.call_count, 1, "Expected only one call to git clone (called %d times instead)" % mock_git_clone.call_count)
+    self.assertEqual(mock_git_fetch.call_count, 1, "Expected only one call to git fetch (called %d times instead)" % mock_git_fetch.call_count)
 
   @patch("alibuild_helpers.build.urlopen")
   @patch("alibuild_helpers.build.execute")
