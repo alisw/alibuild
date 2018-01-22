@@ -238,7 +238,8 @@ if type csrutil &> /dev/null; then
       printf "You might run into environment problems if you do not disable it.${EZ}\n" >&2; }
 fi
 
-export MODULEPATH="$WORK_DIR/MODULES/$ARCHITECTURE:$MODULEPATH"
+export MODULEPATH="$WORK_DIR/MODULES/$ARCHITECTURE${MODULEPATH:+":$MODULEPATH"}"
+MODULEPATH=$(echo "$MODULEPATH" | sed -e 's/::*/:/g; s/^://; s/:$//')
 IGNORE_ERR="Unable to locate a modulefile for 'Toolchain/"
 case "$ACTION" in
   enter)
