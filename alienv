@@ -29,6 +29,9 @@ else
   EZ=
 fi
 
+# My operating system
+UNAME=$(uname)
+
 function printHelp() {
 cat >&2 <<EoF
 $PROG -- load environment for aliBuild packages through modulefiles
@@ -98,7 +101,7 @@ EoF
 }
 
 function installHint() {
-  if [[ `uname` == Darwin ]]; then
+  if [[ $UNAME == Darwin ]]; then
     CMD='brew install modules'
   elif which apt-get > /dev/null 2>&1; then
     CMD='apt-get install environment-modules'
@@ -124,6 +127,10 @@ function existModules() {
     $MODULECMD bash -t avail 2>&1 | grep -qFx "$MODULE" || \
       { printf "${ER}ERROR: $MODULE was not found${EZ}\n" >&2; return 1; }
   done
+}
+
+function stripDyld() {
+  echo unset $( (typeset | grep ^DYLD | cut -d= -f1 | grep '_modshare$' | xargs echo ) 2> /dev/null; echo ';' )
 }
 
 ARCHITECTURE=
@@ -248,6 +255,7 @@ case "$ACTION" in
     MODULES=$(normModules "${ARGS[@]}")
     existModules $MODULES
     eval $($MODULECMD bash add $MODULES 2> >(grep -v "$IGNORE_ERR" >&2))
+    [[ $UNAME == Darwin ]] && eval $(stripDyld)
     if [[ ! -z "$CLEAN_ENV" ]]; then
       case $MODULES_SHELL in
         sh|bash) export PS1="[$MODULES]"' \w $> '   ;;
@@ -266,6 +274,7 @@ case "$ACTION" in
     [[ $ACTION == load ]] && existModules $MODULES
     [[ $VERBOSE == 1 ]] && printf "${ET}Use ${EM}alienv list${ET} to list loaded modules.${EZ}\n" >&2
     $MODULECMD $MODULES_SHELL $ACTION $MODULES 2> >(grep -v "$IGNORE_ERR" >&2)
+    [[ $UNAME == Darwin ]] && ( eval $($MODULECMD $MODULES_SHELL $ACTION $MODULES 2> /dev/null) &> /dev/null; stripDyld )
     exit 0
   ;;
   setenv)
@@ -273,6 +282,7 @@ case "$ACTION" in
     MODULES=$(normModules "${ARGS[@]}")
     existModules $MODULES
     eval $($MODULECMD bash add $MODULES 2> >(grep -v "$IGNORE_ERR" >&2))
+    [[ $UNAME == Darwin ]] && eval $(stripDyld)
     exec "${COMMAND_IN_ENV[@]}"
   ;;
   q|query)
