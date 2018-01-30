@@ -74,7 +74,7 @@ def updateReferenceRepo(referenceSources, p, spec, fetch=True):
   elif fetch:
     cmd = format("cd %(referenceRepo)s && "
                  "git fetch --tags %(source)s 2>&1 && "
-                 "git fetch %(source)s 'refs/heads/*:refs/heads/*' 2>&1",
+                 "git fetch %(source)s '+refs/heads/*:refs/heads/*' 2>&1",
                  referenceRepo=referenceRepo,
                  source=spec["source"])
     debug("Updating reference repository: %s" % cmd)
