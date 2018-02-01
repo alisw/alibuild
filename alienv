@@ -3,17 +3,6 @@
 # Load and test Modulefiles created by recipes.
 PROG=$(basename "$0")
 
-# Detect parent shell (fall back to bash)
-[[ -z "$MODULES_SHELL" ]] && MODULES_SHELL=$(ps -e -o pid,command | grep -E "^\s*$PPID\s+" | awk '{print $2}' | sed -e 's/^-\{0,1\}\(.*\)$/\1/')
-case "$MODULES_SHELL" in
-  sh)                                      ;;
-  csh|tcsh) SHELL_NORC_PARAM=-f            ;;
-  ksh)      SHELL_NORC_ENV="ENV=/dev/null" ;;
-  zsh)      SHELL_NORC_PARAM=--no-rcs      ;;
-  *)        MODULES_SHELL=bash
-            SHELL_NORC_PARAM=--norc        ;;
-esac
-
 # If we are on a TTY, enable colors
 if test -t 1; then
   EM=`printf '\033[35m'`  # magenta
@@ -117,6 +106,44 @@ function installHint() {
   printf "${EZ}"
 }
 
+function detectShell() {
+  # Detect parent shell (fall back to bash)
+  [[ -z "$MODULES_SHELL" ]] && MODULES_SHELL=$(ps -e -o pid,command | grep -E "^\s*$PPID\s+" | awk '{print $2}' | sed -e 's/^-\{0,1\}\(.*\)$/\1/')
+  case "$MODULES_SHELL" in
+    sh)                                      ;;
+    csh|tcsh) SHELL_NORC_PARAM=-f            ;;
+    ksh)      SHELL_NORC_ENV="ENV=/dev/null" ;;
+    zsh)      SHELL_NORC_PARAM=--no-rcs      ;;
+    *)        MODULES_SHELL=bash
+              SHELL_NORC_PARAM=--norc        ;;
+  esac
+}
+
+function collectModules() {
+  if [[ -z "$NO_REFRESH" ]]; then
+    # Collect all modulefiles in one place
+    rm -rf $WORK_DIR/MODULES/$ARCHITECTURE
+    mkdir -p $WORK_DIR/MODULES/$ARCHITECTURE/BASE
+    cat > $WORK_DIR/MODULES/$ARCHITECTURE/BASE/1.0 <<EOF
+#%Module1.0
+set base_path $WORK_DIR/$ARCHITECTURE
+setenv BASEDIR \$base_path
+set osname [uname sysname]
+set osarchitecture [uname machine]
+EOF
+    while read PKG; do
+      PKGVER=${PKG##*/}
+      PKGNAME=${PKG%/*}
+      PKGNAME=${PKGNAME##*/}
+      [[ ! -e "$PKG/etc/modulefiles/$PKGNAME" ]] && continue
+      mkdir -p "$WORK_DIR/MODULES/$ARCHITECTURE/$PKGNAME"
+      cp "$PKG/etc/modulefiles/$PKGNAME" "$WORK_DIR/MODULES/$ARCHITECTURE/$PKGNAME/$PKGVER"
+    done < <(find $WORK_DIR/$ARCHITECTURE -maxdepth 2 -mindepth 2 2> /dev/null)
+  else
+    printf "${EY}WARNING: not updating modulefiles${EZ}\n" >&2
+  fi
+}
+
 function normModules() {
   echo "$@" | sed -e 's/,/ /g; s/VO_ALICE@//g; s!::!/!g'
 }
@@ -216,29 +243,6 @@ if [[ -d $WORK_DIR/MODULES/$ARCHITECTURE ]]; then
   rm -f $WORK_DIR/MODULES/$ARCHITECTURE/.testwrite 2> /dev/null || true
 fi
 
-if [[ -z "$NO_REFRESH" ]]; then
-  # Collect all modulefiles in one place
-  rm -rf $WORK_DIR/MODULES/$ARCHITECTURE
-  mkdir -p $WORK_DIR/MODULES/$ARCHITECTURE/BASE
-  cat > $WORK_DIR/MODULES/$ARCHITECTURE/BASE/1.0 <<EOF
-#%Module1.0
-set base_path $WORK_DIR/$ARCHITECTURE
-setenv BASEDIR \$base_path
-set osname [uname sysname]
-set osarchitecture [uname machine]
-EOF
-  while read PKG; do
-    PKGVER=${PKG##*/}
-    PKGNAME=${PKG%/*}
-    PKGNAME=${PKGNAME##*/}
-    [[ ! -e "$PKG/etc/modulefiles/$PKGNAME" ]] && continue
-    mkdir -p "$WORK_DIR/MODULES/$ARCHITECTURE/$PKGNAME"
-    cp "$PKG/etc/modulefiles/$PKGNAME" "$WORK_DIR/MODULES/$ARCHITECTURE/$PKGNAME/$PKGVER"
-  done < <(find $WORK_DIR/$ARCHITECTURE -maxdepth 2 -mindepth 2 2> /dev/null)
-else
-  printf "${EY}WARNING: not updating modulefiles${EZ}\n" >&2
-fi
-
 if type csrutil &> /dev/null; then
   csrutil status | grep -q disabled || \
     { printf "${EY}WARNING: System Integrity Protection is enabled. " >&2;
@@ -256,9 +260,11 @@ case "$ACTION" in
     [[ $ALIENVLVL == 1 ]] || \
       { printf "${ER}ERROR: already in an alienv environment${EZ}\n" >&2; exit 1; }
     MODULES=$(normModules "${ARGS[@]}")
+    collectModules
     existModules $MODULES
     eval $($MODULECMD bash add $MODULES 2> >(grep -v "$IGNORE_ERR" >&2))
     [[ $UNAME == Darwin ]] && eval $(stripDyld)
+    detectShell
     if [[ ! -z "$CLEAN_ENV" ]]; then
       case $MODULES_SHELL in
         sh|bash) export PS1="[$MODULES]"' \w $> '   ;;
@@ -274,8 +280,9 @@ case "$ACTION" in
   printenv|load|unload)
     [[ $ACTION == printenv ]] && ACTION=load
     MODULES=$(normModules "${ARGS[@]}")
-    [[ $ACTION == load ]] && existModules $MODULES
+    [[ $ACTION == load ]] && { collectModules; existModules $MODULES; }
     [[ $VERBOSE == 1 ]] && printf "${ET}Use ${EM}alienv list${ET} to list loaded modules.${EZ}\n" >&2
+    detectShell
     $MODULECMD $MODULES_SHELL $ACTION $MODULES 2> >(grep -v "$IGNORE_ERR" >&2)
     [[ $UNAME == Darwin ]] && ( eval $($MODULECMD $MODULES_SHELL $ACTION $MODULES 2> /dev/null) &> /dev/null; stripDyld )
     exit 0
@@ -283,6 +290,7 @@ case "$ACTION" in
   setenv)
     [[ -z "${COMMAND_IN_ENV[*]}" ]] && { printHelp "No command specified with -c"; false; }
     MODULES=$(normModules "${ARGS[@]}")
+    collectModules
     existModules $MODULES
     eval $($MODULECMD bash add $MODULES 2> >(grep -v "$IGNORE_ERR" >&2))
     [[ $UNAME == Darwin ]] && eval $(stripDyld)
@@ -290,17 +298,20 @@ case "$ACTION" in
   ;;
   q|query)
     [[ -z "${ARGS[0]}" ]] && SEARCH_CMD=cat || SEARCH_CMD=( grep -iE "${ARGS[0]}" )
+    collectModules
     $MODULECMD bash -t avail 2>&1 | grep -E '^[^/]+/[^/]+$' | grep -vE ':$' | \
       "${SEARCH_CMD[@]}" | sed -e 's!^\([^/]*\)/\(.*\)$!VO_ALICE@\1::\2!'
     exit ${PIPESTATUS[3]}  # grep
   ;;
   avail)
+    collectModules
     exec $MODULECMD bash avail
   ;;
   list)
     exec $MODULECMD bash list
   ;;
   modulecmd)
+    collectModules
     exec $MODULECMD "${ARGS[@]}"
   ;;
   '')
