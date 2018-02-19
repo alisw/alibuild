@@ -1,6 +1,6 @@
 ---
 title: ALIBUILD
-subtitle: O2 DAQ build tutorial
+subtitle: O2 Dataflow build tutorial
 layout: main
 ---
 
@@ -100,7 +100,7 @@ they can be obtained as system packages (with `yum`, or `pip`, for instance). It
 will also tell you what to do to get them.
 
     cd ~/alice
-    aliDoctor --defaults o2-daq flpproto
+    aliDoctor --defaults o2-dataflow flpproto
 
 The command above will print what packages are absolutely needed but missing,
 and which ones can optionally be installed as system ones. Our objective is to
@@ -138,7 +138,7 @@ After you have correctly installed the packages above, re-run the aliDoctor
 command:
 
     cd ~/alice
-    aliDoctor --defaults o2-daq flpproto
+    aliDoctor --defaults o2-dataflow flpproto
 
 If everything is correct, the following packages will be picked up from the
 system:
@@ -171,9 +171,9 @@ This is the simplest part and the one you are going to reiterate in case of
 continued development.
 
     cd ~/alice
-    aliBuild build flpproto --defaults o2-daq
+    aliBuild build flpproto --defaults o2-dataflow
 
-Do not forget the `--defaults o2-daq` flag!
+Do not forget the `--defaults o2-dataflow` flag!
 
 The first installation will take a while and will take care of building all the
 dependencies. Subsequent builds will be much faster, and in particular,
@@ -182,18 +182,17 @@ dependencies will not be rebuilt.
 
 # Using the software
 
-To use the software you need to load the environment. First add this line to your .bashrc: 
+To use the software you need to load the environment. First add this line to your .bashrc:
 
     export ALIBUILD_WORK_DIR=$HOME/alice/sw; eval "`alienv shell-helper`"
-    
+
 Then execute:
 
     alienv load flpproto/latest
-    
+
 It loads the environment in your *current* shell. Use the `unload` command to clean the environment.
 
 You will also be able to open a *new* shell (you can clean the environment by just coming back
-to the old shell with `exit`): 
+to the old shell with `exit`):
 
     alienv enter flpproto/latest
-
