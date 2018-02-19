@@ -118,9 +118,9 @@ Notice that aliBuild automatically takes care of dependencies, so you
 only need to specify the toplevel package. We specify here that we will build
 for o2 and aliBuild will choose ROOT6 and a new CMake as opposed to the versions used
 for AliRoot. For those not interested in the simulation and analysis, the defaults
-`o2-daq` can be used
+`o2-dataflow` can be used
 
-    aliBuild --defaults o2-daq build O2
+    aliBuild --defaults o2-dataflow build O2
 
 Depending on your setup, this should take between 30 minutes to 1 hour
 on reasonably modern hardware. If it takes more, you might want to read
