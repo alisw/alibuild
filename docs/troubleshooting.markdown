@@ -249,11 +249,11 @@ get the prerequisites with:
 sudo apt-get install build-essential tcl8.5-dev
 ```
 
-Download the [tarball for version 3.2.10](http://downloads.sourceforge.net/project/modules/Modules/modules-3.2.10/modules-3.2.10.tar.gz), unpack it, configure and build
+Download the [tarball for version 3.2.10](https://downloads.sourceforge.net/project/modules/Modules/modules-3.2.10/modules-3.2.10.tar.gz), unpack it, configure and build
 it:
 
 ```bash
-curl -LO http://downloads.sourceforge.net/project/modules/Modules/modules-3.2.10/modules-3.2.10.tar.gz
+curl -LO https://downloads.sourceforge.net/project/modules/Modules/modules-3.2.10/modules-3.2.10.tar.gz
 tar xzf modules-3.2.10.tar.gz
 cd modules-3.2.10/
 ./configure --disable-versioning --exec-prefix=/usr/local
