@@ -37,5 +37,5 @@ time coverage run -a alibuild/aliBuild version
 # test the docs
 pushd alibuild
   jekyll build -s docs -d _site --baseurl .
-  htmlproofer ./_site
+  script/custom_htmlproofer.rb
 popd

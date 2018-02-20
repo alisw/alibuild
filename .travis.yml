@@ -1,5 +1,10 @@
-sudo: required
 dist: trusty
+addons:
+  apt:
+    packages:
+      - curl
+      - libcurl4-openssl-dev
+      - environment-modules
 language: python
 python:
   - "2.7"
@@ -10,7 +15,6 @@ cache:
   directories:
     - $HOME/sw/TARS
 before_install: |
-  sudo apt-get install -y curl environment-modules
   cd ..
   git clone -b IB/v5-06/next https://github.com/alisw/alidist
 install: |
