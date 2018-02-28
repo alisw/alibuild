@@ -38,6 +38,7 @@ def doMain(args, parser):
     "LC_NUMERIC": "C",
     "LC_TIME": "C",
     "LC_ALL": "C",
+    "GREP_OPTIONS": "",
     "BASH_ENV": "",
     "ALIBUILD_ARCHITECTURE": args.architecture
   }
