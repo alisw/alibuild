@@ -4,6 +4,7 @@
 
 set -e
 set +h
+function hash() { true; }
 export WORK_DIR="${WORK_DIR_OVERRIDE:-%(workDir)s}"
 
 # From our dependencies
