@@ -2,7 +2,8 @@ highlighter: rouge
 baseurl: /alibuild
 menu_header: ALIBUILD
 menu:
-  - name: quick.html
+  -
+    name: quick.html
     label: QUICKSTART
   -
     name: user.html
@@ -17,14 +18,8 @@ menu:
     name: troubleshooting.html
     label: TROUBLESHOOTING
   -
-    name: tutorial.html
-    label: TUTORIAL (AliPhysics)
-  -
-    name: o2-tutorial.html
-    label: TUTORIAL (O2)
-  -
-    name: o2-dataflow-tutorial.html
-    label: TUTORIAL (O2 dataflow)
+    name: https://alice-doc.github.io/alice-analysis-tutorial/building/
+    label: ALICE TUTORIAL
 defaults:
   -
     scope:

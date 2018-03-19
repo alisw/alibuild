@@ -26,7 +26,12 @@
       <ul class="pure-menu-list">
       {% for cat in site.menu %}
         <li class="pure-menu-item menu-item-section menu-item-devided">
+          {% assign proto = cat.name|slice: 0,4 %}
+          {% if proto == "http" %}
+          <a href="{{cat.name}}" class="pure-menu-link">{{ cat.label }}</a>
+          {% else %}
           <a href="{{site.baseurl}}/{{cat.name}}" class="pure-menu-link">{{ cat.label }}</a>
+          {% endif %}
         </li>
         {% for sub in cat.items %}
         <li>
