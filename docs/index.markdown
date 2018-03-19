@@ -4,6 +4,11 @@ subtile: About this tool
 layout: main
 ---
 
+<div style="text-align:center;width:100%">
+  <a href="https://badge.fury.io/py/alibuild"><img src="https://badge.fury.io/py/alibuild.svg" alt="PyPI version" height="22"></a>
+  <a href="https://travis-ci.org/alisw/alibuild"><img src="https://travis-ci.org/alisw/alibuild.svg?branch=master" alt="Build status" height="22"></a>
+</div>
+
 A simple build tool for ALICE experiment software and its externals. Recipes
 for the externals and ALICE software are stored in
 [alidist](https://github.com/alisw/alidist).
@@ -61,5 +66,3 @@ package your own software.
       <br/><a href="quick.html#loading-the-package-environment">Read more</a>
     </div>
 </div>
-
-
