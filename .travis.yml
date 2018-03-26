@@ -24,10 +24,11 @@ install: |
     pip install mock
     pip install pyflakes
     gem install jekyll html-proofer
+    pip install twine
 script: |
   alibuild/script/cibuild
 after_success:
   - bash <(curl -s https://codecov.io/bash)
 env:
   global:
-  - NOKOGIRI_USE_SYSTEM_LIBRARIES=true # speeds up installation of html-proofer
+    - NOKOGIRI_USE_SYSTEM_LIBRARIES=true  # speeds up installation of html-proofer
