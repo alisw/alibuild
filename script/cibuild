@@ -41,7 +41,10 @@ pushd alibuild
 popd
 
 # Deploy if this is a tag (do it only for one Python version, not all matrix tests)
-if [[ $TRAVIS_PYTHON_VERSION == 3* && $TRAVIS_TAG && $TRAVIS_PULL_REQUEST == false ]]; then
+## WILL DISAPPEAR IN PRODUCTION ##
+TRAVIS_TAG='v1.5.4.rc1'
+## /WILL DISAPPEAR IN PRODUCTION ##
+if [[ $TRAVIS_PYTHON_VERSION == 3* && $TRAVIS_TAG ]]; then
   pushd alibuild
     sed -i.deleteme -e "s/LAST_TAG/${TRAVIS_TAG}/g" setup.py
     rm -f *.deleteme
