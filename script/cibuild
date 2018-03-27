@@ -39,3 +39,29 @@ pushd alibuild
   jekyll build -s docs -d _site --baseurl .
   script/custom_htmlproofer.rb
 popd
+
+# Deploy if this is a tag (do it only for one Python version, not all matrix tests)
+## WILL DISAPPEAR IN PRODUCTION ##
+TRAVIS_TAG='v1.5.4.rc1'
+## /WILL DISAPPEAR IN PRODUCTION ##
+if [[ $TRAVIS_PYTHON_VERSION == 3* && $TRAVIS_TAG ]]; then
+  pushd alibuild
+    sed -i.deleteme -e "s/LAST_TAG/${TRAVIS_TAG}/g" setup.py
+    rm -f *.deleteme
+    git clean -fxd
+    git diff
+    python setup.py sdist
+
+    # Write credentials to ~/.pypirc
+    cat > ~/.pypirc <<EOF
+[distutils]
+index-servers=pypi
+
+[pypi]
+username = alibuild
+password = $PYPI_PASSWORD
+EOF
+    twine upload dist/*
+    rm -f ~/.pypirc
+  popd
+fi
