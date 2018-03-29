@@ -175,6 +175,12 @@ def doDoctor(args, parser):
                                                             taps                    = taps,
                                                             log                     = info)
 
+  alwaysBuilt = set([x for x in specs]) - fromSystem - own - failed
+  if alwaysBuilt:
+    banner("The following packages will be built by aliBuild because\n"
+            " usage of a system version of it is not allowed or supported, by policy:\n\n- " +
+            " \n- ".join(alwaysBuilt)
+          )
   if fromSystem:
     banner("The following packages will be picked up from the system:\n\n- " +
            "\n- ".join(fromSystem) +
