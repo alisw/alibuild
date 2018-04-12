@@ -42,6 +42,9 @@ def normalise_multiple_options(option, sep=","):
   return [x for x in ",".join(option).split(sep) if x]
 
 def prunePaths(workDir):
+  if not "ALIENVLVL" in os.environ:
+    # Not in an alienv shell: trust current environment
+    return
   for x in ["PATH", "LD_LIBRARY_PATH", "DYLD_LIBRARY_PATH"]:
     if not x in os.environ:
       continue
