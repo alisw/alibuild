@@ -275,3 +275,32 @@ In this case, you can ask aliBuild to update cached branches information by
 adding the `-u` or `--fetch-repos` option. Note that by default this is not
 needed, it's only for very special use cases (such as centralized builds and
 server-side pull request checks).
+
+## Generating a dependency graph
+
+It is possible to generating a PDF with a dependency graph using the `aliDeps`
+tool. Assuming you run it from a directory containing `alidist`, and you have
+Graphviz installed on your system, you can simply run:
+
+    aliDeps O2 --defaults o2 --outgraph graph.pdf
+
+The example above generates a dependency graph for the package `O2` using the
+defaults `o2`, and saving the results to a PDF file named `graph.pdf`. This is
+what the graph looks like:
+
+![drawing](deps.png)
+
+Packages in green are runtime dependencies, purple are build dependencies, while
+red packages are runtime dependencies in some cases, and build dependencies in
+others (this can indicate an error in the recipes).
+
+Connections are color-coded as well: blue connections indicate a runtime
+dependency whereas a grey connection indicate a build dependency.
+
+By default, `aliDeps` runs the usual system checks to exclude packages that can
+be taken from the system. If you want to display the full list of dependencies,
+you may want to use:
+
+    aliDeps O2 --defaults o2 --no-system --outgraph graph.pdf
+
+Please run `aliDeps --help` for further information.

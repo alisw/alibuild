@@ -13,7 +13,7 @@ from alibuild_helpers.args import doParseArgs
 from alibuild_helpers.init import doInit
 from alibuild_helpers.clean import doClean
 from alibuild_helpers.doctor import doDoctor
-from alibuild_helpers.deps import deps
+from alibuild_helpers.deps import doDeps
 from alibuild_helpers.log import info, warning, debug, logger
 from alibuild_helpers.utilities import getVersion, detectArch
 from alibuild_helpers.build import doBuild, star
@@ -60,15 +60,10 @@ def doMain(args, parser):
   if args.action == "doctor":
     doDoctor(args, parser)
 
-  if args.action == "deps":
-    deps(recipesDir=args.distDir,
-         topPackage=args.topPackage,
-         outFile=args.outFile,
-         buildRequires=args.buildRequires,
-         transitiveRed=args.neat,
-         disable=args.disable) and sys.exit(0) or sys.exit(1)
-
   logger.setLevel(logging.DEBUG if args.debug else logging.INFO)
+
+  if args.action == "deps":
+    sys.exit(0 if doDeps(args, parser) else 1)
 
   if args.action == "clean":
     doClean(workDir=args.workDir, architecture=args.architecture, aggressiveCleanup=args.aggressiveCleanup, dryRun=args.dryRun)
