@@ -9,9 +9,6 @@ menu:
     name: user.html
     label: USER MANUAL
   -
-    name: extra.html
-    label: EXTRA TOOLS
-  -
     name: reference.html
     label: REFERENCE
   -

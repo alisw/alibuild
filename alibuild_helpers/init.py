@@ -59,7 +59,7 @@ def doInit(args):
                                          architecture="",
                                          disable=[],
                                          defaults=args.defaults,
-                                         dieOnError=lambda *x, **y: None,
+                                         dieOnError=dieOnError,
                                          performPreferCheck=lambda *x, **y: (1, ""),
                                          performRequirementCheck=lambda *x, **y: (0, ""),
                                          performValidateDefaults=lambda spec : validateDefaults(spec, args.defaults),

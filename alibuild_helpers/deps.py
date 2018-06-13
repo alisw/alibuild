@@ -1,92 +1,110 @@
 #!/usr/bin/env python
 
 from __future__ import print_function
-from glob import glob
+from alibuild_helpers.log import debug, error, banner, info, success, warning, dieOnError
+from alibuild_helpers.utilities import parseDefaults, readDefaults, getPackageList, validateDefaults, dockerStatusOutput, format
+from alibuild_helpers.cmd import getStatusOutputBash, execute
 from tempfile import NamedTemporaryFile
-import os, sys
-from alibuild_helpers.log import debug, error, info
 from os import remove
-from alibuild_helpers.utilities import format
-from alibuild_helpers.cmd import execute
-from alibuild_helpers.utilities import detectArch
-from alibuild_helpers.utilities import parseRecipe, getRecipeReader
 
-def deps(recipesDir, topPackage, outFile, buildRequires, transitiveRed, disable):
-  dot = {}
-  keys = [ "requires" ]
-  if buildRequires:
-    keys.append("build_requires")
-  for p in glob("%s/*.sh" % recipesDir):
-    debug(format("Reading file %(filename)s", filename=p))
-    try:
-      err, recipe, _ = parseRecipe(getRecipeReader(p))
-      name = recipe["package"]
-      if name in disable:
-        debug("Ignoring %s, disabled explicitly" % name)
-        continue
-    except Exception as e:
-      error(format("Error reading recipe %(filename)s: %(type)s: %(msg)s",
-                   filename=p, type=type(e).__name__, msg=str(e)))
-      sys.exit(1)
-    dot[name] = dot.get(name, [])
-    for k in keys:
-      for d in recipe.get(k, []):
-        d = d.split(":")[0]
-        d in disable or dot[name].append(d)
+def doDeps(args, parser):
 
-  selected = None
-  if topPackage != "all":
-    if not topPackage in dot:
-      error(format("Package %(topPackage)s does not exist", topPackage=topPackage))
-      return False
-    selected = [ topPackage ]
-    olen = 0
-    while len(selected) != olen:
-      olen = len(selected)
-      selected += [ x
-                    for s in selected if s in dot
-                    for x in dot[s] if not x in selected ]
-    selected.sort()
+  # Check if we have an output file
+  if not args.outgraph:
+    parser.error("Specify a PDF output file with --outgraph")
 
-  result = "digraph {\n"
-  for p,deps in list(dot.items()):
-    if selected and not p in selected: continue
-    result += "  \"%s\";\n" % p
-    for d in deps:
-      result += "  \"%s\" -> \"%s\";\n" % (p,d)
-  result += "}\n"
+  # In case we are using Docker
+  dockerImage = args.dockerImage if "dockerImage" in args else ""
+  if args.docker and not dockerImage:
+    dockerImage = "alisw/%s-builder" % args.architecture.split("_")[0]
 
-  with NamedTemporaryFile(delete=False) as fp:
-    fp.write(result)
+  # Resolve all the package parsing boilerplate
+  specs = {}
+  defaultsReader = lambda: readDefaults(args.configDir, args.defaults, parser.error)
+  (err, overrides, taps) = parseDefaults(args.disable, defaultsReader, debug)
+  (systemPackages, ownPackages, failed, validDefaults) = \
+    getPackageList(packages                = [args.package],
+                   specs                   = specs,
+                   configDir               = args.configDir,
+                   preferSystem            = args.preferSystem,
+                   noSystem                = args.noSystem,
+                   architecture            = args.architecture,
+                   disable                 = args.disable,
+                   defaults                = args.defaults,
+                   dieOnError              = dieOnError,
+                   performPreferCheck      = lambda pkg, cmd : dockerStatusOutput(cmd, dockerImage, executor = getStatusOutputBash),
+                   performRequirementCheck = lambda pkg, cmd : dockerStatusOutput(cmd, dockerImage, executor = getStatusOutputBash),
+                   performValidateDefaults = lambda spec : validateDefaults(spec, args.defaults),
+                   overrides               = overrides,
+                   taps                    = taps,
+                   log                     = debug)
+  dieOnError(validDefaults and args.defaults not in validDefaults,
+             "Specified default `%s' is not compatible with the packages you want to build.\n" % args.defaults +
+             "Valid defaults:\n\n- " +
+             "\n- ".join(sorted(validDefaults)))
+
+  for s in specs.values():
+    # Remove disabled packages
+    s["requires"] = [r for r in s["requires"] if not r in args.disable and r != "defaults-release"]
+    s["build_requires"] = [r for r in s["build_requires"] if not r in args.disable and r != "defaults-release"]
+    s["runtime_requires"] = [r for r in s["runtime_requires"] if not r in args.disable and r != "defaults-release"]
+
+  # Determine which pacakages are only build/runtime dependencies
+  all_build   = set()
+  all_runtime = set()
+  for k,spec in specs.items():
+    all_build.update(spec["build_requires"])
+    all_runtime.update(spec["runtime_requires"])
+  all_both = all_build.intersection(all_runtime)
+
+  dot = "digraph {\n"
+  for k,spec in specs.items():
+    if k == "defaults-release":
+      continue
+
+    # Determine node color based on its dependency status
+    color = None
+    if k in all_both:
+      color = "tomato1"
+    elif k in all_runtime:
+      color = "greenyellow"
+    elif k in all_build:
+      color = "plum"
+    elif k == args.package:
+      color = "gold"
+    else:
+      assert color, "This should not happen (happened for %s)" % k
+
+    # Node definition
+    dot += '"%s" [shape=box, style="rounded,filled", fontname="helvetica", fillcolor=%s]\n' % (k,color)
+
+    # Connections (different whether it's a build dependency or a runtime one)
+    for dep in spec["build_requires"]:
+     dot += '"%s" -> "%s" [color=grey70]\n' % (k, dep)
+    for dep in spec["runtime_requires"]:
+     dot += '"%s" -> "%s" [color=dodgerblue3]\n' % (k, dep)
+
+  dot += "}\n"
+
+  if args.outdot:
+    fp = open(args.outdot, "w")
+  else:
+    fp = NamedTemporaryFile(delete=False)
+  fp.write(dot)
+  fp.close()
+
   try:
-    if transitiveRed:
+    if args.neat:
       execute(format("tred %(dotFile)s > %(dotFile)s.0 && mv %(dotFile)s.0 %(dotFile)s",
               dotFile=fp.name))
-    execute(["dot", fp.name, "-Tpdf", "-o", outFile])
+    execute(["dot", fp.name, "-Tpdf", "-o", args.outgraph])
   except Exception as e:
     error(format("Error generating dependencies with dot: %(type)s: %(msg)s",
                  type=type(e).__name__, msg=str(e)))
   else:
-    info(format("Dependencies graph generated: %(outFile)s", outFile=outFile))
-  remove(fp.name)
+    info("Dependencies graph generated: %s" % args.outgraph)
+  if fp.name != args.outdot:
+    remove(fp.name)
+  else:
+    info("Intermediate dot file for Graphviz saved: %s" % args.outdot)
   return True
-
-def depsArgsParser(parser):
-  parser.add_argument("topPackage")
-  parser.add_argument("-a", "--architecture", help="force architecture",
-                      dest="architecture", default=detectArch())
-  parser.add_argument("--dist", dest="distDir", default="alidist",
-                      help="Recipes directory")
-  parser.add_argument("--output-file", "-o", dest="outFile", default="dist.pdf",
-                      help="Output file (PDF format)")
-  parser.add_argument("--debug", "-d", dest="debug", action="store_true", default=False,
-                      help="Debug output")
-  parser.add_argument("--build-requires", "-b", dest="buildRequires", action="store_true",
-                      default=False, help="Debug output")
-  parser.add_argument("--neat", dest="neat", action="store_true", default=False,
-                      help="Neat graph with transitive reduction")
-  parser.add_argument("--disable", dest="disable", default=[],
-                      help="List of packages to ignore")
-  parser.add_argument("--chdir", "-C", help="Change to the specified directory first",
-                      metavar="DIR", dest="chdir", default=os.environ.get("ALIBUILD_CHDIR", "."))
-  return parser

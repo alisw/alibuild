@@ -1,7 +1,6 @@
 import argparse
 from alibuild_helpers.utilities import format, detectArch
 from alibuild_helpers.doctor import doctorArgParser
-from alibuild_helpers.deps import depsArgsParser
 from alibuild_helpers.utilities import normalise_multiple_options
 
 import re
@@ -133,7 +132,30 @@ def doParseArgs(star):
                             metavar="DIR", dest="chdir", default=DEFAULT_CHDIR)
 
   # Options for the deps subcommand
-  deps_parser = depsArgsParser(deps_parser)
+  deps_parser.add_argument("package",
+                           help="Calculate dependency tree for that package")
+  deps_parser.add_argument("--neat", dest="neat", action="store_true", default=False,
+                           help="Neat graph with transitive reduction")
+  deps_parser.add_argument("--outdot", dest="outdot",
+                           help="Keep intermediate Graphviz dot file with this name")
+  deps_parser.add_argument("--outgraph", dest="outgraph",
+                           help="Output file (PDF)")
+  deps_parser.add_argument("-c", "--config", dest="configDir", default="alidist",
+                           help="Path to alidist")
+  deps_parser.add_argument("--defaults", dest="defaults", default="release",
+                           help="Specify which defaults to use")
+  deps_parser.add_argument("--disable", dest="disable", default=[], metavar="PKG", action="append",
+                           help="Do not build PACKAGE and all its (unique) dependencies")
+  deps_parser.add_argument("--docker", dest="docker", action="store_true", default=False)
+  deps_parser.add_argument("--docker-image", dest="dockerImage",
+                           help="Image to use in case you build with docker (implies --docker-image)")
+  deps_parser.add_argument("--architecture", "-a", dest="architecture", default=detectArch(),
+                           help="Architecture")
+  deps_group = deps_parser.add_mutually_exclusive_group()
+  deps_group.add_argument("--always-prefer-system", dest="preferSystem", default=False,
+                     action="store_true", help="Always use system packages when compatible")
+  deps_group.add_argument("--no-system", dest="noSystem", default=False,
+                     action="store_true", help="Never use system packages")
 
   # Options for the doctor subcommand
   doctor_parser = doctorArgParser(doctor_parser)
