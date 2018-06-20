@@ -903,8 +903,9 @@ def doBuild(args, parser):
       ("WRITE_REPO", spec.get("write_repo", source)),
     ]
     # Add the extra environment as passed from the command line.
-    for e in [x.split("=", "1") for x in args.environment]:
-      buildEnvironment.append(e)
+    for e in args.environment:
+        key, _eq, value = e.partition("=")
+        buildEnvironment.append((key, value))
     # In case the --docker options is passed, we setup a docker container which
     # will perform the actual build. Otherwise build as usual using bash.
     if args.docker:
@@ -1002,3 +1003,4 @@ def doBuild(args, parser):
                   devSuffix="-"+args.develPrefix if "develPrefix" in args else "",
                   w=abspath(args.workDir)))
   return (debug, "Everything done", 0)
+
