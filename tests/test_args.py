@@ -1,8 +1,10 @@
 from __future__ import print_function
 # Assuming you are using the mock library to ... mock things
 try:
+    from unittest import mock
     from unittest.mock import patch, call  # In Python 3, mock is built-in
 except ImportError:
+    import mock
     from mock import patch, call  # Python 2
 
 import alibuild_helpers.args
@@ -12,7 +14,6 @@ import sys
 import os
 import os.path
 
-import mock
 import unittest
 import traceback
 import shlex
