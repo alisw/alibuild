@@ -19,7 +19,6 @@ import os
 import os.path
 import re
 
-import mock
 import unittest
 import traceback
 
@@ -257,6 +256,7 @@ class BuildTestCase(unittest.TestCase):
     for x in syncers:
       x.syncToLocal("zlib", dummy_spec)
       x.syncToRemote("zlib", dummy_spec)
+
 
 if __name__ == '__main__':
   unittest.main()
