@@ -257,12 +257,6 @@ class BuildTestCase(unittest.TestCase):
       x.syncToLocal("zlib", dummy_spec)
       x.syncToRemote("zlib", dummy_spec)
 
-  def test_parse_environment_arguments(self):
-      from alibuild_helpers.build import parse_environment_arguments
-      args = parse_environment_arguments(["A=b", "B=c", "C"])
-      self.assertEqual(args[0], ("A", "b"))
-      self.assertEqual(args[1], ("B", "c"))
-      self.assertEqual(args[2], ("C", ""))
 
 if __name__ == '__main__':
   unittest.main()
