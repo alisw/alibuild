@@ -103,9 +103,15 @@ class ProgressPrint:
     if self.count == -1 and self.begin_msg:
       sys.stderr.write("\033[1;35m==>\033[m "+self.begin_msg)
     self.erase()
-    m = re.search("(^|[^0-9])([0-9]{1,2})%", txt)
+    m = re.search("((^|[^0-9])([0-9]{1,2})%|\[([0-9]+)/([0-9]+)\])", txt)
     if m:
-      self.percent = int(m.group(2))
+      if m.group(3) is not None:
+        self.percent = int(m.group(3))
+      else:
+        num = int(m.group(4))
+        den = int(m.group(5))
+        if num >= 0 and den > 0:
+          self.percent = 100 * num / den
     if self.percent > -1:
       sys.stderr.write(" [%2d%%] " % self.percent)
     self.count = (self.count+1) % len(self.STAGES)
