@@ -90,6 +90,11 @@ class DoctorTestCase(unittest.TestCase):
                      disable=[],
                      defaults="release")
 
+    # What to call (longer names deprecated in Python 3.5+)
+    if not hasattr(self, "assertRegex"):
+      self.assertRegex = self.assertRegexpMatches
+      self.assertNotRegex = self.assertNotRegexpMatches
+
     # Test: all should go OK (exit with 0)
     out = resetOut()
     with self.assertRaises(SystemExit) as cm:
@@ -110,7 +115,7 @@ class DoctorTestCase(unittest.TestCase):
       args.packages=["BreakDefaults"]
       doDoctor(args, MagicMock())
     self.assertEqual(cm.exception.code, 2)
-    self.assertRegexpMatches(out["error"].getvalue(), "- its_not_there")
+    self.assertRegex(out["error"].getvalue(), "- its_not_there")
 
     # Test: common defaults
     out = resetOut()
@@ -118,9 +123,9 @@ class DoctorTestCase(unittest.TestCase):
       args.packages=["TestDef1"]
       doDoctor(args, MagicMock())
     self.assertEqual(cm.exception.code, 2)
-    self.assertRegexpMatches(out["banner"].getvalue(), "- common_default")
-    self.assertNotRegexpMatches(out["banner"].getvalue(), "- default1")
-    self.assertNotRegexpMatches(out["banner"].getvalue(), "- default2")
+    self.assertRegex(out["banner"].getvalue(), "- common_default")
+    self.assertNotRegex(out["banner"].getvalue(), "- default1")
+    self.assertNotRegex(out["banner"].getvalue(), "- default2")
 
 if __name__ == '__main__':
   unittest.main()
