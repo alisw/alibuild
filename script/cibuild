@@ -13,7 +13,7 @@ test -e ~/.config/alibuild/analytics-uuid
 coverage run -a alibuild/aliBuild analytics off
 test -e ~/.config/alibuild/disable-analytics
 test -e ~/.config/alibuild/analytics-uuid
-pushd alibuild; time coverage run -a -m unittest discover tests; popd
+PYTHONPATH="alibuild:$PYTHONPATH" time coverage run -a -m unittest discover alibuild/tests
 time coverage run -a alibuild/aliBuild -z test-init init zlib
 pushd test-init/alidist && git status && popd
 pushd test-init/zlib && git status && popd
