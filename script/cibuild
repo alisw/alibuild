@@ -2,6 +2,7 @@
 set -e
 export PATH=~/.local/bin:$PATH
 export PYTHONPATH=~/lib/python2.7/site-packages:$PYTHONPATH
+find . -iname "*.py" | xargs pylint --rcfile alibuild/.pylintrc
 coverage run -a alibuild/aliBuild analytics off
 time coverage run -a alibuild/aliBuild --help
 coverage run -a alibuild/aliBuild analytics off

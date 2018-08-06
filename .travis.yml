@@ -23,6 +23,7 @@ install: |
     pip install coverage
     pip install mock
     pip install pyflakes
+    pip install pylint
     gem install jekyll html-proofer
 script: |
   alibuild/script/cibuild
