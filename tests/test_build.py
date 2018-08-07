@@ -148,7 +148,7 @@ def dummy_exists(x):
 
 # A few errors we should handle, together with the expected result
 class BuildTestCase(unittest.TestCase):
-  @patch("alibuild_helpers.build.urlopen")
+  @patch("alibuild_helpers.build.get")
   @patch("alibuild_helpers.build.execute")
   @patch("alibuild_helpers.workarea.execute")
   @patch("alibuild_helpers.build.getstatusoutput")
@@ -171,7 +171,7 @@ class BuildTestCase(unittest.TestCase):
                               mock_readlink, mock_glob, mock_shutil, mock_open, mock_utilities_open,
                               mock_debug, mock_makedirs, mock_read_defaults, mock_die, mock_sys,
                               mock_workarea_exists, mock_exists, mock_getstatusoutput,
-                              mock_workarea_execute, mock_execute, mock_urlopen):
+                              mock_workarea_execute, mock_execute, mock_get):
     mock_readlink.side_effect = dummy_readlink
     mock_glob.side_effect = lambda x : {"*": ["zlib"],
         "/sw/TARS/osx_x86-64/defaults-release/defaults-release-v1-*.osx_x86-64.tar.gz": ["/sw/TARS/osx_x86-64/defaults-release/defaults-release-v1-1.osx_x86-64.tar.gz"],
@@ -242,13 +242,13 @@ class BuildTestCase(unittest.TestCase):
     self.assertEqual(mock_git_clone.call_count, 1, "Expected only one call to git clone (called %d times instead)" % mock_git_clone.call_count)
     self.assertEqual(mock_git_fetch.call_count, 1, "Expected only one call to git fetch (called %d times instead)" % mock_git_fetch.call_count)
 
-  @patch("alibuild_helpers.build.urlopen")
+  @patch("alibuild_helpers.build.get")
   @patch("alibuild_helpers.build.execute")
   @patch("alibuild_helpers.build.getstatusoutput")
   @patch("alibuild_helpers.build.sys")
   @patch("alibuild_helpers.build.dieOnError")
   @patch("alibuild_helpers.build.error")
-  def test_coverSyncs(self, mock_error, mock_die, mock_sys, mock_getstatusoutput, mock_execute, mock_urlopen):
+  def test_coverSyncs(self, mock_error, mock_die, mock_sys, mock_getstatusoutput, mock_execute, mock_get):
     syncers = [NoRemoteSync(),
                HttpRemoteSync(remoteStore="https://local/test", architecture="osx_x86-64", workdir="/sw", insecure=False),
                RsyncRemoteSync(remoteStore="ssh://local/test", writeStore="ssh://local/test", architecture="osx_x86-64", workdir="/sw", rsyncOptions="")]

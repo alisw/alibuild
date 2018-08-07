@@ -2,11 +2,8 @@ from os.path import abspath, exists, basename, dirname, join, realpath
 from os import makedirs, unlink, readlink, rmdir
 try:
   from commands import getstatusoutput
-  from urllib2 import urlopen, URLError
 except ImportError:
   from subprocess import getstatusoutput
-  from urllib.request import urlopen
-  from urllib.error import URLError
 from alibuild_helpers.analytics import report_event
 from alibuild_helpers.log import debug, error, info, banner, warning
 from alibuild_helpers.log import dieOnError
@@ -22,6 +19,8 @@ from alibuild_helpers.workarea import updateReferenceRepoSpec
 from alibuild_helpers.log import logger_handler, LogFormatter, ProgressPrint, riemannStream
 from datetime import datetime
 from glob import glob
+from requests import get
+from requests.exceptions import RequestException
 try:
   from collections import OrderedDict
 except ImportError:
@@ -72,6 +71,12 @@ class NoRemoteSync:
   def syncToRemote(self, p, spec):
     pass
 
+class CurlError(Exception):
+  def __init__(self, rv):
+    self.rv = rv
+  def __str__(self):
+    return "curl execution returned %d" % self.rv
+
 class HttpRemoteSync:
   def __init__(self, remoteStore, architecture, workdir, insecure):
     self.remoteStore = remoteStore
@@ -79,8 +84,52 @@ class HttpRemoteSync:
     self.architecture = architecture
     self.workdir = workdir
     self.insecure = insecure
+    self.httpTimeoutSec = 15
+    self.httpConnRetries = 4
+    self.httpBackoff = 0.4
+    self.doneOrFailed = []
+
+  def getRetry(self, url, dest=None):
+    for i in range(0, self.httpConnRetries):
+      if i > 0:
+        pauseSec = self.httpBackoff * (2 ** (i - 1))
+        debug("GET {url} failed: retrying in {pause}s".format(url=url, pause=pauseSec))
+        time.sleep(pauseSec)
+      try:
+        debug("GET {url}: processing (attempt {att}/{tot})".format(
+          url=url, att=i+1, tot=self.httpConnRetries))
+        if dest:
+          # Destination specified. Use curl from command line
+          curlCmd = ("curl {insecure} -f --connect-timeout {timeout} " +
+                     "--progress-bar -Lo {dest}.tmp {url}").format(
+                       insecure="-k" if self.insecure else "",
+                       timeout=self.httpTimeoutSec,
+                       dest=dest,
+                       url=url)
+          try:
+            unlink(dest+".tmp")  # remove old temp file first
+          except:
+            pass
+          rv = execute(curlCmd)
+          if rv != 0:
+            raise CurlError(rv)
+          os.rename(dest+".tmp", dest)  # we should not have errors here
+          return True
+        else:
+          # No destination specified: JSON request
+          resp = get(url, verify=not self.insecure, timeout=self.httpTimeoutSec)
+          resp.raise_for_status()
+          return resp.json()
+      except (RequestException,ValueError,CurlError) as e:
+        if i == self.httpConnRetries-1:
+          error("GET {url} failed: {error}".format(url=url, error=str(e)))
+    return None
 
   def syncToLocal(self, p, spec):
+    if spec["hash"] in self.doneOrFailed:
+      debug("Will not redownload {pkg} with build hash {sha}".format(pkg=p, sha=spec["hash"]))
+      return
+
     debug("Updating remote store for package %s@%s" % (p, spec["hash"]))
     hashListUrl = format("%(rs)s/%(sp)s/",
                         rs=self.remoteStore,
@@ -88,21 +137,15 @@ class HttpRemoteSync:
     pkgListUrl = format("%(rs)s/%(sp)s/",
                         rs=self.remoteStore,
                         sp=spec["linksPath"])
-    hashList = []
-    pkgList = []
-    try:
-      if self.insecure:
-        context = ssl._create_unverified_context()
-        hashList = json.loads(urlopen(hashListUrl, context=context).read())
-        pkgList = json.loads(urlopen(pkgListUrl, context=context).read())
-      else:
-        hashList = json.loads(urlopen(hashListUrl).read())
-        pkgList = json.loads(urlopen(pkgListUrl).read())
-    except URLError as e:
-      debug("Cannot find precompiled package for %s@%s" % (p, spec["hash"]))
-    except Exception as e:
-      info(e)
-      error("Unknown response from server")
+
+    hashList = self.getRetry(hashListUrl)
+    pkgList = None
+    if hashList is not None:
+      pkgList = self.getRetry(pkgListUrl)
+    if pkgList is None or hashList is None:
+      error("Cannot download cached {pkg} with build hash {sha}".format(pkg=p, sha=spec["hash"]))
+      self.doneOrFailed.append(spec["hash"])
+      return
 
     cmd = format("mkdir -p %(hd)s && "
                  "mkdir -p %(ld)s",
@@ -111,18 +154,20 @@ class HttpRemoteSync:
     execute(cmd)
     hashList = [x["name"] for x in hashList]
 
+    hasErr = False
     for pkg in hashList:
-      cmd = format("curl %(i)s -o %(hd)s/%(n)s -L %(rs)s/%(sp)s/%(n)s\n",
-                   i="-k" if self.insecure else "",
-                   n=pkg,
-                   sp=spec["storePath"],
-                   rs=self.remoteStore,
-                   hd=spec["tarballHashDir"])
-      debug(cmd)
-      execute(cmd)
+      destPath = os.path.join(spec["tarballHashDir"], pkg)
+      if os.path.isfile(destPath):
+        # Do not redownload twice
+        continue
+      srcUrl = "{remoteStore}/{storePath}/{pkg}".format(
+        remoteStore=self.remoteStore, storePath=spec["storePath"], pkg=pkg)
+      if self.getRetry(srcUrl, destPath) != True:
+        hasErr = True
+
     for pkg in pkgList:
       if pkg["name"] in hashList:
-        cmd = format("ln -sf ../../%(a)s/store/%(sh)s/%(h)s/%(n)s %(ld)s/%(n)s\n",
+        cmd = format("ln -nsf ../../%(a)s/store/%(sh)s/%(h)s/%(n)s %(ld)s/%(n)s\n",
                      a = self.architecture,
                      h = spec["hash"],
                      sh = spec["hash"][0:2],
@@ -130,10 +175,13 @@ class HttpRemoteSync:
                      ld = spec["tarballLinkDir"])
         execute(cmd)
       else:
-        cmd = format("ln -s unknown %(ld)s/%(n)s 2>/dev/null || true\n",
+        cmd = format("ln -nsf unknown %(ld)s/%(n)s\n",
                      ld = spec["tarballLinkDir"],
                      n = pkg["name"])
         execute(cmd)
+
+    if not hasErr:
+      self.doneOrFailed.append(spec["hash"])
 
   def syncToRemote(self, p, spec):
     return
