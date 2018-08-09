@@ -252,7 +252,31 @@ class BuildTestCase(unittest.TestCase):
     syncers = [NoRemoteSync(),
                HttpRemoteSync(remoteStore="https://local/test", architecture="osx_x86-64", workdir="/sw", insecure=False),
                RsyncRemoteSync(remoteStore="ssh://local/test", writeStore="ssh://local/test", architecture="osx_x86-64", workdir="/sw", rsyncOptions="")]
-    dummy_spec = {"package": "zlib", "version": "v1.2.3", "revision": "1", "hash": "deadbeef", "storePath": "/sw/path", "linksPath": "/sw/links", "tarballHashDir": "/sw/TARS", "tarballLinkDir": "/sw/TARS"}
+    dummy_spec = { "package"        : "zlib",
+                   "version"        : "v1.2.3",
+                   "revision"       : "1",
+                   "hash"           : "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
+                   "storePath"      : "/sw/path",
+                   "linksPath"      : "/sw/links",
+                   "tarballHashDir" : "/sw/TARS",
+                   "tarballLinkDir" : "/sw/TARS" }
+
+    class mockRequest:
+      def __init__(self, j):
+        self.j = j
+      def raise_for_status(self):
+        return True
+      def json(self):
+        return self.j
+
+    def mockGet(url, *a, **b):
+      if dummy_spec["storePath"] in url:
+        return mockRequest([{ "name": "zlib-v1.2.3-1.slc7_x86-64.tar.gz" }])
+      else:
+        return mockRequest([{ "name":"zlib-v1.2.3-1.slc7_x86-64.tar.gz" },
+                            { "name":"zlib-v1.2.3-2.slc7_x86-64.tar.gz" }])
+    mock_get.side_effect = mockGet
+
     for x in syncers:
       x.syncToLocal("zlib", dummy_spec)
       x.syncToRemote("zlib", dummy_spec)
