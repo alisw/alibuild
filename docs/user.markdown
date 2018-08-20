@@ -66,23 +66,40 @@ For a quick start introduction, please look [here](./quick.html).
       --fetch-repos, -u     Fetch repository updates
 
 
-## Speedup build process by using a build store
+## Using precompiled packages
 
-In order to avoid rebuilding packages every single time we start from scratch,
-aliBuild supports the concept of an object store where already built tarballs
-are kept. This means that if it notices that a recipe being built has the same
-hash of one of the tarballs in the store, it will fetch it, unpack, and
-relocate it as required.
+By running aliBuild with no special option on CC7, it will automatically try to
+use as many precompiled packages as possible by downloading them from a default
+central server. By using precompiled packages you lose the ability to pick some
+of them from your system. If you do not want to use precompiled packages and you
+want to pick as many packages as possible from your system, you should manually
+specify the `--always-prefer-system` option.
 
-In order to specify the object store you can use the option `--remote-store <uri>`
-where `<uri>` is either a file path, or in the for
-`ssh://<hostname>:<path>`. Notice the latter will use ssh to connect to the
-host, therefore you must make sure you have access to `<hostname>`.
+It is possible to benefit from precompiled builds on every platform, provided
+that the server caching the builds is maintained by yourself. Since every build
+is stored as a tarball with a unique hash, it is sufficient to provide for a
+server or shared space where cached builds will be stored and made available to
+others.
 
-If you have write access to the store, you can upload tarballs by specifying
-`--write-store <uri>` or by adding `::rw` to the `--remote-store` uri.
+In order to specify the cache store, use the option `--remote-store <uri>`,
+where `<uri>` can be:
 
-Support for web based repository is foreseen, but not yet implemented.
+* a local path, for instance `/opt/alibuild_cache`,
+* a remote SSH accessible path, `ssh://<host>:<path>`,
+* an unencrypted rsync path, `rsync://<host>/path`,
+* a HTTP(s) server, `http://<host>/<path>`.
+
+The first three options can also be writable (if you have proper permissions):
+if you specify `::rw` at the end of the URL, your builds will be cached there.
+This is normally what sysadmins do to precache builds: other users can simply
+use the same URL in read-only mode (no `::rw` specified) to fetch the builds.
+
+You need to make sure you have proper filesystem/SSH/rsync permissions of
+course.
+
+It is also possible to specify a write store different from the read one by
+using the `--write-store` option.
+
 
 ## Developing packages locally
 
