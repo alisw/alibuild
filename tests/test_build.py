@@ -264,12 +264,15 @@ class BuildTestCase(unittest.TestCase):
     class mockRequest:
       def __init__(self, j):
         self.j = j
+        self.status_code = 200 if j else 404
       def raise_for_status(self):
         return True
       def json(self):
         return self.j
 
     def mockGet(url, *a, **b):
+      if "triggers_a_404" in url:
+        return mockRequest(None)
       if dummy_spec["storePath"] in url:
         return mockRequest([{ "name": "zlib-v1.2.3-1.slc7_x86-64.tar.gz" }])
       else:
@@ -281,6 +284,9 @@ class BuildTestCase(unittest.TestCase):
       x.syncToLocal("zlib", dummy_spec)
       x.syncToRemote("zlib", dummy_spec)
 
+    dummy_spec["storePath"] = "/triggers_a_404/path"
+    for x in syncers:
+      x.syncToLocal("zlib", dummy_spec)
 
 if __name__ == '__main__':
   unittest.main()
