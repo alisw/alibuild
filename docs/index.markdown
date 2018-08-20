@@ -53,7 +53,7 @@ package your own software.
       aliBuild provides the ability to reuse binary packages which were
       previously centrally built, when they match the one that would be
       built locally.
-      <br/><a href="user.html#speedup-build-process-by-using-a-build-store">Read more</a>
+      <br/><a href="user.html#using-precompiled-packages">Read more</a>
     </div>
     <div class="pure-u-1-3"><h3>Developer mode</h3>
       Besides building and packaging your dependencies, aliBuild
