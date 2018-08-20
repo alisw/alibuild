@@ -243,6 +243,13 @@ def finaliseArgs(args, parser, star):
 
   if args.action == "build":
     args.configDir = format(args.configDir, prefix="")
+
+    # On selected platforms, caching is active by default
+    if args.architecture == "slc7_x86-64" and not args.preferSystem:
+      args.noSystem = True
+      if not args.remoteStore:
+        args.remoteStore = "https://alicache.cern.ch/"
+
     if args.remoteStore or args.writeStore:
       args.noSystem = True
 
