@@ -118,6 +118,9 @@ class HttpRemoteSync:
         else:
           # No destination specified: JSON request
           resp = get(url, verify=not self.insecure, timeout=self.httpTimeoutSec)
+          if resp.status_code == 404:
+            # No need to retry any further
+            return None
           resp.raise_for_status()
           return resp.json()
       except (RequestException,ValueError,CurlError) as e:
