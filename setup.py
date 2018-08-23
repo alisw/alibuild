@@ -20,7 +20,11 @@ install_conditional = []
 try:
   from collections import OrderedDict
 except ImportError:
-  install_conditional = [ "ordereddict" ]
+  install_conditional += [ "ordereddict" ]
+try:
+  import argparse
+except ImportError:
+  install_conditional += [ "argparse" ]
 
 setup(
     name='alibuild',
@@ -82,7 +86,7 @@ setup(
     # your project is installed. For an analysis of "install_requires" vs pip's
     # requirements files see:
     # https://packaging.python.org/en/latest/requirements.html
-    install_requires=['pyyaml','argparse'] + install_conditional,
+    install_requires=['pyyaml'] + install_conditional,
 
     # List additional groups of dependencies here (e.g. development
     # dependencies). You can install these using the following syntax,
