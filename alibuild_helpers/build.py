@@ -904,6 +904,7 @@ def doBuild(args, parser):
                  environment=environment,
                  workDir=workDir,
                  configDir=abspath(args.configDir),
+                 common_recipe=spec.get("common_recipe",""),
                  incremental_recipe=spec.get("incremental_recipe", ":"),
                  sourceDir=source and (dirname(source) + "/") or "",
                  sourceName=source and basename(source) or "",
