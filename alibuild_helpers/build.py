@@ -156,7 +156,7 @@ class HttpRemoteSync:
     if hashList is not None:
       pkgList = self.getRetry(pkgListUrl)
     if pkgList is None or hashList is None:
-      error("Cannot download cached %s with build hash %s" % (p, spec["hash"]))
+      warning("%s (%s) not fetched: have you tried updating the recipes?" % (p, spec["hash"]))
       self.doneOrFailed.append(spec["hash"])
       return
 

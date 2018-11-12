@@ -249,8 +249,9 @@ class BuildTestCase(unittest.TestCase):
   @patch("alibuild_helpers.build.getstatusoutput")
   @patch("alibuild_helpers.build.os")
   @patch("alibuild_helpers.build.dieOnError")
+  @patch("alibuild_helpers.build.warning")
   @patch("alibuild_helpers.build.error")
-  def test_coverSyncs(self, mock_error, mock_die, mock_os, mock_getstatusoutput, mock_execute, mock_get, mock_open):
+  def test_coverSyncs(self, mock_error, mock_warning, mock_die, mock_os, mock_getstatusoutput, mock_execute, mock_get, mock_open):
     syncers = [NoRemoteSync(),
                HttpRemoteSync(remoteStore="https://local/test", architecture="osx_x86-64", workdir="/sw", insecure=False),
                RsyncRemoteSync(remoteStore="ssh://local/test", writeStore="ssh://local/test", architecture="osx_x86-64", workdir="/sw", rsyncOptions="")]
