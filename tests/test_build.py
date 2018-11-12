@@ -14,6 +14,7 @@ except ImportError:
 from alibuild_helpers.build import doBuild, HttpRemoteSync, RsyncRemoteSync, NoRemoteSync
 from alibuild_helpers.analytics import decideAnalytics, askForAnalytics, report_screenview, report_exception, report_event
 from argparse import Namespace
+from io import BytesIO
 import sys
 import os
 import os.path
@@ -242,47 +243,66 @@ class BuildTestCase(unittest.TestCase):
     self.assertEqual(mock_git_clone.call_count, 1, "Expected only one call to git clone (called %d times instead)" % mock_git_clone.call_count)
     self.assertEqual(mock_git_fetch.call_count, 1, "Expected only one call to git fetch (called %d times instead)" % mock_git_fetch.call_count)
 
+  @patch("alibuild_helpers.build.open")
   @patch("alibuild_helpers.build.get")
   @patch("alibuild_helpers.build.execute")
   @patch("alibuild_helpers.build.getstatusoutput")
-  @patch("alibuild_helpers.build.sys")
+  @patch("alibuild_helpers.build.os")
   @patch("alibuild_helpers.build.dieOnError")
   @patch("alibuild_helpers.build.error")
-  def test_coverSyncs(self, mock_error, mock_die, mock_sys, mock_getstatusoutput, mock_execute, mock_get):
+  def test_coverSyncs(self, mock_error, mock_die, mock_os, mock_getstatusoutput, mock_execute, mock_get, mock_open):
     syncers = [NoRemoteSync(),
                HttpRemoteSync(remoteStore="https://local/test", architecture="osx_x86-64", workdir="/sw", insecure=False),
                RsyncRemoteSync(remoteStore="ssh://local/test", writeStore="ssh://local/test", architecture="osx_x86-64", workdir="/sw", rsyncOptions="")]
     dummy_spec = { "package"        : "zlib",
                    "version"        : "v1.2.3",
                    "revision"       : "1",
-                   "hash"           : "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
                    "storePath"      : "/sw/path",
                    "linksPath"      : "/sw/links",
                    "tarballHashDir" : "/sw/TARS",
                    "tarballLinkDir" : "/sw/TARS" }
 
     class mockRequest:
-      def __init__(self, j):
+      def __init__(self, j, simulate_err=False):
         self.j = j
+        self.simulate_err = simulate_err
         self.status_code = 200 if j else 404
+        self._bytes_left = 123456
+        self.headers = { 'content-length': str(self._bytes_left) }
       def raise_for_status(self):
         return True
       def json(self):
         return self.j
+      def iter_content(self, chunk_size=10):
+        content = []
+        if self.simulate_err:
+          return content
+        while self._bytes_left > 0:
+          toread = min(chunk_size, self._bytes_left)
+          content.append(b'x'*toread)
+          self._bytes_left -= toread
+        return content
 
     def mockGet(url, *a, **b):
       if "triggers_a_404" in url:
         return mockRequest(None)
       if dummy_spec["storePath"] in url:
-        return mockRequest([{ "name": "zlib-v1.2.3-1.slc7_x86-64.tar.gz" }])
+        if dummy_spec["hash"].startswith("deadbeef"):
+          return mockRequest([{ "name": "zlib-v1.2.3-1.slc7_x86-64.tar.gz" }])
+        elif dummy_spec["hash"].startswith("baadf00d"):
+          return mockRequest([{ "name": "zlib-v1.2.3-2.slc7_x86-64.tar.gz" }], simulate_err=True)
       else:
         return mockRequest([{ "name":"zlib-v1.2.3-1.slc7_x86-64.tar.gz" },
                             { "name":"zlib-v1.2.3-2.slc7_x86-64.tar.gz" }])
     mock_get.side_effect = mockGet
+    mock_open.side_effect = lambda fn,fmode: BytesIO()
+    mock_os.path.isfile.side_effect = lambda x: False  # file does not exist locally: force download
 
-    for x in syncers:
-      x.syncToLocal("zlib", dummy_spec)
-      x.syncToRemote("zlib", dummy_spec)
+    for testHash in [ "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef", "baadf00dbaadf00dbaadf00dbaadf00dbaadf00d" ]:
+      dummy_spec["hash"] = testHash
+      for x in syncers:
+        x.syncToLocal("zlib", dummy_spec)
+        x.syncToRemote("zlib", dummy_spec)
 
     dummy_spec["storePath"] = "/triggers_a_404/path"
     for x in syncers:

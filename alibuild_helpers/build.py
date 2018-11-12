@@ -76,7 +76,7 @@ class PartialDownloadError(Exception):
     self.downloaded = downloaded
     self.size = size
   def __str__(self):
-    return "only %d out of %d bytes downloaded" % (downloaded, size)
+    return "only %d out of %d bytes downloaded" % (self.downloaded, self.size)
 
 class HttpRemoteSync:
   def __init__(self, remoteStore, architecture, workdir, insecure):
@@ -116,7 +116,7 @@ class HttpRemoteSync:
                   elif now - reportTime > 3:
                     debug("%.0f%% downloaded..." % (100*downloaded/size))
                     reportTime = now
-          if size != -1 and downloaded != size:
+          if size not in [ downloaded, -1 ]:
             raise PartialDownloadError(downloaded, size)
           os.rename(dest+".tmp", dest)  # we should not have errors here
           return True
