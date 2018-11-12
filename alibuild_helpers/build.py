@@ -71,11 +71,12 @@ class NoRemoteSync:
   def syncToRemote(self, p, spec):
     pass
 
-class CurlError(Exception):
-  def __init__(self, rv):
-    self.rv = rv
+class PartialDownloadError(Exception):
+  def __init__(self, downloaded, size):
+    self.downloaded = downloaded
+    self.size = size
   def __str__(self):
-    return "curl execution returned %d" % self.rv
+    return "only %d out of %d bytes downloaded" % (downloaded, size)
 
 class HttpRemoteSync:
   def __init__(self, remoteStore, architecture, workdir, insecure):
@@ -98,20 +99,25 @@ class HttpRemoteSync:
       try:
         debug("GET %s: processing (attempt %d/%d)" % (url, i+1, self.httpConnRetries))
         if dest:
-          # Destination specified. Use curl from command line
-          curlCmd = ("curl {insecure} -f --connect-timeout {timeout} " +
-                     "--progress-bar -Lo {dest}.tmp {url}").format(
-                       insecure="-k" if self.insecure else "",
-                       timeout=self.httpTimeoutSec,
-                       dest=dest,
-                       url=url)
-          try:
-            unlink(dest+".tmp")  # remove old temp file first
-          except:
-            pass
-          rv = execute(curlCmd)
-          if rv != 0:
-            raise CurlError(rv)
+          # Destination specified. Use requests in stream mode
+          resp = get(url, stream=True, verify=not self.insecure, timeout=self.httpTimeoutSec)
+          size = int(resp.headers.get("content-length", "-1"))
+          downloaded = 0
+          reportTime = time.time()
+          with open(dest+".tmp", "wb") as destFp:
+            for chunk in resp.iter_content(chunk_size=32768):
+              if chunk:
+                destFp.write(chunk)
+                downloaded += len(chunk)
+                if size != -1:
+                  now = time.time()
+                  if downloaded == size:
+                    debug("Download complete")
+                  elif now - reportTime > 3:
+                    debug("%.0f%% downloaded..." % (100*downloaded/size))
+                    reportTime = now
+          if size != -1 and downloaded != size:
+            raise PartialDownloadError(downloaded, size)
           os.rename(dest+".tmp", dest)  # we should not have errors here
           return True
         else:
@@ -122,9 +128,14 @@ class HttpRemoteSync:
             return None
           resp.raise_for_status()
           return resp.json()
-      except (RequestException,ValueError,CurlError) as e:
+      except (RequestException,ValueError,PartialDownloadError) as e:
         if i == self.httpConnRetries-1:
           error("GET %s failed: %s" % (url, str(e)))
+        if dest:
+          try:
+            unlink(dest+".tmp")
+          except:
+            pass
     return None
 
   def syncToLocal(self, p, spec):
