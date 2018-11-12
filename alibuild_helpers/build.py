@@ -93,11 +93,10 @@ class HttpRemoteSync:
     for i in range(0, self.httpConnRetries):
       if i > 0:
         pauseSec = self.httpBackoff * (2 ** (i - 1))
-        debug("GET {url} failed: retrying in {pause}s".format(url=url, pause=pauseSec))
+        debug("GET %s failed: retrying in %.2f" % (url, pauseSec))
         time.sleep(pauseSec)
       try:
-        debug("GET {url}: processing (attempt {att}/{tot})".format(
-          url=url, att=i+1, tot=self.httpConnRetries))
+        debug("GET %s: processing (attempt %d/%d)" % (url, i+1, self.httpConnRetries))
         if dest:
           # Destination specified. Use curl from command line
           curlCmd = ("curl {insecure} -f --connect-timeout {timeout} " +
@@ -125,12 +124,12 @@ class HttpRemoteSync:
           return resp.json()
       except (RequestException,ValueError,CurlError) as e:
         if i == self.httpConnRetries-1:
-          error("GET {url} failed: {error}".format(url=url, error=str(e)))
+          error("GET %s failed: %s" % (url, str(e)))
     return None
 
   def syncToLocal(self, p, spec):
     if spec["hash"] in self.doneOrFailed:
-      debug("Will not redownload {pkg} with build hash {sha}".format(pkg=p, sha=spec["hash"]))
+      debug("Will not redownload %s with build hash %s" % (p, spec["hash"]))
       return
 
     debug("Updating remote store for package %s@%s" % (p, spec["hash"]))
@@ -146,7 +145,7 @@ class HttpRemoteSync:
     if hashList is not None:
       pkgList = self.getRetry(pkgListUrl)
     if pkgList is None or hashList is None:
-      error("Cannot download cached {pkg} with build hash {sha}".format(pkg=p, sha=spec["hash"]))
+      error("Cannot download cached %s with build hash %s" % (p, spec["hash"]))
       self.doneOrFailed.append(spec["hash"])
       return
 
