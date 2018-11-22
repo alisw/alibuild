@@ -98,8 +98,8 @@ def doInit(args):
 
     # Make it point relatively to the mirrors for relocation: as per Git specifics, the path has to
     # be relative to the repository's `.git` directory. Don't do it if no common path is found
-    repoObjects = os.path.join(os.path.abspath(dest), ".git", "objects")
-    refObjects = os.path.join(os.path.abspath(args.referenceSources),
+    repoObjects = os.path.join(os.path.realpath(dest), ".git", "objects")
+    refObjects = os.path.join(os.path.realpath(args.referenceSources),
                               spec["package"].lower(), "objects")
     repoAltConf = os.path.join(repoObjects, "info", "alternates")
     if len(os.path.commonprefix([repoObjects, refObjects])) > 1:
