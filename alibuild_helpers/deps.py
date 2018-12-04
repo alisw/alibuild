@@ -87,9 +87,9 @@ def doDeps(args, parser):
   dot += "}\n"
 
   if args.outdot:
-    fp = open(args.outdot, "w")
+    fp = open(args.outdot, "wt")
   else:
-    fp = NamedTemporaryFile(delete=False)
+    fp = NamedTemporaryFile(delete=False, mode="wt")
   fp.write(dot)
   fp.close()
 
