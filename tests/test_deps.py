@@ -75,5 +75,9 @@ class DepsTestCase(unittest.TestCase):
 
     doDeps(args, MagicMock())
 
+    # Same check without explicit intermediate dotfile
+    args.outdot = None
+    doDeps(args, MagicMock())
+
 if __name__ == '__main__':
   unittest.main()
