@@ -145,6 +145,22 @@ export ${BIGPKGNAME}_HASH=$PKGHASH
 export ${BIGPKGNAME}_COMMIT=${COMMIT_HASH}
 EOF
 
+# Add support for direnv https://github.com/direnv/direnv/
+#
+# This is beneficial for all the cases where the build step requires some
+# environment to be properly setup in order to work. e.g. to support ninja or
+# protoc.
+cat << EOF > $BUILDDIR/.envrc
+# Source the build environment which was used for this package
+WORK_DIR=$WORK_DIR source ../../../$PKGPATH/etc/profile.d/init.sh
+
+# On mac we build with the proper installation relative RPATH,
+# so this is not actually used and it's actually harmful since
+# startup time is reduced a lot by the extra overhead from the 
+# dynamic loader
+unset DYLD_LIBRARY_PATH
+EOF
+
 # Environment
 %(environment)s
 
