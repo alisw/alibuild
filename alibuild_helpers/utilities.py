@@ -309,7 +309,12 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
     # If --always-prefer-system is passed or if prefer_system is set to true
     # inside the recipe, use the script specified in the prefer_system_check
     # stanza to see if we can use the system version of the package.
-    if not noSystem and (preferSystem or re.match(spec.get("prefer_system", "(?!.*)"), architecture)):
+    systemRE = spec.get("prefer_system", "(?!.*)")
+    try:
+      systemREMatches = re.match(systemRE, architecture)
+    except TypeError as e:
+      dieOnError(True, "Malformed entry prefer_system: %s in %s" % (systemRE, spec["package"]))
+    if not noSystem and (preferSystem or systemREMatches):
       cmd = spec.get("prefer_system_check", "false").strip()
       if not spec["package"] in testCache:
         testCache[spec["package"]] = performPreferCheck(spec, cmd.strip())

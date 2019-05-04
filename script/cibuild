@@ -25,6 +25,7 @@ time coverage run -a alibuild/aliBuild -c alibuild/tests/testdist build broken3 
 time coverage run -a alibuild/aliBuild -c alibuild/tests/testdist build broken4 --no-system --disable GCC-Toolchain 2>&1 | grep "Malformed header"
 time coverage run -a alibuild/aliBuild -c alibuild/tests/testdist build broken5 --no-system --disable GCC-Toolchain 2>&1 | grep "Missing package"
 time coverage run -a alibuild/aliBuild -c alibuild/tests/testdist build broken6 --no-system --disable GCC-Toolchain 2>&1 | grep scanning
+time coverage run -a alibuild/aliBuild -c alibuild/tests/testdist build broken7 --no-system --disable GCC-Toolchain 2>&1 | grep "Malformed entry prefer_system"
 time coverage run -a alibuild/aliBuild build zlib --no-system --disable GCC-Toolchain
 alibuild/alienv q
 alibuild/alienv setenv zlib/latest -c bash -c '[[ $LD_LIBRARY_PATH == */zlib/* ]]'
