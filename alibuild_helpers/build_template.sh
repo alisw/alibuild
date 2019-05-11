@@ -153,6 +153,7 @@ EOF
 cat << EOF > $BUILDDIR/.envrc
 # Source the build environment which was used for this package
 WORK_DIR=$WORK_DIR source ../../../$PKGPATH/etc/profile.d/init.sh
+source_up
 
 # On mac we build with the proper installation relative RPATH,
 # so this is not actually used and it's actually harmful since
