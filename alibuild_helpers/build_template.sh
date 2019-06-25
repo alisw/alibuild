@@ -190,7 +190,7 @@ fi
 # Find libraries and executables needing relocation on macOS
 if [[ ${ARCHITECTURE:0:3} == "osx" ]]; then
 
-  /usr/bin/find ${RELOCATE_PATHS:-bin lib lib64} -type f -a -not -name '*.py' -a -not -name '*.pyc' -a -not -name '*.h' -not -name '*.js' -not -name '*.txt' -not -name '*.dat' -not -name '*.sav' -not -name '*.wav' -not -name '*.png' -not -name '*.css' -not -name '*.cc' | \
+  /usr/bin/find ${RELOCATE_PATHS:-bin lib lib64} -type f -not -name '*.py' -not -name '*.pyc' -not -name '*.h' -not -name '*.js' -not -name '*.txt' -not -name '*.dat' -not -name '*.sav' -not -name '*.wav' -not -name '*.png' -not -name '*.css' -not -name '*.cc' | \
   while read BIN; do
     MACHOTYPE=$(set +o pipefail; otool -h "$PWD/$BIN" 2> /dev/null | grep filetype -A1 | awk 'END{print $5}')
 
