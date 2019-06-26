@@ -190,9 +190,9 @@ fi
 # Find libraries and executables needing relocation on macOS
 if [[ ${ARCHITECTURE:0:3} == "osx" ]]; then
 
-  /usr/bin/find ${RELOCATE_PATHS:-bin lib lib64} -type f | \
+  /usr/bin/find ${RELOCATE_PATHS:-bin lib lib64} -type f -not -name '*.py' -not -name '*.pyc' -not -name '*.h' -not -name '*.js' -not -name '*.txt' -not -name '*.dat' -not -name '*.sav' -not -name '*.wav' -not -name '*.png' -not -name '*.css' -not -name '*.cc' | \
   while read BIN; do
-    MACHOTYPE=$(set +o pipefail; otool -h "$PWD/$BIN" 2> /dev/null | grep filetype -A1 | tail -n1 | awk '{print $5}')
+    MACHOTYPE=$(set +o pipefail; otool -h "$PWD/$BIN" 2> /dev/null | grep filetype -A1 | awk 'END{print $5}')
 
     # See mach-o/loader.h from XNU sources: 2 == executable, 6 == dylib
     if [[ $MACHOTYPE == 6 ]]; then
