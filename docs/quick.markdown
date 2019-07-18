@@ -5,20 +5,32 @@ layout: main
 ---
 
 aliBuild is a tool to simplify building and installing ALICE / ALFA
-software. The tool itself is available as a standard PyPi package. You
+software. This is a quickstart Guide which will show you how to build
+and use a package, for extended documentation please have a look at the
+[user guide](user.html).
+
+## Setting up
+
+The tool itself is available as a standard PyPi package. You
 can install it via:
 
     pip install alibuild
 
-Alternatively you can checkout the github repository and use it from
-there:
+Alternatively, if you cannot use pip, you can checkout the Github repository and
+use it from there:
 
     git clone https://github.com/alisw/alibuild.git
 
-This will provide you the tool itself. In order to work you will need a
-set of recipes from a repository called `alidist`:
+This will provide you the tool itself. 
 
-    git clone https://github.com/alisw/alidist.git
+In order to work you will need a set of recipes from a repository called
+[alidist](https://github.com/alisw/alidist.git). On the first invokation of
+`alibuild` the recipes will be downloaded and put in a `alidist` folder. 
+In case you need to use a special branch / repository you can always `git clone` 
+the repository yourself. By default alibuild will pickup the recipes found
+in `$PWD/alidist`.
+
+## Building a package
 
 Once you have obtained both repository, you can trigger a build via:
 
@@ -36,7 +48,10 @@ Once you have obtained both repository, you can trigger a build via:
   building where possible (defaults to the number of CPUs available if
   omitted).
 
-### Results of a build
+If you need to modify the compile options, you can do so by looking at the
+recipes in your local `alidist` folder and amend them.
+
+## Results of a build
 
 By default (can be changed using the `-c` option) the installation of your builds
 can be found in:
@@ -51,55 +66,25 @@ where:
 - `<package-revision>`: is the number of times you rebuilt the same version of
   a package, using a different recipe. In general this will be 1.
 
-For example:
+For example, on Centos7:
 
-    sw/slc7_x86-64/AliRoot/v5-07-01-1
+    sw/slc7_x86-64/AliRoot/v6-16-01-1
 
-we call this path "the `PACKAGE_ROOT` for package `<package>`".
+## Using the built package
 
+Environment for packages built using aliBuild is managed by [Environment
+Modules](http://modules.sourceforge.net) and a wrapper script called alienv.
+Notice you will need the package `environment-modules` on Linux or `modules` on
+macOS for the following to work.
 
-## Loading the package environment
+Assuming you are in the toplevel directory containing `alibuild`, `alidist` and
+`sw` you can do:
 
-Environment for packages built using aliBuild is managed by
-[Environment Modules](http://modules.sourceforge.net). Assuming you are in the
-toplevel directory containing `alibuild`, `alidist` and `sw` you can do:
-
-    alibuild/alienv q
+    alienv q
 
 to list the available packages, and:
 
-    alibuild/alienv enter VO_ALICE@PackageA::VersionA[,VO_ALICE@PackageB::VersionB...]
+    alienv enter VO_ALICE@PackageA::VersionA[,VO_ALICE@PackageB::VersionB...]
 
-to enter a shell with the appropriate environment set. Note that loading a
-toplevel package recursively sets the environment for all its dependencies.
-
-You can also execute a command with the proper environment without altering the
-current one. For instance:
-
-    alibuild/alienv setenv VO_ALICE@AliRoot::latest -c aliroot -b
-
-To see other commands consult the online manual:
-
-    alibuild/alienv help
-
-Environment Modules is required: the package is usually called
-`environment-modules` on Linux, or simply `modules` if using Homebrew on OSX.
-
-Note that `alienv` works exactly like the one found on CVMFS, but for local
-packages built with `aliBuild`.
-
-
-### Environment for packages lacking a module definition
-
-Some packages do not have a modulefile: this usually occurs for those which are
-not distributed on the Grid. If you think this is wrong feel free to submit a
-[pull request](https://github.com/alisw/alidist/pulls) or
-[open an issue](https://github.com/alisw/alidist/issues) to the relevant
-packages.
-
-It is still possible to load the environment by sourcing the `init.sh` file
-produced for each package under the `etc/profile.d` subdirectory. For instance:
-
-    WORK_DIR=$PWD/sw source sw/slc7_x86-64/AliRoot/v5-08-02-1/etc/profile.d/init.sh
-
-Dependencies are automatically loaded.
+to enter a shell with the appropriate environment set. To learn more about alienv you
+can also look at the [user guide](user.html).
