@@ -87,4 +87,4 @@ to list the available packages, and:
     alienv enter VO_ALICE@PackageA::VersionA[,VO_ALICE@PackageB::VersionB...]
 
 to enter a shell with the appropriate environment set. To learn more about alienv you
-can also look at the [user guide](user.html).
+can also look at the [user guide](user.html#using-the-packages-you-have-built).
