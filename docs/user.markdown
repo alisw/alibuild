@@ -321,3 +321,50 @@ you may want to use:
     aliDeps O2 --defaults o2 --no-system --outgraph graph.pdf
 
 Please run `aliDeps --help` for further information.
+
+## Using the packages you have built
+
+### Loading the package environment
+
+Environment for packages built using aliBuild is managed by
+[Environment Modules](http://modules.sourceforge.net) and the wrapper script
+`alienv`. To list the available packages you can do:
+
+    alienv q
+
+while:
+
+    alienv enter VO_ALICE@PackageA::VersionA[,VO_ALICE@PackageB::VersionB...]
+
+will enter a shell with the appropriate environment set. Note that loading a
+toplevel package recursively sets the environment for all its dependencies.
+
+You can also execute a command with the proper environment without altering the
+current one. For instance:
+
+    alienv setenv VO_ALICE@AliRoot::latest -c aliroot -b
+
+To see other commands consult the online manual:
+
+    alienv help
+
+Environment Modules is required: the package is usually called
+`environment-modules` on Linux, or simply `modules` if using Homebrew on OSX.
+
+Note that `alienv` works exactly like the one found on CVMFS, but for local
+packages built with `aliBuild`.
+
+### Environment for packages lacking a module definition
+
+Some packages do not have a modulefile: this usually occurs for those which are
+not distributed on the Grid. If you think this is wrong feel free to submit a
+[pull request](https://github.com/alisw/alidist/pulls) or
+[open an issue](https://github.com/alisw/alidist/issues) to the relevant
+packages.
+
+It is still possible to load the environment by sourcing the `init.sh` file
+produced for each package under the `etc/profile.d` subdirectory. For instance:
+
+    WORK_DIR=$PWD/sw source sw/slc7_x86-64/AliRoot/v5-08-02-1/etc/profile.d/init.sh
+
+Dependencies are automatically loaded.
