@@ -276,6 +276,14 @@ In case some yet to appear bug in alibuild will force us to rebuild a
 previously built area, this will be widely publicized and users will get a warning
 when running the command.
 
+You can also upgrade / install a specific version of alibuild by specifying it on the 
+command line. E.g.:
+
+    pip install alibuild=1.5.5.rc1
+    
+this is in particular required when you want to try out release candidates (rc) builds which
+are masked out by default.
+
 ## Rebuilding packages from branches instead of tags
 
 Generally, recipes specify a Git _tag_ name in the `tag:` field. In some cases,
