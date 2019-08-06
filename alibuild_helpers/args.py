@@ -109,6 +109,8 @@ def doParseArgs(star):
                       dest="develPrefix", default=argparse.SUPPRESS)
   build_parser.add_argument("--fetch-repos", "-u", dest="fetchRepos", default=False,
                             action="store_true", help="Fetch repository updates")
+  build_parser.add_argument("--force-old-devel-hash", dest="forceOldDevelHash", default=False,
+                            action="store_true", help="Do not consider dependencies which are development packages when deciding what to rebuild")
 
   group = build_parser.add_mutually_exclusive_group()
   group.add_argument("--always-prefer-system", dest="preferSystem", default=False,

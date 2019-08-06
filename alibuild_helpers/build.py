@@ -563,6 +563,16 @@ def doBuild(args, parser):
     spec.update(dict([(x, format(y, **pkgSpec)) for (x, y) in varSpecs]))
     spec["old_devel_hash"] = readHashFile(spec["buildDir"]+"/.build_succeeded")
 
+  # This we do to make sure that a package does not rebuild if
+  # a dependency which is development package changed.
+  if args.forceOldDevelHash:
+    for p in buildOrder:
+      if not "devel_hash" in spec:
+        continue
+      if not "old_devel_hash" in spec:
+        continue
+      spec["devel_hash"] = spec["old_devel_hash"][0:len(spec["devel_hash"])]
+
   # We recursively calculate the full set of requires "full_requires"
   # including build_requires and the subset of them which are needed at
   # runtime "full_runtime_requires".
