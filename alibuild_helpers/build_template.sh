@@ -75,13 +75,19 @@ fi
 # Reference statements
 %(referenceStatement)s
 
-if [[ ! "$SOURCE0" == '' && "${SOURCE0:0:1}" != "/" && ! -d "$SOURCEDIR" ]]; then
-  # In case there is a stale link / file, for whatever reason.
-  rm -rf $SOURCEDIR
-  git clone ${GIT_REFERENCE:+--reference $GIT_REFERENCE} "$SOURCE0" "$SOURCEDIR"
-  cd $SOURCEDIR
-  git checkout "${GIT_TAG}"
-  git remote set-url --push origin $WRITE_REPO
+if [[ ! "$SOURCE0" == '' && "${SOURCE0:0:1}" != "/" ]]; then
+  if [[ ! -d "$SOURCEDIR" ]]; then
+    # In case there is a stale link / file, for whatever reason.
+    rm -rf $SOURCEDIR
+    git clone ${GIT_REFERENCE:+--reference $GIT_REFERENCE} "$SOURCE0" "$SOURCEDIR"
+    cd $SOURCEDIR
+    git remote set-url --push origin $WRITE_REPO
+    git checkout "${GIT_TAG}"
+  else
+    # Folder is already present, but check that it is the right tag
+    cd $SOURCEDIR
+    git checkout "${GIT_TAG}"
+  fi
 elif [[ ! "$SOURCE0" == '' && "${SOURCE0:0:1}" == "/" ]]; then
   ln -snf $SOURCE0 $SOURCEDIR
 fi
@@ -157,7 +163,7 @@ source_up
 
 # On mac we build with the proper installation relative RPATH,
 # so this is not actually used and it's actually harmful since
-# startup time is reduced a lot by the extra overhead from the 
+# startup time is reduced a lot by the extra overhead from the
 # dynamic loader
 unset DYLD_LIBRARY_PATH
 EOF
