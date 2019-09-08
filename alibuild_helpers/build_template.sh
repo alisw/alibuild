@@ -89,6 +89,8 @@ fi
 mkdir -p "$SOURCEDIR"
 cd "$BUILDDIR"
 
+echo "Foo"
+
 # Actual build script, as defined in the recipe
 
 # This actually does the build, taking in to account shortcuts like
