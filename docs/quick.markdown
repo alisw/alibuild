@@ -71,6 +71,7 @@ For example, on Centos7:
     sw/slc7_x86-64/AliRoot/v6-16-01-1
 
 ## Using the built package
+{: #loading-the-package-environment}
 
 Environment for packages built using aliBuild is managed by [Environment
 Modules](http://modules.sourceforge.net) and a wrapper script called alienv.
