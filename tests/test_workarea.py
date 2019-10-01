@@ -40,7 +40,7 @@ def allow_git_clone(x, mock_git_clone, mock_git_fetch, **k):
   s = " ".join(x) if isinstance(x, list) else x
   if re.search("^git clone ", s):
     mock_git_clone()
-  elif re.search("&& git fetch --tags", s):
+  elif re.search("&& git fetch -f --tags", s):
     mock_git_fetch()
   return 0
 

@@ -122,7 +122,7 @@ def dummy_execute(x, mock_git_clone, mock_git_fetch, **kwds):
     return 0
   if re.search("^git clone --bare", s):
     mock_git_clone()
-  elif re.search("&& git fetch --tags", s):
+  elif re.search("&& git fetch -f --tags", s):
     mock_git_fetch()
     return 0
   return {
