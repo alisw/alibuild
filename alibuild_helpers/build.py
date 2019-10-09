@@ -1023,7 +1023,7 @@ def doBuild(args, parser):
       updatablePkgs.append(spec["package"])
 
     buildErrMsg = format("Error while executing %(sd)s/build.sh on `%(h)s'.\n"
-                         "Log can be found in %(w)s/BUILD/%(p)s-latest%(devSuffix)s/log.\n"
+                         "Log can be found in %(w)s/BUILD/%(p)s-latest%(devSuffix)s/log\n"
                          "Please upload it to CERNBox/Dropbox if you intend to request support.\n"
                          "Build directory is %(w)s/BUILD/%(p)s-latest%(devSuffix)s/%(p)s.",
                          h=socket.gethostname(),
