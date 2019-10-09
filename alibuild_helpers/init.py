@@ -7,7 +7,7 @@ from alibuild_helpers.workarea import updateReferenceRepoSpec
 
 from os.path import abspath, basename, join
 import os.path as path
-import os
+import os, sys
 try:
   from collections import OrderedDict
 except ImportError:
@@ -26,13 +26,13 @@ def doInit(args):
   if args.dryRun:
     info("This will initialise local checkouts for %s\n"
          "--dry-run / -n specified. Doing nothing." % ",".join(x["name"] for x in pkgs))
-    exit(0)
+    sys.exit(0)
   try:
     path.exists(args.develPrefix) or os.mkdir(args.develPrefix)
     path.exists(args.referenceSources) or os.makedirs(args.referenceSources)
   except OSError as e:
     error(str(e))
-    exit(1)
+    sys.exit(1)
 
   # Fetch recipes first if necessary
   if path.exists(args.configDir):
