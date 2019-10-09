@@ -2,6 +2,7 @@ import argparse
 from alibuild_helpers.utilities import format, detectArch
 from alibuild_helpers.doctor import doctorArgParser
 from alibuild_helpers.utilities import normalise_multiple_options
+import multiprocessing
 
 import re
 import os
@@ -19,22 +20,6 @@ DEFAULT_WORK_DIR = os.environ.get("ALIBUILD_WORK_DIR", os.environ.get("ALICE_WOR
 # cd to this directory before start
 DEFAULT_CHDIR = os.environ.get("ALIBUILD_CHDIR", ".")
 
-# Detect number of available CPUs. Fallback to 1.
-def detectJobs():
-  # Python 2.6+
-  try:
-    import multiprocessing
-    return multiprocessing.cpu_count()
-  except (ImportError, NotImplementedError):
-    pass
-  # POSIX
-  try:
-    res = int(os.sysconf("SC_NPROCESSORS_ONLN"))
-    if res > 0:
-      return res
-  except (AttributeError, ValueError):
-    pass
-  return 1
 def csv_list(s):
   return s.split(',')
 
@@ -82,7 +67,7 @@ def doParseArgs(star):
   build_parser.add_argument("-e", dest="environment", action='append', default=[])
   build_parser.add_argument("-v", dest="volumes", action='append', default=[],
                       help="Specify volumes to be used in Docker")
-  build_parser.add_argument("--jobs", "-j", dest="jobs", type=int, default=detectJobs())
+  build_parser.add_argument("--jobs", "-j", dest="jobs", type=int, default=multiprocessing.cpu_count())
   build_parser.add_argument("--reference-sources", dest="referenceSources", default="%(workDir)s/MIRROR")
   build_parser.add_argument("--remote-store", dest="remoteStore", default="",
                             help="Where to find packages already built for reuse."

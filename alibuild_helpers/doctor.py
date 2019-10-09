@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import os, re
+import os, re, sys
 from os.path import exists, abspath, expanduser
 try:
   from commands import getstatusoutput
@@ -151,7 +151,7 @@ def doDoctor(args, parser):
   (err, overrides, taps) = parseDefaults(args.disable, defaultsReader, info)
   if err:
     error(err)
-    exit(1)
+    sys.exit(1)
 
   def performValidateDefaults(spec):
     (ok,msg,valid) = validateDefaults(spec, args.defaults)
@@ -175,7 +175,7 @@ def doDoctor(args, parser):
                                                             taps                    = taps,
                                                             log                     = info)
 
-  alwaysBuilt = set([x for x in specs]) - fromSystem - own - failed
+  alwaysBuilt = set(x for x in specs) - fromSystem - own - failed
   if alwaysBuilt:
     banner("The following packages will be built by aliBuild because\n"
             " usage of a system version of it is not allowed or supported, by policy:\n\n- " +
@@ -206,5 +206,5 @@ def doDoctor(args, parser):
     exitcode = 3
   if exitcode:
     error("There were errors: build cannot be performed if they are not resolved. Check the messages above.")
-  exit(exitcode)
+  sys.exit(exitcode)
 

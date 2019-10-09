@@ -171,7 +171,7 @@ def readDefaults(configDir, defaults, error):
   err, defaultsMeta, defaultsBody = parseRecipe(getRecipeReader(defaultsFilename))
   if err:
     error(err)
-    exit(1)
+    sys.exit(1)
   return (defaultsMeta, defaultsBody)
 
 # Get the appropriate recipe reader depending on th filename
