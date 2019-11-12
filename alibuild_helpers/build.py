@@ -16,7 +16,7 @@ from alibuild_helpers.utilities import Hasher
 from alibuild_helpers.utilities import yamlDump
 import yaml
 from alibuild_helpers.workarea import updateReferenceRepoSpec
-from alibuild_helpers.log import logger_handler, LogFormatter, ProgressPrint, riemannStream
+from alibuild_helpers.log import logger_handler, LogFormatter, ProgressPrint
 from datetime import datetime
 from glob import glob
 from requests import get
@@ -617,11 +617,6 @@ def doBuild(args, parser):
     # Since we can execute this multiple times for a given package, in order to
     # ensure consistency, we need to reset things and make them pristine.
     spec.pop("revision", None)
-    riemannStream.setAttributes(package = spec["package"],
-                                package_hash = spec["version"],
-                                architecture = args.architecture,
-                                defaults = args.defaults)
-    riemannStream.setState("warning")
 
     debug("Updating from tarballs")
     # If we arrived here it really means we have a tarball which was created
@@ -750,7 +745,6 @@ def doBuild(args, parser):
       # If we get here, we know we are in sync with whatever remote store.  We
       # can therefore create a directory which contains all the packages which
       # were used to compile this one.
-      riemannStream.setState('ok')
       debug("Package %s was correctly compiled. Moving to next one." % spec["package"])
       # If using incremental builds, next time we execute the script we need to remove
       # the placeholders which avoid rebuilds.

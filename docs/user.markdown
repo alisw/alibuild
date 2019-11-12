@@ -227,17 +227,6 @@ to touch. In this case you can use `--always-prefer-system` option which
 will try very hard to reuse as many system packages as possible (always
 checking they are actually compatible with the one used in the recipe).
 
-## Monitoring builds with Riemann
-
-aliBuild comes with support for pushing every single line produced by
-the output to a [Riemann](http://riemann.io) instance. This can be
-enabled by setting the two environment variables:
-
-- `RIEMANN_HOST`: the hostname Riemann server you want to push your data
-  to, defaults to `localhost`.
-- `RIEMANN_PORT`: the port the Riemann server is listening at, defaults
-  to 5555.
-
 ## Cleaning up the build area (new in 1.1.0)
 
 Whenever you build using a different recipe or set of sources, alibuild
