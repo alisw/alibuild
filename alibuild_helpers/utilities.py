@@ -135,8 +135,8 @@ def detectArch():
     osReleaseLines = []
     hasOsRelease = False
   try:
-    import platform
-    platformTuple = platform.dist()
+    import platform, distro
+    platformTuple = distro.linux_distribution()
     platformSystem = platform.system()
     platformProcessor = platform.processor()
     if " " in platformProcessor:
