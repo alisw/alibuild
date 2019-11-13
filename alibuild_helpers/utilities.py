@@ -141,7 +141,13 @@ def detectArch():
     hasOsRelease = False
   try:
     import platform
-    platformTuple = platform.dist()
+    if platform.system() == "Darwin":
+      return "osx_x86-64"
+  except:
+    pass
+  try:
+    import platform, distro
+    platformTuple = distro.linux_distribution()
     platformSystem = platform.system()
     platformProcessor = platform.processor()
     if " " in platformProcessor:

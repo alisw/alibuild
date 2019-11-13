@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [2.7, 3.5, 3.6, 3.7]
+        python-version: [2.7, 3.5, 3.6, 3.7, 3.8]
 
     steps:
     - uses: actions/checkout@v2
@@ -40,7 +40,7 @@ jobs:
         sudo apt-get update -y
         sudo apt-get install -y environment-modules libxml2-dev libxslt1-dev ruby-dev
         sudo NOKOGIRI_USE_SYSTEM_LIBRARIES=true gem install --no-document jekyll html-proofer
-        pip install pylint mock coverage codecov
+        pip install pylint mock coverage codecov distro
         cd ..
         git clone -b IB/v5-06/next https://github.com/alisw/alidist
         cat /etc/os-release
