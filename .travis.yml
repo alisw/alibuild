@@ -27,6 +27,7 @@ install: |
     gem install jekyll html-proofer
     pip install twine
     pip install requests
+    pip install distro
 script: |
   alibuild/script/cibuild
 after_success:
