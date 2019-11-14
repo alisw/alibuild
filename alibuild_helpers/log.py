@@ -5,67 +5,12 @@ from os import getenv
 import socket, time
 from alibuild_helpers.utilities import format, to_unicode
 
-debug, error, warning, info, success, riemannStream = (None, None, None, None, None, None)
+debug, error, warning, info, success = (None, None, None, None, None)
 
 def dieOnError(err, msg):
   if err:
-    riemannStream.setState('critical')
     error(msg)
     sys.exit(1)
-
-# A stream object which will end up pushing data to a riemann server
-class RiemannStream(object):
-  def __init__(self, host, port):
-    self.currentHost = socket.gethostname()
-    self.buffer = ""
-    self.state = None
-    self.enabled = False
-    self.attributes = {}
-    self.begin = time.time()
-    if not host:
-      return
-    try:
-      import bernhard
-      self.client = bernhard.Client(host=host, port=port)
-      self.client.send({'host': self.currentHost, 'state': 'ok', 'service': "alibuild started"})
-      self.enabled = True
-      info("Sending log data to %s:%s" % (host, port))
-    except Exception as e:
-      info("RIEMANN_HOST %s:%s specified, however there was a problem initialising:"  % (host, port))
-      info(e)
-
-  def setAttributes(self, **attributes):
-    self.attributes = attributes
-    self.begin = time.time()
-    self.attributes["start_time"] = self.begin
-
-  def setState(self, state):
-    self.state = state
-
-  def write(self, s):
-    self.buffer += s
-
-  def flush(self):
-    for x in self.buffer.strip("\n").split("\n"):
-      serviceLabel = ""
-      if "package" in self.attributes:
-        serviceLabel += " %(package)s@%(package_hash)s" % self.attributes
-      if "architecture" in self.attributes:
-        serviceLabel += " " + self.attributes["architecture"]
-      payload = {'host': self.currentHost,
-                 'service': 'alibuild_log%s' % serviceLabel,
-                 'description': x.decode('utf-8').encode('ascii','ignore'),
-                 'ttl': getenv("RIEMANN_TTL", 60),
-                 'metric': time.time() - self.begin
-                }
-      payload.update({'attributes': self.attributes})
-      if self.state:
-        payload['state'] = self.state
-      try:
-        self.client.send(payload)
-      except:
-        pass
-    self.buffer = ""
 
 class LogFormatter(logging.Formatter):
   def __init__(self, fmtstr):
@@ -157,10 +102,3 @@ warning = logger.warning
 info = logger.info
 banner = logger.banner
 success = logger.success
-
-riemannStream = RiemannStream(host=getenv("RIEMANN_HOST"),
-                              port=getenv("RIEMANN_PORT", "5555"))
-# If the RiemannStreamer can be used, we add it to those use during
-# printout.
-if riemannStream.enabled:
-  logger.addHandler(logging.StreamHandler(riemannStream))
