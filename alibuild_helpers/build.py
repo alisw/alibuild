@@ -464,7 +464,8 @@ def doBuild(args, parser):
 
   # Clone/update repos
   for p in [p for p in buildOrder if "source" in specs[p]]:
-    updateReferenceRepoSpec(args.referenceSources, p, specs[p], args.fetchRepos)
+    if not args.remoteStore or args.forceCloneRepos:
+      updateReferenceRepoSpec(args.referenceSources, p, specs[p], args.fetchRepos)
 
     # Retrieve git heads
     cmd = "git ls-remote --heads %s" % (specs[p].get("reference", specs[p]["source"]))
@@ -768,8 +769,29 @@ def doBuild(args, parser):
                         a=args.architecture,
                         p=spec["package"])
 
+          getstatusoutput('cd {}; {} -xzf {}'.format(workDir, tar(), d))
           getstatusoutput("ln -snf %s %s" % (src, dst1))
           getstatusoutput("ln -snf %s %s" % (src, dst2))
+
+          if args.docker:
+            dockerWrapper = '''
+              docker run --rm -it
+              --user $(id -u):$(id -g)
+              -v {workdir}:/sw
+              -e WORK_DIR=/sw
+              -w /sw
+              {image}
+              bash -ex /sw/{architecture}/{p}/latest
+              '''.replace('\n', ' ').format(
+                image=dockerImage,
+                workdir=workDir,
+                architecture=args.architecture,
+                p=spec["package"],
+              )
+            execute(dockerWrapper)
+          else:
+            getstatusoutput('cd {0}; export WORK_DIR={0}; bash -ex "{1}/relocate-me.sh"'.format(workDir, realpath(dst2)))
+
           info("Using cached build for %s" % p)
         break
       else:
@@ -868,6 +890,10 @@ def doBuild(args, parser):
       debug(spec["cachedTarball"] and
             "Found tarball in %s" % spec["cachedTarball"] or
             "No cache tarballs found")
+
+    if "source" in spec:
+      debug("Making sure the sources are MIRRORed")
+      updateReferenceRepoSpec(args.referenceSources, p, spec, args.fetchRepos)
 
     # Generate the part which sources the environment for all the dependencies.
     # Notice that we guarantee that a dependency is always sourced before the

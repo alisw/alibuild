@@ -83,6 +83,8 @@ def dummy_getstatusoutput(x):
     return (0, "")
   if re.match("ln -snf[^;]*$", x):
     return (0, "")
+  if x.startswith("cd /sw; "):
+    return (0, "")
   return {
       "GIT_DIR=/alidist/.git git rev-parse HEAD": (0, "6cec7b7b3769826219dfa85e5daa6de6522229a0"),
       'pip --disable-pip-version-check show alibuild | grep -e "^Version:" | sed -e \'s/.* //\'': (0, "v1.5.0"),
