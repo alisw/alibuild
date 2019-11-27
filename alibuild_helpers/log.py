@@ -3,6 +3,7 @@ import sys
 import re
 from os import getenv
 import socket, time
+import datetime
 from alibuild_helpers.utilities import format, to_unicode
 
 debug, error, warning, info, success = (None, None, None, None, None)
@@ -29,6 +30,7 @@ class LogFormatter(logging.Formatter):
     elif record.levelno == logging.INFO or record.levelno == logging.BANNER:
       return record.msg
     return "\n".join([ format(self.fmtstr,
+                              asctime = datetime.datetime.now().strftime("%Y-%m-%d@%H:%M:%S"),
                               levelname=self.LEVEL_COLORS.get(record.levelno, self.COLOR_RESET) +
                                         record.levelname +
                                         self.COLOR_RESET,
