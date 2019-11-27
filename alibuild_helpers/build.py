@@ -489,7 +489,7 @@ def doBuild(args, parser):
   debug("Main package is %s@%s" % (mainPackage, mainHash))
   if args.debug:
     logger_handler.setFormatter(
-        LogFormatter("%%(levelname)s:%s:%s: %%(message)s" %
+        LogFormatter("%%(asctime)s:%%(levelname)s:%s:%s: %%(message)s" %
                      (mainPackage, args.develPrefix if "develPrefix" in args else mainHash[0:8])))
 
   # Now that we have the main package set, we can print out Useful information
@@ -608,7 +608,7 @@ def doBuild(args, parser):
     spec = specs[p]
     if args.debug:
       logger_handler.setFormatter(
-          LogFormatter("%%(levelname)s:%s:%s:%s: %%(message)s" %
+          LogFormatter("%%(asctime)s:%%(levelname)s:%s:%s:%s: %%(message)s" %
                        (mainPackage, p, args.develPrefix if "develPrefix" in args else mainHash[0:8])))
     if spec["package"] in develPkgs and getattr(syncHelper, "writeStore", None):
       warning("Disabling remote write store from now since %s is a development package." % spec["package"])
