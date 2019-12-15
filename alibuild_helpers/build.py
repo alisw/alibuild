@@ -408,7 +408,7 @@ def doBuild(args, parser):
     updateReferenceRepoSpec(args.referenceSources, p, specs[p], args.fetchRepos)
 
     # Retrieve git heads
-    cmd = "git ls-remote --heads %s" % (specs[p]["reference"] if "reference" in specs[p] else specs[p]["source"])
+    cmd = "git ls-remote --heads %s" % (specs[p].get("reference", specs[p]["source"]))
     if specs[p]["package"] in develPkgs:
        specs[p]["source"] = join(os.getcwd(), specs[p]["package"])
        cmd = "git ls-remote --heads %s" % specs[p]["source"]
