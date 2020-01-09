@@ -17,6 +17,11 @@ Install with:
 
     pip install alibuild
 
+On macOS you can also install with:
+
+    brew tap alisw/system-deps
+    brew install alisw/system-deps/alibuild
+
 Instant gratification on your machine with:
 
     git clone https://github.com/alisw/alidist.git
