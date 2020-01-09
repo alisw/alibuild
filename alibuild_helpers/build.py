@@ -240,6 +240,50 @@ class RsyncRemoteSync:
     err = execute(cmd)
     dieOnError(err, "Unable to upload tarball.")
 
+class S3RemoteSync:
+  def __init__(self, remoteStore, writeStore, architecture, workdir):
+    # This will require rclone to be installed in order to actually work
+    # The name of the remote is always alibuild
+    self.remoteStore = re.sub("^s3://", "", remoteStore)
+    self.writeStore = re.sub("^s3://", "", writeStore)
+    self.architecture = architecture
+    self.workdir = workdir
+
+  def syncToLocal(self, p, spec):
+    debug("Updating remote store for package %s@%s" % (p, spec["hash"]))
+    cmd = format("set -x; "
+                 "mkdir -p %(tarballHashDir)s\n"
+                 "s3cmd sync -s -v --host s3.cern.ch --host-bucket %(b)s.s3.cern.ch s3://%(b)s/%(storePath)s/ %(tarballHashDir)s/ || true\n"
+                 "for x in `s3cmd ls -s --host s3.cern.ch --host-bucket %(b)s.s3.cern.ch s3://%(b)s/%(linksPath)s/ | sed -e 's|.*s3://|s3://|'`; do"
+                 "  rm '%(tarballLinkDir)s'/*;"
+                 "  ln -sf `s3cmd get -s --host s3.cern.ch --host-bucket %(b)s.s3.cern.ch $x -` %(tarballLinkDir)s/`basename $x` || true\n"
+                 "done",
+                 b=self.remoteStore,
+                 storePath=spec["storePath"],
+                 linksPath=spec["linksPath"],
+                 tarballHashDir=spec["tarballHashDir"],
+                 tarballLinkDir=spec["tarballLinkDir"])
+    print(cmd)
+    err = execute(cmd)
+    dieOnError(err, "Unable to update from specified store.")
+
+  def syncToRemote(self, p, spec):
+    if not self.writeStore:
+      return
+    tarballNameWithRev = format("%(package)s-%(version)s-%(revision)s.%(architecture)s.tar.gz",
+                                architecture=self.architecture,
+                                **spec)
+    cmd = format("cd %(workdir)s && "
+                 "s3cmd put -s -v --host s3.cern.ch --host-bucket %(b)s.s3.cern.ch %(storePath)s/%(tarballNameWithRev)s s3://%(b)s/%(storePath)s/ || true\n"
+                 "readlink %(linksPath)s/%(tarballNameWithRev)s | s3cmd put -s -v --host s3.cern.ch --host-bucket %(b)s.s3.cern.ch - s3://%(b)s/%(linksPath)s/%(tarballNameWithRev)s || true\n",
+                 workdir=self.workdir,
+                 b=self.remoteStore,
+                 storePath=spec["storePath"],
+                 linksPath=spec["linksPath"],
+                 tarballNameWithRev=tarballNameWithRev)
+    err = execute(cmd)
+    dieOnError(err, "Unable to upload tarball.")
+
 # Creates a directory in the store which contains symlinks to the package
 # and its direct / indirect dependencies
 def createDistLinks(spec, specs, args, repoType, requiresType):
@@ -267,7 +311,17 @@ def createDistLinks(spec, specs, args, repoType, requiresType):
                    source=source))
 
   rsyncOptions = ""
-  if args.writeStore:
+  if args.writeStore.startswith("s3://"):
+    bucket = re.sub("^s3://", "", args.writeStore)
+    cmd = format("cd %(w)s && "
+                 "for x in `find %(t)s -type l`; do"
+                 "  readlink $x | s3cmd put -P -s --host s3.cern.ch --host-bucket %(b)s.s3.cern.ch - s3://%(b)s/$x;"
+                 "done",
+                 w=args.workDir,
+                 b=bucket,
+                 t=target)
+    execute(cmd)
+  elif args.writeStore:
     cmd = format("cd %(w)s && "
                  "rsync -avR %(o)s --ignore-existing %(t)s/  %(rs)s/",
                  w=args.workDir,
@@ -279,6 +333,9 @@ def createDistLinks(spec, specs, args, repoType, requiresType):
 def doBuild(args, parser):
   if args.remoteStore.startswith("http"):
     syncHelper = HttpRemoteSync(args.remoteStore, args.architecture, args.workDir, args.insecure)
+  elif args.remoteStore.startswith("s3://"):
+    syncHelper = S3RemoteSync(args.remoteStore, args.writeStore,
+                              args.architecture, args.workDir)
   elif args.remoteStore:
     syncHelper = RsyncRemoteSync(args.remoteStore, args.writeStore, args.architecture, args.workDir, "")
   else:
