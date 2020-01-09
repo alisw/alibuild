@@ -192,42 +192,6 @@ fails, you have two options:
 
   and simply run alibuild by invoking `alibuild/aliBuild`.
 
-
-### FastJet fails to compile on my brand new Mac
-
-A common problem is that whenever you try to compile FastJet on a brand
-new Mac (from OSX 10.11 "El Capitan") you get an error like:
-
-    checking whether we are cross compiling... configure: error: in `/Users/me/alice/sw/BUILD/c07a643b35e78fb6e4e289bdb3d5ec7a800a702d/fastjet/fastjet':
-    configure: error: cannot run C compiled programs.
-    If you meant to cross compile, use `--host'.
-
-this is symtomatic of having `SIP` protection enabled on your Mac (now
-default since El Captain).
-
-Starting from El Capitan (OS X 10.11) Apple has introduced System
-Integrity Protection, also known as “rootless mode”. As explained
-[here](https://dberzano.github.io/2015/10/05/el-capitan/#system_integrity_protection)
-this might have an impact to library loading when you have scripts (or
-applications) invoking other scripts.
-
-While we are working on a solution to make ALICE software compliant to
-this new security feature you might want to turn it off completely.
-
-To turn SIP off:
-
-- Reboot your Mac in Recovery Mode. That is, before OS X starts up, hold down
-  Command-R and keep both keys pressed until the Apple logo appears along with
-  a progress bar.
-- From the Utilities menu open a Terminal.
-- At the shell type: csrutil disable: a message will notify the success of your
-  operation.
-- Now from the  menu select Restart.
-
-**Notice that we are not liable for any damage caused by turning System
-Integrity Protection off. Do it only if you know what you are doing!**
-
-
 ### Environment Modules is not available for my system
 
 On some legacy systems (for instance, Ubuntu 12.04) there is no way to install
