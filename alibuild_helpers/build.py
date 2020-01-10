@@ -889,12 +889,13 @@ def doBuild(args, parser):
     # Generate the part which creates the environment for the package.
     # This can be either variable set via the "env" keyword in the metadata
     # or paths which get appended via the "append_path" one.
-    # By default we append LD_LIBRARY_PATH, PATH and DYLD_LIBRARY_PATH
-    # FIXME: do not append variables for Mac on Linux.
+    # By default we append LD_LIBRARY_PATH, PATH
     environment = ""
     dieOnError(not isinstance(spec.get("env", {}), dict),
                "Tag `env' in %s should be a dict." % p)
     for key,value in spec.get("env", {}).items():
+      if key == "DYLD_LIBRARY_PATH":
+        continue
       environment += format("echo 'export %(key)s=\"%(value)s\"' >> $INSTALLROOT/etc/profile.d/init.sh\n",
                             key=key,
                             value=value)
@@ -905,13 +906,14 @@ def doBuild(args, parser):
                "Tag `append_path' in %s should be a dict." % p)
     for pathName,pathVal in pathDict.items():
       pathVal = isinstance(pathVal, list) and pathVal or [ pathVal ]
+      if pathName == "DYLD_LIBRARY_PATH":
+        continue
       environment += format("\ncat << \EOF >> \"$INSTALLROOT/etc/profile.d/init.sh\"\nexport %(key)s=$%(key)s:%(value)s\nEOF",
                             key=pathName,
                             value=":".join(pathVal))
 
     # Same thing, but prepending the results so that they win against system ones.
     defaultPrependPaths = { "LD_LIBRARY_PATH": "$%s/lib" % basePath,
-                            "DYLD_LIBRARY_PATH": "$%s/lib" % basePath,
                             "PATH": "$%s/bin" % basePath }
     pathDict = spec.get("prepend_path", {})
     dieOnError(not isinstance(pathDict, dict),
@@ -921,6 +923,8 @@ def doBuild(args, parser):
     for pathName,pathVal in defaultPrependPaths.items():
       pathDict[pathName] = [ pathVal ] + pathDict.get(pathName, [])
     for pathName,pathVal in pathDict.items():
+      if pathName == "DYLD_LIBRARY_PATH":
+        continue
       environment += format("\ncat << \EOF >> \"$INSTALLROOT/etc/profile.d/init.sh\"\nexport %(key)s=%(value)s:$%(key)s\nEOF",
                             key=pathName,
                             value=":".join(pathVal))

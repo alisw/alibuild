@@ -78,13 +78,9 @@ The following entries are optional in the header:
         prepend_path:
           "PATH": "$FOO_ROOT/binexec/foobar"
           "LD_LIBRARY_PATH": [ "$FOO_ROOT/sub/lib", "$FOO_ROOT/sub/lib64" ]
-          "DYLD_LIBRARY_PATH":
-            - "$FOO_ROOT/sub/lib"
-            - "$FOO_ROOT/sub/lib64
 
     will result in prepending `$FOO_ROOT/binexec/foobar` to `$PATH`, and both
-    `$FOO_ROOT/sub/lib` and `lib64` to `LD_LIBRARY_PATH` and
-    `DYLD_LIBRARY_PATH`.
+    `$FOO_ROOT/sub/lib` and `lib64` to `LD_LIBRARY_PATH`.
   - `append_path`: same as `prepend_path` but paths are appended rather than
     prepended.
   - `requires`: a list of run-time and build-time dependency for the package. E.g.:
