@@ -42,7 +42,9 @@ def normalise_multiple_options(option, sep=","):
   return [x for x in ",".join(option).split(sep) if x]
 
 def prunePaths(workDir):
-  for x in ["PATH", "LD_LIBRARY_PATH", "DYLD_LIBRARY_PATH"]:
+  if "DYLD_LIBRARY_PATH" in os.environ:
+    os.environ.pop("DYLD_LIBRARY_PATH")
+  for x in ["PATH", "LD_LIBRARY_PATH"]:
     if not x in os.environ:
       continue
     workDirEscaped = re.escape("%s" % workDir) + "[^:]*:?"

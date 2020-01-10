@@ -1,6 +1,7 @@
 #!/bin/bash
 
 # Automatically generated build script
+unset DYLD_LIBRARY_PATH
 
 set -e
 set +h
@@ -111,13 +112,13 @@ cd "$BUILDDIR"
 #   the relocation script so that it takes into account the new location.
 if [[ "$CACHED_TARBALL" == "" && ! -f $BUILDROOT/log ]]; then
   set -o pipefail
-  (set -x; source "$WORK_DIR/SPECS/$ARCHITECTURE/$PKGNAME/$PKGVERSION-$PKGREVISION/$PKGNAME.sh" 2>&1) | tee "$BUILDROOT/log"
+  (set -x; unset DYLD_LIBRARY_PATH; source "$WORK_DIR/SPECS/$ARCHITECTURE/$PKGNAME/$PKGVERSION-$PKGREVISION/$PKGNAME.sh" 2>&1) | tee "$BUILDROOT/log"
 elif [[ "$CACHED_TARBALL" == "" && $INCREMENTAL_BUILD_HASH != "0" && -f "$BUILDDIR/.build_succeeded" ]]; then
   set -o pipefail
   (%(incremental_recipe)s) 2>&1 | tee "$BUILDROOT/log"
 elif [[ "$CACHED_TARBALL" == "" ]]; then
   set -o pipefail
-  (set -x; source "$WORK_DIR/SPECS/$ARCHITECTURE/$PKGNAME/$PKGVERSION-$PKGREVISION/$PKGNAME.sh" 2>&1) | tee "$BUILDROOT/log"
+  (set -x; unset DYLD_LIBRARY_PATH; source "$WORK_DIR/SPECS/$ARCHITECTURE/$PKGNAME/$PKGVERSION-$PKGREVISION/$PKGNAME.sh" 2>&1) | tee "$BUILDROOT/log"
 else
   # Unpack the cached tarball in the $INSTALLROOT and remove the unrelocated
   # files.
