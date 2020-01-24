@@ -36,7 +36,7 @@ import sys
 import time
 
 def star():
-  return basename(sys.argv[0]).lower().replace("build", "")
+  return re.sub("build.*$", "", basename(sys.argv[0]).lower())
 
 def gzip():
   return getstatusoutput("which pigz")[0] and "gzip" or "pigz"
