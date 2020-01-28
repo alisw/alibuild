@@ -871,8 +871,8 @@ def doBuild(args, parser):
     # Notice that we guarantee that a dependency is always sourced before the
     # parts depending on it, but we do not guaranteed anything for the order in
     # which unrelated components are activated.
-    dependencies = ""
-    dependenciesInit = ""
+    dependencies = "ALIBUILD_ARCH_PREFIX=\"${ALIBUILD_ARCH_PREFIX:-%s}\"\n" % args.architecture
+    dependenciesInit = "echo ALIBUILD_ARCH_PREFIX=\"\${ALIBUILD_ARCH_PREFIX:-%s}\" >> $INSTALLROOT/etc/profile.d/init.sh\n" % args.architecture
     for dep in spec.get("requires", []):
       depSpec = specs[dep]
       depInfo = {
@@ -882,9 +882,9 @@ def doBuild(args, parser):
         "revision": depSpec["revision"],
         "bigpackage": dep.upper().replace("-", "_")
       }
-      dependencies += format("[ \"X$%(bigpackage)s_VERSION\" = X  ] && source \"$WORK_DIR/%(architecture)s/%(package)s/%(version)s-%(revision)s/etc/profile.d/init.sh\"\n",
+      dependencies += format("[ -z ${%(bigpackage)s_REVISION+x} ] && source \"$WORK_DIR/$ALIBUILD_ARCH_PREFIX/%(package)s/%(version)s-%(revision)s/etc/profile.d/init.sh\"\n",
                              **depInfo)
-      dependenciesInit += format('echo [ \\\"X\$%(bigpackage)s_VERSION\\\" = X ] \&\& source \${WORK_DIR}/%(architecture)s/%(package)s/%(version)s-%(revision)s/etc/profile.d/init.sh >> \"$INSTALLROOT/etc/profile.d/init.sh\"\n',
+      dependenciesInit += format('echo [ -z \${%(bigpackage)s_REVISION+x} ] \&\& source \${WORK_DIR}/\${ALIBUILD_ARCH_PREFIX}/%(package)s/%(version)s-%(revision)s/etc/profile.d/init.sh >> \"$INSTALLROOT/etc/profile.d/init.sh\"\n',
                              **depInfo)
     # Generate the part which creates the environment for the package.
     # This can be either variable set via the "env" keyword in the metadata
@@ -925,7 +925,7 @@ def doBuild(args, parser):
     for pathName,pathVal in pathDict.items():
       if pathName == "DYLD_LIBRARY_PATH":
         continue
-      environment += format("\ncat << \EOF >> \"$INSTALLROOT/etc/profile.d/init.sh\"\nexport %(key)s=%(value)s:$%(key)s\nEOF",
+      environment += format("\ncat << \EOF >> \"$INSTALLROOT/etc/profile.d/init.sh\"\nexport %(key)s=%(value)s${%(key)s+:$%(key)s}\nEOF",
                             key=pathName,
                             value=":".join(pathVal))
 
