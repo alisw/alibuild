@@ -263,7 +263,6 @@ class S3RemoteSync:
                  linksPath=spec["linksPath"],
                  tarballHashDir=spec["tarballHashDir"],
                  tarballLinkDir=spec["tarballLinkDir"])
-    print(cmd)
     err = execute(cmd)
     dieOnError(err, "Unable to update from specified store.")
 
