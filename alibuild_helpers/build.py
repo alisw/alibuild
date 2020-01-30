@@ -251,12 +251,12 @@ class S3RemoteSync:
 
   def syncToLocal(self, p, spec):
     debug("Updating remote store for package %s@%s" % (p, spec["hash"]))
-    cmd = format("set -x; "
+    cmd = format(
                  "mkdir -p %(tarballHashDir)s\n"
-                 "s3cmd sync -s -v --host s3.cern.ch --host-bucket %(b)s.s3.cern.ch s3://%(b)s/%(storePath)s/ %(tarballHashDir)s/ || true\n"
-                 "for x in `s3cmd ls -s --host s3.cern.ch --host-bucket %(b)s.s3.cern.ch s3://%(b)s/%(linksPath)s/ | sed -e 's|.*s3://|s3://|'`; do"
-                 "  rm '%(tarballLinkDir)s'/*;"
-                 "  ln -sf `s3cmd get -s --host s3.cern.ch --host-bucket %(b)s.s3.cern.ch $x -` %(tarballLinkDir)s/`basename $x` || true\n"
+                 "s3cmd sync -s -v --host s3.cern.ch --host-bucket %(b)s.s3.cern.ch s3://%(b)s/%(storePath)s/ %(tarballHashDir)s/ 2>/dev/null || true\n"
+                 "for x in `s3cmd ls -s --host s3.cern.ch --host-bucket %(b)s.s3.cern.ch s3://%(b)s/%(linksPath)s/ 2>/dev/null | sed -e 's|.*s3://|s3://|'`; do"
+                 "  mkdir -p '%(tarballLinkDir)s'; find '%(tarballLinkDir)s' -type l -delete;"
+                 "  ln -sf `s3cmd get -s --host s3.cern.ch --host-bucket %(b)s.s3.cern.ch $x - 2>/dev/null` %(tarballLinkDir)s/`basename $x` || true\n"
                  "done",
                  b=self.remoteStore,
                  storePath=spec["storePath"],
@@ -273,8 +273,10 @@ class S3RemoteSync:
                                 architecture=self.architecture,
                                 **spec)
     cmd = format("cd %(workdir)s && "
-                 "s3cmd put -s -v --host s3.cern.ch --host-bucket %(b)s.s3.cern.ch %(storePath)s/%(tarballNameWithRev)s s3://%(b)s/%(storePath)s/ || true\n"
-                 "readlink %(linksPath)s/%(tarballNameWithRev)s | s3cmd put -s -v --host s3.cern.ch --host-bucket %(b)s.s3.cern.ch - s3://%(b)s/%(linksPath)s/%(tarballNameWithRev)s || true\n",
+                 "TARSHA256=`sha256sum %(storePath)s/%(tarballNameWithRev)s | awk '{ print $1 }'` && "
+                 "s3cmd put -s -v --host s3.cern.ch --add-header \"x-amz-meta-sha256:$TARSHA256\" --host-bucket %(b)s.s3.cern.ch %(storePath)s/%(tarballNameWithRev)s s3://%(b)s/%(storePath)s/ 2>/dev/null || true\n"
+                 "HASHEDURL=`readlink %(linksPath)s/%(tarballNameWithRev)s | sed -e's|^../../||'` &&"
+                 "echo $HASHEDURL | s3cmd put -s -v --host s3.cern.ch --host-bucket %(b)s.s3.cern.ch --add-header=\"x-amz-website-redirect-location:https://s3.cern.ch/swift/v1/%(b)s/TARS/${HASHEDURL}\" - s3://%(b)s/%(linksPath)s/%(tarballNameWithRev)s 2>/dev/null || true\n",
                  workdir=self.workdir,
                  b=self.remoteStore,
                  storePath=spec["storePath"],
@@ -314,7 +316,8 @@ def createDistLinks(spec, specs, args, repoType, requiresType):
     bucket = re.sub("^s3://", "", args.writeStore)
     cmd = format("cd %(w)s && "
                  "for x in `find %(t)s -type l`; do"
-                 "  readlink $x | s3cmd put -P -s --host s3.cern.ch --host-bucket %(b)s.s3.cern.ch - s3://%(b)s/$x;"
+                 "  HASHEDURL=`readlink $x | sed -e 's|.*/[.][.]/TARS|TARS|'` &&"
+                 "  echo $HASHEDURL | s3cmd put -q -P -s --add-header=\"x-amz-website-redirect-location:https://s3.cern.ch/swift/v1/%(b)s/${HASHEDURL}\" --host s3.cern.ch --host-bucket %(b)s.s3.cern.ch - s3://%(b)s/$x 2>/dev/null;"
                  "done",
                  w=args.workDir,
                  b=bucket,
