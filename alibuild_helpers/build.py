@@ -317,7 +317,7 @@ def createDistLinks(spec, specs, args, repoType, requiresType):
     cmd = format("cd %(w)s && "
                  "for x in `find %(t)s -type l`; do"
                  "  HASHEDURL=`readlink $x | sed -e 's|.*/[.][.]/TARS|TARS|'` &&"
-                 "  echo $HASHEDURL | s3cmd put -q -P -s --add-header=\"x-amz-website-redirect-location:https://s3.cern.ch/swift/v1/%(b)s/${HASHEDURL}\" --host s3.cern.ch --host-bucket %(b)s.s3.cern.ch - s3://%(b)s/$x 2>/dev/null;"
+                 "  echo $HASHEDURL | s3cmd put --skip-existing -q -P -s --add-header=\"x-amz-website-redirect-location:https://s3.cern.ch/swift/v1/%(b)s/${HASHEDURL}\" --host s3.cern.ch --host-bucket %(b)s.s3.cern.ch - s3://%(b)s/$x 2>/dev/null;"
                  "done",
                  w=args.workDir,
                  b=bucket,
