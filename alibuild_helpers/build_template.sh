@@ -201,8 +201,8 @@ if [[ ${ARCHITECTURE:0:3} == "osx" ]]; then
   while read BIN; do
     MACHOTYPE=$(set +o pipefail; otool -h "$PWD/$BIN" 2> /dev/null | grep filetype -A1 | awk 'END{print $5}')
 
-    # See mach-o/loader.h from XNU sources: 2 == executable, 6 == dylib
-    if [[ $MACHOTYPE == 6 ]]; then
+    # See mach-o/loader.h from XNU sources: 2 == executable, 6 == dylib, 8 == bundle
+    if [[ $MACHOTYPE == 6 || $MACHOTYPE == 8 ]]; then
       # Only dylibs: relocate LC_ID_DYLIB
       if otool -D "$PWD/$BIN" 2> /dev/null | tail -n1 | grep -q $PKGHASH; then
         cat <<EOF >> "$INSTALLROOT/relocate-me.sh"
@@ -215,7 +215,7 @@ EOF
       fi
     fi
 
-    if [[ $MACHOTYPE == 2 || $MACHOTYPE == 6 ]]; then
+    if [[ $MACHOTYPE == 2 || $MACHOTYPE == 6 || $MACHOTYPE == 8 ]]; then
       # Both libs and binaries: relocate LC_RPATH
       if otool -l "$PWD/$BIN" 2> /dev/null | grep -A2 LC_RPATH | grep path | grep -q $PKGHASH; then
         cat <<EOF >> "$INSTALLROOT/relocate-me.sh"
