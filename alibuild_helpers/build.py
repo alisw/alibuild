@@ -1006,6 +1006,8 @@ def doBuild(args, parser):
       ("DEVEL_HASH", spec.get("devel_hash", "")),
       ("DEVEL_PREFIX", develPrefix),
       ("BUILD_FAMILY", spec["build_family"]),
+      ("GIT_COMMITTER_NAME", "unknown"),
+      ("GIT_COMMITTER_EMAIL", "unknown"),
       ("GIT_TAG", spec["tag"]),
       ("MY_GZIP", gzip()),
       ("MY_TAR", tar()),
@@ -1038,6 +1040,7 @@ def doBuild(args, parser):
       for volume in args.volumes:
         additionalVolumes += " -v %s " % volume
       dockerWrapper = format("docker run --rm -it"
+              " --user $(id -u):$(id -g)"
               " -v %(workdir)s:/sw"
               " -v %(scriptDir)s/build.sh:/build.sh:ro"
               " %(mirrorVolume)s"
