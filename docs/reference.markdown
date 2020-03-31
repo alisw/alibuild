@@ -4,12 +4,12 @@ subtitle: Recipe reference manual
 layout: main
 ---
 
-1. [Recipe formats](#Recipes)
-    1. [The header](#TheHeader)
-    2. [The body](#TheBody)
-    3. [Defaults, common requirements for builds](#Defaults)
-2. [Relocation, building Vs execution environment](#Relocation)
-3. [Known issues](#KnownIssues)
+1. [Recipe formats](#recipe-formats)
+    1. [The header](#the-header)
+    2. [The body](#the-body)
+    3. [Defaults, common requirements for builds](#defaults)
+2. [Relocation](#relocation)
+3. [Known issues](#known-issues)
 
 ## Recipe formats <a name="Recipes"></a>
 
@@ -42,7 +42,7 @@ An example recipe for `zlib` is the following:
     make ${JOBS+-j $JOBS}
     make install
 
-### The header <a name="TheHeader"></a>
+### The header
 
 The following entries are mandatory in the header:
 
@@ -132,7 +132,7 @@ The following entries are optional in the header:
     relocation of executables and dynamic libraries **on macOS only**. If not
     specified, defaults to `bin`, `lib` and `lib64`.
 
-### The body <a name="TheBody"></a>
+### The body
 
 This is the build script executed to effectively build and install your
 software. Being a shell script you can be as flexible as you want in its
@@ -242,9 +242,35 @@ You can limit which defaults can be applied to a given package by using the
 `valid_defaults` key.
 
 
-## Relocation, building Vs execution environment <a name="Relocation"></a>
+## Relocation, 
 
+aliBuild supports relocating binary packages so that the scratch space used for builds (e.g. /build) and the actual installation folder (i.e. /cvmfs/alice.cern.ch ) do not need to be the same. By design this is done automatically, and
+the user should not have to care about it. The procedure takes care of relocating scripts and, on macOS, to embed the correct paths for the dynamic libraries dependencies, so that SIP does not need to be disabled. The internal procedure is
+roughly as follows:
 
-## Known issues <a name="KnownIssues"></a>
+* The build happens in `BUILD/<package>-latest/<package>` and installs byproducts in `INSTALLROOT=<work-dir>/INSTALLROOT/<package-hash>/<architecture>/<package>/<version>-<revisions>`. This way we know that every file which contains `<package-hash>` needs to be relocated.
+* Once the build is completed, aliBuild looks for the above mentioned `<package-hash>` and generates a script in the `$INSTALLROOT/relocate-me.sh` which can be used to relocate the binary installation, once it has been unpacked.
+* The path under `<work-dir>/INSTALLROOT/<package-hash>` is tarred up in a binary tarball.
 
+When a tarball is installed, either because it was downloaded by aliBuild or by some other script (e.g. the CVMFS publisher, the following happens:
 
+* The tarball is expanded.
+* The relocation script `relocate-me.sh` is executed with something similar to:
+
+```
+WORK_DIR=<new-installation-workdir> relocate-me.sh
+```
+
+which will take the path up to the `≤package-hash≥` and re-map it to the newly specified WORK_DIR.
+
+## Build environment
+
+FIXME: to be added.
+
+## Runtime environment
+
+FIXME: to be added
+
+## Known issues
+
+FIXME: to be added
