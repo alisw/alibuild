@@ -27,6 +27,8 @@ def doMain(args, parser):
   # do not get fooled when parsing localized messages.
   # We set ALIBUILD_ARCHITECTURE so that it's picked up by the external
   # command which does the reporting.
+  if not "architecture" in args:
+    args.architecture = detectArch()
   ENVIRONMENT_OVERRIDES = {
     "LANG": "C",
     "LANGUAGE": "C",
