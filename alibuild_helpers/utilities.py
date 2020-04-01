@@ -22,6 +22,11 @@ class SpecError(Exception):
 
 asList = lambda x : x if type(x) == list else [x]
 
+# Keep the linter happy
+if sys.version_info[0] >= 3:
+  basestring = None
+  unicode = None
+
 def is_string(s):
   if sys.version_info[0] >= 3:
     return isinstance(s, str)
