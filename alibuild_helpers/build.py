@@ -940,7 +940,7 @@ def doBuild(args, parser):
 
     cmd_raw = ""
     try:
-      fp = open(dirname(realpath(__file__))+'/alibuild_helpers/build_template.sh', 'r')
+      fp = open(dirname(realpath(__file__))+'/build_template.sh', 'r')
       cmd_raw = fp.read()
       fp.close()
     except:

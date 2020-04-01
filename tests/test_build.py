@@ -1,10 +1,10 @@
 from __future__ import print_function
 # Assuming you are using the mock library to ... mock things
 try:
-    from unittest.mock import patch, call, MagicMock  # In Python 3, mock is built-in
+    from unittest.mock import patch, call, MagicMock, DEFAULT  # In Python 3, mock is built-in
     from io import StringIO
 except ImportError:
-    from mock import patch, call, MagicMock  # Python 2
+    from mock import patch, call, MagicMock, DEFAULT  # Python 2
     from StringIO import StringIO
 try:
   from collections import OrderedDict
@@ -100,14 +100,17 @@ TIMES_ASKED = {}
 
 def dummy_open(x, mode="r"):
   if mode == "r":
-    threshold, result = {
+    known = {
       "/sw/BUILD/27ce49698e818e8efb56b6eff6dd785e503df341/defaults-release/.build_succeeded": (0, StringIO("0")),
       "/sw/BUILD/3e90b4e08bad439fa5f25282480d1adb9efb0c0d/zlib/.build_succeeded": (0, StringIO("0")),
       "/sw/BUILD/%s/ROOT/.build_succeeded" % TEST_ROOT_BUILD_HASH: (0, StringIO("0")),
       "/sw/osx_x86-64/defaults-release/v1-1/.build-hash": (1, StringIO("27ce49698e818e8efb56b6eff6dd785e503df341")),
       "/sw/osx_x86-64/zlib/v1.2.3-1/.build-hash": (1, StringIO("3e90b4e08bad439fa5f25282480d1adb9efb0c0d")),
       "/sw/osx_x86-64/ROOT/v6-08-30-1/.build-hash": (1, StringIO(TEST_ROOT_BUILD_HASH))
-    }[x]
+    }
+    if not x in known:
+      return DEFAULT
+    threshold, result = known[x]
     if threshold > TIMES_ASKED.get(x, 0):
       result = None
     TIMES_ASKED[x] = TIMES_ASKED.get(x, 0) + 1
@@ -139,13 +142,16 @@ def dummy_readlink(x):
 def dummy_exists(x):
   if x.endswith("alibuild_helpers/.git"):
     return False
-  return {
+  known = {
     "/alidist": True,
     "/sw/SPECS": False,
     "/alidist/.git": True,
     "alibuild_helpers/.git": False,
     "/sw/MIRROR/root": True,
-    "/sw/MIRROR/zlib": False}[x]
+    "/sw/MIRROR/zlib": False}
+  if x in known:
+    return known[x]
+  return DEFAULT 
 
 # A few errors we should handle, together with the expected result
 class BuildTestCase(unittest.TestCase):
@@ -168,12 +174,14 @@ class BuildTestCase(unittest.TestCase):
   @patch("alibuild_helpers.build.banner")
   @patch("alibuild_helpers.build.getStatusOutputBash")
   @patch("alibuild_helpers.workarea.is_writeable")
-  def test_coverDoBuild(self, mock_is_writeable, mock_getStatusOutputBash, mock_banner,
+  @patch("alibuild_helpers.build.basename")
+  def test_coverDoBuild(self, mock_basename, mock_is_writeable, mock_getStatusOutputBash, mock_banner,
                               mock_readlink, mock_glob, mock_shutil, mock_open, mock_utilities_open,
                               mock_debug, mock_makedirs, mock_read_defaults, mock_die, mock_sys,
                               mock_workarea_exists, mock_exists, mock_getstatusoutput,
                               mock_workarea_execute, mock_execute, mock_get):
     mock_readlink.side_effect = dummy_readlink
+    mock_basename.side_effect = lambda x : "aliBuild"
     mock_glob.side_effect = lambda x : {"*": ["zlib"],
         "/sw/TARS/osx_x86-64/defaults-release/defaults-release-v1-*.osx_x86-64.tar.gz": ["/sw/TARS/osx_x86-64/defaults-release/defaults-release-v1-1.osx_x86-64.tar.gz"],
         "/sw/TARS/osx_x86-64/zlib/zlib-v1.2.3-*.osx_x86-64.tar.gz": [],
