@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [3.5, 3.6, 3.7, 3.8]
+        python-version: [2.7, 3.5, 3.6, 3.7]
 
     steps:
     - uses: actions/checkout@v2
@@ -34,7 +34,14 @@ jobs:
         flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
         # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
-    - name: Test with pytest
+    - name: Run Tests
       run: |
-        pip install pytest
-        pytest
+        set -x
+        sudo apt-get update -y
+        sudo apt-get install -y environment-modules libxml2-dev libxslt1-dev ruby-dev
+        sudo NOKOGIRI_USE_SYSTEM_LIBRARIES=true gem install --no-document jekyll html-proofer
+        pip install pylint mock coverage codecov
+        cd ..
+        git clone -b IB/v5-06/next https://github.com/alisw/alidist
+        cat /etc/os-release
+        alibuild/script/cibuild
