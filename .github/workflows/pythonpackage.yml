@@ -45,3 +45,4 @@ jobs:
         git clone -b IB/v5-06/next https://github.com/alisw/alidist
         cat /etc/os-release
         alibuild/script/cibuild
+        bash <(curl -s https://codecov.io/bash)
