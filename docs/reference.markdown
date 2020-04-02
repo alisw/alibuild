@@ -4,7 +4,14 @@ subtitle: Recipe reference manual
 layout: main
 ---
 
-## Recipes format
+1. [Recipe formats](#recipe-formats)
+    1. [The header](#the-header)
+    2. [The body](#the-body)
+    3. [Defaults, common requirements for builds](#defaults)
+2. [Relocation](#relocation)
+3. [Known issues](#known-issues)
+
+## Recipe formats
 
 The recipes are found in the a separate repository. The repository can be 
 specified via the `-c` option and defaults to _alidist_.
@@ -173,7 +180,8 @@ uppercased):
  - `<PACKAGE>_REVISION`: package build number.
  - `<PACKAGE>_HASH`: hash of the recipe used to build the package.
 
-### Defaults
+### Defaults, common requirements for builds
+{ :defaults }
 
 aliBuild uses a special file, called `defaults-release.sh` which will be
 included as a build requires of any recipe. This is in general handy to
@@ -233,3 +241,72 @@ For a more complete example see
 
 You can limit which defaults can be applied to a given package by using the
 `valid_defaults` key.
+
+## Relocation 
+
+aliBuild supports relocating binary packages so that the scratch space used for builds (e.g. /build) and the actual installation folder (i.e. /cvmfs/alice.cern.ch ) do not need to be the same. By design this is done automatically, and
+the user should not have to care about it. The procedure takes care of relocating scripts and, on macOS, to embed the correct paths for the dynamic libraries dependencies, so that SIP does not need to be disabled. The internal procedure is
+roughly as follows:
+
+* The build happens in `BUILD/<package>-latest/<package>` and installs byproducts in `INSTALLROOT=<work-dir>/INSTALLROOT/<package-hash>/<architecture>/<package>/<version>-<revisions>`. This way we know that every file which contains `<package-hash>` needs to be relocated.
+* Once the build is completed, aliBuild looks for the above mentioned `<package-hash>` and generates a script in the `$INSTALLROOT/relocate-me.sh` which can be used to relocate the binary installation, once it has been unpacked.
+* The path under `<work-dir>/INSTALLROOT/<package-hash>` is tarred up in a binary tarball.
+
+When a tarball is installed, either because it was downloaded by aliBuild or by some other script (e.g. the CVMFS publisher, the following happens:
+
+* The tarball is expanded.
+* The relocation script `relocate-me.sh` is executed with something similar to:
+
+```
+WORK_DIR=<new-installation-workdir> relocate-me.sh
+```
+
+which will take the path up to the `≤package-hash≥` and re-map it to the newly specified WORK_DIR.
+
+Notice that the special variable `@@PKGREVISION@$PKGHASH@@` can be used to have the actual revision of the package in the relocated file.
+
+## Build environment
+
+Before each package is built, aliBuild will populate the environment with build related information. For a complete list of those see [the body section](#the-body). After the build is done the user has access to the environment of the build by sourcing the `<work-dir>/<architecture>/<package>/<version>/etc/profile.d/init.sh` file. E.g.:
+
+```bash
+WORK_DIR=<work-dir> source <work-dir>/<architecture>/<package>/<version>/etc/profile.d/init.sh
+```
+
+Notice that for development packages, we also generate a `.envrc` file in `<work-dir>/BUILD/<package>-<version>/<package>/.envrc` which can be used to load the build environment via [direnv](https://direnv.net), e.g. for easy IDE integration (see for example https://aliceo2group.github.io/advanced/ides.html).
+
+## Runtime environment
+
+Runtime environment is usually provided via [environment modules](https://modules.readthedocs.io/en/latest/). While the build environment is automatically generated, it is responsibility of the recipe to create a module file in `$INSTALLROOT/etc/modulefiles/$PKGNAME`. For example:
+
+```
+# ModuleFile
+mkdir -p etc/modulefiles
+cat > etc/modulefiles/$PKGNAME <<EoF
+#%Module1.0
+proc ModulesHelp { } {
+   global version
+   puts stderr "ALICE Modulefile for $PKGNAME $PKGVERSION-@@PKGREVISION@$PKGHASH@@"
+}
+set version $PKGVERSION-@@PKGREVISION@$PKGHASH@@
+module-whatis "ALICE Modulefile for $PKGNAME $PKGVERSION-@@PKGREVISION@$PKGHASH@@"
+# Dependencies
+module load BASE/1.0                                                                      \\
+             ${BOOST_REVISION:+boost/$BOOST_VERSION-$BOOST_REVISION}                      \\
+             ${FAIRLOGGER_REVISION:+FairLogger/$FAIRLOGGER_VERSION-$FAIRLOGGER_REVISION}  \\
+             ${ZEROMQ_REVISION:+ZeroMQ/$ZEROMQ_VERSION-$ZEROMQ_REVISION}                  \\
+             ${ASIOFI_REVISION:+asiofi/$ASIOFI_VERSION-$ASIOFI_REVISION}                  \\
+             ${DDS_REVISION:+DDS/$DDS_VERSION-$DDS_REVISION}
+# Our environment
+set FAIRMQ_ROOT \$::env(BASEDIR)/$PKGNAME/\$version
+prepend-path PATH \$FAIRMQ_ROOT/bin
+prepend-path LD_LIBRARY_PATH \$FAIRMQ_ROOT/lib
+EoF
+MODULEDIR="$INSTALLROOT/etc/modulefiles"
+mkdir -p $MODULEDIR && rsync -a --delete etc/modulefiles/ $MODULEDIR
+```
+
+Please keep in mind the following reccomendation when writing the modulefile:
+
+* Do not use runtime environment variables which are usually not set by a given tool. For example avoid exposing `<package>_ROOT`. This is because if we build in a mode where system dependencies are used, we cannot rely on their presence.
+* Use `<package>_REVISION` to guard inclusion of extra dependencies. This will make sure that only dependencies which were actually built via `aliBuild` will be included in the modulefile.
