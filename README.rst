@@ -1,3 +1,5 @@
+.. image:: https://github.com/alisw/alibuild/workflows/Python%20package/badge.svg
+
 aliBuild
 ========
 
