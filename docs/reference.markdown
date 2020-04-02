@@ -9,7 +9,6 @@ layout: main
     2. [The body](#the-body)
     3. [Defaults, common requirements for builds](#defaults)
 2. [Relocation](#relocation)
-3. [Known issues](#known-issues)
 
 ## Recipe formats
 
@@ -180,8 +179,7 @@ uppercased):
  - `<PACKAGE>_REVISION`: package build number.
  - `<PACKAGE>_HASH`: hash of the recipe used to build the package.
 
-### Defaults, common requirements for builds
-{ :defaults }
+### Defaults
 
 aliBuild uses a special file, called `defaults-release.sh` which will be
 included as a build requires of any recipe. This is in general handy to
