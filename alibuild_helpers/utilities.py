@@ -154,7 +154,7 @@ def detectArch():
       platformProcessor = platform.machine()
     return doDetectArch(hasOsRelease, osReleaseLines, platformTuple, platformSystem, platformProcessor)
   except:
-    return None
+    return doDetectArch(hasOsRelease, osReleaseLines, ["unknown", "", ""], "", "")
 
 def getVersion():
   try:
