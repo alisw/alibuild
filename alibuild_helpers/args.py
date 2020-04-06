@@ -33,6 +33,7 @@ def alidist_string(s, star):
   return dict(zip(["repo","ver"], expanded.split("@", 1)))
 
 def doParseArgs(star):
+  detectedArch = detectArch()
   parser = argparse.ArgumentParser(epilog="For help about each option, specify --help after the option itself.\nFor complete documentation please refer to https://alisw.github.io/alibuild")
 
   parser.add_argument("-d", "--debug", dest="debug", action="store_true", default=False, help="Enable debug log output")
@@ -63,7 +64,7 @@ def doParseArgs(star):
                             help="Image to use in case you build with docker (implies --docker)")
   build_parser.add_argument("--work-dir", "-w", dest="workDir", default=DEFAULT_WORK_DIR)
   build_parser.add_argument("--architecture", "-a", dest="architecture",
-                      default=detectArch())
+                      default=detectedArch)
   build_parser.add_argument("-e", dest="environment", action='append', default=[])
   build_parser.add_argument("-v", dest="volumes", action='append', default=[],
                       help="Specify volumes to be used in Docker")
@@ -103,7 +104,7 @@ def doParseArgs(star):
 
   # Options for clean subcommand
   clean_parser.add_argument("--architecture", "-a", dest="architecture",
-                            default=detectArch())
+                            default=detectedArch)
   clean_parser.add_argument("--force-unknown-architecture", dest="forceUnknownArch", default=False,
                             action="store_true", help="Do not check for valid architecture")
   clean_parser.add_argument("--work-dir", "-w", dest="workDir", default=DEFAULT_WORK_DIR)
@@ -134,7 +135,7 @@ def doParseArgs(star):
   deps_parser.add_argument("--docker", dest="docker", action="store_true", default=False)
   deps_parser.add_argument("--docker-image", dest="dockerImage",
                            help="Image to use in case you build with docker (implies --docker-image)")
-  deps_parser.add_argument("--architecture", "-a", dest="architecture", default=detectArch(),
+  deps_parser.add_argument("--architecture", "-a", dest="architecture", default=detectedArch,
                            help="Architecture")
   deps_group = deps_parser.add_mutually_exclusive_group()
   deps_group.add_argument("--always-prefer-system", dest="preferSystem", default=False,
@@ -148,7 +149,7 @@ def doParseArgs(star):
   # Options for the init subcommand
   init_parser.add_argument("pkgname", nargs="?", default="", help="One (or more) of the packages in `alidist'")
   init_parser.add_argument("--architecture", "-a", dest="architecture",
-                            default=detectArch())
+                            default=detectedArch)
   init_parser.add_argument("--work-dir", "-w", dest="workDir", default=DEFAULT_WORK_DIR)
   init_parser.add_argument("--devel-prefix", "-z", nargs="?", default=".", help="Version name to use for development packages. Defaults to branch name.",
                            dest="develPrefix")
@@ -163,7 +164,7 @@ def doParseArgs(star):
 
   # Options for the version subcommand
   version_parser.add_argument("--architecture", "-a", dest="architecture",
-                      default=detectArch())
+                      default=detectedArch)
 
   # Make sure old option ordering behavior is actually still working
   prog = sys.argv[0]
