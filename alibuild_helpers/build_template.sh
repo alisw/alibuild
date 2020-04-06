@@ -3,6 +3,10 @@
 # Automatically generated build script
 unset DYLD_LIBRARY_PATH
 
+# Cleanup variables which should not be exposed to user code
+unset AWS_ACCESS_KEY_ID
+unset AWS_SECRET_ACCESS_KEY
+
 set -e
 set +h
 function hash() { true; }
