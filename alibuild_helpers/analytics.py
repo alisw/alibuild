@@ -100,6 +100,9 @@ def report_event(category, action, label = "", value = None):
 def report_screenview(screen_name):
   report("screenview", cd=screen_name)
 
+def report_timing(category, var, value, label):
+  report("timing", utc=category, utv=var, utt=value, utl=label)
+
 def report_exception(e):
   report("exception",
     exd = e.__class__.__name__,
