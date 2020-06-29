@@ -275,7 +275,9 @@ Notice that for development packages, we also generate a `.envrc` file in `<work
 
 ## Runtime environment
 
-Runtime environment is usually provided via [environment modules](https://modules.readthedocs.io/en/latest/). While the build environment is automatically generated, it is responsibility of the recipe to create a module file in `$INSTALLROOT/etc/modulefiles/$PKGNAME`. For example:
+Runtime environment is usually provided via [environment modules](https://modules.readthedocs.io/en/latest/). 
+
+While the build environment is automatically generated, it is responsibility of the recipe to create a module file in `$INSTALLROOT/etc/modulefiles/$PKGNAME`. For example:
 
 ```
 # ModuleFile
@@ -308,3 +310,31 @@ Please keep in mind the following reccomendation when writing the modulefile:
 
 * Do not use runtime environment variables which are usually not set by a given tool. For example avoid exposing `<package>_ROOT`. This is because if we build in a mode where system dependencies are used, we cannot rely on their presence.
 * Use `<package>_REVISION` to guard inclusion of extra dependencies. This will make sure that only dependencies which were actually built via `aliBuild` will be included in the modulefile.
+
+It's also now possible to generate automatically the initial part of the modulefile, up to the `# Our environment` line, by using the `alibuild-recipe-tools` helper scripts. In order to do this you need to add `alibuild-recipe-tools` as a `build_requires` of your package and substitute the module creation with:
+
+```bash
+#ModuleFile
+mkdir -p etc/modulefiles
+alibuild-generate-module > etc/modulefiles/$PKGNAME
+mkdir -p $INSTALLROOT/etc/modulefiles && rsync -a --delete etc/modulefiles/ $INSTALLROOT/etc/modulefiles
+```
+
+One can also append extra configuration with e.g.:
+
+```bash
+cat >> etc/modulefiles/$PKGNAME <<EoF
+# Our environment
+set DEBUGGUI_ROOT \$::env(BASEDIR)/$PKGNAME/\$version
+prepend-path PATH \$DEBUGGUI_ROOT/bin
+prepend-path LD_LIBRARY_PATH \$DEBUGGUI_ROOT/lib
+EoF
+```
+
+Notice that this will append a dependency on all the requirements of a given package, being them `requires` or `build_requires` if you need to disable a few, just set as empty the associated `_REVISION` variable, e.g.:
+
+```bash
+LIBUV_REVISION= alibuild-generate-module > etc/modulefiles/$PKGNAME
+```
+
+will remove libuv from the dependencies.
