@@ -14,8 +14,8 @@ jobs:
           python-version: 3.7
       - name: Replace the tag in the setup.py
         run: >-
-          GITHUB_TAG=`$GITHUB_REF | sed -e 's|refs/tags||'`
-          echo $GITHUB_TAG
+          GITHUB_TAG=`echo $GITHUB_REF | sed -e 's|refs/tags||'` ;
+          echo $GITHUB_TAG ;
           perl -p -i -e "s/LAST_TAG/$GITHUB_TAG/g" setup.py
       - name: Build the python distribution
         run: >-
