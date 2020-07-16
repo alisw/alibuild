@@ -87,7 +87,7 @@ if [[ ! "$SOURCE0" == '' && "${SOURCE0:0:1}" != "/" ]]; then
     git clone ${GIT_REFERENCE:+--reference $GIT_REFERENCE} "$SOURCE0" "$SOURCEDIR"
     cd $SOURCEDIR
     git remote set-url --push origin $WRITE_REPO
-    git checkout "${GIT_TAG}"
+    git checkout -f "${GIT_TAG}"
   else
     # Folder is already present, but check that it is the right tag
     cd $SOURCEDIR
