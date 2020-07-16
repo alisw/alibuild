@@ -1,0 +1,22 @@
+name: Release
+on:
+  release:
+    types: [published]
+jobs:
+  build_release:
+    name: Build aliBuild release and publish it on Pypi
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/checkout@master
+      - name: Set up Python 3.7
+        uses: actions/setup-python@v1
+        with:
+          python-version: 3.7
+      - name: Replace the tag in the setup.py
+        run: >-
+          GITHUB_TAG=`$GITHUB_REF | sed -e 's|refs/tags||'`
+          echo $GITHUB_TAG
+          perl -p -i -e "s/LAST_TAG/$GITHUB_TAG/g" setup.py
+      - name: Build the python distribution
+        run: >-
+          python setup.py sdist
