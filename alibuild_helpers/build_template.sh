@@ -258,7 +258,7 @@ mkdir -p "${WORK_DIR}/TARS/$HASH_PATH" \
 
 PACKAGE_WITH_REV=$PKGNAME-$PKGVERSION-$PKGREVISION.$ARCHITECTURE.tar.gz
 # Avoid having broken left overs if the tar fails
-$MY_TAR -C $WORK_DIR/INSTALLROOT/$PKGHASH -c -z -f "$WORK_DIR/TARS/$HASH_PATH/${PACKAGE_WITH_REV}.processing" .
+$MY_TAR -C $WORK_DIR/INSTALLROOT/$PKGHASH -c . | $MY_GZIP -c > "$WORK_DIR/TARS/$HASH_PATH/${PACKAGE_WITH_REV}.processing"
 mv $WORK_DIR/TARS/$HASH_PATH/${PACKAGE_WITH_REV}.processing $WORK_DIR/TARS/$HASH_PATH/$PACKAGE_WITH_REV
 
 ln -nfs \
@@ -267,7 +267,7 @@ ln -nfs \
 
 # Unpack, and relocate
 cd "$WORK_DIR"
-$MY_TAR -xzf "$WORK_DIR/TARS/$HASH_PATH/$PACKAGE_WITH_REV"
+$MY_GZIP -dc "$WORK_DIR/TARS/$HASH_PATH/$PACKAGE_WITH_REV" | $MY_TAR -x
 [ "X$CAN_DELETE" = X1 ] && rm "$WORK_DIR/TARS/$HASH_PATH/$PACKAGE_WITH_REV"
 bash -ex "$ARCHITECTURE/$PKGNAME/$PKGVERSION-$PKGREVISION/relocate-me.sh"
 # Last package built gets a "latest" mark.
