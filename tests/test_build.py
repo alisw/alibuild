@@ -10,12 +10,14 @@ try:
   from collections import OrderedDict
 except ImportError:
   from ordereddict import OrderedDict
+import sys
+git_mock = MagicMock(partialCloneFilter="--filter=blob:none")
+sys.modules["alibuild_helpers.git"] = git_mock
 
 from alibuild_helpers.build import doBuild, HttpRemoteSync, RsyncRemoteSync, NoRemoteSync
 from alibuild_helpers.analytics import decideAnalytics, askForAnalytics, report_screenview, report_exception, report_event
 from argparse import Namespace
 from io import BytesIO
-import sys
 import os
 import os.path
 import re
@@ -123,7 +125,7 @@ def dummy_execute(x, mock_git_clone, mock_git_fetch, **kwds):
   s = " ".join(x) if isinstance(x, list) else x
   if re.match(".*ln -sfn.*TARS", s):
     return 0
-  if re.search("^git clone --bare", s):
+  if re.search("^git clone --filter=blob:none --bare", s):
     mock_git_clone()
   elif re.search("&& git fetch -f --tags", s):
     mock_git_fetch()
@@ -132,8 +134,8 @@ def dummy_execute(x, mock_git_clone, mock_git_fetch, **kwds):
     "/bin/bash -e -x /sw/SPECS/osx_x86-64/defaults-release/v1-1/build.sh 2>&1": 0,
     '/bin/bash -e -x /sw/SPECS/osx_x86-64/zlib/v1.2.3-1/build.sh 2>&1': 0,
     '/bin/bash -e -x /sw/SPECS/osx_x86-64/ROOT/v6-08-30-1/build.sh 2>&1': 0,
-    "git clone --bare https://github.com/star-externals/zlib /sw/MIRROR/zlib": 0,
-    "git clone --bare https://github.com/root-mirror/root /sw/MIRROR/root": 0
+    "git clone --filter=blob:none --bare https://github.com/star-externals/zlib /sw/MIRROR/zlib": 0,
+    "git clone --filter=blob:none --bare https://github.com/root-mirror/root /sw/MIRROR/root": 0,
   }[s]
 
 def dummy_readlink(x):

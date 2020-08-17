@@ -3,6 +3,7 @@ from alibuild_helpers.utilities import format
 from alibuild_helpers.utilities import parseRecipe, getPackageList, getRecipeReader, parseDefaults, readDefaults, validateDefaults
 from alibuild_helpers.log import debug, error, warning, banner, info
 from alibuild_helpers.log import dieOnError
+from alibuild_helpers.git import partialCloneFilter
 from alibuild_helpers.workarea import updateReferenceRepoSpec
 
 from os.path import abspath, basename, join
@@ -38,7 +39,8 @@ def doInit(args):
   if path.exists(args.configDir):
     warning("using existing recipes from %s" % args.configDir)
   else:
-    cmd = format("git clone %(repo)s%(branch)s %(cd)s",
+    cmd = format("git clone %(pcf)s %(repo)s%(branch)s %(cd)s",
+                 pcf=partialCloneFilter,
                  repo=args.dist["repo"] if ":" in args.dist["repo"] else "https://github.com/%s" % args.dist["repo"],
                  branch=" -b "+args.dist["ver"] if args.dist["ver"] else "",
                  cd=args.configDir)
@@ -84,8 +86,9 @@ def doInit(args):
     debug("cloning %s%s for development" % (spec["package"], " version "+p["ver"] if p["ver"] else ""))
 
     updateReferenceRepoSpec(args.referenceSources, spec["package"], spec, True)
-    cmd = format("git clone %(readRepo)s%(branch)s --reference %(refSource)s %(cd)s && " +
+    cmd = format("git clone %(pcf)s %(readRepo)s%(branch)s --reference %(refSource)s %(cd)s && " +
                  "cd %(cd)s && git remote set-url --push origin %(writeRepo)s",
+                 pcf=partialCloneFilter,
                  readRepo=spec["source"],
                  writeRepo=writeRepo,
                  branch=" -b "+p["ver"] if p["ver"] else "",

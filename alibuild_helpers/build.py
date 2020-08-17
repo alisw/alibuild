@@ -14,6 +14,7 @@ from alibuild_helpers.utilities import getPackageList
 from alibuild_helpers.utilities import validateDefaults
 from alibuild_helpers.utilities import Hasher
 from alibuild_helpers.utilities import yamlDump
+from alibuild_helpers.git import partialCloneFilter
 import yaml
 from alibuild_helpers.workarea import updateReferenceRepoSpec
 from alibuild_helpers.log import logger_handler, LogFormatter, ProgressPrint
@@ -936,6 +937,10 @@ def doBuild(args, parser):
     if "reference" in spec:
       referenceStatement = "export GIT_REFERENCE=${GIT_REFERENCE_OVERRIDE:-%s}/%s" % (dirname(spec["reference"]), basename(spec["reference"]))
 
+    partialCloneStatement = ""
+    if partialCloneFilter:
+      partialCloneStatement = "export GIT_PARTIAL_CLONE_FILTER='--filter=blob:none'"
+
     debug(spec)
 
     cmd_raw = ""
@@ -975,6 +980,7 @@ def doBuild(args, parser):
                  sourceDir=source and (dirname(source) + "/") or "",
                  sourceName=source and basename(source) or "",
                  referenceStatement=referenceStatement,
+                 partialCloneStatement=partialCloneStatement,
                  requires=" ".join(spec["requires"]),
                  build_requires=" ".join(spec["build_requires"]),
                  runtime_requires=" ".join(spec["runtime_requires"])

@@ -1,5 +1,6 @@
 from alibuild_helpers.log import dieOnError, debug
 from alibuild_helpers.cmd import execute
+from alibuild_helpers.git import partialCloneFilter
 from os.path import dirname, abspath
 try:
   from commands import getstatusoutput
@@ -68,7 +69,8 @@ def updateReferenceRepo(referenceSources, p, spec, fetch=True):
 
   err = False
   if not path.exists(referenceRepo):
-    cmd = ["git", "clone", "--bare", spec["source"], referenceRepo]
+    cmd = ["git", "clone", partialCloneFilter, "--bare", spec["source"], referenceRepo]
+    cmd = [x for x in cmd if x]
     debug("Cloning reference repository: %s" % " ".join(cmd))
     err = execute(cmd)
   elif fetch:

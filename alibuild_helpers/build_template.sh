@@ -79,12 +79,13 @@ fi
 
 # Reference statements
 %(referenceStatement)s
+%(partialCloneStatement)s
 
 if [[ ! "$SOURCE0" == '' && "${SOURCE0:0:1}" != "/" ]]; then
   if [[ ! -d "$SOURCEDIR" ]]; then
     # In case there is a stale link / file, for whatever reason.
     rm -rf $SOURCEDIR
-    git clone ${GIT_REFERENCE:+--reference $GIT_REFERENCE} "$SOURCE0" "$SOURCEDIR"
+    git clone ${GIT_PARTIAL_CLONE_FILTER} ${GIT_REFERENCE:+--reference $GIT_REFERENCE} "$SOURCE0" "$SOURCEDIR"
     cd $SOURCEDIR
     git remote set-url --push origin $WRITE_REPO
     git checkout -f "${GIT_TAG}"
