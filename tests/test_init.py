@@ -1,15 +1,19 @@
 from __future__ import print_function
 # Assuming you are using the mock library to ... mock things
 try:
-    from unittest.mock import patch, call  # In Python 3, mock is built-in
+    from unittest.mock import patch, call, MagicMock  # In Python 3, mock is built-in
     from io import StringIO
 except ImportError:
-    from mock import patch, call  # Python 2
+    from mock import patch, call, MagicMock  # Python 2
     from StringIO import StringIO
 try:
   from collections import OrderedDict
 except ImportError:
   from ordereddict import OrderedDict
+import sys
+
+git_mock = MagicMock(partialCloneFilter="--filter=blob:none")
+sys.modules["alibuild_helpers.git"] = git_mock
 from alibuild_helpers.init import doInit,parsePackagesDefinition
 import mock
 import unittest
@@ -37,8 +41,8 @@ def dummy_exists(x):
   return False
 
 CLONE_EVERYTHING = [
- call(u'git clone https://github.com/alisw/alidist -b master /alidist'),
- call(u'git clone https://github.com/alisw/AliRoot -b v5-08-00 --reference /sw/MIRROR/aliroot ./AliRoot && cd ./AliRoot && git remote set-url --push origin https://github.com/alisw/AliRoot')
+ call(u'git clone --filter=blob:none https://github.com/alisw/alidist -b master /alidist'),
+ call(u'git clone --filter=blob:none https://github.com/alisw/AliRoot -b v5-08-00 --reference /sw/MIRROR/aliroot ./AliRoot && cd ./AliRoot && git remote set-url --push origin https://github.com/alisw/AliRoot')
 ]
 
 class InitTestCase(unittest.TestCase):
@@ -100,7 +104,7 @@ class InitTestCase(unittest.TestCase):
         fetchRepos = False
       )
       doInit(args)
-      mock_execute.assert_called_with("git clone https://github.com/alisw/AliRoot -b v5-08-00 --reference /sw/MIRROR/aliroot ./AliRoot && cd ./AliRoot && git remote set-url --push origin https://github.com/alisw/AliRoot")
+      mock_execute.assert_called_with("git clone --filter=blob:none https://github.com/alisw/AliRoot -b v5-08-00 --reference /sw/MIRROR/aliroot ./AliRoot && cd ./AliRoot && git remote set-url --push origin https://github.com/alisw/AliRoot")
       self.assertEqual(mock_execute.mock_calls, CLONE_EVERYTHING)
       mock_path.exists.assert_has_calls([call('.'), call('/sw/MIRROR'), call('/alidist'), call('./AliRoot')])
 
@@ -109,7 +113,7 @@ class InitTestCase(unittest.TestCase):
       mock_path.reset_mock()
       args.fetchRepos = True
       doInit(args)
-      mock_execute.assert_called_with("git clone https://github.com/alisw/AliRoot -b v5-08-00 --reference /sw/MIRROR/aliroot ./AliRoot && cd ./AliRoot && git remote set-url --push origin https://github.com/alisw/AliRoot")
+      mock_execute.assert_called_with("git clone --filter=blob:none https://github.com/alisw/AliRoot -b v5-08-00 --reference /sw/MIRROR/aliroot ./AliRoot && cd ./AliRoot && git remote set-url --push origin https://github.com/alisw/AliRoot")
       self.assertEqual(mock_execute.mock_calls, CLONE_EVERYTHING)
       mock_path.exists.assert_has_calls([call('.'), call('/sw/MIRROR'), call('/alidist'), call('./AliRoot')])
 
