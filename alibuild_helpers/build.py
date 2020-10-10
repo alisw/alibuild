@@ -295,7 +295,7 @@ class S3RemoteSync:
     cmd = format("cd %(workdir)s && "
                  "TARSHA256=`sha256sum %(storePath)s/%(tarballNameWithRev)s | awk '{ print $1 }'` && "
                  "s3cmd put -s -v --host s3.cern.ch --host-bucket %(b)s.s3.cern.ch %(storePath)s/%(tarballNameWithRev)s s3://%(b)s/%(storePath)s/ 2>/dev/null || true\n"
-                 "HASHEDURL=`readlink %(linksPath)s/%(tarballNameWithRev)s | sed -e's|^../../||'` &&"
+                 "HASHEDURL=`readlink %(linksPath)s/%(tarballNameWithRev)s | sed -e's|^../../||'` && "
                  "echo $HASHEDURL | s3cmd put -s -v --host s3.cern.ch --host-bucket %(b)s.s3.cern.ch - s3://%(b)s/%(linksPath)s/%(tarballNameWithRev)s 2>/dev/null || true\n",
                  workdir=self.workdir,
                  b=self.remoteStore,
@@ -324,8 +324,8 @@ def createDistLinks(spec, specs, args, repoType, requiresType):
                     p=dep["package"],
                     v=dep["version"],
                     r=dep["revision"])
-    execute(format("cd %(workDir)s &&"
-                   "mkdir -p %(target)s &&"
+    execute(format("cd %(workDir)s && "
+                   "mkdir -p %(target)s && "
                    "ln -sfn %(source)s %(target)s",
                    workDir = args.workDir,
                    target=target,
@@ -336,7 +336,7 @@ def createDistLinks(spec, specs, args, repoType, requiresType):
     bucket = re.sub("^s3://", "", args.writeStore)
     cmd = format("cd %(w)s && "
                  "for x in `find %(t)s -type l`; do"
-                 "  HASHEDURL=`readlink $x | sed -e 's|.*/[.][.]/TARS|TARS|'` &&"
+                 "  HASHEDURL=`readlink $x | sed -e 's|.*/[.][.]/TARS|TARS|'` && "
                  "  echo $HASHEDURL | s3cmd put --skip-existing -q -P -s --add-header=\"x-amz-website-redirect-location:https://s3.cern.ch/swift/v1/%(b)s/${HASHEDURL}\" --host s3.cern.ch --host-bucket %(b)s.s3.cern.ch - s3://%(b)s/$x 2>/dev/null;"
                  "done",
                  w=args.workDir,
@@ -805,6 +805,40 @@ def doBuild(args, parser):
       spec["revision"] = min(set(range(1, max(busyRevisions)+2)) - set(busyRevisions))
     elif not "revision" in spec:
       spec["revision"] = "1"
+
+    # Recreate symlinks to this development package builds.
+    if spec["package"] in develPkgs:
+      debug("Creating symlinks to builds of devel package %s" % spec["package"])
+      cmd = format("ln -snf %(pkgHash)s %(wd)s/BUILD/%(pkgName)s-latest",
+                   wd=workDir,
+                   pkgName=spec["package"],
+                   pkgHash=spec["hash"])
+      if develPrefix:
+        cmd += format(" && ln -snf %(pkgHash)s %(wd)s/BUILD/%(pkgName)s-latest-%(devPrefix)s",
+                      wd=workDir,
+                      pkgName=spec["package"],
+                      pkgHash=spec["hash"],
+                      devPrefix=develPrefix)
+      err = execute(cmd)
+      debug(err, cmd)
+      # Last package built gets a "latest" mark.
+      cmd = format("ln -snf %(pkgVersion)s-%(pkgRevision)s %(wd)s/%(arch)s/%(pkgName)s/latest",
+                   wd=workDir,
+                   arch=args.architecture,
+                   pkgName=spec["package"],
+                   pkgVersion=spec["version"],
+                   pkgRevision=spec["revision"])
+      # Latest package built for a given devel prefix gets a "latest-%(family)s" mark.
+      if spec["build_family"]:
+        cmd += format(" && ln -snf %(pkgVersion)s-%(pkgRevision)s %(wd)s/%(arch)s/%(pkgName)s/latest-%(family)s",
+                      wd=workDir,
+                      arch=args.architecture,
+                      pkgName=spec["package"],
+                      pkgVersion=spec["version"],
+                      pkgRevision=spec["revision"],
+                      family=spec["build_family"])
+      err = execute(cmd)
+      debug(err, cmd)
 
     # Check if this development package needs to be rebuilt.
     if spec["package"] in develPkgs:
