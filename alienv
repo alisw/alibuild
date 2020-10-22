@@ -243,9 +243,6 @@ if [[ -d $WORK_DIR/MODULES/$ARCHITECTURE ]]; then
   rm -f $WORK_DIR/MODULES/$ARCHITECTURE/.testwrite 2> /dev/null || true
 fi
 
-# Ask environment-modules to run in 3.x mode
-export MODULES_USE_COMPAT_VERSION=1
-
 export MODULEPATH="$WORK_DIR/MODULES/$ARCHITECTURE${MODULEPATH:+":$MODULEPATH"}"
 MODULEPATH=$(echo "$MODULEPATH" | sed -e 's/::*/:/g; s/^://; s/:$//')
 IGNORE_ERR="Unable to locate a modulefile for 'Toolchain/"
