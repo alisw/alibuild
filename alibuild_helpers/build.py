@@ -465,7 +465,7 @@ def doBuild(args, parser):
 
   # Clone/update repos
   for p in [p for p in buildOrder if "source" in specs[p]]:
-    updateReferenceRepoSpec(args.referenceSources, p, specs[p], args.fetchRepos)
+    updateReferenceRepoSpec(args.referenceSources, p, specs[p], args.fetchRepos, not args.docker)
 
     # Retrieve git heads
     cmd = "git ls-remote --heads %s" % (specs[p].get("reference", specs[p]["source"]))
@@ -938,7 +938,7 @@ def doBuild(args, parser):
       referenceStatement = "export GIT_REFERENCE=${GIT_REFERENCE_OVERRIDE:-%s}/%s" % (dirname(spec["reference"]), basename(spec["reference"]))
 
     partialCloneStatement = ""
-    if partialCloneFilter:
+    if partialCloneFilter and not args.docker:
       partialCloneStatement = "export GIT_PARTIAL_CLONE_FILTER='--filter=blob:none'"
 
     debug(spec)
@@ -1045,7 +1045,7 @@ def doBuild(args, parser):
         additionalEnv += " -e %s='%s' " % env
       for volume in args.volumes:
         additionalVolumes += " -v %s " % volume
-      dockerWrapper = format("docker run --rm -it"
+      dockerWrapper = format("docker run --rm"
               " --user $(id -u):$(id -g)"
               " -v %(workdir)s:/sw"
               " -v %(scriptDir)s/build.sh:/build.sh:ro"
@@ -1057,7 +1057,7 @@ def doBuild(args, parser):
               " %(overrideSource)s"
               " -e WORK_DIR_OVERRIDE=/sw"
               " %(image)s"
-              " %(bash)s -e -x /build.sh",
+              " -c \"%(bash)s -e -x /build.sh\"",
               additionalEnv=additionalEnv,
               additionalVolumes=additionalVolumes,
               bash=BASH,
