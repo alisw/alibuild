@@ -631,15 +631,21 @@ def doBuild(args, parser):
     todo = [p]
     spec["full_requires"] = []
     spec["full_runtime_requires"] = []
+    spec["full_build_requires"] = []
     while todo:
       i = todo.pop(0)
       requires = specs[i].get("requires", [])
       runTimeRequires = specs[i].get("runtime_requires", [])
+      buildRequires = specs[i].get("build_requires", [])
       spec["full_requires"] += requires
       spec["full_runtime_requires"] += runTimeRequires
+      spec["full_build_requires"] += buildRequires
       todo += requires
     spec["full_requires"] = set(spec["full_requires"])
     spec["full_runtime_requires"] = set(spec["full_runtime_requires"])
+    # If something requires or runtime_requires a package, then it's not 
+    # a build_requires only anymore, so we drop it from the list.
+    spec["full_build_requires"] = set(spec["full_build_requires"]) - spec["full_runtime_requires"]
 
   debug("We will build packages in the following order: %s" % " ".join(buildOrder))
   if args.dryRun:
@@ -1026,6 +1032,9 @@ def doBuild(args, parser):
       ("RELOCATE_PATHS", " ".join(spec.get("relocate_paths", []))),
       ("REQUIRES", " ".join(spec["requires"])),
       ("RUNTIME_REQUIRES", " ".join(spec["runtime_requires"])),
+      ("FULL_RUNTIME_REQUIRES", " ".join(spec["full_runtime_requires"])),
+      ("FULL_BUILD_REQUIRES", " ".join(spec["full_build_requires"])),
+      ("FULL_REQUIRES", " ".join(spec["full_requires"])),
       ("WRITE_REPO", spec.get("write_repo", source)),
     ]
     # Add the extra environment as passed from the command line.
