@@ -16,7 +16,7 @@ try:
 except ImportError:
   from ordereddict import OrderedDict
 
-def updateReferenceRepoSpec(referenceSources, p, spec, fetch):
+def updateReferenceRepoSpec(referenceSources, p, spec, fetch, usePartialClone=True):
   """
   Update source reference area whenever possible, and set the spec's "reference"
   if available for reading.
@@ -26,11 +26,11 @@ def updateReferenceRepoSpec(referenceSources, p, spec, fetch):
   @spec             : the spec of the package to be updated (an OrderedDict)
   @fetch            : whether to fetch updates: if False, only clone if not found
   """
-  spec["reference"] = updateReferenceRepo(referenceSources, p, spec, fetch)
+  spec["reference"] = updateReferenceRepo(referenceSources, p, spec, fetch, usePartialClone)
   if not spec["reference"]:
     del spec["reference"]
 
-def updateReferenceRepo(referenceSources, p, spec, fetch=True):
+def updateReferenceRepo(referenceSources, p, spec, fetch=True, usePartialClone=True):
   """
   Update source reference area, if possible.
   If the area is already there and cannot be written, assume it maintained
@@ -69,7 +69,7 @@ def updateReferenceRepo(referenceSources, p, spec, fetch=True):
 
   err = False
   if not path.exists(referenceRepo):
-    cmd = ["git", "clone", partialCloneFilter, "--bare", spec["source"], referenceRepo]
+    cmd = ["git", "clone"] + (usePartialClone and [partialCloneFilter] or []) + ["--bare", spec["source"], referenceRepo]
     cmd = [x for x in cmd if x]
     debug("Cloning reference repository: %s" % " ".join(cmd))
     err = execute(cmd)
