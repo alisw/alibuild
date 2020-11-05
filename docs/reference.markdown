@@ -320,21 +320,11 @@ alibuild-generate-module > etc/modulefiles/$PKGNAME
 mkdir -p $INSTALLROOT/etc/modulefiles && rsync -a --delete etc/modulefiles/ $INSTALLROOT/etc/modulefiles
 ```
 
-One can also append extra configuration with e.g.:
+One can also make sure that PATH and LD_LIBRARY_PATH are properly amended by passing the option `--bin` and `--lib` (respectively). Or you can simply append extra information via:
 
 ```bash
+alibuild-generate-module > etc/modulefiles/$PKGNAME
 cat >> etc/modulefiles/$PKGNAME <<EoF
-# Our environment
-set DEBUGGUI_ROOT \$::env(BASEDIR)/$PKGNAME/\$version
-prepend-path PATH \$DEBUGGUI_ROOT/bin
-prepend-path LD_LIBRARY_PATH \$DEBUGGUI_ROOT/lib
+prepend-path ROOT_INCLUDE_PATH \$PKG_ROOT/include
 EoF
 ```
-
-Notice that this will append a dependency on all the requirements of a given package, being them `requires` or `build_requires` if you need to disable a few, just set as empty the associated `_REVISION` variable, e.g.:
-
-```bash
-LIBUV_REVISION= alibuild-generate-module > etc/modulefiles/$PKGNAME
-```
-
-will remove libuv from the dependencies.
