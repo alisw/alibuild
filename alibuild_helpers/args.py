@@ -234,7 +234,7 @@ def finaliseArgs(args, parser, star):
     if args.architecture == "slc7_x86-64" and not args.preferSystem:
       args.noSystem = True
       if not args.remoteStore:
-        args.remoteStore = "https://alicache.cern.ch/"
+        args.remoteStore = "https://s3.cern.ch/swift/v1/alibuild-repo"
 
     if args.remoteStore or args.writeStore:
       args.noSystem = True
