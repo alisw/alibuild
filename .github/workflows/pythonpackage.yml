@@ -42,7 +42,7 @@ jobs:
         sudo NOKOGIRI_USE_SYSTEM_LIBRARIES=true gem install --no-document jekyll html-proofer
         pip install pylint mock coverage codecov distro
         cd ..
-        git clone -b IB/v5-06/next https://github.com/alisw/alidist
+        git clone -b O2-v1.3.0 https://github.com/alisw/alidist
         cat /etc/os-release
         alibuild/script/cibuild
         bash <(curl -s https://codecov.io/bash)
