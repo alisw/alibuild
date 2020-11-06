@@ -13,11 +13,9 @@ jobs:
   build:
     name: Build on ${{ matrix.python-version }} / ${{matrix.container }}
     runs-on: ubuntu-latest
-    container: ${{ matrix.container }}
     strategy:
       matrix:
         python-version: [2.7, 3.5, 3.6, 3.7, 3.8]
-        container: ['centos:7']
 
     steps:
     - uses: actions/checkout@v2
