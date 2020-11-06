@@ -122,13 +122,26 @@ class HttpRemoteSync:
           os.rename(dest+".tmp", dest)  # we should not have errors here
           return True
         else:
-          # No destination specified: JSON request
-          resp = get(url, verify=not self.insecure, timeout=self.httpTimeoutSec)
-          if resp.status_code == 404:
-            # No need to retry any further
-            return None
-          resp.raise_for_status()
-          return resp.json()
+          # For CERN S3 we need to construct the JSON ourself...
+          s3Request = re.match("https://s3.cern.ch/swift/v1[/]+([^/]*)/(.*)$", url)
+          if s3Request:
+            [bucket, prefix] = s3Request.groups()
+            url = "https://s3.cern.ch/swift/v1/%s/?prefix=%s" % (bucket, prefix.strip("/"))
+            resp = get(url, verify=not self.insecure, timeout=self.httpTimeoutSec)
+            if resp.status_code == 404:
+              # No need to retry any further
+              return None
+            resp.raise_for_status()
+            resp = resp.text
+            return [{"name": basename(x), "type": "file"} for x in resp.split()]
+          else:
+            # No destination specified: JSON request
+            resp = get(url, verify=not self.insecure, timeout=self.httpTimeoutSec)
+            if resp.status_code == 404:
+              # No need to retry any further
+              return None
+            resp.raise_for_status()
+            return resp.json()
       except (RequestException,ValueError,PartialDownloadError) as e:
         if i == self.httpConnRetries-1:
           error("GET %s failed: %s" % (url, str(e)))
