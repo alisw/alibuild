@@ -265,7 +265,7 @@ class S3RemoteSync:
 
   def syncToLocal(self, p, spec):
     debug("Updating remote store for package %s@%s" % (p, spec["hash"]))
-    cmd = format(
+    cmd = format("set -x\n"
                  "mkdir -p %(tarballHashDir)s\n"
                  "s3cmd sync -s -v --host s3.cern.ch --host-bucket %(b)s.s3.cern.ch s3://%(b)s/%(storePath)s/ %(tarballHashDir)s/ 2>/dev/null || true\n"
                  "for x in `s3cmd ls -s --host s3.cern.ch --host-bucket %(b)s.s3.cern.ch s3://%(b)s/%(linksPath)s/ 2>/dev/null | sed -e 's|.*s3://|s3://|'`; do"
@@ -286,7 +286,7 @@ class S3RemoteSync:
     tarballNameWithRev = format("%(package)s-%(version)s-%(revision)s.%(architecture)s.tar.gz",
                                 architecture=self.architecture,
                                 **spec)
-    cmd = format("cd %(workdir)s && "
+    cmd = format("set -x; cd %(workdir)s && "
                  "TARSHA256=`sha256sum %(storePath)s/%(tarballNameWithRev)s | awk '{ print $1 }'` && "
                  "s3cmd put -s -v --host s3.cern.ch --add-header \"x-amz-meta-sha256:$TARSHA256\" --host-bucket %(b)s.s3.cern.ch %(storePath)s/%(tarballNameWithRev)s s3://%(b)s/%(storePath)s/ 2>/dev/null || true\n"
                  "HASHEDURL=`readlink %(linksPath)s/%(tarballNameWithRev)s | sed -e's|^../../||'` &&"
