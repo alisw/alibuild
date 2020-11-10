@@ -328,10 +328,10 @@ def createDistLinks(spec, specs, args, repoType, requiresType):
   rsyncOptions = ""
   if args.writeStore.startswith("s3://"):
     bucket = re.sub("^s3://", "", args.writeStore)
-    cmd = format("cd %(w)s && "
+    cmd = format("set -x; cd %(w)s && "
                  "for x in `find %(t)s -type l`; do"
                  "  HASHEDURL=`readlink $x | sed -e 's|.*/[.][.]/TARS|TARS|'` &&"
-                 "  echo $HASHEDURL | s3cmd put --skip-existing -q -P -s --add-header=\"x-amz-website-redirect-location:https://s3.cern.ch/swift/v1/%(b)s/${HASHEDURL}\" --host s3.cern.ch --host-bucket %(b)s.s3.cern.ch - s3://%(b)s/$x 2>/dev/null;"
+                 "  echo $HASHEDURL | s3cmd put --skip-existing -q -P -s --add-header=\"x-amz-website-redirect-location:https://s3.cern.ch/swift/v1/%(b)s/${HASHEDURL}\" --host s3.cern.ch --host-bucket %(b)s.s3.cern.ch - s3://%(b)s/$x;"
                  "done",
                  w=args.workDir,
                  b=bucket,
