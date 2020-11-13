@@ -235,9 +235,7 @@ def finaliseArgs(args, parser, star):
       args.noSystem = True
       if not args.remoteStore:
         args.remoteStore = "https://s3.cern.ch/swift/v1/alibuild-repo"
-
-    # On selected platforms, caching is active by default
-    if args.architecture == "ubuntu1804_x86-64" and not args.preferSystem:
+    elif args.architecture == "ubuntu1804_x86-64" and not args.preferSystem:
       args.noSystem = True
       if not args.remoteStore:
         args.remoteStore = "https://s3.cern.ch/swift/v1/alibuild-repo"
