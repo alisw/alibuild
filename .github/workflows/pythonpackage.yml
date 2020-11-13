@@ -38,7 +38,21 @@ jobs:
       run: |
         set -x
         sudo apt-get update -y
-        sudo apt-get install -y environment-modules libxml2-dev libxslt1-dev ruby-dev
+        sudo apt-get install -y curl                \
+                                libcurl4-gnutls-dev \
+                                build-essential     \
+                                gfortran            \
+                                libmysqlclient-dev  \
+                                xorg-dev            \
+                                libglu1-mesa-dev    \
+                                libfftw3-dev        \
+                                libxml2-dev         \
+                                git                 \
+                                unzip               \
+                                autoconf            \
+                                automake            \
+                                autopoint           \
+                                texinfo gettext libtool libtool-bin pkg-config bison flex libperl-dev libbz2-dev swig liblzma-dev libnanomsg-dev rsync lsb-release unzip environment-modules libglfw3-dev libtbb-dev python3-venv libncurses-dev environment-modules libxml2-dev libxslt1-dev ruby-dev
         sudo NOKOGIRI_USE_SYSTEM_LIBRARIES=true gem install --no-document jekyll html-proofer
         pip install pylint mock coverage codecov distro
         cd ..
