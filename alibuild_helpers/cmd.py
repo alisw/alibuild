@@ -9,7 +9,8 @@ import subprocess
 BASH = "bash" if getstatusoutput("/bin/bash --version")[0] else "/bin/bash"
 
 def execute(command, printer=debug):
-  popen = subprocess.Popen(command, shell=is_string(command), stdout=subprocess.PIPE)
+  popen = subprocess.Popen(command, shell=is_string(command),
+                           stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
   lines_iterator = iter(popen.stdout.readline, "")
   for line in lines_iterator:
     if not line: break
