@@ -185,7 +185,7 @@ class HttpRemoteSync:
       self.doneOrFailed.append(spec["hash"])
       return
 
-    execute(" ".join(("mkdir", "-p", spec["tarballHashDir"], spec["tarballLinkDir"])))
+    execute("mkdir -p %s %s" % (spec["tarballHashDir"], spec["tarballLinkDir"]))
     hashList = [x["name"] for x in hashList]
 
     hasErr = False
