@@ -91,7 +91,7 @@ class HttpRemoteSync:
     self.httpBackoff = 0.4
     self.doneOrFailed = []
 
-  def getRetry(self, url, dest=None):
+  def getRetry(self, url, dest=None, returnResult=False):
     for i in range(0, self.httpConnRetries):
       if i > 0:
         pauseSec = self.httpBackoff * (2 ** (i - 1))
@@ -99,28 +99,39 @@ class HttpRemoteSync:
         time.sleep(pauseSec)
       try:
         debug("GET %s: processing (attempt %d/%d)" % (url, i+1, self.httpConnRetries))
-        if dest:
-          # Destination specified. Use requests in stream mode
+        if dest or returnResult:
+          # Destination specified -- file (dest) or buffer (returnResult).
+          # Use requests in stream mode
           resp = get(url, stream=True, verify=not self.insecure, timeout=self.httpTimeoutSec)
           size = int(resp.headers.get("content-length", "-1"))
           downloaded = 0
           reportTime = time.time()
-          with open(dest+".tmp", "wb") as destFp:
-            for chunk in resp.iter_content(chunk_size=32768):
-              if chunk:
+          result = []
+
+          try:
+            destFp = open(dest+".tmp", "wb") if dest else None
+            for chunk in filter(bool, resp.iter_content(chunk_size=32768)):
+              if destFp:
                 destFp.write(chunk)
-                downloaded += len(chunk)
-                if size != -1:
-                  now = time.time()
-                  if downloaded == size:
-                    debug("Download complete")
-                  elif now - reportTime > 3:
-                    debug("%.0f%% downloaded..." % (100*downloaded/size))
-                    reportTime = now
-          if size not in [ downloaded, -1 ]:
+              if returnResult:
+                result.append(chunk)
+              downloaded += len(chunk)
+              if size != -1:
+                now = time.time()
+                if downloaded == size:
+                  debug("Download complete")
+                elif now - reportTime > 3:
+                  debug("%.0f%% downloaded..." % (100*downloaded/size))
+                  reportTime = now
+          finally:
+            if destFp:
+              destFp.close()
+
+          if size not in (downloaded, -1):
             raise PartialDownloadError(downloaded, size)
-          os.rename(dest+".tmp", dest)  # we should not have errors here
-          return True
+          if dest:
+            os.rename(dest+".tmp", dest)  # we should not have errors here
+          return b''.join(result) if returnResult else True
         else:
           # For CERN S3 we need to construct the JSON ourself...
           s3Request = re.match("https://s3.cern.ch/swift/v1[/]+([^/]*)/(.*)$", url)
@@ -174,11 +185,7 @@ class HttpRemoteSync:
       self.doneOrFailed.append(spec["hash"])
       return
 
-    cmd = format("mkdir -p %(hd)s && "
-                 "mkdir -p %(ld)s",
-                 hd=spec["tarballHashDir"],
-                 ld=spec["tarballLinkDir"])
-    execute(cmd)
+    execute(" ".join(("mkdir", "-p", spec["tarballHashDir"], spec["tarballLinkDir"])))
     hashList = [x["name"] for x in hashList]
 
     hasErr = False
@@ -187,9 +194,7 @@ class HttpRemoteSync:
       if os.path.isfile(destPath):
         # Do not redownload twice
         continue
-      srcUrl = "{remoteStore}/{storePath}/{pkg}".format(
-        remoteStore=self.remoteStore, storePath=spec["storePath"], pkg=pkg)
-      if self.getRetry(srcUrl, destPath) != True:
+      if not self.getRetry("/".join((self.remoteStore, spec["storePath"], pkg)), destPath):
         hasErr = True
 
     for pkg in pkgList:
@@ -202,10 +207,12 @@ class HttpRemoteSync:
                      ld = spec["tarballLinkDir"])
         execute(cmd)
       else:
-        cmd = format("ln -nsf unknown %(ld)s/%(n)s\n",
-                     ld = spec["tarballLinkDir"],
-                     n = pkg["name"])
-        execute(cmd)
+        linkTarget = self.getRetry("/".join((self.remoteStore, spec["linksPath"], pkg["name"])),
+                                   returnResult=True)
+        execute(format("ln -nsf %(target)s %(ld)s/%(n)s\n",
+                       target=linkTarget.decode("utf-8"),
+                       ld=spec["tarballLinkDir"],
+                       n=pkg["name"]))
 
     if not hasErr:
       self.doneOrFailed.append(spec["hash"])
