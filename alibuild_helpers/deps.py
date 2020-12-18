@@ -20,7 +20,7 @@ def doDeps(args, parser):
 
   # Resolve all the package parsing boilerplate
   specs = {}
-  defaultsReader = lambda: readDefaults(args.configDir, args.defaults, parser.error)
+  defaultsReader = lambda: readDefaults(args.configDir, args.defaults, parser.error, args.architecture)
   (err, overrides, taps) = parseDefaults(args.disable, defaultsReader, debug)
   (systemPackages, ownPackages, failed, validDefaults) = \
     getPackageList(packages                = [args.package],

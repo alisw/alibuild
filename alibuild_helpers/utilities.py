@@ -171,7 +171,7 @@ def filterByArchitecture(arch, requires):
     if re.match(matcher, arch):
       yield require
 
-def readDefaults(configDir, defaults, error):
+def readDefaults(configDir, defaults, error, architecture):
   defaultsFilename = "%s/defaults-%s.sh" % (configDir, defaults)
   if not exists(defaultsFilename):
     viableDefaults = ["- " + basename(x).replace("defaults-","").replace(".sh", "")
@@ -183,6 +183,17 @@ def readDefaults(configDir, defaults, error):
   if err:
     error(err)
     sys.exit(1)
+  archDefaults = "%s/defaults-%s.sh" % (configDir, architecture)
+  archMeta = {}
+  archBody = ""
+  if exists(archDefaults):
+    err, archMeta, archBody = parseRecipe(getRecipeReader(defaultsFilename))
+    if err:
+      error(err)
+      sys.exit(1)
+    for x in ["env", "disable", "overrides"]:
+      defaultsMeta.get(x, {}).update(archMeta.get(x, {}))
+    defaultsBody += "\n# Architecture defaults\n" + archBody
   return (defaultsMeta, defaultsBody)
 
 # Get the appropriate recipe reader depending on th filename

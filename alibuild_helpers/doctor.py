@@ -159,7 +159,7 @@ def doDoctor(args, parser):
   specs = {}
   def unreachable():
     assert(False)
-  defaultsReader = lambda : readDefaults(args.configDir, args.defaults, parser.error)
+  defaultsReader = lambda : readDefaults(args.configDir, args.defaults, parser.error, args.architecture)
   (err, overrides, taps) = parseDefaults(args.disable, defaultsReader, info)
   if err:
     error(err)

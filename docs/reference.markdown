@@ -240,6 +240,19 @@ For a more complete example see
 You can limit which defaults can be applied to a given package by using the
 `valid_defaults` key.
 
+### Architecture defaults
+
+Architecture defaults are similar to normal defaults but they are
+always sourced, if available in alidist, and should never be provided on the
+command line. 
+
+Their filename is always:
+
+    defaults-<arch>.sh
+
+where `<arch>` is the current architecture. They have precedence over normal
+defaults.
+
 ## Relocation 
 
 aliBuild supports relocating binary packages so that the scratch space used for builds (e.g. /build) and the actual installation folder (i.e. /cvmfs/alice.cern.ch ) do not need to be the same. By design this is done automatically, and

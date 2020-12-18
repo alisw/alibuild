@@ -51,7 +51,7 @@ def doInit(args):
   # Use standard functions supporting overrides and taps. Ignore all disables
   # and system packages as they are irrelevant in this context
   specs = {}
-  defaultsReader = lambda: readDefaults(args.configDir, args.defaults, error)
+  defaultsReader = lambda: readDefaults(args.configDir, args.defaults, error, args.architecture)
   (err, overrides, taps) = parseDefaults([], defaultsReader, debug)
   (_,_,_,validDefaults) = getPackageList(packages=[ p["name"] for p in pkgs ],
                                          specs=specs,
