@@ -375,7 +375,7 @@ def doBuild(args, parser):
                     "Maybe you need to \"cd\" to the right directory or " +
                     "you forgot to run \"aliBuild init\"?") % (star(), args.configDir), 1)
 
-  defaultsReader = lambda : readDefaults(args.configDir, args.defaults, parser.error)
+  defaultsReader = lambda : readDefaults(args.configDir, args.defaults, parser.error, args.architecture)
   (err, overrides, taps) = parseDefaults(args.disable,
                                          defaultsReader, debug)
   dieOnError(err, err)
