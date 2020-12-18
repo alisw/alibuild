@@ -102,7 +102,8 @@ class InitTestCase(unittest.TestCase):
         dist = fake_dist,
         defaults = "release",
         dryRun = False,
-        fetchRepos = False
+        fetchRepos = False,
+        architecture = "slc7_x86-64"
       )
       doInit(args)
       mock_execute.assert_called_with("git clone --filter=blob:none https://github.com/alisw/AliRoot -b v5-08-00 --reference /sw/MIRROR/aliroot ./AliRoot && cd ./AliRoot && git remote set-url --push origin https://github.com/alisw/AliRoot")
