@@ -67,7 +67,8 @@ class InitTestCase(unittest.TestCase):
         dist = fake_dist,
         defaults = "release",
         dryRun = True,
-        fetchRepos = False
+        fetchRepos = False,
+        architecture = "slc7_x86-64"
       )
       self.assertRaises(SystemExit, doInit, args)
       self.assertEqual(mock_info.mock_calls, [call('This will initialise local checkouts for zlib,AliRoot\n--dry-run / -n specified. Doing nothing.')])
