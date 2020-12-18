@@ -192,7 +192,7 @@ def readDefaults(configDir, defaults, error, architecture):
       error(err)
       sys.exit(1)
     for x in ["env", "disable", "overrides"]:
-      defaultsMeta.get(x, {}).update(archMeta.get(x, {}))
+      defaultsMeta.setdefault(x, {}).update(archMeta.get(x, {}))
     defaultsBody += "\n# Architecture defaults\n" + archBody
   return (defaultsMeta, defaultsBody)
 
