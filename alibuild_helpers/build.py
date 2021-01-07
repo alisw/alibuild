@@ -91,14 +91,21 @@ class HttpRemoteSync:
     self.httpBackoff = 0.4
     self.doneOrFailed = []
 
-  def getRetry(self, url, dest=None, returnResult=False):
+  def getRetry(self, url, dest=None, returnResult=False, log=True):
     for i in range(0, self.httpConnRetries):
       if i > 0:
         pauseSec = self.httpBackoff * (2 ** (i - 1))
         debug("GET %s failed: retrying in %.2f" % (url, pauseSec))
         time.sleep(pauseSec)
+        # If the download has failed, enable debug output, even if it was
+        # disabled before. We disable debug output for e.g. symlink downloads
+        # to make sure the output log isn't overwhelmed. If the download
+        # failed, we want to know about it, though. Note that aliBuild has to
+        # be called with --debug for this to take effect.
+        log = True
       try:
-        debug("GET %s: processing (attempt %d/%d)" % (url, i+1, self.httpConnRetries))
+        if log:
+          debug("GET %s: processing (attempt %d/%d)" % (url, i+1, self.httpConnRetries))
         if dest or returnResult:
           # Destination specified -- file (dest) or buffer (returnResult).
           # Use requests in stream mode
@@ -116,7 +123,7 @@ class HttpRemoteSync:
               if returnResult:
                 result.append(chunk)
               downloaded += len(chunk)
-              if size != -1:
+              if log and size != -1:
                 now = time.time()
                 if downloaded == size:
                   debug("Download complete")
@@ -208,7 +215,7 @@ class HttpRemoteSync:
         execute(cmd)
       else:
         linkTarget = self.getRetry("/".join((self.remoteStore, spec["linksPath"], pkg["name"])),
-                                   returnResult=True)
+                                   returnResult=True, log=False)
         execute(format("ln -nsf %(target)s %(ld)s/%(n)s\n",
                        target=linkTarget.decode("utf-8").rstrip("\r\n"),
                        ld=spec["tarballLinkDir"],
