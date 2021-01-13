@@ -315,6 +315,8 @@ def createDistLinks(spec, specs, args, repoType, requiresType):
                   v=spec["version"],
                   r=spec["revision"])
   shutil.rmtree(target, True)
+  cmd = format("cd %(w)s && mkdir -p %(t)s", w=args.workDir, t=target)
+  links = []
   for x in [spec["package"]] + list(spec[requiresType]):
     dep = specs[x]
     source = format("../../../../../TARS/%(a)s/store/%(sh)s/%(h)s/%(p)s-%(v)s-%(r)s.%(a)s.tar.gz",
@@ -324,12 +326,14 @@ def createDistLinks(spec, specs, args, repoType, requiresType):
                     p=dep["package"],
                     v=dep["version"],
                     r=dep["revision"])
-    execute(format("cd %(workDir)s && "
-                   "mkdir -p %(target)s && "
-                   "ln -sfn %(source)s %(target)s",
-                   workDir = args.workDir,
-                   target=target,
-                   source=source))
+    links.append(format("ln -sfn %(source)s %(target)s",
+                 target=target,
+                 source=source))
+  # We do it in chunks to avoid hitting shell limits but
+  # still do more than one symlink at the time, to save the
+  # forking cost.
+  for g in [ links[i:i+10] for i in range(0, len(links), 10) ]:
+    execute(" && ".join([cmd] + g))
 
   rsyncOptions = ""
   if args.writeStore.startswith("s3://"):
