@@ -67,7 +67,7 @@ CORRECT_BEHAVIOR = [
   ((), "build zlib --remote-store rsync://test.local/"                    , [("noSystem", True)]),
   ((), "build zlib --remote-store rsync://test.local/::rw"                , [("noSystem", True), ("remoteStore", "rsync://test.local/"), ("writeStore", "rsync://test.local/")]),
   ((), "build zlib --architecture slc7_x86-64"                            , [("noSystem", True), ("preferSystem", False), ("remoteStore", "https://s3.cern.ch/swift/v1/alibuild-repo")]),
-  ((), "build zlib --architecture ubuntu1804_x86-64"                      , [("noSystem", True), ("preferSystem", False), ("remoteStore", "https://s3.cern.ch/swift/v1/alibuild-repo")]),
+  ((), "build zlib --architecture ubuntu1804_x86-64"                      , [("noSystem", False), ("preferSystem", False), ("remoteStore", "")]),
   ((), "build zlib -a slc7_x86-64 --docker-image alisw/slc7-builder"      , [("docker", True), ("dockerImage", "alisw/slc7-builder")]),
   ((), "build zlib -a slc7_x86-64 --docker"                               , [("docker", True), ("dockerImage", "alisw/slc7-builder")]),
   ((), "build zlib --devel-prefix -a slc7_x86-64 --docker"                , [("docker", True), ("dockerImage", "alisw/slc7-builder"), ("develPrefix", "%s-slc7_x86-64" % os.path.basename(os.getcwd()))]),
