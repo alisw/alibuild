@@ -386,6 +386,14 @@ def doBuild(args, parser):
                     "Maybe you need to \"cd\" to the right directory or " +
                     "you forgot to run \"aliBuild init\"?") % (star(), args.configDir), 1)
 
+  err, value = getstatusoutput("GIT_DIR=%s/.git git symbolic-ref -q HEAD" % args.configDir)
+  branch_basename = re.sub("refs/heads/", "", value)
+  branch_stream = re.sub("-patches$", "", branch_basename)
+  # In case the basename and the stream are the same,
+  # the stream becomes empty.
+  if branch_stream == branch_basename:
+    branch_stream = ""
+
   defaultsReader = lambda : readDefaults(args.configDir, args.defaults, parser.error, args.architecture)
   (err, overrides, taps) = parseDefaults(args.disable,
                                          defaultsReader, debug)
@@ -556,6 +564,8 @@ def doBuild(args, parser):
                              commit_hash=spec["commit_hash"],
                              short_hash=spec["commit_hash"][0:10],
                              tag=spec["tag"],
+                             branch_basename = branch_basename,
+                             branch_stream = branch_stream or spec["tag"],
                              tag_basename=basename(spec["tag"]),
                              defaults_upper=defaults_upper,
                              **nowKwds)

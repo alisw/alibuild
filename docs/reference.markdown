@@ -50,6 +50,8 @@ The following entries are mandatory in the header:
     of the package. Notice you can actually use some special formatting
     substitutions which will be replaced with the associated value on build.
     Valid substitutions are:
+      - `%(branch_basename)s`
+      - `%(branch_stream)s`
       - `%(commit_hash)s`
       - `%(short_hash)s`
       - `%(tag)s`
@@ -130,6 +132,10 @@ The following entries are optional in the header:
   - `relocate_paths`: a list of toplevel paths scanned recursively to perform
     relocation of executables and dynamic libraries **on macOS only**. If not
     specified, defaults to `bin`, `lib` and `lib64`.
+  - `branch_basename`: the name of the current alidist branch.
+  - `branch_stream`: in case the alidist branch ends in `-patches`, the name of
+    branch without `-patches`. If the branch does not end in `-patches`, the
+    `tag` field of the recipe is used.
 
 ### The body
 

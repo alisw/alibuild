@@ -89,7 +89,8 @@ def dummy_getstatusoutput(x):
       "GIT_DIR=/alidist/.git git rev-parse HEAD": (0, "6cec7b7b3769826219dfa85e5daa6de6522229a0"),
       'pip --disable-pip-version-check show alibuild | grep -e "^Version:" | sed -e \'s/.* //\'': (0, "v1.5.0"),
       'which pigz': (1, ""),
-      'tar --ignore-failed-read -cvvf /dev/null /dev/zero': (0, "")
+      'tar --ignore-failed-read -cvvf /dev/null /dev/zero': (0, ""),
+      'GIT_DIR=/alidist/.git git symbolic-ref -q HEAD': (0, "master")
     }[x]
 
 def dummy_getStatusOutputBash(x):
