@@ -137,6 +137,7 @@ def dummy_execute(x, mock_git_clone, mock_git_fetch, **kwds):
     '/bin/bash -e -x /sw/SPECS/osx_x86-64/ROOT/v6-08-30-1/build.sh 2>&1': 0,
     "git clone --filter=blob:none --bare https://github.com/star-externals/zlib /sw/MIRROR/zlib": 0,
     "git clone --filter=blob:none --bare https://github.com/root-mirror/root /sw/MIRROR/root": 0,
+    "cat /sw/MIRROR/fetch-log.txt": 0,
   }[s]
 
 def dummy_readlink(x):
