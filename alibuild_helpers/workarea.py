@@ -68,6 +68,7 @@ def updateReferenceRepo(referenceSources, p, spec, fetch=True, usePartialClone=T
       return None  # no reference can be found and created (not fatal)
 
   err = False
+  logPath = os.path.join(dirname(referenceRepo), "fetch-log.txt")
   if not path.exists(referenceRepo):
     cmd = ["git", "clone"] + (usePartialClone and [partialCloneFilter] or []) + ["--bare", spec["source"], referenceRepo]
     cmd = [x for x in cmd if x]
@@ -75,12 +76,15 @@ def updateReferenceRepo(referenceSources, p, spec, fetch=True, usePartialClone=T
     err = execute(cmd)
   elif fetch:
     cmd = format("cd %(referenceRepo)s && "
-                 "git fetch -f --tags %(source)s 2>&1 && "
-                 "git fetch -f %(source)s '+refs/heads/*:refs/heads/*' 2>&1",
+                 "git fetch -f --tags %(source)s >%(logPath)s 2>&1 && "
+                 "git fetch -f %(source)s '+refs/heads/*:refs/heads/*' >>%(logPath)s 2>&1",
                  referenceRepo=referenceRepo,
-                 source=spec["source"])
+                 source=spec["source"],
+                 logPath=logPath)
     debug("Updating reference repository: %s" % cmd)
     err = execute(cmd)
+  if os.path.exists(logPath):
+    execute("cat " + logPath)
   dieOnError(err, "Error while updating reference repos %s." % spec["source"])
   return referenceRepo  # reference is read-write
 
