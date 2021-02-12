@@ -67,6 +67,7 @@ def getDirectoryHash(d):
 
 # Helper class which does not do anything to sync
 class NoRemoteSync:
+  writeStore = ""
   def syncToLocal(self, p, spec):
     pass
   def syncToRemote(self, p, spec):
@@ -727,7 +728,7 @@ def doBuild(args, parser):
       logger_handler.setFormatter(
           LogFormatter("%%(asctime)s:%%(levelname)s:%s:%s:%s: %%(message)s" %
                        (mainPackage, p, args.develPrefix if "develPrefix" in args else mainHash[0:8])))
-    if spec["package"] in develPkgs and getattr(syncHelper, "writeStore", None):
+    if spec["package"] in develPkgs and syncHelper.writeStore:
       warning("Disabling remote write store from now since %s is a development package.", spec["package"])
       syncHelper.writeStore = ""
 
@@ -768,7 +769,6 @@ def doBuild(args, parser):
     # - Remove it if we do not know its hash
     # - Use the latest number in the version, to decide its revision
     debug("Packages already built using this version\n%s", "\n".join(packages))
-    busyRevisions = []
 
     # Calculate the build_family for the package
     #
@@ -792,51 +792,53 @@ def doBuild(args, parser):
     if spec["package"] == mainPackage:
       mainBuildFamily = spec["build_family"]
 
+    busyRevisions = set()
+    # We can tell that the remote store is read-only if it has an empty or
+    # no writeStore property. See below for explanation of why we need this.
+    revisionPrefix = "" if syncHelper.writeStore else "local"
     for d in packages:
-      realPath = readlink(d)
-      matcher = format("../../%(a)s/store/[0-9a-f]{2}/([0-9a-f]*)/%(p)s-%(v)s-([0-9]*).%(a)s.tar.gz$",
-                       a=args.architecture,
-                       p=spec["package"],
-                       v=spec["version"])
-      m = re.match(matcher, realPath)
-      if not m:
+      match = re.match(
+        "../../%s/store/[0-9a-f]{2}/([0-9a-f]+)/%s-%s-(%s[0-9]+).%s.tar.gz$" %
+        tuple(map(re.escape, (args.architecture, spec["package"], spec["version"],
+                              revisionPrefix, args.architecture))),
+        readlink(d))
+      if not match:
         continue
-      h, revision = m.groups()
-      revision = int(revision)
+      h, revision = match.groups()
+      if h != spec["hash"]:
+        # Strip revisionPrefix; the rest is an integer. Convert it to an int
+        # so we can get a sensible max() existing revision below.
+        busyRevisions.add(int(revision[len(revisionPrefix):]))
+        continue
 
       # If we have an hash match, we use the old revision for the package
       # and we do not need to build it.
-      if h == spec["hash"]:
-        spec["revision"] = revision
-        if spec["package"] in develPkgs and "incremental_recipe" in spec:
-          spec["obsolete_tarball"] = d
-        else:
-          debug("Package %s with hash %s is already found in %s. Not building.", p, h, d)
-          src = format("%(v)s-%(r)s",
-                       w=workDir,
-                       v=spec["version"],
-                       r=spec["revision"])
-          dst1 = format("%(w)s/%(a)s/%(p)s/latest-%(bf)s",
-                        w=workDir,
-                        a=args.architecture,
-                        p=spec["package"],
-                        bf=spec["build_family"])
-          dst2 = format("%(w)s/%(a)s/%(p)s/latest",
-                        w=workDir,
-                        a=args.architecture,
-                        p=spec["package"])
-
-          getstatusoutput("ln -snf %s %s" % (src, dst1))
-          getstatusoutput("ln -snf %s %s" % (src, dst2))
-          info("Using cached build for %s", p)
-        break
+      spec["revision"] = revision
+      if spec["package"] in develPkgs and "incremental_recipe" in spec:
+        spec["obsolete_tarball"] = d
       else:
-        busyRevisions.append(revision)
+        debug("Package %s with hash %s is already found in %s. Not building.",
+              p, h, d)
+        getstatusoutput("ln -snf %s-%s %s/%s/%s/latest-%s" % (
+          spec["version"], spec["revision"],
+          workDir, args.architecture, spec["package"], spec["build_family"]))
+        getstatusoutput("ln -snf %s-%s %s/%s/%s/latest" % (
+          spec["version"], spec["revision"],
+          workDir, args.architecture, spec["package"]))
+        info("Using cached build for %s", p)
+      break
 
-    if not "revision" in spec and busyRevisions:
-      spec["revision"] = min(set(range(1, max(busyRevisions)+2)) - set(busyRevisions))
-    elif not "revision" in spec:
-      spec["revision"] = "1"
+    # If we aren't using an existing revision, assign the next free revision
+    # to this package. If we're not uploading it, name it localN to avoid
+    # interference with the remote store -- in case this package is built
+    # somewhere else, the next revision N might be assigned there, and would
+    # conflict with our revision N.
+    if "revision" not in spec:
+      # The regex finding busyRevisions above already ensures that revision
+      # numbers start with revisionPrefix, and has stripped the prefix.
+      spec["revision"] = revisionPrefix + str(
+        min(set(range(1, max(busyRevisions) + 2)) - busyRevisions)
+        if busyRevisions else 1)
 
     # Recreate symlinks to this development package builds.
     if spec["package"] in develPkgs:
@@ -878,6 +880,7 @@ def doBuild(args, parser):
       if spec["devel_hash"]+spec["deps_hash"] == spec["old_devel_hash"]:
         info("Development package %s does not need rebuild", spec["package"])
         buildOrder.pop(0)
+        packageIterations = 0
         continue
 
     # Now that we have all the information about the package we want to build, let's
@@ -1205,7 +1208,11 @@ def doBuild(args, parser):
 
     dieOnError(err, buildErrMsg)
 
-    syncHelper.syncToRemote(p, spec)
+    # Make sure not to upload local-only packages! These might have been
+    # produced in a previous run with a read-only remote store.
+    if not spec["revision"].startswith("local"):
+      syncHelper.syncToRemote(p, spec)
+
   banner("Build of %s successfully completed on `%s'.\n"
          "Your software installation is at:"
          "\n\n  %s\n\n"
