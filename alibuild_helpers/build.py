@@ -283,7 +283,7 @@ class S3RemoteSync:
                  "s3cmd --no-check-md5 sync -s -v --host s3.cern.ch --host-bucket %(b)s.s3.cern.ch s3://%(b)s/%(storePath)s/ %(tarballHashDir)s/ 2>&1 || true\n"
                  "mkdir -p '%(tarballLinkDir)s'; find '%(tarballLinkDir)s' -type l -delete;\n"
                  "for x in `curl -sL https://s3.cern.ch/swift/v1/%(b)s/?prefix=%(linksPath)s/`; do\n"
-                 "  ln -sf `curl -sL https://s3.cern.ch/swift/v1/%(b)s/$x` %(tarballLinkDir)s/`basename $x` || true\n"
+                 "  ln -sf ../../`curl -sL https://s3.cern.ch/swift/v1/%(b)s/$x` %(tarballLinkDir)s/`basename $x` || true\n"
                  "done",
                  b=self.remoteStore,
                  storePath=spec["storePath"],
