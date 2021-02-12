@@ -216,7 +216,7 @@ class HttpRemoteSync:
       else:
         linkTarget = self.getRetry("/".join((self.remoteStore, spec["linksPath"], pkg["name"])),
                                    returnResult=True, log=False)
-        execute(format("ln -nsf %(target)s %(ld)s/%(n)s\n",
+        execute(format("ln -nsf ../../%(target)s %(ld)s/%(n)s\n",
                        target=linkTarget.decode("utf-8").rstrip("\r\n"),
                        ld=spec["tarballLinkDir"],
                        n=pkg["name"]))
