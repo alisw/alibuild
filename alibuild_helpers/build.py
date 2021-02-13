@@ -502,18 +502,31 @@ def doBuild(args, parser):
                   pwd=os.getcwd(), star=star()))
 
   # Clone/update repos
-  for p in [p for p in buildOrder if "source" in specs[p]]:
-    updateReferenceRepoSpec(args.referenceSources, p, specs[p], args.fetchRepos, not args.docker)
+  import concurrent.futures
+  with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+    def downloadTask(p):
+      updateReferenceRepoSpec(args.referenceSources, p, specs[p], args.fetchRepos, not args.docker)
 
-    # Retrieve git heads
-    cmd = "git ls-remote --heads %s" % (specs[p].get("reference", specs[p]["source"]))
-    if specs[p]["package"] in develPkgs:
-       specs[p]["source"] = join(os.getcwd(), specs[p]["package"])
-       cmd = "git ls-remote --heads %s" % specs[p]["source"]
-    debug("Executing %s" % cmd)
-    res, output = getStatusOutputBash(cmd)
-    dieOnError(res, "Error on '%s': %s" % (cmd, output))
-    specs[p]["git_heads"] = output.split("\n")
+      # Retrieve git heads
+      cmd = "git ls-remote --heads %s" % (specs[p].get("reference", specs[p]["source"]))
+      if specs[p]["package"] in develPkgs:
+         specs[p]["source"] = join(os.getcwd(), specs[p]["package"])
+         cmd = "git ls-remote --heads %s" % specs[p]["source"]
+      debug("Executing %s" % cmd)
+      err, output = getStatusOutputBash(cmd)
+      if err:
+        raise RuntimeError("Error on '%s': %s" % (cmd, output))
+      specs[p]["git_heads"] = output.split("\n")
+      return "ok"
+    future_to_download = {executor.submit(downloadTask, p): p for p in [p for p in buildOrder if "source" in specs[p]]}
+    for future in concurrent.futures.as_completed(future_to_download):
+        futurePackage = future_to_download[future]
+        try:
+            data = future.result()
+        except Exception as exc:
+            print('%r generated an exception: %s' % (futurePackage, exc))
+        else:
+            print('%r package updated: %s' % (futurePackage, data))
 
   # Resolve the tag to the actual commit ref
   for p in buildOrder:
