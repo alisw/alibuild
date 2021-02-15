@@ -524,9 +524,9 @@ def doBuild(args, parser):
         try:
             data = future.result()
         except Exception as exc:
-            print('%r generated an exception: %s' % (futurePackage, exc))
+            raise RuntimeError("Error on fetching '%r'. Aborting." % futurePackage)
         else:
-            print('%r package updated: %s' % (futurePackage, data))
+            debug('%r package updated: %s' % (futurePackage, data))
 
   # Resolve the tag to the actual commit ref
   for p in buildOrder:
