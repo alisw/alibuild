@@ -321,7 +321,7 @@ def createDistLinks(spec, specs, args, repoType, requiresType):
                   p=spec["package"],
                   v=spec["version"],
                   r=spec["revision"])
-  shutil.rmtree(target, True)
+  shutil.rmtree(target.encode("utf-8"), True)
   cmd = format("cd %(w)s && mkdir -p %(t)s", w=args.workDir, t=target)
   links = []
   for x in [spec["package"]] + list(spec[requiresType]):
@@ -893,7 +893,9 @@ def doBuild(args, parser):
     if fileHash != spec["hash"]:
       if fileHash != "0":
         debug("Mismatch between local area (%s) and the one which I should build (%s). Redoing." % (fileHash, spec["hash"]))
-      shutil.rmtree(dirname(hashFile), True)
+      # shutil.rmtree under Python 2 fails when hashFile is unicode and the
+      # directory contains files with non-ASCII names, e.g. Golang/Boost.
+      shutil.rmtree(dirname(hashFile).encode("utf-8"), True)
     else:
       # If we get here, we know we are in sync with whatever remote store.  We
       # can therefore create a directory which contains all the packages which
