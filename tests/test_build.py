@@ -190,9 +190,9 @@ class BuildTestCase(unittest.TestCase):
         "/sw/TARS/osx_x86-64/defaults-release/defaults-release-v1-*.osx_x86-64.tar.gz": ["/sw/TARS/osx_x86-64/defaults-release/defaults-release-v1-1.osx_x86-64.tar.gz"],
         "/sw/TARS/osx_x86-64/zlib/zlib-v1.2.3-*.osx_x86-64.tar.gz": [],
         "/sw/TARS/osx_x86-64/ROOT/ROOT-v6-08-30-*.osx_x86-64.tar.gz": [],
-        "/sw/TARS/osx_x86-64/store/27/27ce49698e818e8efb56b6eff6dd785e503df341/*": [],
-        "/sw/TARS/osx_x86-64/store/3e/3e90b4e08bad439fa5f25282480d1adb9efb0c0d/*": [],
-        "/sw/TARS/osx_x86-64/store/%s/%s/*" % (TEST_ROOT_BUILD_HASH[0:2], TEST_ROOT_BUILD_HASH): [],
+        "/sw/TARS/osx_x86-64/store/27/27ce49698e818e8efb56b6eff6dd785e503df341/*gz": [],
+        "/sw/TARS/osx_x86-64/store/3e/3e90b4e08bad439fa5f25282480d1adb9efb0c0d/*gz": [],
+        "/sw/TARS/osx_x86-64/store/%s/%s/*gz" % (TEST_ROOT_BUILD_HASH[0:2], TEST_ROOT_BUILD_HASH): [],
         "/sw/TARS/osx_x86-64/defaults-release/defaults-release-v1-1.osx_x86-64.tar.gz": ["../../osx_x86-64/store/27/27ce49698e818e8efb56b6eff6dd785e503df341/defaults-release-v1-1.osx_x86-64.tar.gz"],
       }[x]
     os.environ["ALIBUILD_NO_ANALYTICS"] = "1"

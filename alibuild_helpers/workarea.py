@@ -61,10 +61,10 @@ def updateReferenceRepo(referenceSources, p, spec, fetch=True, usePartialClone=T
 
   if not is_writeable(referenceSources):
     if path.exists(referenceRepo):
-      debug("Using %s as reference for %s" % (referenceRepo, p))
+      debug("Using %s as reference for %s", referenceRepo, p)
       return referenceRepo  # reference is read-only
     else:
-      debug("Cannot create reference for %s in %s" % (p, referenceSources))
+      debug("Cannot create reference for %s in %s", p, referenceSources)
       return None  # no reference can be found and created (not fatal)
 
   err = False
@@ -72,7 +72,7 @@ def updateReferenceRepo(referenceSources, p, spec, fetch=True, usePartialClone=T
   if not path.exists(referenceRepo):
     cmd = ["git", "clone"] + (usePartialClone and [partialCloneFilter] or []) + ["--bare", spec["source"], referenceRepo]
     cmd = [x for x in cmd if x]
-    debug("Cloning reference repository: %s" % " ".join(cmd))
+    debug("Cloning reference repository: %s", " ".join(cmd))
     err = execute(cmd)
   elif fetch:
     cmd = format("cd %(referenceRepo)s && "
@@ -81,7 +81,7 @@ def updateReferenceRepo(referenceSources, p, spec, fetch=True, usePartialClone=T
                  referenceRepo=referenceRepo,
                  source=spec["source"],
                  logPath=logPath)
-    debug("Updating reference repository: %s" % cmd)
+    debug("Updating reference repository: %s", cmd)
     err = execute(cmd)
   if os.path.exists(logPath):
     execute("cat " + logPath)

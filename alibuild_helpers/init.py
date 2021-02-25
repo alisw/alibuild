@@ -26,25 +26,25 @@ def doInit(args):
   assert(type(pkgs) == list)
   if args.dryRun:
     info("This will initialise local checkouts for %s\n"
-         "--dry-run / -n specified. Doing nothing." % ",".join(x["name"] for x in pkgs))
+         "--dry-run / -n specified. Doing nothing.", ",".join(x["name"] for x in pkgs))
     sys.exit(0)
   try:
     path.exists(args.develPrefix) or os.mkdir(args.develPrefix)
     path.exists(args.referenceSources) or os.makedirs(args.referenceSources)
   except OSError as e:
-    error(str(e))
+    error("%s", e)
     sys.exit(1)
 
   # Fetch recipes first if necessary
   if path.exists(args.configDir):
-    warning("using existing recipes from %s" % args.configDir)
+    warning("using existing recipes from %s", args.configDir)
   else:
     cmd = format("git clone %(pcf)s %(repo)s%(branch)s %(cd)s",
                  pcf=partialCloneFilter,
                  repo=args.dist["repo"] if ":" in args.dist["repo"] else "https://github.com/%s" % args.dist["repo"],
                  branch=" -b "+args.dist["ver"] if args.dist["ver"] else "",
                  cd=args.configDir)
-    debug(cmd)
+    debug("%s", cmd)
     err = execute(cmd)
     dieOnError(err!=0, "cannot clone recipes")
 
@@ -80,10 +80,10 @@ def doInit(args):
     writeRepo = spec.get("write_repo", spec.get("source"))
     dieOnError(not writeRepo, "package %s has no source field and cannot be developed" % spec["package"])
     if path.exists(dest):
-      warning("not cloning %s since it already exists" % spec["package"])
+      warning("not cloning %s since it already exists", spec["package"])
       continue
     p["ver"] = p["ver"] if p["ver"] else spec.get("tag", spec["version"])
-    debug("cloning %s%s for development" % (spec["package"], " version "+p["ver"] if p["ver"] else ""))
+    debug("cloning %s%s for development", spec["package"], " version "+p["ver"] if p["ver"] else "")
 
     updateReferenceRepoSpec(args.referenceSources, spec["package"], spec, True)
     cmd = format("git clone %(pcf)s %(readRepo)s%(branch)s --reference %(refSource)s %(cd)s && " +
@@ -94,7 +94,7 @@ def doInit(args):
                  branch=" -b "+p["ver"] if p["ver"] else "",
                  refSource=join(args.referenceSources, spec["package"].lower()),
                  cd=dest)
-    debug(cmd)
+    debug("%s", cmd)
     err = execute(cmd)
     dieOnError(err!=0, "cannot clone %s%s" %
                        (spec["package"], " version "+p["ver"] if p["ver"] else ""))
@@ -109,6 +109,5 @@ def doInit(args):
       with open(repoAltConf, "w") as fil:
         fil.write(os.path.relpath(refObjects, repoObjects) + "\n")
 
-  banner(format("Development directory %(d)s created%(pkgs)s",
-         pkgs=" for "+", ".join([ x["name"].lower() for x in pkgs ]) if pkgs else "",
-         d=args.develPrefix))
+  banner("Development directory %s created%s", args.develPrefix,
+         " for "+", ".join(x["name"].lower() for x in pkgs) if pkgs else "")
