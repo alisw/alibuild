@@ -10,7 +10,7 @@ debug, error, warning, info, success = (None, None, None, None, None)
 
 def dieOnError(err, msg):
   if err:
-    error(msg)
+    error("%s", msg)
     sys.exit(1)
 
 class LogFormatter(logging.Formatter):
@@ -22,7 +22,7 @@ class LogFormatter(logging.Formatter):
                           logging.CRITICAL: "\033[1;37;41m",
                           logging.SUCCESS:  "\033[1;32m" } if sys.stdout.isatty() else {}
   def format(self, record):
-    record.msg = to_unicode(record.msg)
+    record.msg = to_unicode(record.msg % record.args)
     if record.levelno == logging.BANNER and sys.stdout.isatty():
       lines = record.msg.split("\n")
       return "\n\033[1;34m==>\033[m \033[1m%s\033[m" % lines[0] + \

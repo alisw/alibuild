@@ -57,8 +57,8 @@ found unexpected end of stream
 class Recoder(object):
   def __init__(self):
     self.buffer = ""
-  def __call__(self, s):
-    self.buffer += s
+  def __call__(self, s, *a):
+    self.buffer += s % a
 
 class BufferReader(object):
   def __init__(self, filename, recipe):

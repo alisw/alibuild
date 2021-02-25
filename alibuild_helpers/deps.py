@@ -99,8 +99,7 @@ def doDeps(args, parser):
               dotFile=fp.name))
     execute(["dot", fp.name, "-Tpdf", "-o", args.outgraph])
   except Exception as e:
-    error(format("Error generating dependencies with dot: %(type)s: %(msg)s",
-                 type=type(e).__name__, msg=str(e)))
+    error("Error generating dependencies with dot: %s: %s", type(e).__name__, e)
   else:
     info("Dependencies graph generated: %s" % args.outgraph)
   if fp.name != args.outdot:

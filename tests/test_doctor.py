@@ -76,9 +76,9 @@ class DoctorTestCase(unittest.TestCase):
     # Collect printouts
     def resetOut():
       return { "warning": StringIO(), "error": StringIO(), "banner": StringIO() }
-    mockPrintError.side_effect   = lambda e: out["error"].write(e+"\n")
-    mockPrintWarning.side_effect = lambda e: out["warning"].write(e+"\n")
-    mockPrintBanner.side_effect  = lambda e: out["banner"].write(e+"\n")
+    mockPrintError.side_effect   = lambda e, *a: out["error"].write((e%a)+"\n")
+    mockPrintWarning.side_effect = lambda e, *a: out["warning"].write((e%a)+"\n")
+    mockPrintBanner.side_effect  = lambda e, *a: out["banner"].write((e%a)+"\n")
 
     args = Namespace(workDir="/work",
                      configDir="/dist",

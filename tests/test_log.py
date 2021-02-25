@@ -18,7 +18,7 @@ class LogTestCase(unittest.TestCase):
     def test_dieOnError(self, mock_sys, mock_error):
       dieOnError(True, "Message")
       mock_sys.exit.assert_called_once_with(1)
-      mock_error.assert_called_once_with("Message")
+      mock_error.assert_called_once_with("%s", "Message")
       mock_error.reset_mock()
       dieOnError(False, "Message")
       mock_error.assert_not_called()

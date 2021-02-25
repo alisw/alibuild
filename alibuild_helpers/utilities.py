@@ -179,12 +179,11 @@ def readDefaults(configDir, defaults, error, architecture):
   if not exists(defaultsFilename):
     viableDefaults = ["- " + basename(x).replace("defaults-","").replace(".sh", "")
                       for x in glob("%s/defaults-*.sh" % configDir)]
-    error(format("Default `%(d)s' does not exists. Viable options:\n%(v)s",
-                 d=defaults or "<no defaults specified>",
-                 v="\n".join(viableDefaults)))
+    error("Default `%s' does not exists. Viable options:\n%s",
+          defaults or "<no defaults specified>", "\n".join(viableDefaults))
   err, defaultsMeta, defaultsBody = parseRecipe(getRecipeReader(defaultsFilename))
   if err:
-    error(err)
+    error("%s", err)
     sys.exit(1)
   archDefaults = "%s/defaults-%s.sh" % (configDir, architecture)
   archMeta = {}
@@ -192,7 +191,7 @@ def readDefaults(configDir, defaults, error, architecture):
   if exists(archDefaults):
     err, archMeta, archBody = parseRecipe(getRecipeReader(defaultsFilename))
     if err:
-      error(err)
+      error("%s", err)
       sys.exit(1)
     for x in ["env", "disable", "overrides"]:
       defaultsMeta.setdefault(x, {}).update(archMeta.get(x, {}))
@@ -286,7 +285,7 @@ def parseDefaults(disable, defaultsGetter, log):
   # metadata early and extract the override and disable data.
   defaultsDisable = asList(defaultsMeta.get("disable", []))
   for x in defaultsDisable:
-    log("Package %s has been disabled by current default." % x)
+    log("Package %s has been disabled by current default.", x)
   disable.extend(defaultsDisable)
   if type(defaultsMeta.get("overrides", OrderedDict())) != OrderedDict:
     return ("overrides should be a dictionary", None, None)
@@ -328,7 +327,7 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
     for override in overrides:
       if not re.match("^" + override.strip("^$") + "$", lowerPkg):
         continue
-      log("Overrides for package %s: %s" % (spec["package"], overrides[override]))
+      log("Overrides for package %s: %s", spec["package"], overrides[override])
       spec.update(overrides.get(override, {}) or {})
 
     # If --always-prefer-system is passed or if prefer_system is set to true
