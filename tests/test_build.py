@@ -107,7 +107,7 @@ def dummy_open(x, mode="r"):
       "/sw/BUILD/27ce49698e818e8efb56b6eff6dd785e503df341/defaults-release/.build_succeeded": (0, StringIO("0")),
       "/sw/BUILD/3e90b4e08bad439fa5f25282480d1adb9efb0c0d/zlib/.build_succeeded": (0, StringIO("0")),
       "/sw/BUILD/%s/ROOT/.build_succeeded" % TEST_ROOT_BUILD_HASH: (0, StringIO("0")),
-      "/sw/osx_x86-64/defaults-release/v1-local1/.build-hash": (1, StringIO("27ce49698e818e8efb56b6eff6dd785e503df341")),
+      "/sw/osx_x86-64/defaults-release/v1-1/.build-hash": (1, StringIO("27ce49698e818e8efb56b6eff6dd785e503df341")),
       "/sw/osx_x86-64/zlib/v1.2.3-local1/.build-hash": (1, StringIO("3e90b4e08bad439fa5f25282480d1adb9efb0c0d")),
       "/sw/osx_x86-64/ROOT/v6-08-30-local1/.build-hash": (1, StringIO(TEST_ROOT_BUILD_HASH))
     }
@@ -132,7 +132,7 @@ def dummy_execute(x, mock_git_clone, mock_git_fetch, **kwds):
     mock_git_fetch()
     return 0
   return {
-    "/bin/bash -e -x /sw/SPECS/osx_x86-64/defaults-release/v1-local1/build.sh 2>&1": 0,
+    "/bin/bash -e -x /sw/SPECS/osx_x86-64/defaults-release/v1-1/build.sh 2>&1": 0,
     '/bin/bash -e -x /sw/SPECS/osx_x86-64/zlib/v1.2.3-local1/build.sh 2>&1': 0,
     '/bin/bash -e -x /sw/SPECS/osx_x86-64/ROOT/v6-08-30-local1/build.sh 2>&1': 0,
     "git clone --filter=blob:none --bare https://github.com/star-externals/zlib /sw/MIRROR/zlib": 0,

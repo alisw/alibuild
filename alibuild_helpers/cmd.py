@@ -10,10 +10,9 @@ BASH = "bash" if getstatusoutput("/bin/bash --version")[0] else "/bin/bash"
 
 def execute(command, printer=debug):
   popen = subprocess.Popen(command, shell=is_string(command), stdout=subprocess.PIPE)
-  lines_iterator = iter(popen.stdout.readline, "")
-  for line in lines_iterator:
+  for line in iter(popen.stdout.readline, ""):
     if not line: break
-    printer(to_unicode(line).strip("\n")) # yield line
+    printer("%s", to_unicode(line).strip("\n"))
   out = to_unicode(popen.communicate()[0]).strip("\n")
   if out:
     printer(out)

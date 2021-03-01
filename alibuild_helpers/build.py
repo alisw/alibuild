@@ -798,17 +798,24 @@ def doBuild(args, parser):
     revisionPrefix = "" if syncHelper.writeStore else "local"
     for d in packages:
       match = re.match(
-        "../../%s/store/[0-9a-f]{2}/([0-9a-f]+)/%s-%s-(%s[0-9]+).%s.tar.gz$" %
-        tuple(map(re.escape, (args.architecture, spec["package"], spec["version"],
-                              revisionPrefix, args.architecture))),
+        "../../%s/store/[0-9a-f]{2}/([0-9a-f]+)/%s-%s-((?:local)?[0-9]+).%s.tar.gz$" %
+        tuple(map(re.escape, (args.architecture, spec["package"],
+                              spec["version"], args.architecture))),
         readlink(d))
       if not match:
         continue
       h, revision = match.groups()
+
       if h != spec["hash"]:
-        # Strip revisionPrefix; the rest is an integer. Convert it to an int
-        # so we can get a sensible max() existing revision below.
-        busyRevisions.add(int(revision[len(revisionPrefix):]))
+        if revision.startswith(revisionPrefix) and revision[len(revisionPrefix):].isdigit():
+          # Strip revisionPrefix; the rest is an integer. Convert it to an int
+          # so we can get a sensible max() existing revision below.
+          busyRevisions.add(int(revision[len(revisionPrefix):]))
+        continue
+
+      # Don't re-use local revisions when we have a read-write store, so that
+      # packages we'll upload later don't depend on local revisions.
+      if syncHelper.writeStore and "local" in revision:
         continue
 
       # If we have an hash match, we use the old revision for the package
