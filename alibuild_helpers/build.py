@@ -67,7 +67,6 @@ def getDirectoryHash(d):
 
 # Helper class which does not do anything to sync
 class NoRemoteSync:
-  writeStore = ""
   def syncToLocal(self, p, spec):
     pass
   def syncToRemote(self, p, spec):
@@ -728,7 +727,7 @@ def doBuild(args, parser):
       logger_handler.setFormatter(
           LogFormatter("%%(asctime)s:%%(levelname)s:%s:%s:%s: %%(message)s" %
                        (mainPackage, p, args.develPrefix if "develPrefix" in args else mainHash[0:8])))
-    if spec["package"] in develPkgs and syncHelper.writeStore:
+    if spec["package"] in develPkgs and getattr(syncHelper, "writeStore", None):
       warning("Disabling remote write store from now since %s is a development package.", spec["package"])
       syncHelper.writeStore = ""
 
@@ -795,16 +794,17 @@ def doBuild(args, parser):
     busyRevisions = set()
     # We can tell that the remote store is read-only if it has an empty or
     # no writeStore property. See below for explanation of why we need this.
-    revisionPrefix = "" if syncHelper.writeStore else "local"
+    revisionPrefix = "" if getattr(syncHelper, "writeStore", "") else "local"
     for d in packages:
-      match = re.match(
-        "../../%s/store/[0-9a-f]{2}/([0-9a-f]+)/%s-%s-((?:local)?[0-9]+).%s.tar.gz$" %
-        tuple(map(re.escape, (args.architecture, spec["package"],
-                              spec["version"], args.architecture))),
-        readlink(d))
-      if not match:
+      realPath = readlink(d)
+      matcher = format("../../%(a)s/store/[0-9a-f]{2}/([0-9a-f]*)/%(p)s-%(v)s-((?:local)?[0-9]*).%(a)s.tar.gz$",
+                       a=args.architecture,
+                       p=spec["package"],
+                       v=spec["version"])
+      m = re.match(matcher, realPath)
+      if not m:
         continue
-      h, revision = match.groups()
+      h, revision = m.groups()
 
       if h != spec["hash"]:
         if revision.startswith(revisionPrefix) and revision[len(revisionPrefix):].isdigit():
@@ -815,7 +815,7 @@ def doBuild(args, parser):
 
       # Don't re-use local revisions when we have a read-write store, so that
       # packages we'll upload later don't depend on local revisions.
-      if syncHelper.writeStore and "local" in revision:
+      if getattr(syncHelper, "writeStore", False) and "local" in revision:
         continue
 
       # If we have an hash match, we use the old revision for the package
@@ -824,14 +824,23 @@ def doBuild(args, parser):
       if spec["package"] in develPkgs and "incremental_recipe" in spec:
         spec["obsolete_tarball"] = d
       else:
-        debug("Package %s with hash %s is already found in %s. Not building.",
-              p, h, d)
-        getstatusoutput("ln -snf %s-%s %s/%s/%s/latest-%s" % (
-          spec["version"], spec["revision"],
-          workDir, args.architecture, spec["package"], spec["build_family"]))
-        getstatusoutput("ln -snf %s-%s %s/%s/%s/latest" % (
-          spec["version"], spec["revision"],
-          workDir, args.architecture, spec["package"]))
+        debug("Package %s with hash %s is already found in %s. Not building.", p, h, d)
+        src = format("%(v)s-%(r)s",
+                     w=workDir,
+                     v=spec["version"],
+                     r=spec["revision"])
+        dst1 = format("%(w)s/%(a)s/%(p)s/latest-%(bf)s",
+                      w=workDir,
+                      a=args.architecture,
+                      p=spec["package"],
+                      bf=spec["build_family"])
+        dst2 = format("%(w)s/%(a)s/%(p)s/latest",
+                      w=workDir,
+                      a=args.architecture,
+                      p=spec["package"])
+
+        getstatusoutput("ln -snf %s %s" % (src, dst1))
+        getstatusoutput("ln -snf %s %s" % (src, dst2))
         info("Using cached build for %s", p)
       break
 
@@ -841,8 +850,8 @@ def doBuild(args, parser):
     # somewhere else, the next revision N might be assigned there, and would
     # conflict with our revision N.
     if "revision" not in spec:
-      # The regex finding busyRevisions above already ensures that revision
-      # numbers start with revisionPrefix, and has stripped the prefix.
+      # The code finding busyRevisions above already ensures that revision
+      # numbers start with revisionPrefix, and has left us plain ints.
       spec["revision"] = revisionPrefix + str(
         min(set(range(1, max(busyRevisions) + 2)) - busyRevisions)
         if busyRevisions else 1)
@@ -887,7 +896,6 @@ def doBuild(args, parser):
       if spec["devel_hash"]+spec["deps_hash"] == spec["old_devel_hash"]:
         info("Development package %s does not need rebuild", spec["package"])
         buildOrder.pop(0)
-        packageIterations = 0
         continue
 
     # Now that we have all the information about the package we want to build, let's
@@ -1217,8 +1225,9 @@ def doBuild(args, parser):
 
     # Make sure not to upload local-only packages! These might have been
     # produced in a previous run with a read-only remote store.
-    if not spec["revision"].startswith("local"):
-      syncHelper.syncToRemote(p, spec)
+    if spec["revision"].startswith("local"):
+      continue   # Skip upload below.
+    syncHelper.syncToRemote(p, spec)
 
   banner("Build of %s successfully completed on `%s'.\n"
          "Your software installation is at:"
