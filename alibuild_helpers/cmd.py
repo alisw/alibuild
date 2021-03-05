@@ -13,7 +13,7 @@ def execute(command, printer=debug):
   lines_iterator = iter(popen.stdout.readline, "")
   for line in lines_iterator:
     if not line: break
-    printer("%s", to_unicode(line).strip("\n"))
+    printer("{}".format(to_unicode(line).strip("\n")))
   out = to_unicode(popen.communicate()[0]).strip("\n")
   if out:
     printer(out)
