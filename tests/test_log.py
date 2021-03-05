@@ -28,22 +28,22 @@ class LogTestCase(unittest.TestCase):
       mock_stderr.write.side_effect = lambda x: True
       sleep_time = 0.6
       p = ProgressPrint("begin")
-      p("First message")
+      p("%s", "First message")
       self.assertEqual(p.percent, -1)
       sleep(sleep_time)
-      p("Has percentage: 80%")
+      p("%s", "Has percentage: 80%")
       self.assertEqual(p.percent, 80)
       sleep(sleep_time)
-      p("No percentage")
+      p("%s", "No percentage")
       self.assertEqual(p.percent, 80)  # unchanged
       sleep(sleep_time)
-      p("[100/200] Building CXX object this/is/a/ninja/test")
+      p("%s", "[100/200] Building CXX object this/is/a/ninja/test")
       self.assertEqual(p.percent, 50)
       sleep(sleep_time)
-      p("[100/0] Wrong-styled Ninja progress")
+      p("%s", "[100/0] Wrong-styled Ninja progress")
       self.assertEqual(p.percent, 50)  # unchanged
       sleep(sleep_time)
-      p("Last message")
+      p("%s", "Last message")
       p.end()
 
 if __name__ == '__main__':

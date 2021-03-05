@@ -44,7 +44,8 @@ class ProgressPrint:
     self.STAGES = [ ".", "..", "...", "....", ".....", "....", "...", ".." ]
     self.begin_msg = begin_msg
     self.percent = -1
-  def __call__(self, txt):
+  def __call__(self, txt, *args):
+    txt %= args
     if time.time()-self.lasttime < 0.5:
       return
     if self.count == -1 and self.begin_msg:

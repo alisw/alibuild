@@ -552,7 +552,7 @@ def doBuild(args, parser):
             spec["commit_hash"] = out.strip()
             cmd = "cd %s && git diff -r HEAD && git status --porcelain" % spec["source"]
             h = Hasher()
-            err = execute(cmd, h)
+            err = execute(cmd, lambda s, *a: h(s % a))
             debug("Command %s returned %d", cmd, err)
             dieOnError(err, "Unable to detect source code changes.")
             spec["devel_hash"] = spec["commit_hash"] + h.hexdigest()
