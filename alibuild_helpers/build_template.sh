@@ -92,7 +92,11 @@ if [[ ! "$SOURCE0" == '' && "${SOURCE0:0:1}" != "/" ]]; then
   else
     # Folder is already present, but check that it is the right tag
     cd $SOURCEDIR
-    git checkout "${GIT_TAG}"
+    if ! git checkout "$GIT_TAG"; then
+      # If we can't find the tag, it might be new. Fetch tags and try again.
+      git fetch -f "$SOURCE0" "refs/tags/$GIT_TAG:refs/tags/$GIT_TAG"
+      git checkout "$GIT_TAG"
+    fi
   fi
 elif [[ ! "$SOURCE0" == '' && "${SOURCE0:0:1}" == "/" ]]; then
   ln -snf $SOURCE0 $SOURCEDIR
