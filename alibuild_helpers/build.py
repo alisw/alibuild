@@ -1006,6 +1006,7 @@ def doBuild(args, parser):
         "package": dep,
         "version": depSpec["version"],
         "revision": depSpec["revision"],
+        "hash": depSpec["hash"]
       }
       dependenciesDict[dep] = depInfo
     dependenciesJSON = str(dependenciesDict)
