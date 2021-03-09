@@ -142,6 +142,10 @@ fi
 
 cd "$WORK_DIR/INSTALLROOT/$PKGHASH"
 echo "$PKGHASH" > "$INSTALLROOT/.build-hash"
+cat <<\EOF | tr \' \" >"$INSTALLROOT/.full-dependencies"
+%(dependenciesJSON)s
+EOF
+
 mkdir -p "$INSTALLROOT/etc/profile.d"
 BIGPKGNAME=`echo "$PKGNAME" | tr [:lower:] [:upper:] | tr - _`
 rm -f "$INSTALLROOT/etc/profile.d/init.sh"

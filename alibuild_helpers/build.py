@@ -998,6 +998,19 @@ def doBuild(args, parser):
                              **depInfo)
       dependenciesInit += format('echo [ -z \${%(bigpackage)s_REVISION+x} ] \&\& source \${WORK_DIR}/\${ALIBUILD_ARCH_PREFIX}/%(package)s/%(version)s-%(revision)s/etc/profile.d/init.sh >> \"$INSTALLROOT/etc/profile.d/init.sh\"\n',
                              **depInfo)
+    dependenciesDict = {}
+    for dep in spec.get("full_requires", []):
+      depSpec = specs[dep]
+      depInfo = {
+        "architecture": args.architecture,
+        "package": dep,
+        "version": depSpec["version"],
+        "revision": depSpec["revision"],
+        "bigpackage": dep.upper().replace("-", "_")
+      }
+      dependenciesDict[dep] = depInfo
+    dependenciesJSON = str(dependenciesDict)
+      
     # Generate the part which creates the environment for the package.
     # This can be either variable set via the "env" keyword in the metadata
     # or paths which get appended via the "append_path" one.
@@ -1081,6 +1094,7 @@ def doBuild(args, parser):
     cmd = format(cmd_raw,
                  dependencies=dependencies,
                  dependenciesInit=dependenciesInit,
+                 dependenciesJSON=dependenciesJSON,
                  develPrefix=develPrefix,
                  environment=environment,
                  workDir=workDir,
