@@ -111,7 +111,7 @@ def doDoctor(args, parser):
   # Decide if we can use homebrew. If not, we replace it with "true" so
   # that we do not get spurious messages on linux
   homebrew_replacement = ""
-  err, output = getstatusoutput("which c++")
+  err, output = getstatusoutput("type c++")
   if err:
     warning("Unable to find system compiler.\n"
             "%s\n"
@@ -121,6 +121,16 @@ def doDoctor(args, parser):
             "* On Ubuntu compatible systems: https://alice-doc.github.io/alice-analysis-tutorial/building/prereq-ubuntu.html\n"
             "* On macOS: https://alice-doc.github.io/alice-analysis-tutorial/building/prereq-macos.html\n",
             output)
+  err, output = getstatusoutput("type git")
+  if err:
+    error("Unable to find git.\n"
+          "%s\n"
+          "Please follow prerequisites:\n"
+          "* On Centos compatible systems: https://alice-doc.github.io/alice-analysis-tutorial/building/prereq-centos7.html\n"
+          "* On Fedora compatible systems: https://alice-doc.github.io/alice-analysis-tutorial/building/prereq-fedora.html\n"
+          "* On Ubuntu compatible systems: https://alice-doc.github.io/alice-analysis-tutorial/building/prereq-ubuntu.html\n"
+          "* On macOS: https://alice-doc.github.io/alice-analysis-tutorial/building/prereq-macos.html\n",
+          output)
   # Decide if we can use homebrew. If not, we replace it with "true" so
   # that we do not get spurious messages on linux
   homebrew_replacement = ""
