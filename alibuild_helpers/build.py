@@ -366,6 +366,51 @@ def createDistLinks(spec, specs, args, repoType, requiresType):
                  t=target)
     execute(cmd)
 
+
+def storeHashes(package, specs, isDevelPkg, considerRelocation):
+  """Calculate various hashes for package, and store them in specs[package]."""
+  spec = specs[package]
+  h = Hasher()
+  dh = Hasher()
+
+  for x in ["recipe", "version", "package", "commit_hash",
+            "env", "append_path", "prepend_path"]:
+    if sys.version_info[0] < 3 and x in spec and type(spec[x]) == OrderedDict:
+      # Python 2: use YAML dict order to prevent changing hashes
+      h(str(yaml.safe_load(yamlDump(spec[x]))))
+    else:
+      h(str(spec.get(x, "none")))
+
+  # If the commit hash is a real hash, and not a tag, we can safely assume
+  # that's unique, and therefore we can avoid putting the repository or the
+  # name of the branch in the hash.
+  if spec["commit_hash"] == spec.get("tag", "0"):
+    h(spec.get("source", "none"))
+    if "source" in spec:
+      h(spec["tag"])
+
+  for dep in spec.get("requires", []):
+    h(specs[dep]["remote_revision_hash"])
+    dh(specs[dep]["remote_revision_hash"] + specs[dep].get("devel_hash", ""))
+
+  if spec.get("force_rebuild", False):
+    h(str(time.time()))
+
+  if isDevelPkg and "incremental_recipe" in spec:
+    h(spec["incremental_recipe"])
+    ih = Hasher()
+    ih(spec["incremental_recipe"])
+    spec["incremental_hash"] = ih.hexdigest()
+  elif isDevelPkg:
+    h(spec.get("devel_hash"))
+
+  if considerRelocation and "relocate_paths" in spec:
+    h("relocate:"+" ".join(sorted(spec["relocate_paths"])))
+
+  spec["remote_revision_hash"] = h.hexdigest()
+  spec["deps_hash"] = dh.hexdigest()
+
+
 def doBuild(args, parser):
   if args.remoteStore.startswith("http"):
     syncHelper = HttpRemoteSync(args.remoteStore, args.architecture, args.workDir, args.insecure)
@@ -615,44 +660,14 @@ def doBuild(args, parser):
       debug("Commit hash for %s@%s is %s", spec["source"], spec["tag"], spec["commit_hash"])
 
   # Calculate the hashes. We do this in build order so that we can guarantee
-  # that the hashes of the dependencies are calculated first.  Also notice that
-  # if the commit hash is a real hash, and not a tag, we can safely assume
-  # that's unique, and therefore we can avoid putting the repository or the
-  # name of the branch in the hash.
+  # that the hashes of the dependencies are calculated first.
   debug("Calculating hashes.")
   for p in buildOrder:
     spec = specs[p]
     debug("spec = %r", spec)
     debug("develPkgs = %r", develPkgs)
-    h = Hasher()
-    dh = Hasher()
-    for x in ["recipe", "version", "package", "commit_hash",
-              "env", "append_path", "prepend_path"]:
-      if sys.version_info[0] < 3 and x in spec and type(spec[x]) == OrderedDict:
-        # Python 2: use YAML dict order to prevent changing hashes
-        h(str(yaml.safe_load(yamlDump(spec[x]))))
-      else:
-        h(str(spec.get(x, "none")))
-    if spec["commit_hash"] == spec.get("tag", "0"):
-      h(spec.get("source", "none"))
-      if "source" in spec:
-        h(spec["tag"])
-    for dep in spec.get("requires", []):
-      h(specs[dep]["remote_revision_hash"])
-      dh(specs[dep]["remote_revision_hash"] + specs[dep].get("devel_hash", ""))
-    if bool(spec.get("force_rebuild", False)):
-      h(str(time.time()))
-    if spec["package"] in develPkgs and "incremental_recipe" in spec:
-      h(spec["incremental_recipe"])
-      ih = Hasher()
-      ih(spec["incremental_recipe"])
-      spec["incremental_hash"] = ih.hexdigest()
-    elif p in develPkgs:
-      h(spec.get("devel_hash"))
-    if args.architecture.startswith("osx") and "relocate_paths" in spec:
-        h("relocate:"+" ".join(sorted(spec["relocate_paths"])))
-    spec["remote_revision_hash"] = h.hexdigest()
-    spec["deps_hash"] = dh.hexdigest()
+    storeHashes(p, specs, isDevelPkg=p in develPkgs,
+                considerRelocation=args.architecture.startswith("osx"))
     debug("Hash for recipe %s is %s", p, spec["remote_revision_hash"])
 
   # This adds to the spec where it should find, locally or remotely the
