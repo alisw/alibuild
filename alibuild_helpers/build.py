@@ -318,6 +318,7 @@ class S3RemoteSync:
 # Creates a directory in the store which contains symlinks to the package
 # and its direct / indirect dependencies
 def createDistLinks(spec, specs, args, repoType, requiresType):
+  # At the point we call this function, spec has a single, definitive hash.
   target = format("TARS/%(a)s/%(rp)s/%(p)s/%(p)s-%(v)s-%(r)s",
                   a=args.architecture,
                   rp=repoType,
@@ -368,8 +369,20 @@ def createDistLinks(spec, specs, args, repoType, requiresType):
 
 
 def storeHashes(package, specs, isDevelPkg, considerRelocation):
-  """Calculate various hashes for package, and store them in specs[package]."""
+  """Calculate various hashes for package, and store them in specs[package].
+
+  Assumes that all dependencies of the package already have a definitive hash.
+  """
   spec = specs[package]
+
+  if "remote_revision_hash" in spec and "local_revision_hash" in spec:
+    # We've already calculated these hashes before, so no need to do it again.
+    # This also works around a bug, where after the first hash calculation,
+    # some attributes of spec are changed (e.g. append_path and prepend_path
+    # entries are turned from strings into lists), which changes the hash on
+    # subsequent calculations.
+    return
+
   h = Hasher()
   dh = Hasher()
 
@@ -390,8 +403,9 @@ def storeHashes(package, specs, isDevelPkg, considerRelocation):
       h(spec["tag"])
 
   for dep in spec.get("requires", []):
-    h(specs[dep]["remote_revision_hash"])
-    dh(specs[dep]["remote_revision_hash"] + specs[dep].get("devel_hash", ""))
+    # At this point, our dependencies have a single hash, local or remote.
+    h(specs[dep]["hash"])
+    dh(specs[dep]["hash"] + specs[dep].get("devel_hash", ""))
 
   if spec.get("force_rebuild", False):
     h(str(time.time()))
@@ -409,6 +423,10 @@ def storeHashes(package, specs, isDevelPkg, considerRelocation):
 
   spec["remote_revision_hash"] = h.hexdigest()
   spec["deps_hash"] = dh.hexdigest()
+  # The local hash must differ from the remote hash to avoid conflicts where
+  # the remote has a package with the same hash as an existing local revision.
+  h("local")
+  spec["local_revision_hash"] = h.hexdigest()
 
 
 def doBuild(args, parser):
@@ -659,40 +677,6 @@ def doBuild(args, parser):
     if "source" in spec:
       debug("Commit hash for %s@%s is %s", spec["source"], spec["tag"], spec["commit_hash"])
 
-  # Calculate the hashes. We do this in build order so that we can guarantee
-  # that the hashes of the dependencies are calculated first.
-  debug("Calculating hashes.")
-  for p in buildOrder:
-    spec = specs[p]
-    debug("spec = %r", spec)
-    debug("develPkgs = %r", develPkgs)
-    storeHashes(p, specs, isDevelPkg=p in develPkgs,
-                considerRelocation=args.architecture.startswith("osx"))
-    debug("Hash for recipe %s is %s", p, spec["remote_revision_hash"])
-
-  # This adds to the spec where it should find, locally or remotely the
-  # various tarballs and links.
-  for p in buildOrder:
-    spec = specs[p]
-    pkgSpec = {
-      "workDir": workDir,
-      "package": spec["package"],
-      "version": spec["version"],
-      "remote_revision_hash": spec["remote_revision_hash"],
-      "remote_prefix": spec["remote_revision_hash"][0:2],
-      "architecture": args.architecture
-    }
-    varSpecs = [
-      ("remote_store_path", "TARS/%(architecture)s/store/%(remote_prefix)s/%(remote_revision_hash)s"),
-      ("remote_links_path", "TARS/%(architecture)s/%(package)s"),
-      ("remote_tar_hash_dir",
-       "%(workDir)s/TARS/%(architecture)s/store/%(remote_prefix)s/%(remote_revision_hash)s"),
-      ("remote_tar_link_dir", "%(workDir)s/TARS/%(architecture)s/%(package)s"),
-    ]
-    spec.update(dict([(x, format(y, **pkgSpec)) for (x, y) in varSpecs]))
-    spec["old_devel_hash"] = readHashFile(
-      "%(workDir)s/BUILD/%(remote_revision_hash)s/%(package)s/.build_succeeded" % pkgSpec)
-
   # We recursively calculate the full set of requires "full_requires"
   # including build_requires and the subset of them which are needed at
   # runtime "full_runtime_requires".
@@ -746,6 +730,41 @@ def doBuild(args, parser):
       logger_handler.setFormatter(
           LogFormatter("%%(asctime)s:%%(levelname)s:%s:%s:%s: %%(message)s" %
                        (mainPackage, p, args.develPrefix if "develPrefix" in args else mainHash[0:8])))
+
+    # Calculate the hashes. We do this in build order so that we can guarantee
+    # that the hashes of the dependencies are calculated first. Do this inside
+    # the main build loop to make sure that our dependencies have been assigned
+    # a single, definitive hash.
+    debug("Calculating hash.")
+    debug("spec = %r", spec)
+    debug("develPkgs = %r", develPkgs)
+    storeHashes(p, specs, isDevelPkg=p in develPkgs,
+                considerRelocation=args.architecture.startswith("osx"))
+    debug("Hashes for recipe %s are %s (remote), %s (local)",
+          p, spec["remote_revision_hash"], spec["local_revision_hash"])
+
+    # This adds to the spec where it should find, locally or remotely the
+    # various tarballs and links.
+    pkgSpec = {
+      "workDir": workDir,
+      "package": spec["package"],
+      "version": spec["version"],
+      "remote_revision_hash": spec["remote_revision_hash"],
+      "remote_prefix": spec["remote_revision_hash"][0:2],
+      "local_revision_hash": spec["local_revision_hash"],
+      "local_prefix": spec["local_revision_hash"][0:2],
+      "architecture": args.architecture
+    }
+    spec.update({k: v % pkgSpec for k, v in (
+      ("remote_store_path", "TARS/%(architecture)s/store/%(remote_prefix)s/%(remote_revision_hash)s"),
+      ("remote_links_path", "TARS/%(architecture)s/%(package)s"),
+      ("remote_tar_hash_dir",
+       "%(workDir)s/TARS/%(architecture)s/store/%(remote_prefix)s/%(remote_revision_hash)s"),
+      ("local_tar_hash_dir",
+       "%(workDir)s/TARS/%(architecture)s/store/%(local_prefix)s/%(local_revision_hash)s"),
+      ("remote_tar_link_dir", "%(workDir)s/TARS/%(architecture)s/%(package)s"),
+    )})
+
     if spec["package"] in develPkgs and getattr(syncHelper, "writeStore", None):
       warning("Disabling remote write store from now since %s is a development package.", spec["package"])
       syncHelper.writeStore = ""
@@ -825,7 +844,10 @@ def doBuild(args, parser):
         continue
       h, revision = m.groups()
 
-      if h != spec["remote_revision_hash"]:
+      if not (("local" in revision and h == spec["local_revision_hash"]) or
+              ("local" not in revision and h == spec["remote_revision_hash"])):
+        # This tarball's hash doesn't match what we need. Remember that its
+        # revision number is taken, in case we assign our own later.
         if revision.startswith(revisionPrefix) and revision[len(revisionPrefix):].isdigit():
           # Strip revisionPrefix; the rest is an integer. Convert it to an int
           # so we can get a sensible max() existing revision below.
@@ -875,9 +897,16 @@ def doBuild(args, parser):
         min(set(range(1, max(busyRevisions) + 2)) - busyRevisions)
         if busyRevisions else 1)
 
-    # FIXME: Here, we will later pick the correct hash (local or remote).
-    spec["hash"] = spec["remote_revision_hash"]
-    spec["tar_hash_dir"] = spec["remote_tar_hash_dir"]
+    # Now we know whether we're using a local or remote package, so we can set
+    # the proper hash and tarball directory.
+    if spec["revision"].startswith("local"):
+      spec["hash"] = spec["local_revision_hash"]
+      spec["tar_hash_dir"] = spec["local_tar_hash_dir"]
+    else:
+      spec["hash"] = spec["remote_revision_hash"]
+      spec["tar_hash_dir"] = spec["remote_tar_hash_dir"]
+    spec["old_devel_hash"] = readHashFile(join(
+      workDir, "BUILD", spec["hash"], spec["package"], ".build_succeeded"))
 
     # Recreate symlinks to this development package builds.
     if spec["package"] in develPkgs:
