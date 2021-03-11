@@ -171,58 +171,61 @@ class HttpRemoteSync:
     return None
 
   def syncToLocal(self, p, spec):
-    if spec["hash"] in self.doneOrFailed:
-      debug("Will not redownload %s with build hash %s", p, spec["hash"])
+    if spec["remote_revision_hash"] in self.doneOrFailed:
+      debug("Will not redownload %s with build hash %s",
+            p, spec["remote_revision_hash"])
       return
 
-    debug("Updating remote store for package %s@%s", p, spec["hash"])
-    hashListUrl = format("%(rs)s/%(sp)s/",
-                        rs=self.remoteStore,
-                        sp=spec["storePath"])
-    pkgListUrl = format("%(rs)s/%(sp)s/",
-                        rs=self.remoteStore,
-                        sp=spec["linksPath"])
+    debug("Updating remote store for package %s@%s",
+          p, spec["remote_revision_hash"])
+    hashListUrl = "{rs}/{sp}/".format(rs=self.remoteStore, sp=spec["remote_store_path"])
+    pkgListUrl = "{rs}/{lp}/".format(rs=self.remoteStore, lp=spec["remote_links_path"])
 
     hashList = self.getRetry(hashListUrl)
     pkgList = None
     if hashList is not None:
       pkgList = self.getRetry(pkgListUrl)
     if pkgList is None or hashList is None:
-      warning("%s (%s) not fetched: have you tried updating the recipes?", p, spec["hash"])
-      self.doneOrFailed.append(spec["hash"])
+      warning("%s (%s) not fetched: have you tried updating the recipes?",
+              p, spec["remote_revision_hash"])
+      self.doneOrFailed.append(spec["remote_revision_hash"])
       return
 
-    execute("mkdir -p %s %s" % (spec["tarballHashDir"], spec["tarballLinkDir"]))
+    execute("mkdir -p {} {}".format(spec["remote_tar_hash_dir"],
+                                    spec["remote_tar_link_dir"]))
     hashList = [x["name"] for x in hashList]
 
     hasErr = False
     for pkg in hashList:
-      destPath = os.path.join(spec["tarballHashDir"], pkg)
+      destPath = os.path.join(spec["remote_tar_hash_dir"], pkg)
       if os.path.isfile(destPath):
         # Do not redownload twice
         continue
-      if not self.getRetry("/".join((self.remoteStore, spec["storePath"], pkg)), destPath):
+      if not self.getRetry(
+          "/".join((self.remoteStore, spec["remote_store_path"], pkg)),
+          destPath):
         hasErr = True
 
     for pkg in pkgList:
       if pkg["name"] in hashList:
         cmd = format("ln -nsf ../../%(a)s/store/%(sh)s/%(h)s/%(n)s %(ld)s/%(n)s\n",
                      a = self.architecture,
-                     h = spec["hash"],
-                     sh = spec["hash"][0:2],
+                     h = spec["remote_revision_hash"],
+                     sh = spec["remote_revision_hash"][0:2],
                      n = pkg["name"],
-                     ld = spec["tarballLinkDir"])
+                     ld = spec["remote_tar_link_dir"])
         execute(cmd)
       else:
-        linkTarget = self.getRetry("/".join((self.remoteStore, spec["linksPath"], pkg["name"])),
-                                   returnResult=True, log=False)
+        linkTarget = self.getRetry(
+          "/".join((self.remoteStore, spec["remote_links_path"], pkg["name"])),
+          returnResult=True, log=False)
         execute(format("ln -nsf ../../%(target)s %(ld)s/%(n)s\n",
                        target=linkTarget.decode("utf-8").rstrip("\r\n"),
-                       ld=spec["tarballLinkDir"],
+                       ld=spec["remote_tar_link_dir"],
                        n=pkg["name"]))
 
     if not hasErr:
-      self.doneOrFailed.append(spec["hash"])
+      self.doneOrFailed.append(spec["remote_revision_hash"])
 
   def syncToRemote(self, p, spec):
     return
@@ -237,16 +240,16 @@ class RsyncRemoteSync:
     self.workdir = workdir
 
   def syncToLocal(self, p, spec):
-    debug("Updating remote store for package %s@%s", p, spec["hash"])
+    debug("Updating remote store for package %s@%s", p, spec["remote_revision_hash"])
     cmd = format("mkdir -p %(tarballHashDir)s\n"
                  "rsync -av %(ro)s %(remoteStore)s/%(storePath)s/ %(tarballHashDir)s/ || true\n"
                  "rsync -av --delete %(ro)s %(remoteStore)s/%(linksPath)s/ %(tarballLinkDir)s/ || true\n",
                  ro=self.rsyncOptions,
                  remoteStore=self.remoteStore,
-                 storePath=spec["storePath"],
-                 linksPath=spec["linksPath"],
-                 tarballHashDir=spec["tarballHashDir"],
-                 tarballLinkDir=spec["tarballLinkDir"])
+                 storePath=spec["remote_store_path"],
+                 linksPath=spec["remote_links_path"],
+                 tarballHashDir=spec["remote_tar_hash_dir"],
+                 tarballLinkDir=spec["remote_tar_link_dir"])
     err = execute(cmd)
     dieOnError(err, "Unable to update from specified store.")
 
@@ -262,8 +265,8 @@ class RsyncRemoteSync:
                  workdir=self.workdir,
                  remoteStore=self.remoteStore,
                  rsyncOptions=self.rsyncOptions,
-                 storePath=spec["storePath"],
-                 linksPath=spec["linksPath"],
+                 storePath=spec["remote_store_path"],
+                 linksPath=spec["remote_links_path"],
                  tarballNameWithRev=tarballNameWithRev)
     err = execute(cmd)
     dieOnError(err, "Unable to upload tarball.")
@@ -278,7 +281,7 @@ class S3RemoteSync:
     self.workdir = workdir
 
   def syncToLocal(self, p, spec):
-    debug("Updating remote store for package %s@%s", p, spec["hash"])
+    debug("Updating remote store for package %s@%s", p, spec["remote_revision_hash"])
     cmd = format(
                  "s3cmd --no-check-md5 sync -s -v --host s3.cern.ch --host-bucket %(b)s.s3.cern.ch s3://%(b)s/%(storePath)s/ %(tarballHashDir)s/ 2>&1 || true\n"
                  "mkdir -p '%(tarballLinkDir)s'; find '%(tarballLinkDir)s' -type l -delete;\n"
@@ -286,10 +289,10 @@ class S3RemoteSync:
                  "  ln -sf ../../`curl -sL https://s3.cern.ch/swift/v1/%(b)s/$x` %(tarballLinkDir)s/`basename $x` || true\n"
                  "done",
                  b=self.remoteStore,
-                 storePath=spec["storePath"],
-                 linksPath=spec["linksPath"],
-                 tarballHashDir=spec["tarballHashDir"],
-                 tarballLinkDir=spec["tarballLinkDir"])
+                 storePath=spec["remote_store_path"],
+                 linksPath=spec["remote_links_path"],
+                 tarballHashDir=spec["remote_tar_hash_dir"],
+                 tarballLinkDir=spec["remote_tar_link_dir"])
     err = execute(cmd)
     dieOnError(err, "Unable to update from specified store.")
 
@@ -306,8 +309,8 @@ class S3RemoteSync:
                  "echo $HASHEDURL | s3cmd put -s -v --host s3.cern.ch --host-bucket %(b)s.s3.cern.ch - s3://%(b)s/%(linksPath)s/%(tarballNameWithRev)s 2>/dev/null || true\n",
                  workdir=self.workdir,
                  b=self.remoteStore,
-                 storePath=spec["storePath"],
-                 linksPath=spec["linksPath"],
+                 storePath=spec["remote_store_path"],
+                 linksPath=spec["remote_links_path"],
                  tarballNameWithRev=tarballNameWithRev)
     err = execute(cmd)
     dieOnError(err, "Unable to upload tarball.")
@@ -315,6 +318,7 @@ class S3RemoteSync:
 # Creates a directory in the store which contains symlinks to the package
 # and its direct / indirect dependencies
 def createDistLinks(spec, specs, args, repoType, requiresType):
+  # At the point we call this function, spec has a single, definitive hash.
   target = format("TARS/%(a)s/%(rp)s/%(p)s/%(p)s-%(v)s-%(r)s",
                   a=args.architecture,
                   rp=repoType,
@@ -362,6 +366,72 @@ def createDistLinks(spec, specs, args, repoType, requiresType):
                  o=rsyncOptions,
                  t=target)
     execute(cmd)
+
+
+def storeHashes(package, specs, isDevelPkg, considerRelocation):
+  """Calculate various hashes for package, and store them in specs[package].
+
+  Assumes that all dependencies of the package already have a definitive hash.
+  """
+  spec = specs[package]
+
+  if "remote_revision_hash" in spec and "local_revision_hash" in spec:
+    # We've already calculated these hashes before, so no need to do it again.
+    # This also works around a bug, where after the first hash calculation,
+    # some attributes of spec are changed (e.g. append_path and prepend_path
+    # entries are turned from strings into lists), which changes the hash on
+    # subsequent calculations.
+    return
+
+  hasher = Hasher()
+
+  if spec.get("force_rebuild", False):
+    hasher(str(time.time()))
+
+  for key in ("recipe", "version", "package", "commit_hash", "env",
+              "append_path", "prepend_path"):
+    if sys.version_info[0] < 3 and key in spec and isinstance(spec[key], OrderedDict):
+      # Python 2: use YAML dict order to prevent changing hashes
+      hasher(str(yaml.safe_load(yamlDump(spec[key]))))
+    else:
+      hasher(str(spec.get(key, "none")))
+
+  # If the commit hash is a real hash, and not a tag, we can safely assume
+  # that's unique, and therefore we can avoid putting the repository or the
+  # name of the branch in the hash.
+  if spec["commit_hash"] == spec.get("tag", "0"):
+    if "source" in spec:
+      hasher(spec["source"])
+      hasher(spec["tag"])
+    else:
+      hasher("none")
+
+  depsHasher = Hasher()
+  for dep in spec.get("requires", []):
+    # At this point, our dependencies have a single hash, local or remote.
+    hasher(specs[dep]["hash"])
+    depsHasher(specs[dep]["hash"])
+    depsHasher(specs[dep].get("devel_hash", ""))
+  spec["deps_hash"] = depsHasher.hexdigest()
+
+  if isDevelPkg and "incremental_recipe" in spec:
+    hasher(spec["incremental_recipe"])
+    ih = Hasher()
+    ih(spec["incremental_recipe"])
+    spec["incremental_hash"] = ih.hexdigest()
+  elif isDevelPkg:
+    hasher(spec.get("devel_hash"))
+
+  if considerRelocation and "relocate_paths" in spec:
+    hasher("relocate:")
+    hasher(" ".join(sorted(spec["relocate_paths"])))
+
+  spec["remote_revision_hash"] = hasher.hexdigest()
+  # The local hash must differ from the remote hash to avoid conflicts where
+  # the remote has a package with the same hash as an existing local revision.
+  hasher("local")
+  spec["local_revision_hash"] = hasher.hexdigest()
+
 
 def doBuild(args, parser):
   if args.remoteStore.startswith("http"):
@@ -611,69 +681,6 @@ def doBuild(args, parser):
     if "source" in spec:
       debug("Commit hash for %s@%s is %s", spec["source"], spec["tag"], spec["commit_hash"])
 
-  # Calculate the hashes. We do this in build order so that we can guarantee
-  # that the hashes of the dependencies are calculated first.  Also notice that
-  # if the commit hash is a real hash, and not a tag, we can safely assume
-  # that's unique, and therefore we can avoid putting the repository or the
-  # name of the branch in the hash.
-  debug("Calculating hashes.")
-  for p in buildOrder:
-    spec = specs[p]
-    debug("spec = %r", spec)
-    debug("develPkgs = %r", develPkgs)
-    h = Hasher()
-    dh = Hasher()
-    for x in ["recipe", "version", "package", "commit_hash",
-              "env", "append_path", "prepend_path"]:
-      if sys.version_info[0] < 3 and x in spec and type(spec[x]) == OrderedDict:
-        # Python 2: use YAML dict order to prevent changing hashes
-        h(str(yaml.safe_load(yamlDump(spec[x]))))
-      else:
-        h(str(spec.get(x, "none")))
-    if spec["commit_hash"] == spec.get("tag", "0"):
-      h(spec.get("source", "none"))
-      if "source" in spec:
-        h(spec["tag"])
-    for dep in spec.get("requires", []):
-      h(specs[dep]["hash"])
-      dh(specs[dep]["hash"] + specs[dep].get("devel_hash", ""))
-    if bool(spec.get("force_rebuild", False)):
-      h(str(time.time()))
-    if spec["package"] in develPkgs and "incremental_recipe" in spec:
-      h(spec["incremental_recipe"])
-      ih = Hasher()
-      ih(spec["incremental_recipe"])
-      spec["incremental_hash"] = ih.hexdigest()
-    elif p in develPkgs:
-      h(spec.get("devel_hash"))
-    if args.architecture.startswith("osx") and "relocate_paths" in spec:
-        h("relocate:"+" ".join(sorted(spec["relocate_paths"])))
-    spec["hash"] = h.hexdigest()
-    spec["deps_hash"] = dh.hexdigest()
-    debug("Hash for recipe %s is %s", p, spec["hash"])
-
-  # This adds to the spec where it should find, locally or remotely the
-  # various tarballs and links.
-  for p in buildOrder:
-    spec = specs[p]
-    pkgSpec = {
-      "workDir": workDir,
-      "package": spec["package"],
-      "version": spec["version"],
-      "hash": spec["hash"],
-      "prefix": spec["hash"][0:2],
-      "architecture": args.architecture
-    }
-    varSpecs = [
-      ("storePath", "TARS/%(architecture)s/store/%(prefix)s/%(hash)s"),
-      ("linksPath", "TARS/%(architecture)s/%(package)s"),
-      ("tarballHashDir", "%(workDir)s/TARS/%(architecture)s/store/%(prefix)s/%(hash)s"),
-      ("tarballLinkDir", "%(workDir)s/TARS/%(architecture)s/%(package)s"),
-      ("buildDir", "%(workDir)s/BUILD/%(hash)s/%(package)s")
-    ]
-    spec.update(dict([(x, format(y, **pkgSpec)) for (x, y) in varSpecs]))
-    spec["old_devel_hash"] = readHashFile(spec["buildDir"]+"/.build_succeeded")
-
   # We recursively calculate the full set of requires "full_requires"
   # including build_requires and the subset of them which are needed at
   # runtime "full_runtime_requires".
@@ -727,6 +734,41 @@ def doBuild(args, parser):
       logger_handler.setFormatter(
           LogFormatter("%%(asctime)s:%%(levelname)s:%s:%s:%s: %%(message)s" %
                        (mainPackage, p, args.develPrefix if "develPrefix" in args else mainHash[0:8])))
+
+    # Calculate the hashes. We do this in build order so that we can guarantee
+    # that the hashes of the dependencies are calculated first. Do this inside
+    # the main build loop to make sure that our dependencies have been assigned
+    # a single, definitive hash.
+    debug("Calculating hash.")
+    debug("spec = %r", spec)
+    debug("develPkgs = %r", develPkgs)
+    storeHashes(p, specs, isDevelPkg=p in develPkgs,
+                considerRelocation=args.architecture.startswith("osx"))
+    debug("Hashes for recipe %s are %s (remote), %s (local)",
+          p, spec["remote_revision_hash"], spec["local_revision_hash"])
+
+    # This adds to the spec where it should find, locally or remotely the
+    # various tarballs and links.
+    pkgSpec = {
+      "workDir": workDir,
+      "package": spec["package"],
+      "version": spec["version"],
+      "remote_revision_hash": spec["remote_revision_hash"],
+      "remote_prefix": spec["remote_revision_hash"][0:2],
+      "local_revision_hash": spec["local_revision_hash"],
+      "local_prefix": spec["local_revision_hash"][0:2],
+      "architecture": args.architecture
+    }
+    spec.update({k: v % pkgSpec for k, v in (
+      ("remote_store_path", "TARS/%(architecture)s/store/%(remote_prefix)s/%(remote_revision_hash)s"),
+      ("remote_links_path", "TARS/%(architecture)s/%(package)s"),
+      ("remote_tar_hash_dir",
+       "%(workDir)s/TARS/%(architecture)s/store/%(remote_prefix)s/%(remote_revision_hash)s"),
+      ("local_tar_hash_dir",
+       "%(workDir)s/TARS/%(architecture)s/store/%(local_prefix)s/%(local_revision_hash)s"),
+      ("remote_tar_link_dir", "%(workDir)s/TARS/%(architecture)s/%(package)s"),
+    )})
+
     if spec["package"] in develPkgs and getattr(syncHelper, "writeStore", None):
       warning("Disabling remote write store from now since %s is a development package.", spec["package"])
       syncHelper.writeStore = ""
@@ -806,7 +848,10 @@ def doBuild(args, parser):
         continue
       h, revision = m.groups()
 
-      if h != spec["hash"]:
+      if not (("local" in revision and h == spec["local_revision_hash"]) or
+              ("local" not in revision and h == spec["remote_revision_hash"])):
+        # This tarball's hash doesn't match what we need. Remember that its
+        # revision number is taken, in case we assign our own later.
         if revision.startswith(revisionPrefix) and revision[len(revisionPrefix):].isdigit():
           # Strip revisionPrefix; the rest is an integer. Convert it to an int
           # so we can get a sensible max() existing revision below.
@@ -824,7 +869,8 @@ def doBuild(args, parser):
       if spec["package"] in develPkgs and "incremental_recipe" in spec:
         spec["obsolete_tarball"] = d
       else:
-        debug("Package %s with hash %s is already found in %s. Not building.", p, h, d)
+        debug("Not building: %s %s-%s with hash %s exists in %s.",
+              p, spec["version"], revision, h, d)
         src = format("%(v)s-%(r)s",
                      w=workDir,
                      v=spec["version"],
@@ -855,6 +901,17 @@ def doBuild(args, parser):
       spec["revision"] = revisionPrefix + str(
         min(set(range(1, max(busyRevisions) + 2)) - busyRevisions)
         if busyRevisions else 1)
+
+    # Now we know whether we're using a local or remote package, so we can set
+    # the proper hash and tarball directory.
+    if spec["revision"].startswith("local"):
+      spec["hash"] = spec["local_revision_hash"]
+      spec["tar_hash_dir"] = spec["local_tar_hash_dir"]
+    else:
+      spec["hash"] = spec["remote_revision_hash"]
+      spec["tar_hash_dir"] = spec["remote_tar_hash_dir"]
+    spec["old_devel_hash"] = readHashFile(join(
+      workDir, "BUILD", spec["hash"], spec["package"], ".build_succeeded"))
 
     # Recreate symlinks to this development package builds.
     if spec["package"] in develPkgs:
@@ -968,13 +1025,13 @@ def doBuild(args, parser):
           pass
       continue
 
-    debug("Looking for cached tarball in %s", spec["tarballHashDir"])
-    # FIXME: I should get the tarballHashDir updated with server at this point.
+    debug("Looking for cached tarball in %s", spec["tar_hash_dir"])
+    # FIXME: I should get the tar_hash_dir updated with server at this point.
     #        It does not really matter that the symlinks are ok at this point
     #        as I only used the tarballs as reusable binary blobs.
     spec["cachedTarball"] = ""
     if not spec["package"] in develPkgs:
-      tarballs = glob(join(spec["tarballHashDir"], "*gz"))
+      tarballs = glob(join(spec["tar_hash_dir"], "*gz"))
       spec["cachedTarball"] = tarballs[0] if len(tarballs) else ""
       debug("Found tarball in %s" % spec["cachedTarball"]
             if spec["cachedTarball"] else "No cache tarballs found")
