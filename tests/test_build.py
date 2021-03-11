@@ -70,8 +70,8 @@ append_path:
 make
 make install
 """
-TEST_ROOT_BUILD_HASH = "2cb80ea18ac9ec56b94c4d9a865caa1f7e03a8f0" if sys.version_info[0] < 3 else \
-                       "1fc9be611d016280a2a66519923965839d0d009b"
+TEST_ROOT_BUILD_HASH = "96cf657d1a5e2d41f16dfe42ced8c3522ab4e413" if sys.version_info[0] < 3 else \
+                       "8ec3f41b6b585ef86a02e9c595eed67f34d63f08"
 
 TEST_DEFAULT_RELEASE = """package: defaults-release
 version: v1
@@ -105,10 +105,10 @@ def dummy_open(x, mode="r"):
   if mode == "r":
     known = {
       "/sw/BUILD/27ce49698e818e8efb56b6eff6dd785e503df341/defaults-release/.build_succeeded": (0, StringIO("0")),
-      "/sw/BUILD/3e90b4e08bad439fa5f25282480d1adb9efb0c0d/zlib/.build_succeeded": (0, StringIO("0")),
+      "/sw/BUILD/8cd1f56c450f05ffbba3276bad08eae30f814999/zlib/.build_succeeded": (0, StringIO("0")),
       "/sw/BUILD/%s/ROOT/.build_succeeded" % TEST_ROOT_BUILD_HASH: (0, StringIO("0")),
       "/sw/osx_x86-64/defaults-release/v1-1/.build-hash": (1, StringIO("27ce49698e818e8efb56b6eff6dd785e503df341")),
-      "/sw/osx_x86-64/zlib/v1.2.3-local1/.build-hash": (1, StringIO("3e90b4e08bad439fa5f25282480d1adb9efb0c0d")),
+      "/sw/osx_x86-64/zlib/v1.2.3-local1/.build-hash": (1, StringIO("8cd1f56c450f05ffbba3276bad08eae30f814999")),
       "/sw/osx_x86-64/ROOT/v6-08-30-local1/.build-hash": (1, StringIO(TEST_ROOT_BUILD_HASH))
     }
     if not x in known:
@@ -191,7 +191,7 @@ class BuildTestCase(unittest.TestCase):
         "/sw/TARS/osx_x86-64/zlib/zlib-v1.2.3-*.osx_x86-64.tar.gz": [],
         "/sw/TARS/osx_x86-64/ROOT/ROOT-v6-08-30-*.osx_x86-64.tar.gz": [],
         "/sw/TARS/osx_x86-64/store/27/27ce49698e818e8efb56b6eff6dd785e503df341/*gz": [],
-        "/sw/TARS/osx_x86-64/store/3e/3e90b4e08bad439fa5f25282480d1adb9efb0c0d/*gz": [],
+        "/sw/TARS/osx_x86-64/store/8c/8cd1f56c450f05ffbba3276bad08eae30f814999/*gz": [],
         "/sw/TARS/osx_x86-64/store/%s/%s/*gz" % (TEST_ROOT_BUILD_HASH[0:2], TEST_ROOT_BUILD_HASH): [],
         "/sw/TARS/osx_x86-64/defaults-release/defaults-release-v1-1.osx_x86-64.tar.gz": ["../../osx_x86-64/store/27/27ce49698e818e8efb56b6eff6dd785e503df341/defaults-release-v1-1.osx_x86-64.tar.gz"],
       }[x]
