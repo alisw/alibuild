@@ -267,13 +267,13 @@ class BuildTestCase(unittest.TestCase):
     syncers = [NoRemoteSync(),
                HttpRemoteSync(remoteStore="https://local/test", architecture="osx_x86-64", workdir="/sw", insecure=False),
                RsyncRemoteSync(remoteStore="ssh://local/test", writeStore="ssh://local/test", architecture="osx_x86-64", workdir="/sw", rsyncOptions="")]
-    dummy_spec = { "package"        : "zlib",
-                   "version"        : "v1.2.3",
-                   "revision"       : "1",
-                   "storePath"      : "/sw/path",
-                   "linksPath"      : "/sw/links",
-                   "tarballHashDir" : "/sw/TARS",
-                   "tarballLinkDir" : "/sw/TARS" }
+    dummy_spec = {"package": "zlib",
+                  "version": "v1.2.3",
+                  "revision": "1",
+                  "remote_store_path": "/sw/path",
+                  "remote_links_path": "/sw/links",
+                  "remote_tar_hash_dir": "/sw/TARS",
+                  "remote_tar_link_dir": "/sw/TARS"}
 
     class mockRequest:
       def __init__(self, j, simulate_err=False):
@@ -299,10 +299,10 @@ class BuildTestCase(unittest.TestCase):
     def mockGet(url, *a, **b):
       if "triggers_a_404" in url:
         return mockRequest(None)
-      if dummy_spec["storePath"] in url:
-        if dummy_spec["hash"].startswith("deadbeef"):
+      if dummy_spec["remote_store_path"] in url:
+        if dummy_spec["remote_revision_hash"].startswith("deadbeef"):
           return mockRequest([{ "name": "zlib-v1.2.3-1.slc7_x86-64.tar.gz" }])
-        elif dummy_spec["hash"].startswith("baadf00d"):
+        elif dummy_spec["remote_revision_hash"].startswith("baadf00d"):
           return mockRequest([{ "name": "zlib-v1.2.3-2.slc7_x86-64.tar.gz" }], simulate_err=True)
       else:
         return mockRequest([{ "name":"zlib-v1.2.3-1.slc7_x86-64.tar.gz" },
@@ -312,12 +312,12 @@ class BuildTestCase(unittest.TestCase):
     mock_os.path.isfile.side_effect = lambda x: False  # file does not exist locally: force download
 
     for testHash in [ "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef", "baadf00dbaadf00dbaadf00dbaadf00dbaadf00d" ]:
-      dummy_spec["hash"] = testHash
+      dummy_spec["remote_revision_hash"] = testHash
       for x in syncers:
         x.syncToLocal("zlib", dummy_spec)
         x.syncToRemote("zlib", dummy_spec)
 
-    dummy_spec["storePath"] = "/triggers_a_404/path"
+    dummy_spec["remote_store_path"] = "/triggers_a_404/path"
     for x in syncers:
       x.syncToLocal("zlib", dummy_spec)
 
