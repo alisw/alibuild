@@ -215,6 +215,12 @@ class HttpRemoteSync:
                      n = pkg["name"],
                      ld = spec["remote_tar_link_dir"])
         execute(cmd)
+      elif os.path.islink(join(spec["remote_tar_link_dir"], pkg["name"])):
+        # Do not redownload twice. The download isn't large, but if we have
+        # lots of small files it takes a while. With local revisions, we won't
+        # produce revisions that will conflict with remote revisions unless we
+        # upload them anyway, so there's no need to redownload.
+        pass
       else:
         linkTarget = self.getRetry(
           "/".join((self.remoteStore, spec["remote_links_path"], pkg["name"])),
