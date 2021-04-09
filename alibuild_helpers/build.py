@@ -964,14 +964,9 @@ def doBuild(args, parser):
                                                spec["version"],
                                                spec["revision"])
     fileHash = readHashFile(hashFile)
-    if fileHash != spec["hash"]:
-      if fileHash != "0":
-        debug("Mismatch between local area (%s) and the one which I should build (%s). Redoing.",
-              fileHash, spec["hash"])
-      # shutil.rmtree under Python 2 fails when hashFile is unicode and the
-      # directory contains files with non-ASCII names, e.g. Golang/Boost.
-      shutil.rmtree(dirname(hashFile).encode("utf-8"), True)
-    else:
+    # Development packages have their own rebuild-detection logic above.
+    # spec["hash"] is only useful here for regular packages.
+    if fileHash == spec["hash"] and spec["package"] not in develPkgs:
       # If we get here, we know we are in sync with whatever remote store.  We
       # can therefore create a directory which contains all the packages which
       # were used to compile this one.
@@ -1025,6 +1020,13 @@ def doBuild(args, parser):
         except:
           pass
       continue
+
+    if fileHash != "0":
+      debug("Mismatch between local area (%s) and the one which I should build (%s). Redoing.",
+            fileHash, spec["hash"])
+    # shutil.rmtree under Python 2 fails when hashFile is unicode and the
+    # directory contains files with non-ASCII names, e.g. Golang/Boost.
+    shutil.rmtree(dirname(hashFile).encode("utf-8"), True)
 
     debug("Looking for cached tarball in %s", spec["tar_hash_dir"])
     # FIXME: I should get the tar_hash_dir updated with server at this point.
