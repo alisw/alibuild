@@ -168,10 +168,28 @@ def getVersion():
     err, version = getstatusoutput(cmd)
     return version if not err else "Unknown version."
 
-def filterByArchitecture(arch, requires):
+def filterRequires(arch, default, target, requires):
   for r in requires:
-    require, matcher = ":" in r and r.split(":", 1) or (r, ".*")
-    if re.match(matcher, arch):
+    if ":" not in r:
+      yield r
+      continue
+    require, matchers = r.split(":", 1)
+    if not "=" in matchers:
+      matchers = "arch=" + matchers
+    matchesAll = True
+    for matcher in matchers.split(","):
+      if not "=" in matcher:
+        raise "Bad require filter definition"
+      field, matcher = matcher.split("=")
+      if field not in ["arch", "defaults", "target"]:
+        raise RuntimeError("Bad require filter definition: \"%s\". Must be one of arch, default, target." % field)
+      if field == "arch" and not re.match(matcher, arch):
+        matchesAll = False
+      if field == "defaults" and not re.match(matcher, default):
+        matchesAll = False
+      if field == "target" and not re.match(matcher, target):
+        matchesAll = False
+    if matchesAll:
       yield require
 
 def readDefaults(configDir, defaults, error, architecture):
@@ -310,7 +328,12 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
   packages = packages[:]
   validDefaults = []  # empty list: all OK; None: no valid default; non-empty list: list of valid ones
   while packages:
-    p = packages.pop(0)
+    fullPkg = packages.pop(0)
+    target = all
+    if ":" in fullPkg:
+      p, target = fullPkg.split(":")
+    else:
+      p = fullPkg
     if p in specs:
       continue
     lowerPkg = p.lower()
@@ -377,7 +400,7 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
           validDefaults = None  # no valid default works for all current packages
 
     # For the moment we treat build_requires just as requires.
-    fn = lambda what: filterByArchitecture(architecture, spec.get(what, []))
+    fn = lambda what: filterRequires(architecture, defaults, target, spec.get(what, []))
     spec["requires"] = [x for x in fn("requires") if not x in disable]
     spec["build_requires"] = [x for x in fn("build_requires") if not x in disable]
     if spec["package"] != "defaults-release":
@@ -390,6 +413,7 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
     spec["tag"] = spec.get("tag", spec["version"])
     spec["version"] = spec["version"].replace("/", "_")
     spec["recipe"] = recipe.strip("\n")
+    spec["target"] = target
     specs[spec["package"]] = spec
     packages += spec["requires"]
   return (systemPackages, ownPackages, failedRequirements, validDefaults)
