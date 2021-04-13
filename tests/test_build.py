@@ -159,33 +159,31 @@ def dummy_exists(x):
 
 # A few errors we should handle, together with the expected result
 class BuildTestCase(unittest.TestCase):
-  @patch("alibuild_helpers.build.get")
+  @patch("alibuild_helpers.sync.get")
   @patch("alibuild_helpers.build.execute")
   @patch("alibuild_helpers.workarea.execute")
-  @patch("alibuild_helpers.build.getstatusoutput")
-  @patch("alibuild_helpers.build.exists")
-  @patch("alibuild_helpers.workarea.path.exists")
+  @patch("alibuild_helpers.sync.execute")
+  @patch("alibuild_helpers.build.getstatusoutput", new=MagicMock(side_effect=dummy_getstatusoutput))
+  @patch("alibuild_helpers.build.exists", new=MagicMock(side_effect=dummy_exists))
+  @patch("alibuild_helpers.workarea.path.exists", new=MagicMock(side_effect=dummy_exists))
   @patch("alibuild_helpers.build.sys")
   @patch("alibuild_helpers.build.dieOnError")
   @patch("alibuild_helpers.build.readDefaults")
   @patch("alibuild_helpers.build.makedirs")
   @patch("alibuild_helpers.build.debug")
   @patch("alibuild_helpers.utilities.open")
-  @patch("alibuild_helpers.build.open")
+  @patch("alibuild_helpers.sync.open", new=MagicMock(side_effect=dummy_open))
+  @patch("alibuild_helpers.build.open", new=MagicMock(side_effect=dummy_open))
   @patch("alibuild_helpers.build.shutil")
   @patch("alibuild_helpers.build.glob")
-  @patch("alibuild_helpers.build.readlink")
+  @patch("alibuild_helpers.build.readlink", new=MagicMock(side_effect=dummy_readlink))
   @patch("alibuild_helpers.build.banner")
-  @patch("alibuild_helpers.build.getStatusOutputBash")
-  @patch("alibuild_helpers.workarea.is_writeable")
-  @patch("alibuild_helpers.build.basename")
-  def test_coverDoBuild(self, mock_basename, mock_is_writeable, mock_getStatusOutputBash, mock_banner,
-                              mock_readlink, mock_glob, mock_shutil, mock_open, mock_utilities_open,
+  @patch("alibuild_helpers.build.getStatusOutputBash", new=MagicMock(side_effect=dummy_getStatusOutputBash))
+  @patch("alibuild_helpers.workarea.is_writeable", new=MagicMock(return_value=True))
+  @patch("alibuild_helpers.build.basename", new=MagicMock(return_value="aliBuild"))
+  def test_coverDoBuild(self, mock_banner, mock_glob, mock_shutil, mock_utilities_open,
                               mock_debug, mock_makedirs, mock_read_defaults, mock_die, mock_sys,
-                              mock_workarea_exists, mock_exists, mock_getstatusoutput,
-                              mock_workarea_execute, mock_execute, mock_get):
-    mock_readlink.side_effect = dummy_readlink
-    mock_basename.side_effect = lambda x : "aliBuild"
+                              mock_sync_execute, mock_workarea_execute, mock_execute, mock_get):
     mock_glob.side_effect = lambda x : {"*": ["zlib"],
         "/sw/TARS/osx_x86-64/defaults-release/defaults-release-v1-*.osx_x86-64.tar.gz": ["/sw/TARS/osx_x86-64/defaults-release/defaults-release-v1-1.osx_x86-64.tar.gz"],
         "/sw/TARS/osx_x86-64/zlib/zlib-v1.2.3-*.osx_x86-64.tar.gz": [],
@@ -201,18 +199,13 @@ class BuildTestCase(unittest.TestCase):
       "/alidist/zlib.sh": StringIO(TEST_ZLIB_RECIPE),
       "/alidist/defaults-release.sh": StringIO(TEST_DEFAULT_RELEASE)
     }[x]
-    mock_is_writeable.side_effect = lambda x: True
-    mock_open.side_effect = dummy_open
 
     mock_git_clone = MagicMock(return_value=None)
     mock_git_fetch = MagicMock(return_value=None)
     mock_execute.side_effect = lambda x, **kwds: dummy_execute(x, mock_git_clone, mock_git_fetch, **kwds)
     mock_workarea_execute.side_effect = lambda x, **kwds: dummy_execute(x, mock_git_clone, mock_git_fetch, **kwds)
+    mock_sync_execute.side_effect = lambda x, **kwds: dummy_execute(x, mock_git_clone, mock_git_fetch, **kwds)
 
-    mock_exists.side_effect = dummy_exists
-    mock_workarea_exists.side_effect = dummy_exists
-    mock_getstatusoutput.side_effect = dummy_getstatusoutput
-    mock_getStatusOutputBash.side_effect = dummy_getStatusOutputBash
     mock_parser = MagicMock()
     mock_read_defaults.return_value = (OrderedDict({"package": "defaults-release", "disable": []}), "")
     args = Namespace(
@@ -255,15 +248,14 @@ class BuildTestCase(unittest.TestCase):
     self.assertEqual(mock_git_clone.call_count, 1, "Expected only one call to git clone (called %d times instead)" % mock_git_clone.call_count)
     self.assertEqual(mock_git_fetch.call_count, 1, "Expected only one call to git fetch (called %d times instead)" % mock_git_fetch.call_count)
 
-  @patch("alibuild_helpers.build.open")
-  @patch("alibuild_helpers.build.get")
-  @patch("alibuild_helpers.build.execute")
-  @patch("alibuild_helpers.build.getstatusoutput")
-  @patch("alibuild_helpers.build.os")
-  @patch("alibuild_helpers.build.dieOnError")
-  @patch("alibuild_helpers.build.warning")
-  @patch("alibuild_helpers.build.error")
-  def test_coverSyncs(self, mock_error, mock_warning, mock_die, mock_os, mock_getstatusoutput, mock_execute, mock_get, mock_open):
+  @patch("alibuild_helpers.sync.open", new=MagicMock(side_effect=lambda fn, mode: BytesIO()))
+  @patch("alibuild_helpers.sync.get")
+  @patch("alibuild_helpers.sync.execute")
+  @patch("alibuild_helpers.sync.os")
+  @patch("alibuild_helpers.sync.dieOnError")
+  @patch("alibuild_helpers.sync.warning")
+  @patch("alibuild_helpers.sync.error")
+  def test_coverSyncs(self, mock_error, mock_warning, mock_die, mock_os, mock_execute, mock_get):
     syncers = [NoRemoteSync(),
                HttpRemoteSync(remoteStore="https://local/test", architecture="osx_x86-64", workdir="/sw", insecure=False),
                RsyncRemoteSync(remoteStore="ssh://local/test", writeStore="ssh://local/test", architecture="osx_x86-64", workdir="/sw", rsyncOptions="")]
@@ -308,7 +300,6 @@ class BuildTestCase(unittest.TestCase):
         return mockRequest([{ "name":"zlib-v1.2.3-1.slc7_x86-64.tar.gz" },
                             { "name":"zlib-v1.2.3-2.slc7_x86-64.tar.gz" }])
     mock_get.side_effect = mockGet
-    mock_open.side_effect = lambda fn,fmode: BytesIO()
     mock_os.path.isfile.side_effect = lambda x: False  # file does not exist locally: force download
 
     for testHash in [ "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef", "baadf00dbaadf00dbaadf00dbaadf00dbaadf00d" ]:
