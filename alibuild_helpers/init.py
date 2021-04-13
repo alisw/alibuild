@@ -39,7 +39,7 @@ def doInit(args):
   if path.exists(args.configDir):
     warning("using existing recipes from %s", args.configDir)
   else:
-    cmd = format("git clone --origin upstream %(pcf)s %(repo)s%(branch)s %(cd)s",
+    cmd = format("git clone %(pcf)s %(repo)s%(branch)s %(cd)s",
                  pcf=partialCloneFilter,
                  repo=args.dist["repo"] if ":" in args.dist["repo"] else "https://github.com/%s" % args.dist["repo"],
                  branch=" -b "+args.dist["ver"] if args.dist["ver"] else "",
@@ -86,8 +86,8 @@ def doInit(args):
     debug("cloning %s%s for development", spec["package"], " version "+p["ver"] if p["ver"] else "")
 
     updateReferenceRepoSpec(args.referenceSources, spec["package"], spec, True)
-    cmd = format("git clone --origin upstream %(pcf)s %(readRepo)s%(branch)s --reference %(refSource)s %(cd)s && " +
-                 "cd %(cd)s && git remote set-url --push upstream %(writeRepo)s",
+    cmd = format("git clone %(pcf)s %(readRepo)s%(branch)s --reference %(refSource)s %(cd)s && " +
+                 "cd %(cd)s && git remote set-url --push origin %(writeRepo)s",
                  pcf=partialCloneFilter,
                  readRepo=spec["source"],
                  writeRepo=writeRepo,
