@@ -97,9 +97,8 @@ class HttpRemoteSync:
               # No need to retry any further
               return None
             resp.raise_for_status()
-            resp = resp.text
             return [{"name": os.path.basename(x), "type": "file"}
-                    for x in resp.split()]
+                    for x in resp.text.split()]
           else:
             # No destination specified: JSON request
             resp = get(url, verify=not self.insecure, timeout=self.httpTimeoutSec)
@@ -127,13 +126,15 @@ class HttpRemoteSync:
     debug("Updating remote store for package %s@%s",
           p, spec["remote_revision_hash"])
     hashListUrl = "{rs}/{sp}/".format(rs=self.remoteStore, sp=spec["remote_store_path"])
+    manifestUrl = "{rs}/{lp}.manifest".format(rs=self.remoteStore, lp=spec["remote_links_path"])
     pkgListUrl = "{rs}/{lp}/".format(rs=self.remoteStore, lp=spec["remote_links_path"])
 
     hashList = self.getRetry(hashListUrl)
-    pkgList = None
+    freeSymlinkList = None
     if hashList is not None:
-      pkgList = self.getRetry(pkgListUrl)
-    if pkgList is None or hashList is None:
+      manifest = self.getRetry(manifestUrl, returnResult=True)
+      freeSymlinkList = self.getRetry(pkgListUrl)
+    if freeSymlinkList is None or hashList is None:
       warning("%s (%s) not fetched: have you tried updating the recipes?",
               p, spec["remote_revision_hash"])
       self.doneOrFailed.append(spec["remote_revision_hash"])
@@ -154,29 +155,43 @@ class HttpRemoteSync:
           destPath):
         hasErr = True
 
-    for pkg in pkgList:
-      if pkg["name"] in hashList:
-        cmd = format("ln -nsf ../../%(a)s/store/%(sh)s/%(h)s/%(n)s %(ld)s/%(n)s\n",
-                     a = self.architecture,
-                     h = spec["remote_revision_hash"],
-                     sh = spec["remote_revision_hash"][0:2],
-                     n = pkg["name"],
-                     ld = spec["remote_tar_link_dir"])
-        execute(cmd)
-      elif os.path.islink(os.path.join(spec["remote_tar_link_dir"], pkg["name"])):
-        # Do not redownload twice. The download isn't large, but if we have
-        # lots of small files it takes a while. With local revisions, we won't
-        # produce revisions that will conflict with remote revisions unless we
-        # upload them anyway, so there's no need to redownload.
-        pass
-      else:
-        linkTarget = self.getRetry(
-          "/".join((self.remoteStore, spec["remote_links_path"], pkg["name"])),
-          returnResult=True, log=False)
-        execute(format("ln -nsf ../../%(target)s %(ld)s/%(n)s\n",
-                       target=linkTarget.decode("utf-8").rstrip("\r\n"),
-                       ld=spec["remote_tar_link_dir"],
-                       n=pkg["name"]))
+    # Fetch manifest file with initial symlinks. This file is updated
+    # regularly; we use it to avoid many small network requests.
+    symlinks = {
+      linkname.decode("utf-8"): target.decode("utf-8")
+      for linkname, sep, target in (line.partition(b"\t")
+                                    for line in manifest.splitlines())
+      if sep and linkname and target
+    }
+    # If we've just downloaded a tarball, add a symlink to it.
+    symlinks.update({
+      linkname: os.path.join(self.architecture, "store",
+                             spec["remote_revision_hash"][0:2],
+                             spec["remote_revision_hash"],
+                             linkname)
+      for linkname in hashList
+    })
+    # Now add any remaining symlinks that aren't in the manifest yet. There
+    # should always be relatively few of these, as the separate network
+    # requests are a bit expensive.
+    for link in freeSymlinkList:
+      linkname = link["name"]
+      if linkname in symlinks:
+        # This symlink is already present in the manifest.
+        continue
+      if os.path.islink(os.path.join(spec["remote_tar_link_dir"], linkname)):
+        # We have this symlink locally. With local revisions, we won't produce
+        # revisions that will conflict with remote revisions unless we upload
+        # them anyway, so there's no need to redownload.
+        continue
+      # This symlink isn't in the manifest yet, and we don't have it locally,
+      # so download it individually.
+      symlinks[linkname] = self.getRetry(
+        "/".join((self.remoteStore, spec["remote_links_path"], linkname)),
+        returnResult=True, log=False).decode("utf-8").rstrip("\r\n")
+    for linkname, target in symlinks.items():
+      execute("ln -nsf ../../{target} {linkdir}/{name}".format(
+        linkdir=spec["remote_tar_link_dir"], target=target, name=linkname))
 
     if not hasErr:
       self.doneOrFailed.append(spec["remote_revision_hash"])
@@ -236,18 +251,29 @@ class S3RemoteSync:
 
   def syncToLocal(self, p, spec):
     debug("Updating remote store for package %s@%s", p, spec["remote_revision_hash"])
-    cmd = format(
-                 "s3cmd --no-check-md5 sync -s -v --host s3.cern.ch --host-bucket %(b)s.s3.cern.ch s3://%(b)s/%(storePath)s/ %(tarballHashDir)s/ 2>&1 || true\n"
-                 "mkdir -p '%(tarballLinkDir)s'; find '%(tarballLinkDir)s' -type l -delete;\n"
-                 "for x in `curl -sL https://s3.cern.ch/swift/v1/%(b)s/?prefix=%(linksPath)s/`; do\n"
-                 "  ln -sf ../../`curl -sL https://s3.cern.ch/swift/v1/%(b)s/$x` %(tarballLinkDir)s/`basename $x` || true\n"
-                 "done",
-                 b=self.remoteStore,
-                 storePath=spec["remote_store_path"],
-                 linksPath=spec["remote_links_path"],
-                 tarballHashDir=spec["remote_tar_hash_dir"],
-                 tarballLinkDir=spec["remote_tar_link_dir"])
-    err = execute(cmd)
+    err = execute("""\
+    s3cmd --no-check-md5 sync -s -v --host s3.cern.ch --host-bucket {b}.s3.cern.ch \
+          "s3://{b}/{storePath}/" "{tarballHashDir}/" 2>&1 || true
+    mkdir -p "{tarballLinkDir}"
+    find "{tarballLinkDir}" -type l -delete
+    curl -sL "https://s3.cern.ch/swift/v1/{b}/{linksPath}.manifest" |
+      while IFS='\t' read -r symlink target; do
+        ln -sf "../../$target" "{tarballLinkDir}/$symlink" || true
+      done
+    for x in $(curl -sL "https://s3.cern.ch/swift/v1/{b}/?prefix={linksPath}/"); do
+      # Skip already existing symlinks -- these were from the manifest.
+      # (We delete leftover symlinks from previous runs above.)
+      [ -L "{tarballLinkDir}/$(basename "$x")" ] && continue
+      ln -sf "../../$(curl -sL "https://s3.cern.ch/swift/v1/{b}/$x")" \
+         "{tarballLinkDir}/$(basename "$x")" || true
+    done
+    """.format(
+      b=self.remoteStore,
+      storePath=spec["remote_store_path"],
+      linksPath=spec["remote_links_path"],
+      tarballHashDir=spec["remote_tar_hash_dir"],
+      tarballLinkDir=spec["remote_tar_link_dir"],
+    ))
     dieOnError(err, "Unable to update from specified store.")
 
   def syncToRemote(self, p, spec):
