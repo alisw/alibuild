@@ -91,7 +91,7 @@ class HttpRemoteSync:
           s3Request = re.match("https://s3.cern.ch/swift/v1[/]+([^/]*)/(.*)$", url)
           if s3Request:
             [bucket, prefix] = s3Request.groups()
-            url = "https://s3.cern.ch/swift/v1/%s/?prefix=%s" % (bucket, prefix.strip("/"))
+            url = "https://s3.cern.ch/swift/v1/%s/?prefix=%s" % (bucket, prefix.lstrip("/"))
             resp = get(url, verify=not self.insecure, timeout=self.httpTimeoutSec)
             if resp.status_code == 404:
               # No need to retry any further
