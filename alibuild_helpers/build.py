@@ -14,6 +14,7 @@ from alibuild_helpers.utilities import getPackageList
 from alibuild_helpers.utilities import validateDefaults
 from alibuild_helpers.utilities import Hasher
 from alibuild_helpers.utilities import yamlDump
+from alibuild_helpers.utilities import resolve_tag, resolve_version
 from alibuild_helpers.git import partialCloneFilter
 from alibuild_helpers.sync import NoRemoteSync, HttpRemoteSync, S3RemoteSync, RsyncRemoteSync
 import yaml
@@ -347,7 +348,7 @@ def doBuild(args, parser):
     develPackageBranch = ""
     if "source" in spec:
       # Tag may contain date params like %(year)s, %(month)s, %(day)s, %(hour).
-      spec["tag"] = format(spec["tag"], **nowKwds)
+      spec["tag"] = resolve_tag(spec)
       # By default we assume tag is a commit hash. We then try to find
       # out if the tag is actually a branch and we use the tip of the branch
       # as commit_hash. Finally if the package is a development one, we use the
@@ -384,16 +385,7 @@ def doBuild(args, parser):
 
     # Version may contain date params like tag, plus %(commit_hash)s,
     # %(short_hash)s and %(tag)s.
-    defaults_upper = args.defaults != "release" and "_" + args.defaults.upper().replace("-", "_") or ""
-    spec["version"] = format(spec["version"],
-                             commit_hash=spec["commit_hash"],
-                             short_hash=spec["commit_hash"][0:10],
-                             tag=spec["tag"],
-                             branch_basename = branch_basename,
-                             branch_stream = branch_stream or spec["tag"],
-                             tag_basename=basename(spec["tag"]),
-                             defaults_upper=defaults_upper,
-                             **nowKwds)
+    spec["version"] = resolve_version(spec, args.defaults, branch_basename, branch_stream)
 
     if spec["package"] in develPkgs and "develPrefix" in args and args.develPrefix != "ali-master":
       spec["version"] = args.develPrefix

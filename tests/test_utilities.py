@@ -16,7 +16,9 @@ from alibuild_helpers.utilities import asList
 from alibuild_helpers.utilities import dockerStatusOutput
 from alibuild_helpers.utilities import prunePaths, getVersion
 from alibuild_helpers.utilities import to_unicode
+from alibuild_helpers.utilities import resolve_version, resolve_tag
 import os
+import argparse
 
 UBUNTU_1510_OS_RELEASE = """
 NAME="Ubuntu"
@@ -226,6 +228,21 @@ class TestUtilities(unittest.TestCase):
     self.assertTrue(to_unicode([1,2,3]) == u"[1, 2, 3]")
     self.assertTrue(to_unicode({"a":-1}) == u"{'a': -1}")
     self.assertTrue(to_unicode(123456) == u"123456")
+
+  def test_resolver(self):
+    spec = {"package": "test-pkg",
+      "version": "%(tag_basename)s",
+      "tag": "foo/bar",
+      "commit_hash": "000000000000000000000000000"
+    }
+    self.assertTrue(resolve_version(spec, "release", "stream/v1", "v1"), "bar")
+    spec["version"] = "%(branch_stream)s"
+    self.assertTrue(resolve_version(spec, "release", "stream/v1", "v1"), "v1")
+    spec["version"] = "%(defaults_upper)s"
+    self.assertTrue(resolve_version(spec, "o2", "stream/v1", "v1"), "O2")
+    spec["version"] = "NO%(defaults_upper)s"
+    self.assertTrue(resolve_version(spec, "release", "stream/v1", "v1"), "NO")
+
 
 if __name__ == '__main__':
     unittest.main()
