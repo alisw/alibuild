@@ -246,8 +246,12 @@ def doBuild(args, parser):
                    "\n- ".join(sorted(validDefaults)), 1)
 
   if failed:
-    return (error, "The following packages are system requirements and could not be found:\n\n- " + "\n- ".join(sorted(list(failed))) +
-                   "\n\nPlease run:\n\n\taliDoctor %s\n\nto get a full diagnosis." % args.pkgname.pop(), 1)
+    return (error,
+            "The following packages are system requirements and could not be found:\n\n- {failed}\n\n"
+            "Please run:\n\n\t{star}Doctor --defaults {defaults} {pkgname}\n\nto get a full diagnosis."
+            .format(star=star(), pkgname=args.pkgname.pop(), defaults=args.defaults,
+                    failed="\n- ".join(sorted(list(failed)))),
+            1)
 
   for x in specs.values():
     x["requires"] = [r for r in x["requires"] if not r in args.disable]
