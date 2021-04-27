@@ -384,7 +384,8 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
     except TypeError as e:
       dieOnError(True, "Malformed entry prefer_system: %s in %s" % (systemRE, spec["package"]))
     if not noSystem and (preferSystem or systemREMatches):
-      cmd = spec.get("prefer_system_check", "false").strip()
+      cmd = "REQUESTED_VERSION=%s\n" % resolve_version(spec, defaults, "unavailable", "unavailable")
+      cmd += spec.get("prefer_system_check", "false").strip()
       if not spec["package"] in testCache:
         testCache[spec["package"]] = performPreferCheck(spec, cmd.strip())
 
