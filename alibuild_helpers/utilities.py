@@ -12,6 +12,7 @@ from os.path import basename
 import sys
 import os
 import re
+from datetime import datetime
 try:
   from collections import OrderedDict
 except ImportError:
@@ -45,6 +46,50 @@ def to_unicode(s):
   elif not isinstance(s, unicode):
     return unicode(str(s))
   return s
+
+# Date fields to substitute: they are zero-padded
+now = datetime.now()
+nowKwds = { "year": str(now.year),
+            "month": str(now.month).zfill(2),
+            "day": str(now.day).zfill(2),
+            "hour": str(now.hour).zfill(2) }
+
+def resolve_version(spec, defaults, branch_basename, branch_stream):
+  """Expand the version replacing the following keywords:
+
+  - %(commit_hash)s
+  - %(short_hash)s
+  - %(tag)s
+  - %(branch_basename)s
+  - %(branch_stream)s
+  - %(tag_basename)s
+  - %(defaults_upper)s
+  - %(year)s
+  - %(month)s
+  - %(day)s
+  - %(hour)s
+
+  with the calculated content"""
+  defaults_upper = defaults != "release" and "_" + defaults.upper().replace("-", "_") or ""
+  commit_hash = spec.get("commit_hash", "hash_unknown")
+  tag = spec.get("tag", "tag_unknown")
+  return format(spec["version"],
+                commit_hash=commit_hash,
+                short_hash=commit_hash[0:10],
+                tag=tag,
+                branch_basename = branch_basename,
+                branch_stream = branch_stream or tag,
+                tag_basename=basename(tag),
+                defaults_upper=defaults_upper,
+                **nowKwds)
+
+def resolve_tag(spec):
+  """Expand the version replacing the following keywords:
+  - %(year)s
+  - %(month)s
+  - %(day)s
+  - %(hour)s"""
+  return format(spec["tag"], **nowKwds)
 
 def normalise_multiple_options(option, sep=","):
   return [x for x in ",".join(option).split(sep) if x]
