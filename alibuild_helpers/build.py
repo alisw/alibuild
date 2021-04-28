@@ -471,9 +471,10 @@ def doBuild(args, parser):
     p = buildOrder[0]
     spec = specs[p]
     if args.debug:
+      printedVersion = mainHash == spec["tag"] and mainHash or mainHash[0:8]
       logger_handler.setFormatter(
           LogFormatter("%%(asctime)s:%%(levelname)s:%s:%s:%s: %%(message)s" %
-                       (mainPackage, p, args.develPrefix if "develPrefix" in args else mainHash[0:8])))
+                       (mainPackage, p, args.develPrefix if "develPrefix" in args else printedVersion)))
 
     # Calculate the hashes. We do this in build order so that we can guarantee
     # that the hashes of the dependencies are calculated first. Do this inside
