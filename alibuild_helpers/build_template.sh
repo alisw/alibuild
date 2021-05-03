@@ -81,28 +81,33 @@ fi
 %(referenceStatement)s
 %(partialCloneStatement)s
 
-if [[ ! "$SOURCE0" == '' && "${SOURCE0:0:1}" != "/" ]]; then
-  if [[ ! -d "$SOURCEDIR" ]]; then
-    # In case there is a stale link / file, for whatever reason.
-    rm -rf $SOURCEDIR
-    git clone -n ${GIT_PARTIAL_CLONE_FILTER} ${GIT_REFERENCE:+--reference $GIT_REFERENCE} "$SOURCE0" "$SOURCEDIR"
-    cd $SOURCEDIR
-    git remote set-url --push origin $WRITE_REPO
-    git checkout -f "${GIT_TAG}"
-  else
-    # Folder is already present, but check that it is the right tag
-    cd $SOURCEDIR
-    if ! git checkout "$GIT_TAG"; then
-      # If we can't find the tag, it might be new. Fetch tags and try again.
-      git fetch -f "$SOURCE0" "refs/tags/$GIT_TAG:refs/tags/$GIT_TAG"
-      git checkout "$GIT_TAG"
-    fi
-  fi
-elif [[ ! "$SOURCE0" == '' && "${SOURCE0:0:1}" == "/" ]]; then
-  ln -snf $SOURCE0 $SOURCEDIR
+# We only need to checkout the sources if we're actually building. If we have a
+# cached tarball already, skip the potentially expensive checkout.
+if [ -z "$CACHED_TARBALL" ]; then
+  case "$SOURCE0" in
+    /*)  # SOURCE0 is an absolute path, so just make a symlink there.
+      ln -snf "$SOURCE0" "$SOURCEDIR" ;;
+    ?*)  # SOURCE0 is a relative path, so clone/checkout the git repo there. (The ? ensures $SOURCE0 is not empty.)
+      if ! [ -d "$SOURCEDIR" ]; then
+        # In case there is a stale link / file, for whatever reason.
+        rm -rf $SOURCEDIR
+        git clone -n ${GIT_PARTIAL_CLONE_FILTER} ${GIT_REFERENCE:+--reference $GIT_REFERENCE} "$SOURCE0" "$SOURCEDIR"
+        cd $SOURCEDIR
+        git remote set-url --push origin $WRITE_REPO
+        git checkout -f "${GIT_TAG}"
+      else
+        # Folder is already present, but check that it is the right tag
+        cd $SOURCEDIR
+        if ! git checkout "$GIT_TAG"; then
+          # If we can't find the tag, it might be new. Fetch tags and try again.
+          git fetch -f "$SOURCE0" "refs/tags/$GIT_TAG:refs/tags/$GIT_TAG"
+          git checkout "$GIT_TAG"
+        fi
+      fi ;;
+  esac
+  mkdir -p "$SOURCEDIR"
 fi
 
-mkdir -p "$SOURCEDIR"
 cd "$BUILDDIR"
 
 # Actual build script, as defined in the recipe
