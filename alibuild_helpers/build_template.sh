@@ -124,16 +124,8 @@ cd "$BUILDDIR"
 #   simply rebuild as usual.
 # - In case we have a cached tarball, we skip the build and expand it, change
 #   the relocation script so that it takes into account the new location.
-if [[ "$CACHED_TARBALL" == "" && ! -f $BUILDROOT/log ]]; then
-  set -o pipefail
-  (set -x; unset DYLD_LIBRARY_PATH; source "$WORK_DIR/SPECS/$ARCHITECTURE/$PKGNAME/$PKGVERSION-$PKGREVISION/$PKGNAME.sh" 2>&1) | tee "$BUILDROOT/log"
-elif [[ "$CACHED_TARBALL" == "" && $INCREMENTAL_BUILD_HASH != "0" && -f "$BUILDDIR/.build_succeeded" ]]; then
-  set -o pipefail
-  (%(incremental_recipe)s) 2>&1 | tee "$BUILDROOT/log"
-elif [[ "$CACHED_TARBALL" == "" ]]; then
-  set -o pipefail
-  (set -x; unset DYLD_LIBRARY_PATH; source "$WORK_DIR/SPECS/$ARCHITECTURE/$PKGNAME/$PKGVERSION-$PKGREVISION/$PKGNAME.sh" 2>&1) | tee "$BUILDROOT/log"
-else
+set -o pipefail
+if [ -n "$CACHED_TARBALL" ]; then
   # Unpack the cached tarball in the $INSTALLROOT and remove the unrelocated
   # files.
   rm -rf "$BUILDROOT/log"
@@ -147,6 +139,10 @@ else
   popd
   find $INSTALLROOT -name "*.unrelocated" -delete
   rm -rf $WORK_DIR/TMP/$PKGHASH
+elif [ "$INCREMENTAL_BUILD_HASH" != 0 ] && [ -f "$BUILDROOT/log" ] && [ -f "$BUILDDIR/.build_succeeded" ]; then
+  (%(incremental_recipe)s) 2>&1 | tee "$BUILDROOT/log"
+else
+  (set -x; unset DYLD_LIBRARY_PATH; . "$WORK_DIR/SPECS/$ARCHITECTURE/$PKGNAME/$PKGVERSION-$PKGREVISION/$PKGNAME.sh" 2>&1) | tee "$BUILDROOT/log"
 fi
 
 cd "$WORK_DIR/INSTALLROOT/$PKGHASH"
