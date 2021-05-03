@@ -258,27 +258,30 @@ fi
 
 cat "$INSTALLROOT/relocate-me.sh"
 cat "$INSTALLROOT/.original-unrelocated" | xargs -n1 -I{} cp '{}' '{}'.unrelocated
-cd "$WORK_DIR/INSTALLROOT/$PKGHASH"
 
-# Archive creation
-HASHPREFIX=`echo $PKGHASH | cut -b1,2`
-HASH_PATH=$ARCHITECTURE/store/$HASHPREFIX/$PKGHASH
-mkdir -p "${WORK_DIR}/TARS/$HASH_PATH" \
-         "${WORK_DIR}/TARS/$ARCHITECTURE/$PKGNAME"
+if [ -z "$CACHED_TARBALL" ]; then
+  # If we didn't use a cached tarball, create a tarball now, place it in
+  # $WORK_DIR/TARS/$HASH_PATH/, and put a symlink in place.
+  HASH_PATH=$ARCHITECTURE/store/$(echo "$PKGHASH" | cut -b1,2)/$PKGHASH
+  mkdir -p "$WORK_DIR/TARS/$HASH_PATH" "$WORK_DIR/TARS/$ARCHITECTURE/$PKGNAME"
 
-PACKAGE_WITH_REV=$PKGNAME-$PKGVERSION-$PKGREVISION.$ARCHITECTURE.tar.gz
-# Avoid having broken left overs if the tar fails
-$MY_TAR -C $WORK_DIR/INSTALLROOT/$PKGHASH -c . | $MY_GZIP -c > "$WORK_DIR/TARS/$HASH_PATH/${PACKAGE_WITH_REV}.processing"
-mv $WORK_DIR/TARS/$HASH_PATH/${PACKAGE_WITH_REV}.processing $WORK_DIR/TARS/$HASH_PATH/$PACKAGE_WITH_REV
+  PACKAGE_WITH_REV=$PKGNAME-$PKGVERSION-$PKGREVISION.$ARCHITECTURE.tar.gz
+  # Avoid having broken left overs if the tar fails
+  $MY_TAR -C "$WORK_DIR/INSTALLROOT/$PKGHASH" -c . |
+    $MY_GZIP -c > "$WORK_DIR/TARS/$HASH_PATH/$PACKAGE_WITH_REV.processing"
+  mv "$WORK_DIR/TARS/$HASH_PATH/$PACKAGE_WITH_REV.processing" \
+     "$WORK_DIR/TARS/$HASH_PATH/$PACKAGE_WITH_REV"
 
-ln -nfs \
-  "../../$HASH_PATH/$PACKAGE_WITH_REV" \
-  "$WORK_DIR/TARS/$ARCHITECTURE/$PKGNAME/$PACKAGE_WITH_REV"
+  ln -nfs "../../$HASH_PATH/$PACKAGE_WITH_REV" \
+     "$WORK_DIR/TARS/$ARCHITECTURE/$PKGNAME/$PACKAGE_WITH_REV"
 
-# Unpack, and relocate
+  [ "X$CAN_DELETE" = X1 ] && rm "$WORK_DIR/TARS/$HASH_PATH/$PACKAGE_WITH_REV"
+fi
+
+# Now install our stuff from INSTALLROOT into $WORK_DIR.
+cp -a "$WORK_DIR/INSTALLROOT/$PKGHASH"/* "$WORK_DIR"
+
 cd "$WORK_DIR"
-$MY_GZIP -dc "$WORK_DIR/TARS/$HASH_PATH/$PACKAGE_WITH_REV" | $MY_TAR -x
-[ "X$CAN_DELETE" = X1 ] && rm "$WORK_DIR/TARS/$HASH_PATH/$PACKAGE_WITH_REV"
 bash -ex "$ARCHITECTURE/$PKGNAME/$PKGVERSION-$PKGREVISION/relocate-me.sh"
 # Last package built gets a "latest" mark.
 ln -snf $PKGVERSION-$PKGREVISION $ARCHITECTURE/$PKGNAME/latest
