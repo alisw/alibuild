@@ -1,15 +1,13 @@
 from __future__ import print_function
 # Assuming you are using the mock library to ... mock things
 try:
-    from unittest.mock import patch, call  # In Python 3, mock is built-in
+    from unittest.mock import patch  # In Python 3, mock is built-in
 except ImportError:
-    from mock import patch, call  # Python 2
+    from mock import patch  # Python 2
 
 from alibuild_helpers.log import dieOnError, ProgressPrint
 
-import mock
 import unittest
-import traceback
 from time import sleep
 
 class LogTestCase(unittest.TestCase):

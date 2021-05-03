@@ -1,10 +1,12 @@
 from __future__ import print_function
 # Assuming you are using the mock library to ... mock things
 try:
-    from unittest.mock import patch, call, MagicMock  # In Python 3, mock is built-in
+    from unittest import mock
+    from unittest.mock import call, MagicMock  # In Python 3, mock is built-in
     from io import StringIO
 except ImportError:
-    from mock import patch, call, MagicMock  # Python 2
+    import mock
+    from mock import call, MagicMock  # Python 2
     from StringIO import StringIO
 try:
   from collections import OrderedDict
@@ -15,9 +17,7 @@ import sys
 git_mock = MagicMock(partialCloneFilter="--filter=blob:none")
 sys.modules["alibuild_helpers.git"] = git_mock
 from alibuild_helpers.init import doInit,parsePackagesDefinition
-import mock
 import unittest
-import traceback
 from argparse import Namespace
 import os.path as path
 
