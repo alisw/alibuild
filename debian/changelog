@@ -1,0 +1,5 @@
+python3-alibuild (1.8.2) bionic; urgency=medium
+
+  * Initial release.
+
+ -- Giulio Eulisse <giulio.eulisse@cern.ch>  Tue, 04 May 2021 00:08:40 +0200
