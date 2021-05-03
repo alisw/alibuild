@@ -1,8 +1,10 @@
 from __future__ import print_function
 # Assumin you are using the mock library to ... mock things
 try:
+    from unittest import mock
     from unittest.mock import patch, call, MagicMock  # In Python 3, mock is built-in
 except ImportError:
+    import mock
     from mock import patch, call, MagicMock  # Python 2
 try:
   from collections import OrderedDict
@@ -14,9 +16,7 @@ from os.path import abspath, join
 from os import getcwd
 
 import re
-import mock
 import unittest
-import traceback
 
 def reference_sources_do_not_exists(x):
   if x.endswith("/aliroot"):

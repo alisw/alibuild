@@ -7,9 +7,7 @@ except ImportError:
 
 from alibuild_helpers.clean import decideClean, doClean
 
-import mock
 import unittest
-import traceback
 
 REALPATH_WITH_OBSOLETE_FILES = {
   "sw/BUILD/a-latest": "/sw/BUILD/f339115741c6ab9cf291d3210f44bee795c56e16",

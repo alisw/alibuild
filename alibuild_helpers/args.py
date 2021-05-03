@@ -180,29 +180,27 @@ def doParseArgs(star):
   args = finaliseArgs(parser.parse_args(), parser, star)
   return (args, parser)
 
-VALID_ARCHS_RE = ["slc[5-9]+_(x86-64|ppc64)",
-                  "(ubuntu|ubt|osx|fedora)[0-9]*_x86-64",
-                 ]
+VALID_ARCHS_RE = "^slc[5-9]_(x86-64|ppc64)$|^(ubuntu|ubt|osx|fedora)[0-9]*_x86-64$"
 
 def matchValidArch(architecture):
-  return [x for x in VALID_ARCHS_RE if re.match(x, architecture)]
+  return bool(re.match(VALID_ARCHS_RE, architecture))
 
-ARCHITECTURE_TABLE = [
-           "On Linux, x86-64:\n"
-           "   RHEL5 / SLC5 compatible: slc5_x86-64\n"
-           "   RHEL6 / SLC6 compatible: slc6_x86-64\n"
-           "   RHEL7 / CC7 compatible: slc7_x86-64\n"
-           "   Ubuntu 14.04 compatible: ubuntu1404_x86-64\n"
-           "   Ubuntu 15.04 compatible: ubuntu1504_x86-64\n"
-           "   Ubuntu 15.10 compatible: ubuntu1510_x86-64\n"
-           "   Ubuntu 16.04 compatible: ubuntu1604_x86-64\n"
-           "   Fedora 25 compatible: fedora25_x86-64\n"
-           "   Fedora 26 compatible: fedora26_x86-64\n\n"
-           "On Linux, POWER8 / PPC64 (little endian):\n"
-           "   RHEL7 / CC7 compatible: slc7_ppc64\n\n"
-           "On Mac, x86-64:\n"
-           "   Yosemite and El-Captain: osx_x86-64\n\n"
-      ]
+ARCHITECTURE_TABLE = """\
+On Linux, x86-64:
+   RHEL6 / SLC6 compatible: slc6_x86-64
+   RHEL7 / CC7 compatible: slc7_x86-64
+   RHEL8 / CC8 compatible: slc8_x86-64
+   Ubuntu 18.04 compatible: ubuntu1804_x86-64
+   Ubuntu 20.04 compatible: ubuntu2004_x86-64
+   Fedora 33 compatible: fedora33_x86-64
+   Fedora 34 compatible: fedora34_x86-64
+
+On Linux, POWER8 / PPC64 (little endian):
+   RHEL7 / CC7 compatible: slc7_ppc64
+
+On Mac, x86-64:
+   Yosemite to Big Sur: osx_x86-64
+"""
 
 def finaliseArgs(args, parser, star):
 
@@ -213,14 +211,12 @@ def finaliseArgs(args, parser, star):
   # --architecture can be specified in both clean and build.
   if args.action in  ["build", "clean"]:
     if not args.architecture:
-      parser.error(format("Cannot determine architecture. "
-                   "Please pass it explicitly.\n\n%s" % ARCHITECTURE_TABLE[0]))
+      parser.error("Cannot determine architecture. Please pass it explicitly.\n\n"
+                   + ARCHITECTURE_TABLE)
     if not args.forceUnknownArch and not matchValidArch(args.architecture):
-      parser.error(format("Unknown / unsupported architecture: %(architecture)s.\n\n"
-                  "%(table)s"
-                  "Alternatively, you can use the `--force-unknown-architecture' option.",
-                  table=ARCHITECTURE_TABLE[0],
-                  architecture=args.architecture))
+      parser.error("Unknown / unsupported architecture: {architecture}.\n\n{table}"
+                   "Alternatively, you can use the `--force-unknown-architecture' option."
+                   .format(table=ARCHITECTURE_TABLE, architecture=args.architecture))
 
     args.disable = normalise_multiple_options(args.disable)
 

@@ -138,9 +138,9 @@ def doDetectArch(hasOsRelease, osReleaseLines, platformTuple, platformSystem, pl
   # let's try with /etc/os-release
   if distribution not in ["Ubuntu", "redhat", "centos"] and hasOsRelease:
     for x in osReleaseLines:
-      if not "=" in x:
+      key, is_prop, val = x.partition("=")
+      if not is_prop:
         continue
-      key, val = x.split("=", 1)
       val = val.strip("\n \"")
       if key == "ID":
         distribution = val
@@ -148,28 +148,26 @@ def doDetectArch(hasOsRelease, osReleaseLines, platformTuple, platformSystem, pl
         version = val
 
   if distribution.lower() == "ubuntu":
-    version = version.split(".")
-    version = version[0] + version[1]
+    major, _, minor = version.partition(".")
+    version = major + minor
   elif distribution.lower() == "debian":
     # http://askubuntu.com/questions/445487/which-ubuntu-version-is-equivalent-to-debian-squeeze
-    debian_ubuntu = { "7": "1204",
-                      "8": "1404" }
+    debian_ubuntu = {"7": "1204", "8": "1404", "9": "1604", "10": "1804", "11": "2004"}
     if version in debian_ubuntu:
       distribution = "ubuntu"
       version = debian_ubuntu[version]
   elif distribution in ["redhat", "centos"]:
-    distribution = distribution.replace("centos","slc").replace("redhat","slc").lower()
+    distribution = "slc"
 
   processor = platformProcessor
   if not processor:
     # Sometimes platform.processor returns an empty string
-    p = subprocess.Popen(["uname", "-m"], stdout=subprocess.PIPE)
-    processor = p.stdout.read().decode("ascii").strip()
+    with subprocess.Popen(("uname", "-m"), stdout=subprocess.PIPE) as p:
+      processor = p.stdout.read().decode("ascii").strip()
 
-  return format("%(d)s%(v)s_%(c)s",
-                d=distribution.lower(),
-                v=version.split(".")[0],
-                c=processor.replace("_", "-"))
+  return "{distro}{version}_{machine}".format(
+    distro=distribution.lower(), version=version.split(".")[0],
+    machine=processor.replace("_", "-"))
 
 # Try to guess a good platform. This does not try to cover all the
 # possibly compatible linux distributions, but tries to get right the
@@ -198,7 +196,7 @@ def detectArch():
     platformTuple = distro.linux_distribution()
     platformSystem = platform.system()
     platformProcessor = platform.processor()
-    if " " in platformProcessor:
+    if not platformProcessor or " " in platformProcessor:
       platformProcessor = platform.machine()
     return doDetectArch(hasOsRelease, osReleaseLines, platformTuple, platformSystem, platformProcessor)
   except:
