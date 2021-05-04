@@ -134,23 +134,24 @@ def doDetectArch(hasOsRelease, osReleaseLines, platformTuple, platformSystem, pl
   if platformSystem == "Darwin":
     return "osx_x86-64"
   distribution, version, flavour = platformTuple
+  distribution = distribution.lower()
   # If platform.dist does not return something sensible,
   # let's try with /etc/os-release
-  if distribution not in ["Ubuntu", "redhat", "centos"] and hasOsRelease:
+  if distribution not in ["ubuntu", "redhat", "centos"] and hasOsRelease:
     for x in osReleaseLines:
       key, is_prop, val = x.partition("=")
       if not is_prop:
         continue
       val = val.strip("\n \"")
       if key == "ID":
-        distribution = val
+        distribution = val.lower()
       if key == "VERSION_ID":
         version = val
 
-  if distribution.lower() == "ubuntu":
+  if distribution == "ubuntu":
     major, _, minor = version.partition(".")
     version = major + minor
-  elif distribution.lower() == "debian":
+  elif distribution == "debian":
     # http://askubuntu.com/questions/445487/which-ubuntu-version-is-equivalent-to-debian-squeeze
     debian_ubuntu = {"7": "1204", "8": "1404", "9": "1604", "10": "1804", "11": "2004"}
     if version in debian_ubuntu:
@@ -169,7 +170,7 @@ def doDetectArch(hasOsRelease, osReleaseLines, platformTuple, platformSystem, pl
     processor = stdout.decode("ascii").strip()
 
   return "{distro}{version}_{machine}".format(
-    distro=distribution.lower(), version=version.split(".")[0],
+    distro=distribution, version=version.split(".")[0],
     machine=processor.replace("_", "-"))
 
 # Try to guess a good platform. This does not try to cover all the
