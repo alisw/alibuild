@@ -180,7 +180,7 @@ def doParseArgs(star):
   args = finaliseArgs(parser.parse_args(), parser, star)
   return (args, parser)
 
-VALID_ARCHS_RE = "^slc[5-9]_(x86-64|ppc64)$|^(ubuntu|ubt|osx|fedora)[0-9]*_x86-64$"
+VALID_ARCHS_RE = "^slc[5-9]_(x86-64|ppc64)$|^(ubuntu|ubt|osx|fedora)[0-9]*_(x86-64|arm64)$"
 
 def matchValidArch(architecture):
   return bool(re.match(VALID_ARCHS_RE, architecture))
@@ -200,6 +200,7 @@ On Linux, POWER8 / PPC64 (little endian):
 
 On Mac, x86-64:
    Yosemite to Big Sur: osx_x86-64
+   Big Sur: osx_arm64
 """
 
 def finaliseArgs(args, parser, star):
