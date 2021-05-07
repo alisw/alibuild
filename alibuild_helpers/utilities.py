@@ -162,8 +162,11 @@ def doDetectArch(hasOsRelease, osReleaseLines, platformTuple, platformSystem, pl
   processor = platformProcessor
   if not processor:
     # Sometimes platform.processor returns an empty string
-    with subprocess.Popen(("uname", "-m"), stdout=subprocess.PIPE) as p:
-      processor = p.stdout.read().decode("ascii").strip()
+    stdout, _ = subprocess.Popen(
+      ("uname", "-m"), stdout=subprocess.PIPE,
+      stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL
+    ).communicate()
+    processor = stdout.decode("ascii").strip()
 
   return "{distro}{version}_{machine}".format(
     distro=distribution.lower(), version=version.split(".")[0],
