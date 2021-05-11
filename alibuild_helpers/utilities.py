@@ -132,7 +132,11 @@ def format(s, **kwds):
 
 def doDetectArch(hasOsRelease, osReleaseLines, platformTuple, platformSystem, platformProcessor):
   if platformSystem == "Darwin":
-    return "osx_x86-64"
+    systname,nodename,release,version,machine = os.uname()
+    if machine == "x86-64":
+      return "osx_x86-64"
+    else:
+      return "osx_arm64"
   distribution, version, flavour = platformTuple
   # If platform.dist does not return something sensible,
   # let's try with /etc/os-release
@@ -186,9 +190,12 @@ def detectArch():
     osReleaseLines = []
     hasOsRelease = False
   try:
-    import platform
-    if platform.system() == "Darwin":
-      return "osx_x86-64"
+    systname,nodename,release,version,machine = os.uname()
+    if systname == "Darwin":
+      if machine == "x86-64":
+        return "osx_x86-64"
+      else:
+        return "osx_arm64"
   except:
     pass
   try:
