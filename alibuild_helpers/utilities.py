@@ -164,7 +164,7 @@ def doDetectArch(hasOsRelease, osReleaseLines, platformTuple, platformSystem, pl
     # Sometimes platform.processor returns an empty string
     stdout, _ = subprocess.Popen(
       ("uname", "-m"), stdout=subprocess.PIPE,
-      stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL
+      stderr=None, stdin=None
     ).communicate()
     processor = stdout.decode("ascii").strip()
 
