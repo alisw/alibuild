@@ -79,18 +79,17 @@ setup(
     # https://packaging.python.org/en/latest/requirements.html
     install_requires=['pyyaml',
                       'requests',
-                      'distro',
-                      'futures; python_version <= "2.7"',
-                      'argparse; python_version == "2.6"',
-                      'ordereddict; python_version <= "2.6"'],
+                      'distro'
+                      ],
 
     # List additional groups of dependencies here (e.g. development
     # dependencies). You can install these using the following syntax,
     # for example:
     # $ pip install -e .[dev,test]
     extras_require={
+        ':python_version == "2.7"': ['futures'],
+        ':python_version == "2.6"': ['futures', 'argparse', 'ordereddict'],
     },
-
     # If there are data files included in your packages that need to be
     # installed, specify them here.  If using Python 2.6 or less, then these
     # have to be included in MANIFEST.in as well.
