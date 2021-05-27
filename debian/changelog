@@ -1,3 +1,9 @@
+python3-alibuild (1.8.4~focal) focal; urgency=medium
+
+  * Bump to v1.8.4
+
+ -- Giulio Eulisse <giulio.eulisse@cern.ch>  Thu, 27 May 2021 19:18:00 +0200
+
 python3-alibuild (1.8.2) bionic; urgency=medium
 
   * Initial release.
