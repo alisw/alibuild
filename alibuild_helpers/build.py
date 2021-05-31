@@ -967,12 +967,13 @@ def doBuild(args, parser):
         "-v {workdir}:/sw -v {scriptDir}/build.sh:/build.sh:ro "
         "-e GIT_REFERENCE_OVERRIDE=/mirror -e WORK_DIR_OVERRIDE=/sw "
         "{mirrorVolume} {develVolumes} {additionalEnv} {additionalVolumes} "
-        "{overrideSource} {image} {bash} -ex /build.sh"
+        "{overrideSource} {extraArgs} {image} {bash} -ex /build.sh"
       ).format(
         bash=quote(BASH),
         image=quote(dockerImage),
         workdir=quote(abspath(args.workDir)),
         scriptDir=quote(scriptDir),
+        extraArgs=args.docker_extra_args if "docker_extra_args" in args else "",
         overrideSource="-e SOURCE0_DIR_OVERRIDE=/" if source.startswith("/") else "",
         additionalEnv=" ".join(
           "-e {}={}".format(var, quote(value)) for var, value in buildEnvironment),
