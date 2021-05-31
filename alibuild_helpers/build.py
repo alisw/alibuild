@@ -26,6 +26,10 @@ try:
   from collections import OrderedDict
 except ImportError:
   from ordereddict import OrderedDict
+try:
+  from shlex import quote  # Python 3.3+
+except ImportError:
+  from pipes import quote  # Python 2.7
 
 import socket
 import os
@@ -940,7 +944,7 @@ def doBuild(args, parser):
       ("MY_GZIP", gzip()),
       ("MY_TAR", tar()),
       ("INCREMENTAL_BUILD_HASH", spec.get("incremental_hash", "0")),
-      ("JOBS", args.jobs),
+      ("JOBS", str(args.jobs)),
       ("PKGHASH", spec["hash"]),
       ("PKGNAME", spec["package"]),
       ("PKGREVISION", spec["revision"]),
@@ -958,42 +962,31 @@ def doBuild(args, parser):
     # In case the --docker options is passed, we setup a docker container which
     # will perform the actual build. Otherwise build as usual using bash.
     if args.docker:
-      additionalEnv = ""
-      additionalVolumes = ""
-      develVolumes = ""
-      mirrorVolume = "reference" in spec and " -v %s:/mirror" % dirname(spec["reference"]) or ""
-      overrideSource = source.startswith("/") and "-e SOURCE0_DIR_OVERRIDE=/" or ""
-
-      for devel in develPkgs:
-        develVolumes += " -v $PWD/`readlink %s || echo %s`:/%s:ro " % (devel, devel, devel)
-      for env in buildEnvironment:
-        additionalEnv += " -e %s='%s' " % env
-      for volume in args.volumes:
-        additionalVolumes += " -v %s " % volume
-      dockerWrapper = format("docker run --rm"
-              " --user $(id -u):$(id -g)"
-              " -v %(workdir)s:/sw"
-              " -v %(scriptDir)s/build.sh:/build.sh:ro"
-              " %(mirrorVolume)s"
-              " %(develVolumes)s"
-              " %(additionalEnv)s"
-              " %(additionalVolumes)s"
-              " -e GIT_REFERENCE_OVERRIDE=/mirror"
-              " %(overrideSource)s"
-              " -e WORK_DIR_OVERRIDE=/sw"
-              " %(image)s"
-              " -c \"%(bash)s -e -x /build.sh\"",
-              additionalEnv=additionalEnv,
-              additionalVolumes=additionalVolumes,
-              bash=BASH,
-              develVolumes=develVolumes,
-              workdir=abspath(args.workDir),
-              image=dockerImage,
-              mirrorVolume=mirrorVolume,
-              overrideSource=overrideSource,
-              scriptDir=scriptDir)
+      dockerWrapper = (
+        "docker run --rm --user $(id -u):$(id -g) "
+        "-v {workdir}:/sw -v {scriptDir}/build.sh:/build.sh:ro "
+        "-e GIT_REFERENCE_OVERRIDE=/mirror -e WORK_DIR_OVERRIDE=/sw "
+        "{mirrorVolume} {develVolumes} {additionalEnv} {additionalVolumes} "
+        "{overrideSource} {image} {bash} -ex /build.sh"
+      ).format(
+        bash=quote(BASH),
+        image=quote(dockerImage),
+        workdir=quote(abspath(args.workDir)),
+        scriptDir=quote(scriptDir),
+        overrideSource="-e SOURCE0_DIR_OVERRIDE=/" if source.startswith("/") else "",
+        additionalEnv=" ".join(
+          "-e {}={}".format(var, quote(value)) for var, value in buildEnvironment),
+        develVolumes=" ".join(
+          '-v "$PWD/$(readlink {pkg} || echo {pkg})":/{pkg}:ro'.format(pkg=quote(pkg))
+          for pkg in develPkgs),
+        additionalVolumes=" ".join(
+          "-v %s" % quote(volume) for volume in args.volumes),
+        mirrorVolume=("-v %s:/mirror" % quote(dirname(spec["reference"]))
+                      if "reference" in spec else ""),
+      )
       debug("Docker command: %s", dockerWrapper)
       err = execute(dockerWrapper)
+
     else:
       progress = ProgressPrint("%s is being built (use --debug for full output)" % spec["package"])
       for k,v in buildEnvironment:
