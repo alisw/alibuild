@@ -62,6 +62,10 @@ def doParseArgs(star):
   build_parser.add_argument("--docker", dest="docker", action="store_true", default=False)
   build_parser.add_argument("--docker-image", dest="dockerImage", default=argparse.SUPPRESS,
                             help="Image to use in case you build with docker (implies --docker)")
+  build_parser.add_argument("--docker-extra-args", default="",
+                            help=("Command-line arguments to pass to 'docker run'. "
+                                  "Passed through verbatim -- separate multiple arguments "
+                                  "with spaces, and make sure quoting is correct! (implies --docker)"))
   build_parser.add_argument("--work-dir", "-w", dest="workDir", default=DEFAULT_WORK_DIR)
   build_parser.add_argument("--architecture", "-a", dest="architecture",
                       default=detectedArch)
@@ -134,7 +138,11 @@ def doParseArgs(star):
                            help="Do not build PACKAGE and all its (unique) dependencies")
   deps_parser.add_argument("--docker", dest="docker", action="store_true", default=False)
   deps_parser.add_argument("--docker-image", dest="dockerImage",
-                           help="Image to use in case you build with docker (implies --docker-image)")
+                           help="Image to use in case you build with docker (implies --docker)")
+  deps_parser.add_argument("--docker-extra-args", default="",
+                           help=("Command-line arguments to pass to 'docker run'. "
+                                 "Passed through verbatim -- separate multiple arguments "
+                                 "with spaces, and make sure quoting is correct! (implies --docker)"))
   deps_parser.add_argument("--architecture", "-a", dest="architecture", default=detectedArch,
                            help="Architecture")
   deps_group = deps_parser.add_mutually_exclusive_group()
@@ -236,7 +244,7 @@ def finaliseArgs(args, parser, star):
     if args.remoteStore or args.writeStore:
       args.noSystem = True
 
-    if "dockerImage" in args:
+    if "dockerImage" in args or "docker_extra_args" in args:
       args.docker = True
 
     if args.docker and args.architecture.startswith("osx"):
