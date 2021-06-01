@@ -8,7 +8,7 @@ from os.path import dirname, exists
 import base64
 import hashlib
 from glob import glob
-from os.path import basename
+from os.path import basename, join
 import sys
 import os
 import re
@@ -224,13 +224,13 @@ def filterByArchitecture(arch, requires):
 def readDefaults(configDir, defaults, error, architecture):
   defaultsFilename = "%s/defaults-%s.sh" % (configDir, defaults)
   if not exists(defaultsFilename):
-    viableDefaults = ["- " + basename(x).replace("defaults-","").replace(".sh", "")
-                      for x in glob("%s/defaults-*.sh" % configDir)]
-    error("Default `%s' does not exists. Viable options:\n%s",
-          defaults or "<no defaults specified>", "\n".join(viableDefaults))
+    error("Default `%s' does not exists. Viable options:\n%s" %
+          (defaults or "<no defaults specified>",
+           "\n".join("- " + basename(x).replace("defaults-", "").replace(".sh", "")
+                     for x in glob(join(configDir, "defaults-*.sh")))))
   err, defaultsMeta, defaultsBody = parseRecipe(getRecipeReader(defaultsFilename))
   if err:
-    error("%s", err)
+    error(err)
     sys.exit(1)
   archDefaults = "%s/defaults-%s.sh" % (configDir, architecture)
   archMeta = {}
@@ -238,7 +238,7 @@ def readDefaults(configDir, defaults, error, architecture):
   if exists(archDefaults):
     err, archMeta, archBody = parseRecipe(getRecipeReader(defaultsFilename))
     if err:
-      error("%s", err)
+      error(err)
       sys.exit(1)
     for x in ["env", "disable", "overrides"]:
       defaultsMeta.setdefault(x, {}).update(archMeta.get(x, {}))
