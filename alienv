@@ -108,7 +108,7 @@ function installHint() {
 
 function detectShell() {
   # Detect parent shell (fall back to bash)
-  [[ -z "$MODULES_SHELL" ]] && MODULES_SHELL=$(ps -e -o pid,command | grep -E "^\s*$PPID\s+" | awk '{print $2}' | sed -e 's/^-\{0,1\}\(.*\)$/\1/')
+  [[ -z "$MODULES_SHELL" ]] && MODULES_SHELL=$(ps -e -o pid,command | /bin/grep -E "^\s*$PPID\s+" | awk '{print $2}' | /bin/sed -e 's/^-\{0,1\}\(.*\)$/\1/')
   case "$MODULES_SHELL" in
     sh)                                      ;;
     csh|tcsh) SHELL_NORC_PARAM=-f            ;;
@@ -145,19 +145,19 @@ EOF
 }
 
 function normModules() {
-  echo "$@" | sed -e 's/,/ /g; s/VO_ALICE@//g; s!::!/!g'
+  echo "$@" | /bin/sed -e 's/,/ /g; s/VO_ALICE@//g; s!::!/!g'
 }
 
 function existModules() {
   local MODULE
   for MODULE in "$@"; do
-    $MODULECMD bash -t avail 2>&1 | grep -qFx "$MODULE" || \
+    $MODULECMD bash -t avail 2>&1 | /bin/grep -qFx "$MODULE" || \
       { printf "${ER}ERROR: $MODULE was not found${EZ}\n" >&2; return 1; }
   done
 }
 
 function stripDyld() {
-  echo unset $( (typeset | grep ^DYLD | cut -d= -f1 | grep '_modshare$' | xargs echo ) 2> /dev/null; echo ';' )
+  echo unset $( (typeset | /bin/grep ^DYLD | cut -d= -f1 | /bin/grep '_modshare$' | xargs echo ) 2> /dev/null; echo ';' )
 }
 
 ARCHITECTURE=
@@ -191,7 +191,7 @@ cat <<\EOF
 # Source this file from your .bashrc, .zshrc or .kshrc.
 ALIBUILD_ALIENV__="$ALIBUILD_ALIENV"
 if test -z "$ALIBUILD_ALIENV__"; then
-  ALIBUILD_ALIENV__=`unset alienv; export LC_ALL=C; export LANG=C; type -p alienv | sed -e 's/^alienv is //g' 2> /dev/null`
+  ALIBUILD_ALIENV__=`unset alienv; export LC_ALL=C; export LANG=C; type -p alienv | /bin/sed -e 's/^alienv is //g' 2> /dev/null`
 fi
 alienv() {
   if test -z "$ALIBUILD_ALIENV__"; then
@@ -229,7 +229,7 @@ fi
 [[ ! -d "$WORK_DIR" ]] && { printHelp "Work dir $WORK_DIR cannot be accessed"; false; }
 WORK_DIR=$(cd "$WORK_DIR"; pwd)
 [[ -z "$ARCHITECTURE" ]] && ARCHITECTURE="$("$(dirname "$0")/aliBuild" architecture 2> /dev/null || true)"
-[[ -z "$ARCHITECTURE" || "$ARCHITECTURE" == "<unknown>" ]] && ARCHITECTURE=$(ls -1t $WORK_DIR | grep -vE '^[A-Z]+$' | head -n1)
+[[ -z "$ARCHITECTURE" || "$ARCHITECTURE" == "<unknown>" ]] && ARCHITECTURE=$(ls -1t $WORK_DIR | /bin/grep -vE '^[A-Z]+$' | head -n1)
 [[ -z "$ARCHITECTURE" ]] && { printHelp "Cannot autodetect architecture"; false; }
 
 # Look for modulecmd (v3) or modulecmd-compat (>= v4)
@@ -244,7 +244,7 @@ if [[ -d $WORK_DIR/MODULES/$ARCHITECTURE ]]; then
 fi
 
 export MODULEPATH="$WORK_DIR/MODULES/$ARCHITECTURE${MODULEPATH:+":$MODULEPATH"}"
-MODULEPATH=$(echo "$MODULEPATH" | sed -e 's/::*/:/g; s/^://; s/:$//')
+MODULEPATH=$(echo "$MODULEPATH" | /bin/sed -e 's/::*/:/g; s/^://; s/:$//')
 IGNORE_ERR="Unable to locate a modulefile for 'Toolchain/"
 case "$ACTION" in
   enter)
@@ -253,7 +253,7 @@ case "$ACTION" in
     MODULES=$(normModules "${ARGS[@]}")
     collectModules
     existModules $MODULES
-    eval $($MODULECMD bash add $MODULES 2> >(grep -v "$IGNORE_ERR" >&2))
+    eval $($MODULECMD bash add $MODULES 2> >(/bin/grep -v "$IGNORE_ERR" >&2))
     [[ $UNAME == Darwin ]] && eval $(stripDyld)
     detectShell
     if [[ ! -z "$CLEAN_ENV" ]]; then
@@ -274,7 +274,7 @@ case "$ACTION" in
     [[ $ACTION == load ]] && { collectModules; existModules $MODULES; }
     [[ $VERBOSE == 1 ]] && printf "${ET}Use ${EM}alienv list${ET} to list loaded modules.${EZ}\n" >&2
     detectShell
-    $MODULECMD $MODULES_SHELL $ACTION $MODULES 2> >(grep -v "$IGNORE_ERR" >&2)
+    $MODULECMD $MODULES_SHELL $ACTION $MODULES 2> >(/bin/grep -v "$IGNORE_ERR" >&2)
     [[ $UNAME == Darwin ]] && ( eval $($MODULECMD $MODULES_SHELL $ACTION $MODULES 2> /dev/null) &> /dev/null; stripDyld )
     exit 0
   ;;
@@ -283,15 +283,15 @@ case "$ACTION" in
     MODULES=$(normModules "${ARGS[@]}")
     collectModules
     existModules $MODULES
-    eval $($MODULECMD bash add $MODULES 2> >(grep -v "$IGNORE_ERR" >&2))
+    eval $($MODULECMD bash add $MODULES 2> >(/bin/grep -v "$IGNORE_ERR" >&2))
     [[ $UNAME == Darwin ]] && eval $(stripDyld)
     exec "${COMMAND_IN_ENV[@]}"
   ;;
   q|query)
-    [[ -z "${ARGS[0]}" ]] && SEARCH_CMD=cat || SEARCH_CMD=( grep -iE "${ARGS[0]}" )
+    [[ -z "${ARGS[0]}" ]] && SEARCH_CMD=cat || SEARCH_CMD=( /bin/grep -iE "${ARGS[0]}" )
     collectModules
-    $MODULECMD bash -t avail 2>&1 | grep -E '^[^/]+/[^/]+$' | grep -vE ':$' | \
-      "${SEARCH_CMD[@]}" | sed -e 's!^\([^/]*\)/\(.*\)$!VO_ALICE@\1::\2!'
+    $MODULECMD bash -t avail 2>&1 | /bin/grep -E '^[^/]+/[^/]+$' | /bin/grep -vE ':$' | \
+      "${SEARCH_CMD[@]}" | /bin/sed -e 's!^\([^/]*\)/\(.*\)$!VO_ALICE@\1::\2!'
     exit ${PIPESTATUS[3]}  # grep
   ;;
   avail)
