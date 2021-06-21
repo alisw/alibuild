@@ -451,14 +451,12 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
 
 def dockerStatusOutput(cmd, dockerImage=None, executor=getstatusoutput):
   if dockerImage:
-    DOCKER_WRAPPER = """docker run %(di)s bash -c 'eval "$(echo %(c)s | base64 --decode)"'"""
     try:
       encodedCommand = base64.b64encode(bytes(cmd,  encoding="ascii")).decode()
     except TypeError:
       encodedCommand = base64.b64encode(cmd)
-    cmd = format(DOCKER_WRAPPER,
-                 di=dockerImage,
-                 c=encodedCommand)
+    cmd = """docker run --rm {image} bash -c 'eval "$(echo {cmd} | base64 --decode)"'""" \
+      .format(image=dockerImage, cmd=encodedCommand)
   return executor(cmd)
 
 class Hasher:
