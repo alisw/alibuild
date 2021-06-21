@@ -978,7 +978,7 @@ def doBuild(args, parser):
         additionalEnv=" ".join(
           "-e {}={}".format(var, quote(value)) for var, value in buildEnvironment),
         develVolumes=" ".join(
-          '-v "$PWD/$(readlink {pkg} || echo {pkg})":/{pkg}:ro'.format(pkg=quote(pkg))
+          '-v "$PWD/$(readlink {pkg} || echo {pkg})":/{pkg}:rw'.format(pkg=quote(pkg))
           for pkg in develPkgs),
         additionalVolumes=" ".join(
           "-v %s" % quote(volume) for volume in args.volumes),
