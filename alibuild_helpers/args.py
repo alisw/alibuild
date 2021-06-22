@@ -228,7 +228,7 @@ def finaliseArgs(args, parser, star):
     args.configDir = format(args.configDir, prefix="")
 
     # On selected platforms, caching is active by default
-    if args.architecture == "slc7_x86-64" and not args.preferSystem:
+    if args.architecture in ("slc7_x86-64", "ubuntu2004_x86-64") and not args.preferSystem:
       args.noSystem = True
       if not args.remoteStore:
         args.remoteStore = "https://s3.cern.ch/swift/v1/alibuild-repo"
