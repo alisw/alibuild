@@ -244,7 +244,7 @@ def finaliseArgs(args, parser, star):
     if args.remoteStore or args.writeStore:
       args.noSystem = True
 
-    if "dockerImage" in args or "docker_extra_args" in args:
+    if "dockerImage" in args or args.docker_extra_args:
       args.docker = True
 
     if args.docker and args.architecture.startswith("osx"):
