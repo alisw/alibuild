@@ -1,7 +1,6 @@
 # vim: set fileencoding=utf-8 :
 
 import unittest
-import platform
 
 # Assuming you are using the mock library to ... mock things
 try:
@@ -16,9 +15,8 @@ from alibuild_helpers.utilities import asList
 from alibuild_helpers.utilities import dockerStatusOutput
 from alibuild_helpers.utilities import prunePaths, getVersion
 from alibuild_helpers.utilities import to_unicode
-from alibuild_helpers.utilities import resolve_version, resolve_tag
+from alibuild_helpers.utilities import resolve_version
 import os
-import argparse
 
 UBUNTU_1510_OS_RELEASE = """
 NAME="Ubuntu"
@@ -184,7 +182,7 @@ class TestUtilities(unittest.TestCase):
   def test_dockerStatusOutput(self, mock_getstatusoutput):
     cmd = dockerStatusOutput(cmd="echo foo", dockerImage="image", executor=mock_getstatusoutput)
     self.assertEqual(mock_getstatusoutput.mock_calls,
-                     [call(u'docker run image bash -c \'eval "$(echo ZWNobyBmb28= | base64 --decode)"\'')])
+                     [call(u'docker run --rm image bash -c \'echo foo\'')])
 
   def test_prunePaths(self):
     fake_env = {

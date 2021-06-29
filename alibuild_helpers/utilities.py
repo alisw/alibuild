@@ -5,7 +5,6 @@ try:
 except ImportError:
   from subprocess import getstatusoutput
 from os.path import dirname, exists
-import base64
 import hashlib
 from glob import glob
 from os.path import basename, join
@@ -17,6 +16,10 @@ try:
   from collections import OrderedDict
 except ImportError:
   from ordereddict import OrderedDict
+try:
+  from shlex import quote  # Python 3.3+
+except ImportError:
+  from pipes import quote  # Python 2.7
 
 class SpecError(Exception):
   pass
@@ -450,14 +453,9 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
   return (systemPackages, ownPackages, failedRequirements, validDefaults)
 
 def dockerStatusOutput(cmd, dockerImage=None, executor=getstatusoutput):
-  if dockerImage:
-    try:
-      encodedCommand = base64.b64encode(bytes(cmd,  encoding="ascii")).decode()
-    except TypeError:
-      encodedCommand = base64.b64encode(cmd)
-    cmd = """docker run --rm {image} bash -c 'eval "$(echo {cmd} | base64 --decode)"'""" \
-      .format(image=dockerImage, cmd=encodedCommand)
-  return executor(cmd)
+  return executor("docker run --rm {image} bash -c {command}"
+                  .format(image=dockerImage, command=quote(cmd))
+                  if dockerImage else cmd)
 
 class Hasher:
   def __init__(self):
