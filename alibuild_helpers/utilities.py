@@ -453,7 +453,7 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
   return (systemPackages, ownPackages, failedRequirements, validDefaults)
 
 def dockerStatusOutput(cmd, dockerImage=None, executor=getstatusoutput):
-  return executor("docker run --rm {image} bash -c {command}"
+  return executor("docker run --rm --entrypoint= {image} bash -c {command}"
                   .format(image=dockerImage, command=quote(cmd))
                   if dockerImage else cmd)
 

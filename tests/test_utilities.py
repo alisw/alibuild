@@ -182,7 +182,7 @@ class TestUtilities(unittest.TestCase):
   def test_dockerStatusOutput(self, mock_getstatusoutput):
     cmd = dockerStatusOutput(cmd="echo foo", dockerImage="image", executor=mock_getstatusoutput)
     self.assertEqual(mock_getstatusoutput.mock_calls,
-                     [call(u'docker run --rm image bash -c \'echo foo\'')])
+                     [call(u'docker run --rm --entrypoint= image bash -c \'echo foo\'')])
 
   def test_prunePaths(self):
     fake_env = {
