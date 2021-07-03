@@ -13,7 +13,7 @@ from alibuild_helpers.utilities import Hasher
 from alibuild_helpers.utilities import format
 from alibuild_helpers.utilities import asList
 from alibuild_helpers.utilities import dockerStatusOutput
-from alibuild_helpers.utilities import prunePaths, getVersion
+from alibuild_helpers.utilities import prunePaths
 from alibuild_helpers.utilities import to_unicode
 from alibuild_helpers.utilities import resolve_version
 import os
@@ -214,9 +214,6 @@ class TestUtilities(unittest.TestCase):
       self.assertTrue(fake_env_copy["LD_LIBRARY_PATH"] == "/sw/lib")
       self.assertTrue(fake_env_copy["DYLD_LIBRARY_PATH"] == "/sw/lib")
       self.assertTrue(fake_env_copy["ALIBUILD_VERSION"] == "v1.0.0")
-
-  def test_getVersion(self):
-    getVersion()
 
   def test_to_unicode(self):
     t1 = "ताड़िद्दा"
