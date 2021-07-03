@@ -7,6 +7,7 @@ import logging
 import traceback
 
 from os.path import exists, expanduser
+from alibuild_helpers import __version__
 from alibuild_helpers.analytics import decideAnalytics, askForAnalytics, report_screenview, report_exception, report_event
 from alibuild_helpers.analytics import enable_analytics, disable_analytics
 from alibuild_helpers.args import doParseArgs
@@ -15,7 +16,7 @@ from alibuild_helpers.clean import doClean
 from alibuild_helpers.doctor import doDoctor
 from alibuild_helpers.deps import doDeps
 from alibuild_helpers.log import info, warning, debug, logger, error
-from alibuild_helpers.utilities import getVersion, detectArch
+from alibuild_helpers.utilities import detectArch
 from alibuild_helpers.build import doBuild, star
 
 
@@ -58,7 +59,8 @@ def doMain(args, parser):
       exit(1)
 
   if args.action == "version":
-    print("aliBuild version: %s (%s)" % (getVersion(), args.architecture if args.architecture else "unknown"))
+    print("aliBuild version: {version} ({arch})".format(
+      version=__version__, arch=args.architecture or "unknown"))
     sys.exit(0)
 
   if args.action == "doctor":
@@ -90,7 +92,7 @@ if __name__ == "__main__":
   logger.setLevel(logging.DEBUG if args.debug else logging.INFO)
 
   os.environ["ALIBUILD_ANALYTICS_ID"] = "UA-77346950-1"
-  os.environ["ALIBUILD_VERSION"] = getVersion()
+  os.environ["ALIBUILD_VERSION"] = __version__
   if args.action == "analytics":
     if args.state == "off":
       disable_analytics()

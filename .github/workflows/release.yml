@@ -16,7 +16,7 @@ jobs:
         run: >-
           GITHUB_TAG=`echo $GITHUB_REF | cut -f3 -d/` ;
           echo $GITHUB_TAG ;
-          perl -p -i -e "s/LAST_TAG/$GITHUB_TAG/g" setup.py
+          perl -p -i -e "s/LAST_TAG/$GITHUB_TAG/g" alibuild_helpers/__init__.py
       - name: Build the python distribution
         run: >-
           python setup.py sdist

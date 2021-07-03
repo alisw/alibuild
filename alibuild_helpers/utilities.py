@@ -216,15 +216,6 @@ def detectArch():
   except:
     return doDetectArch(hasOsRelease, osReleaseLines, ["unknown", "", ""], "", "")
 
-def getVersion():
-  try:
-    import pkg_resources  # part of setuptools
-    return pkg_resources.require("alibuild")[0].version
-  except:
-    cmd = "GIT_DIR=\'%s/.git\' git describe --tags" % dirname(dirname(__file__))
-    err, version = getstatusoutput(cmd)
-    return version if not err else "Unknown version."
-
 def filterByArchitecture(arch, requires):
   for r in requires:
     require, matcher = ":" in r and r.split(":", 1) or (r, ".*")
