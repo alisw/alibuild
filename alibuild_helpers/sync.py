@@ -18,6 +18,8 @@ class NoRemoteSync:
     pass
   def syncToRemote(self, p, spec):
     pass
+  def syncDistLinksToRemote(self, link_dir):
+    pass
 
 class PartialDownloadError(Exception):
   def __init__(self, downloaded, size):
@@ -197,7 +199,11 @@ class HttpRemoteSync:
       self.doneOrFailed.append(spec["remote_revision_hash"])
 
   def syncToRemote(self, p, spec):
-    return
+    pass
+
+  def syncDistLinksToRemote(self, link_dir):
+    pass
+
 
 # Helper class to sync package build directory using RSync.
 class RsyncRemoteSync:
@@ -239,6 +245,13 @@ class RsyncRemoteSync:
                  tarballNameWithRev=tarballNameWithRev)
     err = execute(cmd)
     dieOnError(err, "Unable to upload tarball.")
+
+  def syncDistLinksToRemote(self, link_dir):
+    if not self.writeStore:
+      return
+    execute("cd {w} && rsync -avR {o} --ignore-existing {t}/ {rs}/".format(
+      w=self.workdir, rs=self.writeStore, o=self.rsyncOptions, t=link_dir))
+
 
 class S3RemoteSync:
   def __init__(self, remoteStore, writeStore, architecture, workdir):
@@ -294,3 +307,18 @@ class S3RemoteSync:
                  tarballNameWithRev=tarballNameWithRev)
     err = execute(cmd)
     dieOnError(err, "Unable to upload tarball.")
+
+  def syncDistLinksToRemote(self, link_dir):
+    if not self.writeStore:
+      return
+    execute("""\
+    find '{w}/{t}' -type l | while read -r x; do
+      hashedurl=$(readlink "$x" | sed 's|.*/[.][.]/TARS|TARS|') || exit 1
+      echo $hashedurl |
+        s3cmd put --skip-existing -q -P -s \
+                  --add-header="x-amz-website-redirect-location:\
+https://s3.cern.ch/swift/v1/{b}/$hashedurl" \
+                  --host s3.cern.ch --host-bucket {b}.s3.cern.ch \
+                  - "s3://{b}/$x" 2>&1
+    done
+    """.format(w=self.workdir, b=self.writeStore, t=link_dir))
