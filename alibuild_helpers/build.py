@@ -8,7 +8,7 @@ from alibuild_helpers.analytics import report_event
 from alibuild_helpers.log import debug, error, info, banner, warning
 from alibuild_helpers.log import dieOnError
 from alibuild_helpers.cmd import execute, getStatusOutputBash, BASH
-from alibuild_helpers.utilities import prunePaths
+from alibuild_helpers.utilities import star, prunePaths
 from alibuild_helpers.utilities import format, dockerStatusOutput, parseDefaults, readDefaults
 from alibuild_helpers.utilities import getPackageList
 from alibuild_helpers.utilities import validateDefaults
@@ -16,7 +16,8 @@ from alibuild_helpers.utilities import Hasher
 from alibuild_helpers.utilities import yamlDump
 from alibuild_helpers.utilities import resolve_tag, resolve_version
 from alibuild_helpers.git import partialCloneFilter
-from alibuild_helpers.sync import NoRemoteSync, HttpRemoteSync, S3RemoteSync, RsyncRemoteSync
+from alibuild_helpers.sync import (NoRemoteSync, HttpRemoteSync, S3RemoteSync,
+                                   Boto3RemoteSync, RsyncRemoteSync)
 import yaml
 from alibuild_helpers.workarea import updateReferenceRepoSpec
 from alibuild_helpers.log import logger_handler, LogFormatter, ProgressPrint
@@ -38,9 +39,6 @@ import re
 import shutil
 import sys
 import time
-
-def star():
-  return re.sub("build.*$", "", basename(sys.argv[0]).lower())
 
 def gzip():
   return getstatusoutput("which pigz")[0] and "gzip" or "pigz"
@@ -169,6 +167,9 @@ def doBuild(args, parser):
   elif args.remoteStore.startswith("s3://"):
     syncHelper = S3RemoteSync(args.remoteStore, args.writeStore,
                               args.architecture, args.workDir)
+  elif args.remoteStore.startswith("b3://"):
+    syncHelper = Boto3RemoteSync(args.remoteStore, args.writeStore,
+                                 args.architecture, args.workDir)
   elif args.remoteStore:
     syncHelper = RsyncRemoteSync(args.remoteStore, args.writeStore, args.architecture, args.workDir, "")
   else:

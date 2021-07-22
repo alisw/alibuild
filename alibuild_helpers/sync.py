@@ -1,19 +1,21 @@
 """Sync backends for alibuild."""
 
+import glob
 import os
 import os.path
 import re
+import sys
 import time
 from requests import get
 from requests.exceptions import RequestException
 
 from alibuild_helpers.cmd import execute
 from alibuild_helpers.log import debug, warning, error, dieOnError
-from alibuild_helpers.utilities import format
+from alibuild_helpers.utilities import format, star
 
 
-# Helper class which does not do anything to sync
 class NoRemoteSync:
+  """Helper class which does not do anything to sync"""
   def syncToLocal(self, p, spec):
     pass
   def syncToRemote(self, p, spec):
@@ -27,6 +29,7 @@ class PartialDownloadError(Exception):
     self.size = size
   def __str__(self):
     return "only %d out of %d bytes downloaded" % (self.downloaded, self.size)
+
 
 class HttpRemoteSync:
   def __init__(self, remoteStore, architecture, workdir, insecure):
@@ -205,8 +208,9 @@ class HttpRemoteSync:
     pass
 
 
-# Helper class to sync package build directory using RSync.
 class RsyncRemoteSync:
+  """Helper class to sync package build directory using RSync."""
+
   def __init__(self, remoteStore, writeStore, architecture, workdir, rsyncOptions):
     self.remoteStore = re.sub("^ssh://", "", remoteStore)
     self.writeStore = re.sub("^ssh://", "", writeStore)
@@ -254,9 +258,12 @@ class RsyncRemoteSync:
 
 
 class S3RemoteSync:
+  """Sync package build directory from and to S3 using s3cmd.
+
+  s3cmd must be installed separately in order for this to work.
+  """
+
   def __init__(self, remoteStore, writeStore, architecture, workdir):
-    # This will require rclone to be installed in order to actually work
-    # The name of the remote is always alibuild
     self.remoteStore = re.sub("^s3://", "", remoteStore)
     self.writeStore = re.sub("^s3://", "", writeStore)
     self.architecture = architecture
@@ -322,3 +329,162 @@ https://s3.cern.ch/swift/v1/{b}/$hashedurl" \
                   - "s3://{b}/$x" 2>&1
     done
     """.format(w=self.workdir, b=self.writeStore, t=link_dir))
+
+
+class Boto3RemoteSync:
+  """Sync package build directory from and to S3 using boto3.
+
+  As boto3 doesn't support Python 2, this class can only be used under Python
+  3. boto3 is only imported at __init__ time, so if this class is never
+  instantiated, boto3 doesn't have to be installed.
+
+  This class has the advantage over S3RemoteSync that it uses the same
+  connection to S3 every time, while s3cmd must establish a new connection each
+  time.
+  """
+
+  def __init__(self, remoteStore, writeStore, architecture, workdir):
+    self.remoteStore = re.sub("^b3://", "", remoteStore)
+    self.writeStore = re.sub("^b3://", "", writeStore)
+    self.architecture = architecture
+    self.workdir = workdir
+    self._s3_init()
+
+  def _s3_init(self):
+    # This is a separate method so that we can patch it out for unit tests.
+    # Import boto3 here, so that if we don't use this remote store, we don't
+    # have to install it in the first place.
+    try:
+      import boto3
+    except ImportError:
+      error("boto3 must be installed to use %s", Boto3RemoteSync)
+      sys.exit(1)
+
+    try:
+      self.s3 = boto3.client("s3", endpoint_url="https://s3.cern.ch",
+                             aws_access_key_id=os.environ["AWS_ACCESS_KEY_ID"],
+                             aws_secret_access_key=os.environ["AWS_SECRET_ACCESS_KEY"])
+    except KeyError:
+      error("you must pass the AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY env "
+            "variables to %sBuild in order to use the S3 remote store", star())
+      sys.exit(1)
+
+  def _s3_listdir(self, dirname):
+    """List keys of items under dirname in the read bucket."""
+    pages = self.s3.get_paginator("list_objects_v2") \
+                   .paginate(Bucket=self.remoteStore, Delimiter="/",
+                             Prefix=dirname.rstrip("/") + "/")
+    return (item["Key"] for pg in pages for item in pg.get("Contents", ()))
+
+  def _s3_key_exists(self, key):
+    """Return whether the given key exists in the write bucket already."""
+    from botocore.exceptions import ClientError
+    try:
+      self.s3.head_object(Bucket=self.writeStore, Key=key)
+    except ClientError as err:
+      if err.response["Error"]["Code"] == "404":
+        return False
+      raise
+    return True
+
+  def syncToLocal(self, p, spec):
+    debug("Updating remote store for %s@%s", p, spec["remote_revision_hash"])
+
+    # Create required directory tree locally. (exist_ok= is python3-specific.)
+    os.makedirs(os.path.join(self.workdir, spec["remote_tar_link_dir"]),
+                exist_ok=True)
+    os.makedirs(os.path.join(self.workdir, spec["remote_tar_hash_dir"]),
+                exist_ok=True)
+
+    # If we already have a tarball with the same hash, don't even check S3.
+    if glob.glob(os.path.join(self.workdir, spec["remote_store_path"],
+                              "%s-*.tar.gz" % p)):
+      debug("Reusing existing tarball for %s@%s", p, spec["remote_revision_hash"])
+    else:
+      # We don't already have a tarball with the hash that we need, so download
+      # the first existing one from the remote, if possible. (Downloading more
+      # than one is a waste of time as they should be equivalent and we only
+      # ever use one anyway.)
+      for tarball in self._s3_listdir(spec["remote_store_path"]):
+        debug("Fetching tarball %s", tarball)
+        self.s3.download_file(Bucket=self.remoteStore, Key=tarball,
+                              Filename=os.path.join(self.workdir,
+                                                    spec["remote_tar_hash_dir"],
+                                                    os.path.basename(tarball)))
+        break
+      else:
+        debug("Remote has no tarballs for %s@%s", p, spec["remote_revision_hash"])
+
+    # Remove existing symlinks: we'll fetch the ones from the remote next.
+    parent = os.path.join(self.workdir, spec["remote_tar_link_dir"])
+    for fname in os.listdir(parent):
+      path = os.path.join(parent, fname)
+      if os.path.islink(path):
+        os.unlink(path)
+
+    # Fetch symlink manifest and create local symlinks to match.
+    debug("Fetching symlink manifest")
+    n_symlinks = 0
+    for line in self.s3.get_object(
+        Bucket=self.remoteStore, Key=spec["remote_links_path"] + ".manifest"
+    )["Body"].iter_lines():
+      link_name, has_sep, target = line.rstrip(b"\n").partition(b"\t")
+      if not has_sep:
+        debug("Ignoring malformed line in manifest: %r", line)
+        continue
+      if not target.startswith(b"../../"):
+        target = b"../../" + target
+      target = os.fsdecode(target)
+      link_path = os.path.join(self.workdir, spec["remote_tar_link_dir"],
+                               os.fsdecode(link_name))
+      dieOnError(execute("ln -sf {} {}".format(target, link_path)),
+                 "Unable to create symlink {} -> {}".format(link_name, target))
+      n_symlinks += 1
+    debug("Got %d entries in manifest", n_symlinks)
+
+    # Create remote symlinks that aren't in the manifest yet.
+    debug("Looking for symlinks not in manifest")
+    for link_key in self._s3_listdir(spec["remote_links_path"]):
+      link_path = os.path.join(self.workdir, link_key)
+      if os.path.islink(link_path):
+        continue
+      debug("Fetching leftover symlink %s", link_key)
+      resp = self.s3.get_object(Bucket=self.remoteStore, Key=link_key)
+      target = os.fsdecode(resp["Body"].read()).rstrip("\n")
+      if not target.startswith("../../"):
+        target = "../../" + target
+      dieOnError(execute("ln -sf {} {}".format(target, link_path)),
+                 "Unable to create symlink {} -> {}".format(link_key, target))
+
+  def syncToRemote(self, p, spec):
+    if not self.writeStore:
+      return
+    tarballNameWithRev = ("{package}-{version}-{revision}.{architecture}.tar.gz"
+                          .format(architecture=self.architecture, **spec))
+    tar_path = os.path.join(spec["remote_store_path"], tarballNameWithRev)
+    link_path = os.path.join(spec["remote_links_path"], tarballNameWithRev)
+    if self._s3_key_exists(tar_path) or self._s3_key_exists(link_path):
+      debug("%s exists on S3 already, not uploading", tarballNameWithRev)
+      return
+    debug("Uploading tarball and symlink for %s %s-%s (%s) to S3",
+          p, spec["version"], spec["revision"], spec["remote_revision_hash"])
+    self.s3.upload_file(Bucket=self.writeStore, Key=tar_path,
+                        Filename=os.path.join(self.workdir, tar_path))
+    self.s3.put_object(Bucket=self.writeStore, Key=link_path,
+                       Body=os.readlink(os.path.join(self.workdir, link_path))
+                              .lstrip("./").encode("utf-8"))
+
+  def syncDistLinksToRemote(self, link_dir):
+    if not self.writeStore:
+      return
+    for fname in os.listdir(os.path.join(self.workdir, link_dir)):
+      link_key = os.path.join(link_dir, fname)
+      path = os.path.join(self.workdir, link_key)
+      if not os.path.islink(path) or self._s3_key_exists(link_key):
+        continue
+      hash_path = re.sub(r"^(\.\./)*", "", os.readlink(path))
+      self.s3.put_object(Bucket=self.writeStore,
+                         Key=link_key,
+                         Body=os.fsencode(hash_path),
+                         ACL="public-read",
+                         WebsiteRedirectLocation=hash_path)

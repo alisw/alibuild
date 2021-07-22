@@ -31,6 +31,9 @@ if sys.version_info[0] >= 3:
   basestring = None
   unicode = None
 
+def star():
+  return re.sub("build.*$", "", basename(sys.argv[0]).lower())
+
 def is_string(s):
   if sys.version_info[0] >= 3:
     return isinstance(s, str)
