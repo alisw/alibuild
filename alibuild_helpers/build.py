@@ -70,7 +70,7 @@ def getDirectoryHash(d):
 
 # Creates a directory in the store which contains symlinks to the package
 # and its direct / indirect dependencies
-def createDistLinks(spec, specs, args, repoType, requiresType):
+def createDistLinks(spec, specs, args, syncHelper, repoType, requiresType):
   # At the point we call this function, spec has a single, definitive hash.
   target = format("TARS/%(a)s/%(rp)s/%(p)s/%(p)s-%(v)s-%(r)s",
                   a=args.architecture,
@@ -99,26 +99,7 @@ def createDistLinks(spec, specs, args, repoType, requiresType):
   for g in [ links[i:i+10] for i in range(0, len(links), 10) ]:
     execute(" && ".join([cmd] + g))
 
-  rsyncOptions = ""
-  if args.writeStore.startswith("s3://"):
-    bucket = re.sub("^s3://", "", args.writeStore)
-    cmd = format("cd %(w)s && "
-                 "for x in `find %(t)s -type l`; do"
-                 "  HASHEDURL=`readlink $x | sed -e 's|.*/[.][.]/TARS|TARS|'` && "
-                 "  echo $HASHEDURL | s3cmd put --skip-existing -q -P -s --add-header=\"x-amz-website-redirect-location:https://s3.cern.ch/swift/v1/%(b)s/${HASHEDURL}\" --host s3.cern.ch --host-bucket %(b)s.s3.cern.ch - s3://%(b)s/$x 2>/dev/null;"
-                 "done",
-                 w=args.workDir,
-                 b=bucket,
-                 t=target)
-    execute(cmd)
-  elif args.writeStore:
-    cmd = format("cd %(w)s && "
-                 "rsync -avR %(o)s --ignore-existing %(t)s/  %(rs)s/",
-                 w=args.workDir,
-                 rs=args.writeStore,
-                 o=rsyncOptions,
-                 t=target)
-    execute(cmd)
+  syncHelper.syncDistLinksToRemote(target)
 
 
 def storeHashes(package, specs, isDevelPkg, considerRelocation):
@@ -724,9 +705,9 @@ def doBuild(args, parser):
       # We need to create 2 sets of links, once with the full requires,
       # once with only direct dependencies, since that's required to
       # register packages in Alien.
-      createDistLinks(spec, specs, args, "dist", "full_requires")
-      createDistLinks(spec, specs, args, "dist-direct", "requires")
-      createDistLinks(spec, specs, args, "dist-runtime", "full_runtime_requires")
+      createDistLinks(spec, specs, args, syncHelper, "dist", "full_requires")
+      createDistLinks(spec, specs, args, syncHelper, "dist-direct", "requires")
+      createDistLinks(spec, specs, args, syncHelper, "dist-runtime", "full_runtime_requires")
       buildOrder.pop(0)
       packageIterations = 0
       # We can now delete the INSTALLROOT and BUILD directories,
