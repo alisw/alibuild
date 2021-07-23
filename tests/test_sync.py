@@ -62,6 +62,7 @@ class SyncTestCase(unittest.TestCase):
         raise NotImplementedError(url)
 
     @patch("alibuild_helpers.sync.open", new=lambda fn, mode: BytesIO())
+    @patch("os.rename", new=lambda old, new: None)
     @patch("alibuild_helpers.sync.execute", new=lambda cmd, printer=None: 0)
     @patch("alibuild_helpers.sync.warning")
     @patch("alibuild_helpers.sync.error")
