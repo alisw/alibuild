@@ -10,7 +10,7 @@ on:
     branches: [ master ]
 
 jobs:
-  build:
+  unittest:
     name: python${{ matrix.python-version }}
     runs-on: ubuntu-latest
     strategy:
@@ -39,8 +39,8 @@ jobs:
 
     - name: Install test dependencies
       run: |
-        sudo apt-get update -y
-        sudo apt-get install -y curl libcurl4-gnutls-dev build-essential gfortran libmysqlclient-dev xorg-dev libglu1-mesa-dev libfftw3-dev libxml2-dev git unzip autoconf automake autopoint texinfo gettext libtool libtool-bin pkg-config bison flex libperl-dev libbz2-dev swig liblzma-dev libnanomsg-dev rsync lsb-release unzip environment-modules libglfw3-dev libtbb-dev python3-venv libncurses-dev environment-modules libxml2-dev libxslt1-dev ruby-dev
+        sudo apt update -y
+        sudo apt install -y curl libcurl4-gnutls-dev build-essential gfortran libmysqlclient-dev xorg-dev libglu1-mesa-dev libfftw3-dev libxml2-dev git unzip autoconf automake autopoint texinfo gettext libtool libtool-bin pkg-config bison flex libperl-dev libbz2-dev swig liblzma-dev libnanomsg-dev rsync lsb-release unzip environment-modules libglfw3-dev libtbb-dev python3-venv libncurses-dev environment-modules libxml2-dev libxslt1-dev
         python -m pip install --upgrade pylint mock coverage codecov distro -r requirements.txt
 
     - name: Run tests
@@ -88,11 +88,17 @@ jobs:
         time coverage run -a alibuild/aliBuild version
         bash <(curl -s https://codecov.io/bash)
 
-    - name: Install documentation dependencies
-      run: |
-        sudo NOKOGIRI_USE_SYSTEM_LIBRARIES=true gem install --no-document jekyll html-proofer
+  documentation:
+    name: documentation
+    runs-on: ubuntu-latest
+    container:
+      image: jekyll/jekyll
+
+    steps:
+    - uses: actions/checkout@v2
 
     - name: Test documentation
       run: |
+        chmod -R a+rwX .
         jekyll build -s docs -d _site --baseurl .
         script/custom_htmlproofer.rb
