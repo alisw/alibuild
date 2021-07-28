@@ -463,9 +463,15 @@ class Boto3RemoteSync:
                           .format(architecture=self.architecture, **spec))
     tar_path = os.path.join(spec["remote_store_path"], tarballNameWithRev)
     link_path = os.path.join(spec["remote_links_path"], tarballNameWithRev)
-    if self._s3_key_exists(tar_path) or self._s3_key_exists(link_path):
+    tar_exists = self._s3_key_exists(tar_path)
+    link_exists = self._s3_key_exists(link_path)
+    if tar_exists and link_exists:
       debug("%s exists on S3 already, not uploading", tarballNameWithRev)
       return
+    if tar_exists or link_exists:
+      warning("%s exists already but %s does not, overwriting!",
+              tar_path if tar_exists else link_path,
+              link_path if tar_exists else tar_path)
     debug("Uploading tarball and symlink for %s %s-%s (%s) to S3",
           p, spec["version"], spec["revision"], spec["remote_revision_hash"])
     self.s3.upload_file(Bucket=self.writeStore, Key=tar_path,
