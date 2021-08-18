@@ -41,8 +41,8 @@ def dummy_exists(x):
   return False
 
 CLONE_EVERYTHING = [
- call(u'git clone --origin upstream --filter=blob:none https://github.com/alisw/alidist -b master /alidist'),
- call(u'git clone --origin upstream --filter=blob:none https://github.com/alisw/AliRoot -b v5-08-00 --reference /sw/MIRROR/aliroot ./AliRoot && cd ./AliRoot && git remote set-url --push upstream https://github.com/alisw/AliRoot')
+ call(u'git clone --origin upstream https://github.com/alisw/alidist -b master /alidist'),
+ call(u'git clone --origin upstream https://github.com/alisw/AliRoot -b v5-08-00 --reference /sw/MIRROR/aliroot ./AliRoot && cd ./AliRoot && git remote set-url --push upstream https://github.com/alisw/AliRoot')
 ]
 
 class InitTestCase(unittest.TestCase):
