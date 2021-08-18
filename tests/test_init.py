@@ -106,7 +106,7 @@ class InitTestCase(unittest.TestCase):
         architecture = "slc7_x86-64"
       )
       doInit(args)
-      mock_execute.assert_called_with("git clone --origin upstream --filter=blob:none https://github.com/alisw/AliRoot -b v5-08-00 --reference /sw/MIRROR/aliroot ./AliRoot && cd ./AliRoot && git remote set-url --push upstream https://github.com/alisw/AliRoot")
+      mock_execute.assert_called_with("git clone --origin upstream https://github.com/alisw/AliRoot -b v5-08-00 --reference /sw/MIRROR/aliroot ./AliRoot && cd ./AliRoot && git remote set-url --push upstream https://github.com/alisw/AliRoot")
       self.assertEqual(mock_execute.mock_calls, CLONE_EVERYTHING)
       mock_path.exists.assert_has_calls([call('.'), call('/sw/MIRROR'), call('/alidist'), call('./AliRoot')])
 
@@ -115,7 +115,7 @@ class InitTestCase(unittest.TestCase):
       mock_path.reset_mock()
       args.fetchRepos = True
       doInit(args)
-      mock_execute.assert_called_with("git clone --origin upstream --filter=blob:none https://github.com/alisw/AliRoot -b v5-08-00 --reference /sw/MIRROR/aliroot ./AliRoot && cd ./AliRoot && git remote set-url --push upstream https://github.com/alisw/AliRoot")
+      mock_execute.assert_called_with("git clone --origin upstream https://github.com/alisw/AliRoot -b v5-08-00 --reference /sw/MIRROR/aliroot ./AliRoot && cd ./AliRoot && git remote set-url --push upstream https://github.com/alisw/AliRoot")
       self.assertEqual(mock_execute.mock_calls, CLONE_EVERYTHING)
       mock_path.exists.assert_has_calls([call('.'), call('/sw/MIRROR'), call('/alidist'), call('./AliRoot')])
 
