@@ -53,6 +53,25 @@ def to_unicode(s):
     return unicode(str(s))
   return s
 
+
+def resolve_store_path(architecture, spec_hash):
+  """Return the path where a tarball with the given hash is to be stored.
+
+  The returned path is relative to the working directory (normally sw/) or the
+  root of the remote store.
+  """
+  return "/".join(("TARS", architecture, "store", spec_hash[:2], spec_hash))
+
+
+def resolve_links_path(architecture, package):
+  """Return the path where symlinks for the given package are to be stored.
+
+  The returned path is relative to the working directory (normally sw/) or the
+  root of the remote store.
+  """
+  return "/".join(("TARS", architecture, package))
+
+
 # Date fields to substitute: they are zero-padded
 now = datetime.now()
 nowKwds = { "year": str(now.year),
@@ -460,3 +479,7 @@ class Hasher:
     self.h.update(txt)
   def hexdigest(self):
     return self.h.hexdigest()
+  def copy(self):
+    new_hasher = Hasher()
+    new_hasher.h = self.h.copy()
+    return new_hasher

@@ -8,17 +8,14 @@ except ImportError:
     from mock import patch, MagicMock   # Python 2
 
 from alibuild_helpers import sync
+from alibuild_helpers.utilities import resolve_links_path, resolve_store_path
 
 
-TEST_HASHES = GOOD_HASH, BAD_HASH = ("deadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
-                                     "baadf00dbaadf00dbaadf00dbaadf00dbaadf00d")
-DUMMY_SPEC = {"package": "zlib",
-              "version": "v1.2.3",
-              "revision": "1",
-              "remote_store_path": "/sw/path",
-              "remote_links_path": "/sw/links",
-              "remote_tar_hash_dir": "/sw/TARS",
-              "remote_tar_link_dir": "/sw/TARS"}
+ARCHITECTURE = "osx_x86-64"
+GOOD_HASH, BAD_HASH = ("deadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
+                       "baadf00dbaadf00dbaadf00dbaadf00dbaadf00d")
+NONEXISTENT_HASH = "TRIGGERS_A_404"
+DUMMY_SPEC = {"package": "zlib", "version": "v1.2.3", "revision": "1"}
 
 
 class MockRequest:
@@ -48,15 +45,17 @@ class SyncTestCase(unittest.TestCase):
         self.spec = DUMMY_SPEC.copy()
 
     def mock_get(self, url, *args, **kw):
-        if "triggers_a_404" in url:
+        if NONEXISTENT_HASH in url:
             return MockRequest(None)
-        if self.spec["remote_store_path"] in url:
+        if "/store/" in url:
             if self.spec["remote_revision_hash"] == GOOD_HASH:
                 return MockRequest([{"name": "zlib-v1.2.3-1.slc7_x86-64.tar.gz"}])
             elif self.spec["remote_revision_hash"] == BAD_HASH:
                 return MockRequest([{"name": "zlib-v1.2.3-2.slc7_x86-64.tar.gz"}],
                                    simulate_err=True)
-        elif self.spec["remote_links_path"] in url:
+        elif url.endswith(".manifest"):
+            return MockRequest("")
+        elif ("/" + self.spec["package"] + "/") in url:
             return MockRequest([{"name": "zlib-v1.2.3-1.slc7_x86-64.tar.gz"},
                                 {"name": "zlib-v1.2.3-2.slc7_x86-64.tar.gz"}])
         raise NotImplementedError(url)
@@ -70,42 +69,49 @@ class SyncTestCase(unittest.TestCase):
     def test_http_remote(self, mock_get, mock_error, mock_warning):
         mock_get.side_effect = self.mock_get
         syncer = sync.HttpRemoteSync(remoteStore="https://localhost/test",
-                                     architecture="osx_x86-64",
+                                     architecture=ARCHITECTURE,
                                      workdir="/sw", insecure=False)
 
-        for test_hash in TEST_HASHES:
-            mock_error.reset_mock()
-            mock_warning.reset_mock()
-            self.spec["remote_revision_hash"] = test_hash
+        mock_error.reset_mock()
+        mock_warning.reset_mock()
+        self.spec["hash"] = self.spec["remote_revision_hash"] = GOOD_HASH
+        self.spec["remote_hashes"] = [GOOD_HASH]
 
-            syncer.syncToLocal("zlib", self.spec)
+        syncer.syncToLocal("zlib", self.spec)
+        mock_error.assert_not_called()
+        syncer.syncToRemote("zlib", self.spec)
+        syncer.syncDistLinksToRemote("/sw/dist")
 
-            if test_hash == GOOD_HASH:
-                mock_error.assert_not_called()
-            elif test_hash == BAD_HASH:
-                # We can't use mock_error.assert_called_once_with because two
-                # PartialDownloadError instances don't compare equal.
-                self.assertEqual(len(mock_error.call_args_list), 1)
-                self.assertEqual(mock_error.call_args_list[0][0][0],
-                                 "GET %s failed: %s")
-                self.assertEqual(mock_error.call_args_list[0][0][1],
-                                 "https://localhost/test//sw/path/"
-                                 "zlib-v1.2.3-2.slc7_x86-64.tar.gz")
-                self.assertIsInstance(mock_error.call_args_list[0][0][2],
-                                      sync.PartialDownloadError)
-                mock_warning.assert_not_called()
-                mock_warning.assert_not_called()
-            else:
-                raise ValueError("unhandled hash")
+        mock_error.reset_mock()
+        mock_warning.reset_mock()
+        self.spec["hash"] = self.spec["remote_revision_hash"] = BAD_HASH
+        self.spec["remote_hashes"] = [BAD_HASH]
 
-            syncer.syncToRemote("zlib", self.spec)
-            syncer.syncDistLinksToRemote("/sw/dist")
+        syncer.syncToLocal("zlib", self.spec)
 
-        self.spec["remote_store_path"] = "/triggers_a_404/path"
+        # We can't use mock_error.assert_called_once_with because two
+        # PartialDownloadError instances don't compare equal.
+        self.assertEqual(len(mock_error.call_args_list), 1)
+        self.assertEqual(mock_error.call_args_list[0][0][0],
+                         "GET %s failed: %s")
+        self.assertEqual(mock_error.call_args_list[0][0][1],
+                         "https://localhost/test/TARS/%s/store/%s/%s/"
+                         "zlib-v1.2.3-2.slc7_x86-64.tar.gz" %
+                         (ARCHITECTURE, self.spec["remote_revision_hash"][:2],
+                          self.spec["remote_revision_hash"]))
+        self.assertIsInstance(mock_error.call_args_list[0][0][2],
+                              sync.PartialDownloadError)
+        mock_warning.assert_not_called()
+
+        syncer.syncToRemote("zlib", self.spec)
+        syncer.syncDistLinksToRemote("/sw/dist")
+
+        self.spec["hash"] = self.spec["remote_revision_hash"] = NONEXISTENT_HASH
+        self.spec["remote_hashes"] = [NONEXISTENT_HASH]
         syncer.syncToLocal("zlib", self.spec)
         mock_warning.assert_called_once_with(
             "%s (%s) not fetched: have you tried updating the recipes?",
-            "zlib", BAD_HASH)
+            "zlib", NONEXISTENT_HASH)
 
     @patch("alibuild_helpers.sync.execute", new=lambda cmd, printer=None: 0)
     @patch("alibuild_helpers.sync.os")
@@ -119,7 +125,7 @@ class SyncTestCase(unittest.TestCase):
             sync.NoRemoteSync(),
             sync.RsyncRemoteSync(remoteStore="ssh://localhost/test",
                                  writeStore="ssh://localhost/test",
-                                 architecture="osx_x86-64",
+                                 architecture=ARCHITECTURE,
                                  workdir="/sw", rsyncOptions=""),
             sync.S3RemoteSync(remoteStore="s3://localhost",
                               writeStore="s3://localhost",
@@ -127,14 +133,16 @@ class SyncTestCase(unittest.TestCase):
                               workdir="/sw"),
         ]
 
-        for test_hash in TEST_HASHES:
-            self.spec["remote_revision_hash"] = test_hash
+        for test_hash in (GOOD_HASH, BAD_HASH):
+            self.spec["hash"] = self.spec["remote_revision_hash"] = test_hash
+            self.spec["remote_hashes"] = [test_hash]
             for syncer in syncers:
                 syncer.syncToLocal("zlib", self.spec)
                 syncer.syncToRemote("zlib", self.spec)
                 syncer.syncDistLinksToRemote("/sw/dist")
 
-        self.spec["remote_store_path"] = "/triggers_a_404/path"
+        self.spec["hash"] = self.spec["remote_revision_hash"] = NONEXISTENT_HASH
+        self.spec["remote_hashes"] = [NONEXISTENT_HASH]
         for syncer in syncers:
             syncer.syncToLocal("zlib", self.spec)
 
@@ -147,27 +155,32 @@ class Boto3TestCase(unittest.TestCase):
         from botocore.exceptions import ClientError
 
         def paginate_listdir(Bucket, Delimiter, Prefix):
-            if Prefix == self.spec["remote_store_path"] + "/":
+            if "/store/" in Prefix:
+                store_path = resolve_store_path(ARCHITECTURE, self.spec["remote_revision_hash"])
                 if self.spec["remote_revision_hash"] == GOOD_HASH:
-                    return [{"Contents": [{"Key": "zlib-v1.2.3-1.slc7_x86-64.tar.gz"}]}]
+                    return [{"Contents": [{"Key": store_path + Delimiter +
+                                           "zlib-v1.2.3-1.slc7_x86-64.tar.gz"}]}]
                 elif self.spec["remote_revision_hash"] == BAD_HASH:
-                    return [{"Contents": [{"Key": self.spec["remote_store_path"] +
-                                           Delimiter + "zlib-v1.2.3-2.slc7_x86-64.tar.gz"}]}]
-            elif Prefix == self.spec["remote_links_path"] + "/":
-                return [{"Contents": [{"Key": self.spec["remote_links_path"] +
-                                       Delimiter + "zlib-v1.2.3-1.slc7_x86-64.tar.gz"},
-                                      {"Key": self.spec["remote_links_path"] +
-                                       Delimiter + "zlib-v1.2.3-2.slc7_x86-64.tar.gz"}]}]
+                    return [{"Contents": [{"Key": store_path + Delimiter +
+                                           "zlib-v1.2.3-2.slc7_x86-64.tar.gz"}]}]
+                elif self.spec["remote_revision_hash"] == NONEXISTENT_HASH:
+                    return [{}]
+            elif Prefix.endswith("/" + self.spec["package"] + "/"):
+                links_path = resolve_links_path(ARCHITECTURE, self.spec["package"])
+                return [{"Contents": [
+                    {"Key": links_path + Delimiter + "zlib-v1.2.3-1.slc7_x86-64.tar.gz"},
+                    {"Key": links_path + Delimiter + "zlib-v1.2.3-2.slc7_x86-64.tar.gz"},
+                ]}]
             raise NotImplementedError("unknown prefix " + Prefix)
 
         def head_object(Bucket, Key):
-            if BAD_HASH in Key:
+            if NONEXISTENT_HASH in Key:
                 err = ClientError()
                 err.response = {"Error": {"Code": "404"}}
                 raise err
 
         def download_file(Bucket, Key, Filename):
-            self.assertNotIn(BAD_HASH, Key, "tried to fetch nonexistent key")
+            self.assertNotIn(NONEXISTENT_HASH, Key, "tried to fetch nonexistent key")
 
         def get_object(Bucket, Key):
             if Key.endswith(".manifest"):
@@ -202,8 +215,9 @@ class Boto3TestCase(unittest.TestCase):
             architecture="slc7_x86-64", workdir="/sw")
         b3sync.s3 = self.mock_s3()
 
-        for test_hash in TEST_HASHES:
-            self.spec["remote_revision_hash"] = test_hash
+        for test_hash in (GOOD_HASH, BAD_HASH, NONEXISTENT_HASH):
+            self.spec["hash"] = self.spec["remote_revision_hash"] = test_hash
+            self.spec["remote_hashes"] = [test_hash]
             b3sync.syncToLocal("zlib", self.spec)
             b3sync.syncToRemote("zlib", self.spec)
             b3sync.syncDistLinksToRemote("/sw/dist")
