@@ -11,7 +11,7 @@ from requests.exceptions import RequestException
 
 from alibuild_helpers.cmd import execute
 from alibuild_helpers.log import debug, warning, error, dieOnError
-from alibuild_helpers.utilities import format, star
+from alibuild_helpers.utilities import format, star, resolve_store_path, resolve_links_path
 
 
 class NoRemoteSync:
@@ -41,7 +41,6 @@ class HttpRemoteSync:
     self.httpTimeoutSec = 15
     self.httpConnRetries = 4
     self.httpBackoff = 0.4
-    self.doneOrFailed = []
 
   def getRetry(self, url, dest=None, returnResult=False, log=True):
     for i in range(0, self.httpConnRetries):
@@ -123,45 +122,53 @@ class HttpRemoteSync:
     return None
 
   def syncToLocal(self, p, spec):
-    if spec["remote_revision_hash"] in self.doneOrFailed:
-      debug("Will not redownload %s with build hash %s",
-            p, spec["remote_revision_hash"])
-      return
-
-    debug("Updating remote store for package %s@%s",
-          p, spec["remote_revision_hash"])
-    hashListUrl = "{rs}/{sp}/".format(rs=self.remoteStore, sp=spec["remote_store_path"])
-    manifestUrl = "{rs}/{lp}.manifest".format(rs=self.remoteStore, lp=spec["remote_links_path"])
-    pkgListUrl = "{rs}/{lp}/".format(rs=self.remoteStore, lp=spec["remote_links_path"])
-
-    hashList = self.getRetry(hashListUrl)
-    freeSymlinkList = None
-    if hashList is not None:
-      manifest = self.getRetry(manifestUrl, returnResult=True)
-      freeSymlinkList = self.getRetry(pkgListUrl)
-    if freeSymlinkList is None or hashList is None:
-      warning("%s (%s) not fetched: have you tried updating the recipes?",
-              p, spec["remote_revision_hash"])
-      self.doneOrFailed.append(spec["remote_revision_hash"])
-      return
-
-    execute("mkdir -p {} {}".format(spec["remote_tar_hash_dir"],
-                                    spec["remote_tar_link_dir"]))
-    hashList = [x["name"] for x in hashList]
-
-    hasErr = False
-    for pkg in hashList:
-      destPath = os.path.join(spec["remote_tar_hash_dir"], pkg)
-      if os.path.isfile(destPath):
-        # Do not redownload twice
+    # Check for any existing tarballs we can use instead of fetching new ones.
+    for pkg_hash in spec["remote_hashes"]:
+      try:
+        have_tarballs = os.listdir(os.path.join(
+          self.workdir, resolve_store_path(self.architecture, pkg_hash)))
+      except OSError:  # store path not readable
         continue
-      if not self.getRetry(
-          "/".join((self.remoteStore, spec["remote_store_path"], pkg)),
-          destPath):
-        hasErr = True
+      for tarball in have_tarballs:
+        if re.match(r"^{package}-{version}-[0-9]+\.{arch}\.tar\.gz$".format(
+            package=re.escape(spec["package"]),
+            version=re.escape(spec["version"]),
+            arch=re.escape(self.architecture),
+        ), os.path.basename(tarball)):
+          debug("Previously downloaded tarball for %s with hash %s, reusing",
+                p, pkg_hash)
+          return
+
+    debug("Updating remote store for package %s; trying hashes %s",
+          p, ", ".join(spec["remote_hashes"]))
+    store_path = use_tarball = None
+    # Find the first tarball that matches any possible hash and fetch it.
+    for pkg_hash in spec["remote_hashes"]:
+      store_path = resolve_store_path(self.architecture, pkg_hash)
+      tarballs = self.getRetry("%s/%s/" % (self.remoteStore, store_path))
+      if tarballs:
+        use_tarball = tarballs[0]["name"]
+        break
+
+    if store_path is None or use_tarball is None:
+      warning("%s (%s) not fetched: have you tried updating the recipes?",
+              p, ", ".join(spec["remote_hashes"]))
+      return
+
+    links_path = resolve_links_path(self.architecture, spec["package"])
+    execute("mkdir -p {}/{} {}/{}".format(self.workdir, store_path,
+                                          self.workdir, links_path))
+
+    destPath = os.path.join(self.workdir, store_path, use_tarball)
+    if not os.path.isfile(destPath):
+      # Do not download twice
+      self.getRetry("/".join((self.remoteStore, store_path, use_tarball)),
+                    destPath)
 
     # Fetch manifest file with initial symlinks. This file is updated
     # regularly; we use it to avoid many small network requests.
+    manifest = self.getRetry("%s/%s.manifest" % (self.remoteStore, links_path),
+                             returnResult=True)
     symlinks = {
       linkname.decode("utf-8"): target.decode("utf-8")
       for linkname, sep, target in (line.partition(b"\t")
@@ -169,22 +176,18 @@ class HttpRemoteSync:
       if sep and linkname and target
     }
     # If we've just downloaded a tarball, add a symlink to it.
-    symlinks.update({
-      linkname: os.path.join(self.architecture, "store",
-                             spec["remote_revision_hash"][0:2],
-                             spec["remote_revision_hash"],
-                             linkname)
-      for linkname in hashList
-    })
+    # We need to strip the leading TARS/ first, though.
+    assert store_path.startswith("TARS/"), store_path
+    symlinks[use_tarball] = os.path.join(store_path[len("TARS/"):], use_tarball)
     # Now add any remaining symlinks that aren't in the manifest yet. There
     # should always be relatively few of these, as the separate network
     # requests are a bit expensive.
-    for link in freeSymlinkList:
+    for link in self.getRetry("%s/%s/" % (self.remoteStore, links_path)):
       linkname = link["name"]
       if linkname in symlinks:
         # This symlink is already present in the manifest.
         continue
-      if os.path.islink(os.path.join(spec["remote_tar_link_dir"], linkname)):
+      if os.path.islink(os.path.join(self.workdir, links_path, linkname)):
         # We have this symlink locally. With local revisions, we won't produce
         # revisions that will conflict with remote revisions unless we upload
         # them anyway, so there's no need to redownload.
@@ -192,14 +195,12 @@ class HttpRemoteSync:
       # This symlink isn't in the manifest yet, and we don't have it locally,
       # so download it individually.
       symlinks[linkname] = self.getRetry(
-        "/".join((self.remoteStore, spec["remote_links_path"], linkname)),
+        "/".join((self.remoteStore, links_path, linkname)),
         returnResult=True, log=False).decode("utf-8").rstrip("\r\n")
     for linkname, target in symlinks.items():
-      execute("ln -nsf ../../{target} {linkdir}/{name}".format(
-        linkdir=spec["remote_tar_link_dir"], target=target, name=linkname))
-
-    if not hasErr:
-      self.doneOrFailed.append(spec["remote_revision_hash"])
+      execute("ln -nsf ../../{target} {workdir}/{linkdir}/{name}".format(
+        workdir=self.workdir, linkdir=links_path, name=linkname,
+        target=target))
 
   def syncToRemote(self, p, spec):
     pass
@@ -219,17 +220,22 @@ class RsyncRemoteSync:
     self.workdir = workdir
 
   def syncToLocal(self, p, spec):
-    debug("Updating remote store for package %s@%s", p, spec["remote_revision_hash"])
-    cmd = format("mkdir -p %(tarballHashDir)s\n"
-                 "rsync -av %(ro)s %(remoteStore)s/%(storePath)s/ %(tarballHashDir)s/ || true\n"
-                 "rsync -av --delete %(ro)s %(remoteStore)s/%(linksPath)s/ %(tarballLinkDir)s/ || true\n",
-                 ro=self.rsyncOptions,
-                 remoteStore=self.remoteStore,
-                 storePath=spec["remote_store_path"],
-                 linksPath=spec["remote_links_path"],
-                 tarballHashDir=spec["remote_tar_hash_dir"],
-                 tarballLinkDir=spec["remote_tar_link_dir"])
-    err = execute(cmd)
+    debug("Updating remote store for package %s with hashes %s", p,
+          ", ".join(spec["remote_hashes"]))
+    err = execute("""\
+    rsync -av --delete {ro} {remoteStore}/{linksPath}/ {workDir}/{linksPath}/ || :
+    for storePath in {storePaths}; do
+      mkdir -p {workDir}/$storePath
+      # If we transferred at least one file, quit. This assumes that the remote
+      # doesn't have empty dirs under TARS/<arch>/store/.
+      rsync -av {ro} {remoteStore}/$storePath/ {workDir}/$storePath/ && break || :
+    done
+    """.format(ro=self.rsyncOptions,
+               remoteStore=self.remoteStore,
+               workDir=self.workdir,
+               linksPath=resolve_links_path(self.architecture, p),
+               storePaths=" ".join(resolve_store_path(self.architecture, pkg_hash)
+                                   for pkg_hash in spec["remote_hashes"])))
     dieOnError(err, "Unable to update from specified store.")
 
   def syncToRemote(self, p, spec):
@@ -244,8 +250,8 @@ class RsyncRemoteSync:
                  workdir=self.workdir,
                  remoteStore=self.remoteStore,
                  rsyncOptions=self.rsyncOptions,
-                 storePath=spec["remote_store_path"],
-                 linksPath=spec["remote_links_path"],
+                 storePath=resolve_store_path(self.architecture, spec["hash"]),
+                 linksPath=resolve_links_path(self.architecture, p),
                  tarballNameWithRev=tarballNameWithRev)
     err = execute(cmd)
     dieOnError(err, "Unable to upload tarball.")
@@ -270,29 +276,38 @@ class S3RemoteSync:
     self.workdir = workdir
 
   def syncToLocal(self, p, spec):
-    debug("Updating remote store for package %s@%s", p, spec["remote_revision_hash"])
+    debug("Updating remote store for package %s with hashes %s", p,
+          ", ".join(spec["remote_hashes"]))
     err = execute("""\
-    s3cmd --no-check-md5 sync -s -v --host s3.cern.ch --host-bucket {b}.s3.cern.ch \
-          "s3://{b}/{storePath}/" "{tarballHashDir}/" 2>&1 || true
-    mkdir -p "{tarballLinkDir}"
-    find "{tarballLinkDir}" -type l -delete
+    for storePath in {storePaths}; do
+      # For the first store path that contains tarballs, fetch them, and skip
+      # any possible later tarballs (we only need one).
+      if [ -n "$(s3cmd ls -s -v --host s3.cern.ch --host-bucket {b}.s3.cern.ch \
+                       "s3://{b}/$storePath/")" ]; then
+        s3cmd --no-check-md5 sync -s -v --host s3.cern.ch --host-bucket {b}.s3.cern.ch \
+              "s3://{b}/$storePath/" "{workDir}/$storePath/" 2>&1 || :
+        break
+      fi
+    done
+    mkdir -p "{workDir}/{linksPath}"
+    find "{workDir}/{linksPath}" -type l -delete
     curl -sL "https://s3.cern.ch/swift/v1/{b}/{linksPath}.manifest" |
       while IFS='\t' read -r symlink target; do
-        ln -sf "../../$target" "{tarballLinkDir}/$symlink" || true
+        ln -sf "../../${{target#../../}}" "{workDir}/{linksPath}/$symlink" || true
       done
     for x in $(curl -sL "https://s3.cern.ch/swift/v1/{b}/?prefix={linksPath}/"); do
       # Skip already existing symlinks -- these were from the manifest.
       # (We delete leftover symlinks from previous runs above.)
-      [ -L "{tarballLinkDir}/$(basename "$x")" ] && continue
-      ln -sf "../../$(curl -sL "https://s3.cern.ch/swift/v1/{b}/$x")" \
-         "{tarballLinkDir}/$(basename "$x")" || true
+      [ -L "{workDir}/{linksPath}/$(basename "$x")" ] && continue
+      ln -sf "$(curl -sL "https://s3.cern.ch/swift/v1/{b}/$x" | sed -r 's,^(\\.\\./\\.\\./)?,../../,')" \
+         "{workDir}/{linksPath}/$(basename "$x")" || true
     done
     """.format(
       b=self.remoteStore,
-      storePath=spec["remote_store_path"],
-      linksPath=spec["remote_links_path"],
-      tarballHashDir=spec["remote_tar_hash_dir"],
-      tarballLinkDir=spec["remote_tar_link_dir"],
+      storePaths=" ".join(resolve_store_path(self.architecture, pkg_hash)
+                          for pkg_hash in spec["remote_hashes"]),
+      linksPath=resolve_links_path(self.architecture, p),
+      workDir=self.workdir,
     ))
     dieOnError(err, "Unable to update from specified store.")
 
@@ -309,8 +324,8 @@ class S3RemoteSync:
                  "echo $HASHEDURL | s3cmd put -s -v --host s3.cern.ch --host-bucket %(b)s.s3.cern.ch - s3://%(b)s/%(linksPath)s/%(tarballNameWithRev)s 2>&1 || true\n",
                  workdir=self.workdir,
                  b=self.remoteStore,
-                 storePath=spec["remote_store_path"],
-                 linksPath=spec["remote_links_path"],
+                 storePath=resolve_store_path(self.architecture, spec["hash"]),
+                 linksPath=resolve_links_path(self.architecture, p),
                  tarballNameWithRev=tarballNameWithRev)
     err = execute(cmd)
     dieOnError(err, "Unable to upload tarball.")
@@ -388,35 +403,47 @@ class Boto3RemoteSync:
     return True
 
   def syncToLocal(self, p, spec):
-    debug("Updating remote store for %s@%s", p, spec["remote_revision_hash"])
+    from botocore.exceptions import ClientError
+    debug("Updating remote store for package %s with hashes %s", p,
+          ", ".join(spec["remote_hashes"]))
 
-    # Create required directory tree locally. (exist_ok= is python3-specific.)
-    os.makedirs(os.path.join(self.workdir, spec["remote_tar_link_dir"]),
-                exist_ok=True)
-    os.makedirs(os.path.join(self.workdir, spec["remote_tar_hash_dir"]),
-                exist_ok=True)
+    # If we already have a tarball with any equivalent hash, don't check S3.
+    have_tarball = False
+    for pkg_hash in spec["remote_hashes"]:
+      store_path = resolve_store_path(self.architecture, pkg_hash)
+      if glob.glob(os.path.join(self.workdir, store_path, "%s-*.tar.gz" % p)):
+        debug("Reusing existing tarball for %s@%s", p, pkg_hash)
+        have_tarball = True
+        break
 
-    # If we already have a tarball with the same hash, don't even check S3.
-    if glob.glob(os.path.join(self.workdir, spec["remote_store_path"],
-                              "%s-*.tar.gz" % p)):
-      debug("Reusing existing tarball for %s@%s", p, spec["remote_revision_hash"])
-    else:
+    for pkg_hash in spec["remote_hashes"]:
+      if have_tarball:
+        break
+      store_path = resolve_store_path(self.architecture, pkg_hash)
+
       # We don't already have a tarball with the hash that we need, so download
       # the first existing one from the remote, if possible. (Downloading more
       # than one is a waste of time as they should be equivalent and we only
       # ever use one anyway.)
-      for tarball in self._s3_listdir(spec["remote_store_path"]):
+      for tarball in self._s3_listdir(store_path):
         debug("Fetching tarball %s", tarball)
+        # Create containing directory locally. (exist_ok= is python3-specific.)
+        os.makedirs(os.path.join(self.workdir, store_path), exist_ok=True)
         self.s3.download_file(Bucket=self.remoteStore, Key=tarball,
-                              Filename=os.path.join(self.workdir,
-                                                    spec["remote_tar_hash_dir"],
+                              Filename=os.path.join(self.workdir, store_path,
                                                     os.path.basename(tarball)))
+        have_tarball = True  # break out of outer loop
         break
-      else:
-        debug("Remote has no tarballs for %s@%s", p, spec["remote_revision_hash"])
+
+    if not have_tarball:
+      debug("Remote has no tarballs for %s with hashes %s", p,
+            ", ".join(spec["remote_hashes"]))
+
+    links_path = resolve_links_path(self.architecture, p)
+    os.makedirs(os.path.join(self.workdir, links_path), exist_ok=True)
 
     # Remove existing symlinks: we'll fetch the ones from the remote next.
-    parent = os.path.join(self.workdir, spec["remote_tar_link_dir"])
+    parent = os.path.join(self.workdir, links_path)
     for fname in os.listdir(parent):
       path = os.path.join(parent, fname)
       if os.path.islink(path):
@@ -425,26 +452,28 @@ class Boto3RemoteSync:
     # Fetch symlink manifest and create local symlinks to match.
     debug("Fetching symlink manifest")
     n_symlinks = 0
-    for line in self.s3.get_object(
-        Bucket=self.remoteStore, Key=spec["remote_links_path"] + ".manifest"
-    )["Body"].iter_lines():
-      link_name, has_sep, target = line.rstrip(b"\n").partition(b"\t")
-      if not has_sep:
-        debug("Ignoring malformed line in manifest: %r", line)
-        continue
-      if not target.startswith(b"../../"):
-        target = b"../../" + target
-      target = os.fsdecode(target)
-      link_path = os.path.join(self.workdir, spec["remote_tar_link_dir"],
-                               os.fsdecode(link_name))
-      dieOnError(execute("ln -sf {} {}".format(target, link_path)),
-                 "Unable to create symlink {} -> {}".format(link_name, target))
-      n_symlinks += 1
-    debug("Got %d entries in manifest", n_symlinks)
+    try:
+      manifest = self.s3.get_object(Bucket=self.remoteStore, Key=links_path + ".manifest")
+    except ClientError as exc:
+      debug("Could not fetch manifest: %s", exc)
+    else:
+      for line in manifest["Body"].iter_lines():
+        link_name, has_sep, target = line.rstrip(b"\n").partition(b"\t")
+        if not has_sep:
+          debug("Ignoring malformed line in manifest: %r", line)
+          continue
+        if not target.startswith(b"../../"):
+          target = b"../../" + target
+        target = os.fsdecode(target)
+        link_path = os.path.join(self.workdir, links_path, os.fsdecode(link_name))
+        dieOnError(execute("ln -sf {} {}".format(target, link_path)),
+                  "Unable to create symlink {} -> {}".format(link_name, target))
+        n_symlinks += 1
+      debug("Got %d entries in manifest", n_symlinks)
 
     # Create remote symlinks that aren't in the manifest yet.
     debug("Looking for symlinks not in manifest")
-    for link_key in self._s3_listdir(spec["remote_links_path"]):
+    for link_key in self._s3_listdir(links_path):
       link_path = os.path.join(self.workdir, link_key)
       if os.path.islink(link_path):
         continue
@@ -461,8 +490,10 @@ class Boto3RemoteSync:
       return
     tarballNameWithRev = ("{package}-{version}-{revision}.{architecture}.tar.gz"
                           .format(architecture=self.architecture, **spec))
-    tar_path = os.path.join(spec["remote_store_path"], tarballNameWithRev)
-    link_path = os.path.join(spec["remote_links_path"], tarballNameWithRev)
+    tar_path = os.path.join(resolve_store_path(self.architecture, spec["hash"]),
+                            tarballNameWithRev)
+    link_path = os.path.join(resolve_links_path(self.architecture, p),
+                             tarballNameWithRev)
     tar_exists = self._s3_key_exists(tar_path)
     link_exists = self._s3_key_exists(link_path)
     if tar_exists and link_exists:
@@ -473,7 +504,7 @@ class Boto3RemoteSync:
               tar_path if tar_exists else link_path,
               link_path if tar_exists else tar_path)
     debug("Uploading tarball and symlink for %s %s-%s (%s) to S3",
-          p, spec["version"], spec["revision"], spec["remote_revision_hash"])
+          p, spec["version"], spec["revision"], spec["hash"])
     self.s3.upload_file(Bucket=self.writeStore, Key=tar_path,
                         Filename=os.path.join(self.workdir, tar_path))
     self.s3.put_object(Bucket=self.writeStore, Key=link_path,

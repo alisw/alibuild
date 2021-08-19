@@ -8,3 +8,5 @@ _site
 .rubyversion
 *,cover
 .coverage
+# For unit tests
+build.log

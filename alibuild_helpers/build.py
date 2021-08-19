@@ -9,6 +9,7 @@ from alibuild_helpers.log import debug, error, info, banner, warning
 from alibuild_helpers.log import dieOnError
 from alibuild_helpers.cmd import execute, getStatusOutputBash, BASH
 from alibuild_helpers.utilities import star, prunePaths
+from alibuild_helpers.utilities import resolve_store_path
 from alibuild_helpers.utilities import format, dockerStatusOutput, parseDefaults, readDefaults
 from alibuild_helpers.utilities import getPackageList
 from alibuild_helpers.utilities import validateDefaults
@@ -34,7 +35,6 @@ except ImportError:
 
 import socket
 import os
-import ssl
 import re
 import shutil
 import sys
@@ -115,50 +115,102 @@ def storeHashes(package, specs, isDevelPkg, considerRelocation):
     # subsequent calculations.
     return
 
-  h = Hasher()
-  dh = Hasher()
-
-  for x in ["recipe", "version", "package", "commit_hash",
-            "env", "append_path", "prepend_path"]:
-    if sys.version_info[0] < 3 and x in spec and type(spec[x]) == OrderedDict:
-      # Python 2: use YAML dict order to prevent changing hashes
-      h(str(yaml.safe_load(yamlDump(spec[x]))))
-    else:
-      h(str(spec.get(x, "none")))
-
-  # If the commit hash is a real hash, and not a tag, we can safely assume
-  # that's unique, and therefore we can avoid putting the repository or the
-  # name of the branch in the hash.
-  if spec["commit_hash"] == spec.get("tag", "0"):
-    h(spec.get("source", "none"))
-    if "source" in spec:
-      h(spec["tag"])
-
-  for dep in spec.get("requires", []):
-    # At this point, our dependencies have a single hash, local or remote.
-    h(specs[dep]["hash"])
-    dh(specs[dep]["hash"] + specs[dep].get("devel_hash", ""))
+  # For now, all the hashers share data -- they'll be split below.
+  h_all = Hasher()
 
   if spec.get("force_rebuild", False):
-    h(str(time.time()))
+    h_all(str(time.time()))
+
+  def hash_data_for_key(key):
+    if sys.version_info[0] < 3 and key in spec and isinstance(spec[key], OrderedDict):
+      # Python 2: use YAML dict order to prevent changing hashes
+      return str(yaml.safe_load(yamlDump(spec[x])))
+    else:
+      return str(spec.get(x, "none"))
+
+  for x in ("recipe", "version", "package"):
+    h_all(hash_data_for_key(x))
+
+  # commit_hash could be a commit hash (if we're not building a tag, but
+  # instead e.g. a branch or particular commit specified by its hash), or it
+  # could be a tag name (if we're building a tag). We want to calculate the
+  # hash for both cases, so that if we build some commit, we want to be able to
+  # reuse tarballs from other builds of the same commit, even if it was
+  # referred to differently in the other build.
+  debug("Base git ref is %s", spec["commit_hash"])
+  h_default = h_all.copy()
+  h_default(spec["commit_hash"])
+  try:
+    # If spec["commit_hash"] is a tag, get the actual git commit hash.
+    real_commit_hash = spec["git_refs"]["refs/tags/" + spec["commit_hash"]]
+  except KeyError:
+    # If it's not a tag, assume it's an actual commit hash.
+    real_commit_hash = spec["commit_hash"]
+  # Get any other git tags that refer to the same commit. We do not consider
+  # branches, as their heads move, and that will cause problems.
+  debug("Real commit hash is %s, storing alternative", real_commit_hash)
+  h_real_commit = h_all.copy()
+  h_real_commit(real_commit_hash)
+  h_alternatives = [(spec.get("tag", "0"), spec["commit_hash"], h_default),
+                    (spec.get("tag", "0"), real_commit_hash, h_real_commit)]
+  for ref, git_hash in spec.get("git_refs", {}).items():
+    if ref.startswith("refs/tags/") and git_hash == real_commit_hash:
+      tag_name = ref[len("refs/tags/"):]
+      debug("Tag %s also points to %s, storing alternative",
+            tag_name, real_commit_hash)
+      hasher = h_all.copy()
+      hasher(tag_name)
+      h_alternatives.append((tag_name, git_hash, hasher))
+
+  # Now that we've split the hasher with the real commit hash off from the ones
+  # with a tag name, h_all has to add the data to all of them separately.
+  def h_all(data):  # pylint: disable=function-redefined
+    for _, _, hasher in h_alternatives:
+      hasher(data)
+
+  for x in ("env", "append_path", "prepend_path"):
+    h_all(hash_data_for_key(x))
+
+  for tag, commit_hash, hasher in h_alternatives:
+    # If the commit hash is a real hash, and not a tag, we can safely assume
+    # that's unique, and therefore we can avoid putting the repository or the
+    # name of the branch in the hash.
+    if commit_hash == tag:
+      hasher(spec.get("source", "none"))
+      if "source" in spec:
+        hasher(tag)
+
+  dh = Hasher()
+  for dep in spec.get("requires", []):
+    # At this point, our dependencies have a single hash, local or remote.
+    h_all(specs[dep]["hash"])
+    dh(specs[dep]["hash"] + specs[dep].get("devel_hash", ""))
 
   if isDevelPkg and "incremental_recipe" in spec:
-    h(spec["incremental_recipe"])
+    h_all(spec["incremental_recipe"])
     ih = Hasher()
     ih(spec["incremental_recipe"])
     spec["incremental_hash"] = ih.hexdigest()
   elif isDevelPkg:
-    h(spec.get("devel_hash"))
+    h_all(spec.get("devel_hash"))
 
   if considerRelocation and "relocate_paths" in spec:
-    h("relocate:"+" ".join(sorted(spec["relocate_paths"])))
+    h_all("relocate:"+" ".join(sorted(spec["relocate_paths"])))
 
-  spec["remote_revision_hash"] = h.hexdigest()
   spec["deps_hash"] = dh.hexdigest()
+  spec["remote_revision_hash"] = h_default.hexdigest()
+  # Store hypothetical hashes of this spec if we were building it using other
+  # tags that refer to the same commit that we're actually building. These are
+  # later used when fetching from the remote store. The "primary" hash should
+  # be the first in the list, so it's checked first by the remote stores.
+  spec["remote_hashes"] = [spec["remote_revision_hash"]] + \
+    list({h.hexdigest() for _, _, h in h_alternatives} - {spec["remote_revision_hash"]})
   # The local hash must differ from the remote hash to avoid conflicts where
   # the remote has a package with the same hash as an existing local revision.
-  h("local")
-  spec["local_revision_hash"] = h.hexdigest()
+  h_all("local")
+  spec["local_revision_hash"] = h_default.hexdigest()
+  spec["local_hashes"] = [spec["local_revision_hash"]] + \
+    list({h.hexdigest() for _, _, h, in h_alternatives} - {spec["local_revision_hash"]})
 
 
 def doBuild(args, parser):
@@ -311,15 +363,17 @@ def doBuild(args, parser):
       updateReferenceRepoSpec(args.referenceSources, p, specs[p], args.fetchRepos, not args.docker)
 
       # Retrieve git heads
-      cmd = "git ls-remote --heads %s" % (specs[p].get("reference", specs[p]["source"]))
+      cmd = "git ls-remote --heads --tags %s" % (specs[p].get("reference", specs[p]["source"]))
       if specs[p]["package"] in develPkgs:
          specs[p]["source"] = join(os.getcwd(), specs[p]["package"])
-         cmd = "git ls-remote --heads %s" % specs[p]["source"]
+         cmd = "git ls-remote --heads --tags %s" % specs[p]["source"]
       debug("Executing %s", cmd)
       err, output = getStatusOutputBash(cmd)
       if err:
         raise RuntimeError("Error on '%s': %s" % (cmd, output))
-      specs[p]["git_heads"] = output.split("\n")
+      specs[p]["git_refs"] = {git_ref: git_hash for git_hash, sep, git_ref in
+                              (line.partition("\t") for line in output.splitlines())
+                              if sep}
       return "ok"
     future_to_download = {executor.submit(downloadTask, p): p for p in [p for p in buildOrder if "source" in specs[p]]}
     for future in concurrent.futures.as_completed(future_to_download):
@@ -339,39 +393,39 @@ def doBuild(args, parser):
     if "source" in spec:
       # Tag may contain date params like %(year)s, %(month)s, %(day)s, %(hour).
       spec["tag"] = resolve_tag(spec)
-      # By default we assume tag is a commit hash. We then try to find
-      # out if the tag is actually a branch and we use the tip of the branch
-      # as commit_hash. Finally if the package is a development one, we use the
-      # name of the branch as commit_hash.
-      spec["commit_hash"] = spec["tag"]
-      for head in spec["git_heads"]:
-        if head.endswith("refs/heads/{0}".format(spec["tag"])) or spec["package"] in develPkgs:
-          spec["commit_hash"] = head.split("\t", 1)[0]
-          # We are in development mode, we need to rebuild if the commit hash
-          # is different and if there are extra changes on to.
-          if spec["package"] in develPkgs:
-            # Devel package: we get the commit hash from the checked source, not from remote.
-            cmd = "cd %s && git rev-parse HEAD" % spec["source"]
-            err, out = getstatusoutput(cmd)
-            dieOnError(err, "Unable to detect current commit hash.")
-            spec["commit_hash"] = out.strip()
-            cmd = "cd %s && git diff -r HEAD && git status --porcelain" % spec["source"]
-            h = Hasher()
-            err = execute(cmd, lambda s, *a: h(s % a))
-            debug("Command %s returned %d", cmd, err)
-            dieOnError(err, "Unable to detect source code changes.")
-            spec["devel_hash"] = spec["commit_hash"] + h.hexdigest()
-            cmd = "cd %s && git rev-parse --abbrev-ref HEAD" % spec["source"]
-            err, out = getstatusoutput(cmd)
-            if out == "HEAD":
-              err, out = getstatusoutput("cd %s && git rev-parse HEAD" % spec["source"])
-              out = out[0:10]
-            if err:
-              return (error, "Error, unable to lookup changes in development package %s. Is it a git clone?" % spec["source"], 1)
-            develPackageBranch = out.replace("/", "-")
-            spec["tag"] = args.develPrefix if "develPrefix" in args else develPackageBranch
-            spec["commit_hash"] = "0"
-          break
+      # First, we try to resolve the "tag" as a branch name, and use its tip as
+      # the commit_hash. If it's not a branch, it must be a tag or a raw commit
+      # hash, so we use it directly. Finally if the package is a development
+      # one, we use the name of the branch as commit_hash.
+      assert "git_refs" in spec
+      try:
+        spec["commit_hash"] = spec["git_refs"]["refs/heads/" + spec["tag"]]
+      except KeyError:
+        spec["commit_hash"] = spec["tag"]
+      # We are in development mode, we need to rebuild if the commit hash is
+      # different or if there are extra changes on top.
+      if spec["package"] in develPkgs:
+        # Devel package: we get the commit hash from the checked source, not from remote.
+        cmd = "cd %s && git rev-parse HEAD" % spec["source"]
+        err, out = getstatusoutput(cmd)
+        dieOnError(err, "Unable to detect current commit hash.")
+        spec["commit_hash"] = out.strip()
+        cmd = "cd %s && git diff -r HEAD && git status --porcelain" % spec["source"]
+        h = Hasher()
+        err = execute(cmd, lambda s, *a: h(s % a))
+        debug("Command %s returned %d", cmd, err)
+        dieOnError(err, "Unable to detect source code changes.")
+        spec["devel_hash"] = spec["commit_hash"] + h.hexdigest()
+        cmd = "cd %s && git rev-parse --abbrev-ref HEAD" % spec["source"]
+        err, out = getstatusoutput(cmd)
+        if out == "HEAD":
+          err, out = getstatusoutput("cd %s && git rev-parse HEAD" % spec["source"])
+          out = out[0:10]
+        if err:
+          return (error, "Error, unable to lookup changes in development package %s. Is it a git clone?" % spec["source"], 1)
+        develPackageBranch = out.replace("/", "-")
+        spec["tag"] = args.develPrefix if "develPrefix" in args else develPackageBranch
+        spec["commit_hash"] = "0"
 
     # Version may contain date params like tag, plus %(commit_hash)s,
     # %(short_hash)s and %(tag)s.
@@ -471,30 +525,8 @@ def doBuild(args, parser):
     debug("develPkgs = %r", develPkgs)
     storeHashes(p, specs, isDevelPkg=p in develPkgs,
                 considerRelocation=args.architecture.startswith("osx"))
-    debug("Hashes for recipe %s are %s (remote), %s (local)",
-          p, spec["remote_revision_hash"], spec["local_revision_hash"])
-
-    # This adds to the spec where it should find, locally or remotely the
-    # various tarballs and links.
-    pkgSpec = {
-      "workDir": workDir,
-      "package": spec["package"],
-      "version": spec["version"],
-      "remote_revision_hash": spec["remote_revision_hash"],
-      "remote_prefix": spec["remote_revision_hash"][0:2],
-      "local_revision_hash": spec["local_revision_hash"],
-      "local_prefix": spec["local_revision_hash"][0:2],
-      "architecture": args.architecture
-    }
-    spec.update({k: v % pkgSpec for k, v in (
-      ("remote_store_path", "TARS/%(architecture)s/store/%(remote_prefix)s/%(remote_revision_hash)s"),
-      ("remote_links_path", "TARS/%(architecture)s/%(package)s"),
-      ("remote_tar_hash_dir",
-       "%(workDir)s/TARS/%(architecture)s/store/%(remote_prefix)s/%(remote_revision_hash)s"),
-      ("local_tar_hash_dir",
-       "%(workDir)s/TARS/%(architecture)s/store/%(local_prefix)s/%(local_revision_hash)s"),
-      ("remote_tar_link_dir", "%(workDir)s/TARS/%(architecture)s/%(package)s"),
-    )})
+    debug("Hashes for recipe %s are %s (remote); %s (local)", p,
+          ", ".join(spec["remote_hashes"]), ", ".join(spec["local_hashes"]))
 
     if spec["package"] in develPkgs and getattr(syncHelper, "writeStore", None):
       warning("Disabling remote write store from now since %s is a development package.", spec["package"])
@@ -572,11 +604,12 @@ def doBuild(args, parser):
                        v=spec["version"])
       m = re.match(matcher, realPath)
       if not m:
+        warning("Symlink %s -> %s couldn't be parsed", d, realPath)
         continue
       h, revision = m.groups()
 
-      if not (("local" in revision and h == spec["local_revision_hash"]) or
-              ("local" not in revision and h == spec["remote_revision_hash"])):
+      if not (("local" in revision and h in spec["local_hashes"]) or
+              ("local" not in revision and h in spec["remote_hashes"])):
         # This tarball's hash doesn't match what we need. Remember that its
         # revision number is taken, in case we assign our own later.
         if revision.startswith(revisionPrefix) and revision[len(revisionPrefix):].isdigit():
@@ -588,11 +621,15 @@ def doBuild(args, parser):
       # Don't re-use local revisions when we have a read-write store, so that
       # packages we'll upload later don't depend on local revisions.
       if getattr(syncHelper, "writeStore", False) and "local" in revision:
+        debug("Skipping revision %s because we want to upload later", revision)
         continue
 
       # If we have an hash match, we use the old revision for the package
       # and we do not need to build it.
       spec["revision"] = revision
+      # Remember what hash we're actually using.
+      spec["local_revision_hash" if revision.startswith("local")
+           else "remote_revision_hash"] = h
       if spec["package"] in develPkgs and "incremental_recipe" in spec:
         spec["obsolete_tarball"] = d
       else:
@@ -632,10 +669,8 @@ def doBuild(args, parser):
     # the proper hash and tarball directory.
     if spec["revision"].startswith("local"):
       spec["hash"] = spec["local_revision_hash"]
-      spec["tar_hash_dir"] = spec["local_tar_hash_dir"]
     else:
       spec["hash"] = spec["remote_revision_hash"]
-      spec["tar_hash_dir"] = spec["remote_tar_hash_dir"]
     spec["old_devel_hash"] = readHashFile(join(
       workDir, "BUILD", spec["hash"], spec["package"], ".build_succeeded"))
 
@@ -753,13 +788,14 @@ def doBuild(args, parser):
     # directory contains files with non-ASCII names, e.g. Golang/Boost.
     shutil.rmtree(dirname(hashFile).encode("utf-8"), True)
 
-    debug("Looking for cached tarball in %s", spec["tar_hash_dir"])
+    tar_hash_dir = os.path.join(workDir, resolve_store_path(args.architecture, spec["hash"]))
+    debug("Looking for cached tarball in %s", tar_hash_dir)
     # FIXME: I should get the tar_hash_dir updated with server at this point.
     #        It does not really matter that the symlinks are ok at this point
     #        as I only used the tarballs as reusable binary blobs.
     spec["cachedTarball"] = ""
     if not spec["package"] in develPkgs:
-      tarballs = glob(join(spec["tar_hash_dir"], "*gz"))
+      tarballs = glob(os.path.join(tar_hash_dir, "*gz"))
       spec["cachedTarball"] = tarballs[0] if len(tarballs) else ""
       debug("Found tarball in %s" % spec["cachedTarball"]
             if spec["cachedTarball"] else "No cache tarballs found")
