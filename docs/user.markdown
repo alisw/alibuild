@@ -87,9 +87,10 @@ where `<uri>` can be:
 * a local path, for instance `/opt/alibuild_cache`,
 * a remote SSH accessible path, `ssh://<host>:<path>`,
 * an unencrypted rsync path, `rsync://<host>/path`,
+* a CERN S3 bucket, `b3://<bucket>`,
 * a HTTP(s) server, `http://<host>/<path>`.
 
-The first three options can also be writable (if you have proper permissions):
+The first four options can also be writable (if you have proper permissions):
 if you specify `::rw` at the end of the URL, your builds will be cached there.
 This is normally what sysadmins do to precache builds: other users can simply
 use the same URL in read-only mode (no `::rw` specified) to fetch the builds.
@@ -100,6 +101,17 @@ course.
 It is also possible to specify a write store different from the read one by
 using the `--write-store` option.
 
+aliBuild can reuse precompiled packages if they were built with a different tag,
+if that tag points to the same actual commit that you're building now. (This is
+used for the nightly tags, as they are built from a branch named
+`rc/nightly-YYYYMMDD`, while alidist is updated to have a tag like
+`nightly-YYYYMMDD` instead, pointing to the same commit.) However, this reuse
+only works if the precompiled package has the same version as specified in your
+copy of alidist.
+
+This approach assumes that tags don't move (i.e. don't change which commit they
+are tagging) in the repositories being built. If you administer a cache store,
+make sure to delete cached tarballs built using that tag if a tag is moved!
 
 ## Developing packages locally
 
