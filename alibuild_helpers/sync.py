@@ -334,7 +334,8 @@ class S3RemoteSync:
     if not self.writeStore:
       return
     execute("""\
-    find '{w}/{t}' -type l | while read -r x; do
+    cd {w} || exit 1
+    find {t} -type l | while read -r x; do
       hashedurl=$(readlink "$x" | sed 's|.*/[.][.]/TARS|TARS|') || exit 1
       echo $hashedurl |
         s3cmd put --skip-existing -q -P -s \
