@@ -40,12 +40,6 @@ import shutil
 import sys
 import time
 
-def gzip():
-  return getstatusoutput("which pigz")[0] and "gzip" or "pigz"
-
-def tar():
-  return getstatusoutput("tar --ignore-failed-read -cvvf /dev/null /dev/zero")[0] and "tar" or "tar --ignore-failed-read"
-
 def writeAll(fn, txt):
   f = open(fn, "w")
   f.write(txt)
@@ -263,6 +257,15 @@ def doBuild(args, parser):
   debug("Using %sBuild from %sbuild@%s recipes in %sdist@%s",
         star(), star(), getDirectoryHash(dirname(__file__)), star(),
         os.environ["ALIBUILD_ALIDIST_HASH"])
+
+  def get_status(cmd):
+    if dockerImage is not None:
+      err, _ = dockerStatusOutput(cmd, dockerImage, executor=getStatusOutputBash)
+    else:
+      err, _ = getstatusoutput(cmd)
+    return err
+  my_gzip = "pigz" if get_status("which pigz") == 0 else "gzip"
+  my_tar = "tar --ignore-failed-read" if get_status("tar --ignore-failed-read -cvvf /dev/null /dev/zero") == 0 else "tar"
 
   (systemPackages, ownPackages, failed, validDefaults) = getPackageList(packages                = packages,
                                                                         specs                   = specs,
@@ -959,8 +962,8 @@ def doBuild(args, parser):
       ("GIT_COMMITTER_NAME", "unknown"),
       ("GIT_COMMITTER_EMAIL", "unknown"),
       ("GIT_TAG", spec["tag"]),
-      ("MY_GZIP", gzip()),
-      ("MY_TAR", tar()),
+      ("MY_GZIP", my_gzip),
+      ("MY_TAR", my_tar),
       ("INCREMENTAL_BUILD_HASH", spec.get("incremental_hash", "0")),
       ("JOBS", str(args.jobs)),
       ("PKGHASH", spec["hash"]),
