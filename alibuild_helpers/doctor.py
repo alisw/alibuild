@@ -94,7 +94,7 @@ def doctorArgParser(parser):
   parser.add_argument("--docker-image", dest="dockerImage",
                       help="Image to use in case you build with docker (implies --docker)")
   parser.add_argument("--chdir", "-C", help="Change to the specified directory first",
-                      metavar="DIR", dest="chdir", default=os.environ.get("ALIBUILD_CHDIR", "."))
+                      metavar="DIR", dest="chdir", default=os.environ.get("ALIBUILD_CHDIR") or ".")
   return parser
 
 def doDoctor(args, parser):

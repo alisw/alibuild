@@ -14,11 +14,11 @@ except ImportError:
 from os.path import abspath, dirname, basename
 import sys
 
-# Default workdir: fall back on "sw" if env is not set
-DEFAULT_WORK_DIR = os.environ.get("ALIBUILD_WORK_DIR", os.environ.get("ALICE_WORK_DIR", "sw"))
+# Default workdir: fall back on "sw" if env is not set or empty
+DEFAULT_WORK_DIR = os.environ.get("ALIBUILD_WORK_DIR") or os.environ.get("ALICE_WORK_DIR") or "sw"
 
 # cd to this directory before start
-DEFAULT_CHDIR = os.environ.get("ALIBUILD_CHDIR", ".")
+DEFAULT_CHDIR = os.environ.get("ALIBUILD_CHDIR") or "."
 
 def csv_list(s):
   return s.split(',')
