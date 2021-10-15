@@ -211,6 +211,8 @@ On Mac, x86-64:
    Big Sur: osx_arm64
 """
 
+S3_SUPPORTED_ARCHS = "slc7_x86-64", "slc8_x86-64", "ubuntu2004_x86-64"
+
 def finaliseArgs(args, parser, star):
 
   # Nothing to finalise for version or analytics
@@ -236,7 +238,7 @@ def finaliseArgs(args, parser, star):
     args.configDir = format(args.configDir, prefix="")
 
     # On selected platforms, caching is active by default
-    if args.architecture in ("slc7_x86-64", "ubuntu2004_x86-64") and not args.preferSystem:
+    if args.architecture in S3_SUPPORTED_ARCHS and not args.preferSystem:
       args.noSystem = True
       if not args.remoteStore:
         args.remoteStore = "https://s3.cern.ch/swift/v1/alibuild-repo"
