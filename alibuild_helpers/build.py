@@ -207,6 +207,21 @@ def storeHashes(package, specs, isDevelPkg, considerRelocation):
     list({h.hexdigest() for _, _, h, in h_alternatives} - {spec["local_revision_hash"]})
 
 
+def better_tarball(spec, old, new):
+  """Return which tarball we should prefer to reuse."""
+  if not old: return new
+  if not new: return old
+  old_rev, old_hash, _ = old
+  new_rev, new_hash, _ = new
+  old_is_local, new_is_local = old_rev.startswith("local"), new_rev.startswith("local")
+  # If one is local and one is remote, return the remote one.
+  if old_is_local and not new_is_local: return new
+  if new_is_local and not old_is_local: return old
+  # Finally, return the one that appears in the list of hashes earlier.
+  hashes = spec["local_hashes" if old_is_local else "remote_hashes"]
+  return old if hashes.index(old_hash) < hashes.index(new_hash) else new
+
+
 def doBuild(args, parser):
   if args.remoteStore.startswith("http"):
     syncHelper = HttpRemoteSync(args.remoteStore, args.architecture, args.workDir, args.insecure)
@@ -595,24 +610,25 @@ def doBuild(args, parser):
     if spec["package"] == mainPackage:
       mainBuildFamily = spec["build_family"]
 
+    candidate = None
     busyRevisions = set()
     # We can tell that the remote store is read-only if it has an empty or
     # no writeStore property. See below for explanation of why we need this.
     revisionPrefix = "" if getattr(syncHelper, "writeStore", "") else "local"
-    for d in packages:
-      realPath = readlink(d)
+    for symlink in packages:
+      realPath = readlink(symlink)
       matcher = format("../../%(a)s/store/[0-9a-f]{2}/([0-9a-f]*)/%(p)s-%(v)s-((?:local)?[0-9]*).%(a)s.tar.gz$",
                        a=args.architecture,
                        p=spec["package"],
                        v=spec["version"])
-      m = re.match(matcher, realPath)
-      if not m:
-        warning("Symlink %s -> %s couldn't be parsed", d, realPath)
+      match = re.match(matcher, realPath)
+      if not match:
+        warning("Symlink %s -> %s couldn't be parsed", symlink, realPath)
         continue
-      h, revision = m.groups()
+      rev_hash, revision = match.groups()
 
-      if not (("local" in revision and h in spec["local_hashes"]) or
-              ("local" not in revision and h in spec["remote_hashes"])):
+      if not (("local" in revision and rev_hash in spec["local_hashes"]) or
+              ("local" not in revision and rev_hash in spec["remote_hashes"])):
         # This tarball's hash doesn't match what we need. Remember that its
         # revision number is taken, in case we assign our own later.
         if revision.startswith(revisionPrefix) and revision[len(revisionPrefix):].isdigit():
@@ -628,45 +644,40 @@ def doBuild(args, parser):
         continue
 
       # If we have an hash match, we use the old revision for the package
-      # and we do not need to build it.
-      spec["revision"] = revision
-      # Remember what hash we're actually using.
-      spec["local_revision_hash" if revision.startswith("local")
-           else "remote_revision_hash"] = h
-      if spec["package"] in develPkgs and "incremental_recipe" in spec:
-        spec["obsolete_tarball"] = d
-      else:
-        debug("Package %s with hash %s is already found in %s. Not building.", p, h, d)
-        src = format("%(v)s-%(r)s",
-                     w=workDir,
-                     v=spec["version"],
-                     r=spec["revision"])
-        dst1 = format("%(w)s/%(a)s/%(p)s/latest-%(bf)s",
-                      w=workDir,
-                      a=args.architecture,
-                      p=spec["package"],
-                      bf=spec["build_family"])
-        dst2 = format("%(w)s/%(a)s/%(p)s/latest",
-                      w=workDir,
-                      a=args.architecture,
-                      p=spec["package"])
+      # and we do not need to build it. Because we prefer reusing remote
+      # revisions, only store a local revision if there is no other candidate
+      # for reuse yet.
+      candidate = better_tarball(spec, candidate, (revision, rev_hash, symlink))
 
-        getstatusoutput("ln -snf %s %s" % (src, dst1))
-        getstatusoutput("ln -snf %s %s" % (src, dst2))
-        info("Using cached build for %s", p)
-      break
-
-    # If we aren't using an existing revision, assign the next free revision
-    # to this package. If we're not uploading it, name it localN to avoid
-    # interference with the remote store -- in case this package is built
-    # somewhere else, the next revision N might be assigned there, and would
-    # conflict with our revision N.
-    if "revision" not in spec:
+    try:
+      revision, rev_hash, symlink = candidate
+    except TypeError:  # raised if candidate is still None
+      # If we can't reuse an existing revision, assign the next free revision
+      # to this package. If we're not uploading it, name it localN to avoid
+      # interference with the remote store -- in case this package is built
+      # somewhere else, the next revision N might be assigned there, and would
+      # conflict with our revision N.
       # The code finding busyRevisions above already ensures that revision
       # numbers start with revisionPrefix, and has left us plain ints.
       spec["revision"] = revisionPrefix + str(
         min(set(range(1, max(busyRevisions) + 2)) - busyRevisions)
         if busyRevisions else 1)
+    else:
+      spec["revision"] = revision
+      # Remember what hash we're actually using.
+      spec["local_revision_hash" if revision.startswith("local")
+           else "remote_revision_hash"] = rev_hash
+      if spec["package"] in develPkgs and "incremental_recipe" in spec:
+        spec["obsolete_tarball"] = symlink
+      else:
+        debug("Package %s with hash %s is already found in %s. Not building.",
+              p, rev_hash, symlink)
+        getstatusoutput(
+          "ln -snf {v}-{r} {w}/{a}/{p}/latest-{bf};"
+          "ln -snf {v}-{r} {w}/{a}/{p}/latest".format(
+            v=spec["version"], r=spec["revision"], w=workDir,
+            a=args.architecture, p=spec["package"], bf=spec["build_family"]))
+        info("Using cached build for %s", p)
 
     # Now we know whether we're using a local or remote package, so we can set
     # the proper hash and tarball directory.
