@@ -126,7 +126,7 @@ class SyncTestCase(unittest.TestCase):
             sync.RsyncRemoteSync(remoteStore="ssh://localhost/test",
                                  writeStore="ssh://localhost/test",
                                  architecture=ARCHITECTURE,
-                                 workdir="/sw", rsyncOptions=""),
+                                 workdir="/sw"),
             sync.S3RemoteSync(remoteStore="s3://localhost",
                               writeStore="s3://localhost",
                               architecture="slc7_x86-64",
