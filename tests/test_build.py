@@ -215,11 +215,12 @@ class BuildTestCase(unittest.TestCase):
     @patch("alibuild_helpers.build.glob")
     @patch("alibuild_helpers.build.readlink", new=dummy_readlink)
     @patch("alibuild_helpers.build.banner", new=MagicMock(return_value=None))
-    @patch("alibuild_helpers.build.debug", new=MagicMock(return_value=None))
+    @patch("alibuild_helpers.build.debug")
     @patch("alibuild_helpers.build.getStatusOutputBash", new=dummy_getStatusOutputBash)
     @patch("alibuild_helpers.workarea.is_writeable", new=MagicMock(return_value=True))
     @patch("alibuild_helpers.build.basename", new=MagicMock(return_value="aliBuild"))
-    def test_coverDoBuild(self, mock_glob, mock_sys, mock_sync_execute, mock_workarea_execute, mock_execute):
+    def test_coverDoBuild(self, mock_debug, mock_glob, mock_sys, mock_sync_execute, mock_workarea_execute, mock_execute):
+        mock_debug.side_effect = lambda *args: None
         mock_glob.side_effect = lambda x: {
             "*": ["zlib"],
             "/sw/TARS/osx_x86-64/defaults-release/defaults-release-v1-*.osx_x86-64.tar.gz": ["/sw/TARS/osx_x86-64/defaults-release/defaults-release-v1-1.osx_x86-64.tar.gz"],
@@ -268,17 +269,22 @@ class BuildTestCase(unittest.TestCase):
 
         mock_git_clone.reset_mock()
         mock_git_fetch.reset_mock()
-        fmt, msg, code = doBuild(args, mock_parser)
+        mock_debug.reset_mock()
+        exit_code = doBuild(args, mock_parser)
+        self.assertEqual(exit_code, 0)
+        mock_debug.assert_called_with("Everything done")
         mock_git_clone.assert_called_once()
         mock_git_fetch.assert_not_called()
 
         # Force fetching repos
         mock_git_clone.reset_mock()
         mock_git_fetch.reset_mock()
+        mock_debug.reset_mock()
         args.fetchRepos = True
-        fmt, msg, code = doBuild(args, mock_parser)
+        exit_code = doBuild(args, mock_parser)
+        self.assertEqual(exit_code, 0)
+        mock_debug.assert_called_with("Everything done")
         mock_glob.assert_called_with("/sw/TARS/osx_x86-64/ROOT/ROOT-v6-08-30-*.osx_x86-64.tar.gz")
-        self.assertEqual(msg, "Everything done")
         mock_git_clone.assert_called_once()
         mock_git_fetch.assert_called_once()
 
