@@ -222,14 +222,25 @@ class RsyncRemoteSync:
     debug("Updating remote store for package %s with hashes %s", p,
           ", ".join(spec["remote_hashes"]))
     err = execute("""\
-    rsync -av --delete {remoteStore}/{linksPath}/ {workDir}/{linksPath}/ || :
+    rsync -rlvW --delete {remoteStore}/{linksPath}/ {workDir}/{linksPath}/ || :
     for storePath in {storePaths}; do
-      mkdir -p {workDir}/$storePath
-      # If we transferred at least one file, quit. This assumes that the remote
-      # doesn't have empty dirs under TARS/<arch>/store/.
-      rsync -av {remoteStore}/$storePath/ {workDir}/$storePath/ && break || :
+      # Only get the first matching tarball. If there are multiple with the
+      # same hash, we only need one and they should be interchangable.
+      if tars=$(rsync -s --list-only "{remoteStore}/$storePath/{pkg}-{ver}-*.{arch}.tar.gz" 2>/dev/null) &&
+         # Strip away the metadata in rsync's file listing, leaving only the first filename.
+         tar=$(echo "$tars" | sed -rn '1s#[- a-z0-9,/]* [0-9]{{2}}:[0-9]{{2}}:[0-9]{{2}} ##p') &&
+         mkdir -p "{workDir}/$storePath" &&
+         # If we already have a file with the same name, assume it's up to date
+         # with the remote. In reality, we'll have unpacked, relocated and
+         # repacked the tarball from the remote, so the file differs, but
+         # there's no point in downloading the one from the remote again.
+         rsync -vW --ignore-existing "{remoteStore}/$storePath/$tar" "{workDir}/$storePath/"
+      then
+        break
+      fi
     done
-    """.format(remoteStore=self.remoteStore,
+    """.format(pkg=p, ver=spec["version"], arch=self.architecture,
+               remoteStore=self.remoteStore,
                workDir=self.workdir,
                linksPath=resolve_links_path(self.architecture, p),
                storePaths=" ".join(resolve_store_path(self.architecture, pkg_hash)
