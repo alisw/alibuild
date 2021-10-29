@@ -212,26 +212,24 @@ class HttpRemoteSync:
 class RsyncRemoteSync:
   """Helper class to sync package build directory using RSync."""
 
-  def __init__(self, remoteStore, writeStore, architecture, workdir, rsyncOptions):
+  def __init__(self, remoteStore, writeStore, architecture, workdir):
     self.remoteStore = re.sub("^ssh://", "", remoteStore)
     self.writeStore = re.sub("^ssh://", "", writeStore)
     self.architecture = architecture
-    self.rsyncOptions = rsyncOptions
     self.workdir = workdir
 
   def syncToLocal(self, p, spec):
     debug("Updating remote store for package %s with hashes %s", p,
           ", ".join(spec["remote_hashes"]))
     err = execute("""\
-    rsync -av --delete {ro} {remoteStore}/{linksPath}/ {workDir}/{linksPath}/ || :
+    rsync -av --delete {remoteStore}/{linksPath}/ {workDir}/{linksPath}/ || :
     for storePath in {storePaths}; do
       mkdir -p {workDir}/$storePath
       # If we transferred at least one file, quit. This assumes that the remote
       # doesn't have empty dirs under TARS/<arch>/store/.
-      rsync -av {ro} {remoteStore}/$storePath/ {workDir}/$storePath/ && break || :
+      rsync -av {remoteStore}/$storePath/ {workDir}/$storePath/ && break || :
     done
-    """.format(ro=self.rsyncOptions,
-               remoteStore=self.remoteStore,
+    """.format(remoteStore=self.remoteStore,
                workDir=self.workdir,
                linksPath=resolve_links_path(self.architecture, p),
                storePaths=" ".join(resolve_store_path(self.architecture, pkg_hash)
@@ -245,11 +243,10 @@ class RsyncRemoteSync:
                                 architecture=self.architecture,
                                 **spec)
     cmd = format("cd %(workdir)s && "
-                 "rsync -avR %(rsyncOptions)s --ignore-existing %(storePath)s/%(tarballNameWithRev)s  %(remoteStore)s/ &&"
-                 "rsync -avR %(rsyncOptions)s --ignore-existing %(linksPath)s/%(tarballNameWithRev)s  %(remoteStore)s/",
+                 "rsync -avR --ignore-existing %(storePath)s/%(tarballNameWithRev)s  %(remoteStore)s/ &&"
+                 "rsync -avR --ignore-existing %(linksPath)s/%(tarballNameWithRev)s  %(remoteStore)s/",
                  workdir=self.workdir,
                  remoteStore=self.remoteStore,
-                 rsyncOptions=self.rsyncOptions,
                  storePath=resolve_store_path(self.architecture, spec["hash"]),
                  linksPath=resolve_links_path(self.architecture, p),
                  tarballNameWithRev=tarballNameWithRev)
@@ -259,8 +256,8 @@ class RsyncRemoteSync:
   def syncDistLinksToRemote(self, link_dir):
     if not self.writeStore:
       return
-    execute("cd {w} && rsync -avR {o} --ignore-existing {t}/ {rs}/".format(
-      w=self.workdir, rs=self.writeStore, o=self.rsyncOptions, t=link_dir))
+    execute("cd {w} && rsync -avR --ignore-existing {t}/ {rs}/".format(
+      w=self.workdir, rs=self.writeStore, t=link_dir))
 
 
 class S3RemoteSync:

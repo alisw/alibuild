@@ -217,7 +217,7 @@ def doBuild(args, parser):
     syncHelper = Boto3RemoteSync(args.remoteStore, args.writeStore,
                                  args.architecture, args.workDir)
   elif args.remoteStore:
-    syncHelper = RsyncRemoteSync(args.remoteStore, args.writeStore, args.architecture, args.workDir, "")
+    syncHelper = RsyncRemoteSync(args.remoteStore, args.writeStore, args.architecture, args.workDir)
   else:
     syncHelper = NoRemoteSync()
 
