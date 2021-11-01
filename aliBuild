@@ -81,9 +81,8 @@ def doMain(args, parser):
     exit(0)
 
   if args.action == "build":
-    printer, msg, code = doBuild(args, parser)
-    printer(msg)
-    exit(code)
+    sys.exit(doBuild(args, parser))
+
 
 if __name__ == "__main__":
   args, parser = doParseArgs(star())
