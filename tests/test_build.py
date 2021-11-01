@@ -107,7 +107,7 @@ TEST_EXTRA_BUILD_HASH = ("9f9eb8696b7722df52c4703f5fe7acc4b8000ba2" if sys.versi
 def dummy_getstatusoutput(x):
     if re.match("/bin/bash --version", x):
         return (0, "GNU bash, version 3.2.57(1)-release (x86_64-apple-darwin17)\nCopyright (C) 2007 Free Software Foundation, Inc.\n")
-    if re.match("(mkdir -p|ln -snf) [^;]+$", x):
+    if re.match("(mkdir -p|ln -snf) [^;]+(;ln -snf [^;]+)*$", x):
         return (0, "")
     return {
         "GIT_DIR=/alidist/.git git rev-parse HEAD": (0, "6cec7b7b3769826219dfa85e5daa6de6522229a0"),
