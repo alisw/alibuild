@@ -61,16 +61,19 @@ class SyncTestCase(unittest.TestCase):
         raise NotImplementedError(url)
 
     @patch("alibuild_helpers.sync.open", new=lambda fn, mode: BytesIO())
-    @patch("os.rename", new=lambda old, new: None)
-    @patch("alibuild_helpers.sync.execute", new=lambda cmd, printer=None: 0)
+    @patch("os.path.isfile", new=MagicMock(return_value=False))
+    @patch("os.rename", new=MagicMock(return_value=None))
+    @patch("alibuild_helpers.sync.execute", new=MagicMock(return_value=None))
     @patch("alibuild_helpers.sync.debug")
     @patch("alibuild_helpers.sync.error")
     @patch("requests.Session.get")
     def test_http_remote(self, mock_get, mock_error, mock_debug):
+        """Test HTTPS remote store."""
         mock_get.side_effect = self.mock_get
         syncer = sync.HttpRemoteSync(remoteStore="https://localhost/test",
                                      architecture=ARCHITECTURE,
                                      workdir="/sw", insecure=False)
+        syncer.httpBackoff = 0  # speed up tests
 
         mock_error.reset_mock()
         self.spec["hash"] = self.spec["remote_revision_hash"] = GOOD_HASH
@@ -113,6 +116,7 @@ class SyncTestCase(unittest.TestCase):
     @patch("alibuild_helpers.sync.execute", new=lambda cmd, printer=None: 0)
     @patch("alibuild_helpers.sync.os")
     def test_sync(self, mock_os):
+        """Check NoRemoteSync, rsync:// and s3:// remote stores."""
         # file does not exist locally: force download
         mock_os.path.exists.side_effect = lambda path: False
         mock_os.path.islink.side_effect = lambda path: False
@@ -194,14 +198,14 @@ class Boto3TestCase(unittest.TestCase):
             get_object=get_object,
         )
 
+    @unittest.skipIf(sys.version_info < (3, 6), "Only works on python3.6+")
     @patch("alibuild_helpers.sync.execute", new=lambda cmd, printer=None: 0)
     @patch("alibuild_helpers.sync.glob.glob", new=lambda path: [])
     @patch("alibuild_helpers.sync.os.listdir", new=lambda path: [])
     @patch("alibuild_helpers.sync.Boto3RemoteSync._s3_init", new=lambda _: None)
     @patch("alibuild_helpers.sync.os")
     def test_boto3(self, mock_os):
-        if sys.version_info < (3, 6):
-            return
+        """Test b3:// remote store."""
         # file does not exist locally: force download
         mock_os.path.exists.side_effect = lambda path: False
         mock_os.path.islink.side_effect = lambda path: False
@@ -221,4 +225,4 @@ class Boto3TestCase(unittest.TestCase):
 
 
 if __name__ == '__main__':
-  unittest.main()
+    unittest.main()
