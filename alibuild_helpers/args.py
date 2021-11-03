@@ -77,6 +77,8 @@ def doParseArgs(star):
   build_parser.add_argument("--remote-store", dest="remoteStore", default="",
                             help="Where to find packages already built for reuse."
                                  "Use ssh:// in front for remote store. End with ::rw if you want to upload.")
+  build_parser.add_argument("--no-remote-store", action="store_true",
+                            help="Disable the use of the remote store, even if it is enabled by default.")
   build_parser.add_argument("--write-store", dest="writeStore", default="",
                             help="Where to upload the built packages for reuse."
                                  "Use ssh:// in front for remote store.")
@@ -238,10 +240,12 @@ def finaliseArgs(args, parser, star):
     args.configDir = format(args.configDir, prefix="")
 
     # On selected platforms, caching is active by default
-    if args.architecture in S3_SUPPORTED_ARCHS and not args.preferSystem:
+    if args.architecture in S3_SUPPORTED_ARCHS and not args.preferSystem and not args.no_remote_store:
       args.noSystem = True
       if not args.remoteStore:
         args.remoteStore = "https://s3.cern.ch/swift/v1/alibuild-repo"
+    elif args.no_remote_store:
+      args.remoteStore = ""
 
     if args.remoteStore or args.writeStore:
       args.noSystem = True
