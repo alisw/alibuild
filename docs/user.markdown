@@ -8,63 +8,98 @@ layout: main
 
 For a quick start introduction, please look [here](./quick.html).
 
-    usage: alibuild [-h] [--config-dir CONFIGDIR] [--no-local NODEVEL] [--docker]
-                    [--work-dir WORKDIR] [--architecture ARCHITECTURE]
-                    [-e ENVIRONMENT] [-v VOLUMES] [--jobs JOBS]
-                    [--reference-sources REFERENCESOURCES]
-                    [--remote-store REMOTESTORE] [--write-store WRITESTORE]
-                    [--disable PACKAGE] [--defaults [FILE]]
-                    [--always-prefer-system] [--no-system]
-                    [--force-unknown-architecture] [--insecure]
-                    [--aggressive-cleanup] [--debug] [--no-auto-cleanup]
-                    [--devel-prefix [DEVELPREFIX]] [--dist DIST]
-                    [--dry-run] [--fetch-repos|-u]
-                    {init,build,clean} [pkgname]
+```
+aliBuild build [-h] [--defaults DEFAULT]
+               [-a ARCH] [--force-unknown-architecture]
+               [-z [DEVELPREFIX]] [-e ENVIRONMENT] [-j JOBS] [-u]
+               [--no-local PKGLIST] [--disable PACKAGE]
+               [--always-prefer-system | --no-system]
+               [--docker] [--docker-image IMAGE] [--docker-extra-args ARGLIST] [-v VOLUMES]
+               [--no-remote-store] [--remote-store STORE] [--write-store STORE] [--insecure] 
+               [-C DIR] [-w WORKDIR] [-c CONFIGDIR] [--reference-sources MIRRORDIR]
+               [--aggressive-cleanup] [--no-auto-cleanup]
+               PACKAGE [PACKAGE ...]
+```
 
-    positional arguments:
-      {init,build,clean}    what alibuild should do
-      pkgname               One (or more) of the packages in `alidist'
+- `PACKAGE`: One of the packages in `CONFIGDIR`. May be specified multiple
+  times.
+- `-h`, `--help`: show this help message and exit
+- `--defaults DEFAULT`: Use defaults from `CONFIGDIR/defaults-DEFAULT.sh`.
+- `-a ARCH`, `--architecture ARCH`: Build as if on the specified architecture.
+  When used with `--docker`, build inside a Docker image for the specified
+  architecture. Default is the current system architecture.
+- `--force-unknown-architecture`: Build on this system, even if it doesn't have
+  a supported architecture.
+- `-z [DEVELPREFIX]`, `--devel-prefix [DEVELPREFIX]`: Version name to use for
+  development packages. Defaults to branch name.
+- `-e ENVIRONMENT`: KEY=VALUE binding to add to the build environment. May be
+  specified multiple times.
+- `-j JOBS`, `--jobs JOBS`: The number of parallel compilation processes to run.
+- `-u`, `--fetch-repos`: Fetch updates to repositories in `MIRRORDIR`. Required
+  but nonexistent repositories are always cloned, even if this option is not
+  given.
+- `--no-local PKGLIST`: Do not pick up the following packages from a local
+  checkout. `PKGLIST` is a comma-separated list.
+- `--disable PACKAGE`: Do not build `PACKAGE` and all its (unique) dependencies.
+- `--always-prefer-system`: Always use system packages when compatible.
+- `--no-system`: Never use system packages, even if compatible.
 
-    optional arguments:
-      -h, --help            show this help message and exit
-      --config-dir CONFIGDIR, -c CONFIGDIR
-      --no-local NODEVEL    Do not pick up the following packages from a local
-                            checkout.
-      --docker
-      --work-dir WORKDIR, -w WORKDIR
-      --architecture ARCHITECTURE, -a ARCHITECTURE
-      -e ENVIRONMENT
-      -v VOLUMES            Specify volumes to be used in Docker
-      --jobs JOBS, -j JOBS
-      --reference-sources REFERENCESOURCES
-      --remote-store REMOTESTORE
-                            Where to find packages already built for reuse.Use
-                            ssh:// in front for remote store. End with ::rw if you
-                            want to upload.
-      --write-store WRITESTORE
-                            Where to upload the built packages for reuse.Use
-                            ssh:// in front for remote store.
-      --disable PACKAGE     Do not build PACKAGE and all its (unique)
-                            dependencies.
-      --defaults [FILE]     Specify which defaults to use
-      --always-prefer-system
-                            Always use system packages when compatible
-      --no-system           Never use system packages
-      --force-unknown-architecture
-                            Do not check for valid architecture
-      --insecure            Do not check for valid certificates
-      --aggressive-cleanup  Perform additional cleanups
-      --debug, -d
-      --no-auto-cleanup     Do not cleanup build by products automatically
-      --devel-prefix [DEVELPREFIX], -z [DEVELPREFIX]
-                            Version name to use for development packages. Defaults
-                            to branch name.
-      --dist DIST           Prepare development mode by downloading the given
-                            recipes set ([user/repo@]branch)
-      --dry-run, -n         Prints what would happen, without actually doing the
-                            build.
-      --fetch-repos, -u     Fetch repository updates
+### Building inside a container
 
+Builds can be done inside a Docker container, to make it easier to get a common,
+usable environment. The Docker daemon must be installed and running on your
+system. By default, images from `alisw/<platform>-builder:latest` will be used,
+e.g. `alisw/slc8-builder:latest`. They will be fetched if unavailable.
+
+- `--docker`: Build inside a Docker container.
+- `--docker-image IMAGE`: The Docker image to build inside of. Implies
+  `--docker`. By default, an image is chosen based on the architecture.
+- `--docker-extra-args ARGLIST`: Command-line arguments to pass to `docker run`.
+  Passed through verbatim -- separate multiple arguments with spaces, and make
+  sure quoting is correct! Implies `--docker`.
+- `-v VOLUMES`: Additional volume to be mounted inside the Docker container, if
+  one is used. May be specified multiple times. Passed verbatim to `docker run`.
+
+### Re-using prebuilt tarballs
+
+Reusing prebuilt tarballs saves compilation time, as common packages need not be
+rebuilt from scratch. `rsync://`, `https://`, `b3://` and `s3://` remote stores
+are recognised. Some of these require credentials: `s3://` remotes require an
+`~/.s3cfg`; `b3://` remotes require `AWS_ACCESS_KEY_ID` and
+`AWS_SECRET_ACCESS_KEY` environment variables. A useful remote store is
+`https://s3.cern.ch/swift/v1/alibuild-repo`. It requires no credentials and
+provides tarballs for the most common supported architectures.
+
+- `--no-remote-store`: Disable the use of the remote store, even if it is
+  enabled by default.
+- `--remote-store STORE`: Where to find prebuilt tarballs to reuse. See above
+  for available remote stores. End with `::rw` if you want to upload (in that
+  case, `::rw` is stripped and `--write-store` is set to the same value).
+  Implies `--no-system`. May be set to a default store on some architectures;
+  use `--no-remote-store` to disable it in that case.
+- `--write-store STORE`: Where to upload newly built packages. Same syntax as
+  `--remote-store`, except `::rw` is not recognised. Implies `--no-system`.
+- `--insecure`: Don't validate TLS certificates when connecting to an `https://`
+  remote store.
+
+### Customise aliBuild directories
+
+- `-C DIR`, `--chdir DIR`: Change to the specified directory before building.
+  Alternatively, set `ALIBUILD_CHDIR`. Default `.`.
+- `-w WORKDIR`, `--work-dir WORKDIR` The toplevel directory under which builds
+  should be done and build results should be installed. Default `sw`.
+- `-c CONFIGDIR`, `--config-dir CONFIGDIR`: The directory containing build
+  recipes. Default `alidist`.
+- `--reference-sources MIRRORDIR`: The directory where reference git
+  repositories will be cloned. `%(workDir)s` will be substituted by `WORKDIR`.
+  Default `%(workDir)s/MIRROR`.
+
+### Cleaning up after building
+
+- `--aggressive-cleanup`: Delete as much build data as possible when cleaning
+  up.
+- `--no-auto-cleanup`: Do not clean up build directories automatically after a
+  build.
 
 ## Using precompiled packages
 
