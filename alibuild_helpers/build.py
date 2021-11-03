@@ -4,6 +4,7 @@ try:
   from commands import getstatusoutput
 except ImportError:
   from subprocess import getstatusoutput
+from alibuild_helpers import __version__
 from alibuild_helpers.analytics import report_event
 from alibuild_helpers.log import debug, error, info, banner, warning
 from alibuild_helpers.log import dieOnError
@@ -52,12 +53,8 @@ def readHashFile(fn):
     return "0"
 
 def getDirectoryHash(d):
-  if exists(join(d, ".git")):
-    err, out = getstatusoutput("GIT_DIR=%s/.git git rev-parse HEAD" % d)
-    dieOnError(err, "Impossible to find reference for %s " % d)
-  else:
-    err, out = getstatusoutput("pip --disable-pip-version-check show alibuild | grep -e \"^Version:\" | sed -e 's/.* //'")
-    dieOnError(err, "Impossible to find reference for %s " % d)
+  err, out = getstatusoutput("cd %s && git rev-parse HEAD" % d)
+  dieOnError(err, "Impossible to find reference for %s" % d)
   return out
 
 # Creates a directory in the store which contains symlinks to the package
@@ -272,8 +269,7 @@ def doBuild(args, parser):
   debug("Building for architecture %s", args.architecture)
   debug("Number of parallel builds: %d", args.jobs)
   debug("Using %sBuild from %sbuild@%s recipes in %sdist@%s",
-        star(), star(), getDirectoryHash(dirname(__file__)), star(),
-        os.environ["ALIBUILD_ALIDIST_HASH"])
+        star(), star(), __version__, star(), os.environ["ALIBUILD_ALIDIST_HASH"])
 
   def get_status(cmd):
     if dockerImage is not None:
