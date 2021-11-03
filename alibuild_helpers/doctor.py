@@ -8,10 +8,9 @@ except ImportError:
 import logging
 from alibuild_helpers.log import debug, error, banner, info, success, warning
 from alibuild_helpers.log import logger
-from alibuild_helpers.utilities import getPackageList, format, detectArch, parseDefaults, readDefaults, validateDefaults
+from alibuild_helpers.utilities import getPackageList, parseDefaults, readDefaults, validateDefaults
 from alibuild_helpers.utilities import dockerStatusOutput
 from alibuild_helpers.cmd import getStatusOutputBash
-import subprocess
 
 def prunePaths(workDir):
   for x in ["PATH", "LD_LIBRARY_PATH", "DYLD_LIBRARY_PATH"]:
@@ -71,31 +70,6 @@ def systemInfo():
     err,out = getstatusoutput("cat "+f)
     if not err:
       debug("%s:\n%s", f, out)
-
-def doctorArgParser(parser):
-  parser.add_argument("-a", "--architecture", help="force architecture",
-                      dest="architecture", default=detectArch())
-  parser.add_argument("-c", "--config", help="path to alidist",
-                      dest="configDir", default="alidist")
-  parser.add_argument("-w", "--work-dir", help="path to work dir",
-                      dest="workDir", default="workDir")
-  parser.add_argument("--defaults", default="release",
-                      dest="defaults", help="Specify default to use")
-  parser.add_argument("--disable", dest="disable", default=[],
-                      metavar="PACKAGE", action="append",
-                      help="Do not build PACKAGE and all its (unique) dependencies.")
-  parser.add_argument("--always-prefer-system", dest="preferSystem", default=False,
-                      action="store_true", help="Always use system packages when compatible")
-  parser.add_argument("--no-system", dest="noSystem", default=False,
-                      action="store_true", help="Never use system packages")
-  parser.add_argument("packages", nargs="+", help="Package to test",
-                      default=[])
-  parser.add_argument("--docker", dest="docker", action="store_true", default=False)
-  parser.add_argument("--docker-image", dest="dockerImage",
-                      help="Image to use in case you build with docker (implies --docker)")
-  parser.add_argument("--chdir", "-C", help="Change to the specified directory first",
-                      metavar="DIR", dest="chdir", default=os.environ.get("ALIBUILD_CHDIR") or ".")
-  return parser
 
 def doDoctor(args, parser):
   if not exists(args.configDir):

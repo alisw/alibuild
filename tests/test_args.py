@@ -19,7 +19,7 @@ import traceback
 import shlex
 
 if (sys.version_info[0] >= 3):
-  BUILD_MISSING_PKG_ERROR = "the following arguments are required: pkgname"
+  BUILD_MISSING_PKG_ERROR = "the following arguments are required: PACKAGE"
   ANALYTICS_MISSING_STATE_ERROR = "the following arguments are required: state"
 else:
   BUILD_MISSING_PKG_ERROR = "too few arguments"
@@ -34,7 +34,6 @@ PARSER_ERRORS = {
   "builda --force-unknown-architecture zlib" : [call("argument action: invalid choice: 'builda' (choose from 'analytics', 'architecture', 'build', 'clean', 'deps', 'doctor', 'init', 'version')")],
   "build --force-unknown-architecture zlib --no-system --always-prefer-system" : [call('argument --always-prefer-system: not allowed with argument --no-system')],
   "build zlib --architecture foo": ARCHITECTURE_ERROR,
-  "clean --architecture foo": ARCHITECTURE_ERROR,
   "build --force-unknown-architecture zlib --remote-store rsync://test1.local/::rw --write-store rsync://test2.local/::rw ": [call('cannot specify ::rw and --write-store at the same time')],
   "build zlib -a osx_x86-64 --docker-image foo": [call('cannot use `-a osx_x86-64` and --docker')],
   "analytics": [call(ANALYTICS_MISSING_STATE_ERROR)]
@@ -51,7 +50,7 @@ CORRECT_BEHAVIOR = [
   ((), "build --force-unknown-architecture zlib"                                       , [("action", "build"), ("workDir", "sw"), ("referenceSources", "sw/MIRROR")]),
   ((), "init"                                                                          , [("action", "init"), ("workDir", "sw"), ("referenceSources", "sw/MIRROR")]),
   ((), "version"                                                                       , [("action", "version")]),
-  ((), "clean --force-unknown-architecture"                                            , [("action", "clean"), ("workDir", "sw"), ("referenceSources", "sw/MIRROR")]),
+  ((), "clean"                                                                         , [("action", "clean"), ("workDir", "sw")]),
   ((), "build --force-unknown-architecture -j 10 zlib"                                 , [("action", "build"), ("jobs", 10), ("pkgname", ["zlib"])]),
   ((), "build --force-unknown-architecture -j 10 zlib --disable gcc --disable foo"     , [("disable", ["gcc", "foo"])]),
   ((), "build --force-unknown-architecture -j 10 zlib --disable gcc --disable foo,bar" , [("disable", ["gcc", "foo", "bar"])]),
@@ -76,7 +75,7 @@ CORRECT_BEHAVIOR = [
   # With ALIBUILD_WORK_DIR and ALIBUILD_CHDIR set
   (("sw2", ".")    , "build --force-unknown-architecture zlib"                         , [("action", "build"), ("workDir", "sw2"), ("referenceSources", "sw2/MIRROR"), ("chdir", ".")]),
   (("sw3", "mydir"), "init"                                                            , [("action", "init"), ("workDir", "sw3"), ("referenceSources", "sw3/MIRROR"), ("chdir", "mydir")]),
-  (("sw", ".")     , "clean --force-unknown-architecture --chdir mydir2 --work-dir sw4", [("action", "clean"), ("workDir", "sw4"), ("referenceSources", "sw4/MIRROR"), ("chdir", "mydir2")]),
+  (("sw", ".")     , "clean --chdir mydir2 --work-dir sw4"                             , [("action", "clean"), ("workDir", "sw4"), ("chdir", "mydir2")]),
   (()              , "doctor zlib -C mydir -w sw2"                                     , [("action", "doctor"), ("workDir", "sw2"), ("chdir", "mydir")]),
   (()              , "deps zlib --outgraph graph.pdf"                                  , [("action", "deps"), ("outgraph", "graph.pdf")]),
 ]
