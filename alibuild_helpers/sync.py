@@ -222,6 +222,7 @@ class RsyncRemoteSync:
     debug("Updating remote store for package %s with hashes %s", p,
           ", ".join(spec["remote_hashes"]))
     err = execute("""\
+    mkdir -p {workDir}/{linksPath}
     rsync -rlvW --delete {remoteStore}/{linksPath}/ {workDir}/{linksPath}/ || :
     for storePath in {storePaths}; do
       # Only get the first matching tarball. If there are multiple with the
