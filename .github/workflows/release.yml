@@ -35,9 +35,9 @@ jobs:
         run: |
           set -x
           cd "$(dirname "$(brew formula alibuild)")"
-          IFS=$'\n' read -r sha url < \
-            <(curl -fSsL "https://pypi.org/pypi/alibuild/${GITHUB_REF#refs/tags/}/json" |
-                jq -r '.urls[0] | (.digests.sha256, .url)')
+          json=$(curl -fSsL "https://pypi.org/pypi/alibuild/${GITHUB_REF#refs/tags/}/json")
+          sha=$(echo "$json" | jq -r '.urls[0].digests.sha256)
+          url=$(echo "$json" | jq -r '.urls[0].url)
           # Replace keys with two leading spaces only, so we get the toplevel
           # ones applying to alibuild, not those for dependencies.
           sed -i.bak "
