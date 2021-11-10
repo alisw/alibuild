@@ -235,7 +235,7 @@ EOF
       # Both libs and binaries: relocate LC_RPATH
       if otool -l "$PWD/$BIN" 2> /dev/null | grep -A2 LC_RPATH | grep path | grep -q $PKGHASH; then
         cat <<EOF >> "$INSTALLROOT/relocate-me.sh"
-OLD_RPATHS=\$(otool -l \$PP/$BIN | grep -A2 LC_RPATH | grep path | grep \$PH | sed -e 's|^.*path ||' -e 's| .*$||')
+OLD_RPATHS=\$(otool -l \$PP/$BIN | grep -A2 LC_RPATH | grep path | grep \$PH | sed -e 's|^.*path ||' -e 's| .*$||' | sort -u)
 for OLD_RPATH in \$OLD_RPATHS; do
   NEW_RPATH=\${OLD_RPATH/#*INSTALLROOT\/\$PH\/\$OP/\$WORK_DIR/\$PP}
   install_name_tool -rpath "\$OLD_RPATH" "\$NEW_RPATH" "\$PP/$BIN"
@@ -246,7 +246,7 @@ EOF
       # Both libs and binaries: relocate LC_LOAD_DYLIB
       if otool -l "$PWD/$BIN" 2> /dev/null | grep -A2 LC_LOAD_DYLIB | grep name | grep -q $PKGHASH; then
         cat <<EOF >> "$INSTALLROOT/relocate-me.sh"
-OLD_LOAD_DYLIBS=\$(otool -l \$PP/$BIN | grep -A2 LC_LOAD_DYLIB | grep name | grep \$PH | sed -e 's|^.*name ||' -e 's| .*$||')
+OLD_LOAD_DYLIBS=\$(otool -l \$PP/$BIN | grep -A2 LC_LOAD_DYLIB | grep name | grep \$PH | sed -e 's|^.*name ||' -e 's| .*$||' | sort -u)
 for OLD_LOAD_DYLIB in \$OLD_LOAD_DYLIBS; do
   NEW_LOAD_DYLIB=\${OLD_LOAD_DYLIB/#*INSTALLROOT\/\$PH\/\$OP/\$WORK_DIR/\$PP}
   install_name_tool -change "\$OLD_LOAD_DYLIB" "\$NEW_LOAD_DYLIB" "\$PP/$BIN"
