@@ -4,7 +4,7 @@ from alibuild_helpers import __version__
 from alibuild_helpers.analytics import report_event
 from alibuild_helpers.log import debug, error, info, banner, warning
 from alibuild_helpers.log import dieOnError
-from alibuild_helpers.cmd import execute, getstatusoutput, getStatusOutputBash, DockerRunner, BASH
+from alibuild_helpers.cmd import execute, getstatusoutput, DockerRunner, BASH
 from alibuild_helpers.utilities import star, prunePaths
 from alibuild_helpers.utilities import resolve_store_path
 from alibuild_helpers.utilities import format, parseDefaults, readDefaults
@@ -377,7 +377,7 @@ def doBuild(args, parser):
          specs[p]["source"] = join(os.getcwd(), specs[p]["package"])
          cmd = "git ls-remote --heads --tags %s" % specs[p]["source"]
       debug("Executing %s", cmd)
-      err, output = getStatusOutputBash(cmd)
+      err, output = getstatusoutput(cmd)
       if err:
         raise RuntimeError("Error on '%s': %s" % (cmd, output))
       specs[p]["git_refs"] = {git_ref: git_hash for git_hash, sep, git_ref in

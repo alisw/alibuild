@@ -1,5 +1,5 @@
 import sys
-from subprocess import Popen, PIPE, STDOUT
+from subprocess import Popen, PIPE
 try:
   from commands import getstatusoutput
 except ImportError:
@@ -45,14 +45,6 @@ def execute(command, printer=debug):
   if out:
     printer(out)
   return popen.returncode
-
-
-def getStatusOutputBash(command):
-  assert is_string(command), "only strings accepted as command"
-  popen = Popen([BASH, "-c", command], shell=False, stdout=PIPE, stderr=STDOUT,
-                universal_newlines=True)
-  out, _ = popen.communicate()
-  return popen.returncode, out
 
 
 class DockerRunner:
