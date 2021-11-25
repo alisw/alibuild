@@ -1,10 +1,6 @@
 #!/usr/bin/env python
 import subprocess, yaml
-try:
-  from commands import getstatusoutput
-except ImportError:
-  from subprocess import getstatusoutput
-from os.path import dirname, exists
+from os.path import exists
 import hashlib
 from glob import glob
 from os.path import basename, join
@@ -16,10 +12,9 @@ try:
   from collections import OrderedDict
 except ImportError:
   from ordereddict import OrderedDict
-try:
-  from shlex import quote  # Python 3.3+
-except ImportError:
-  from pipes import quote  # Python 2.7
+
+from alibuild_helpers.cmd import getstatusoutput
+
 
 class SpecError(Exception):
   pass
@@ -28,30 +23,10 @@ asList = lambda x : x if type(x) == list else [x]
 
 # Keep the linter happy
 if sys.version_info[0] >= 3:
-  basestring = None
   unicode = None
 
 def star():
   return re.sub("build.*$", "", basename(sys.argv[0]).lower())
-
-def is_string(s):
-  if sys.version_info[0] >= 3:
-    return isinstance(s, str)
-  return isinstance(s, basestring)
-
-def to_unicode(s):
-  if sys.version_info[0] >= 3:
-    if isinstance(s, bytes):
-      try:
-        return s.decode("utf-8")  # to get newlines as such and not as escaped \n
-      except:
-        return s.decode("latin-1")  # Workaround issue with some special characters of latin-1 which are not understood by unicode
-    return str(s)
-  elif isinstance(s, str):
-    return unicode(s, "utf-8")  # utf-8 is a safe assumption
-  elif not isinstance(s, unicode):
-    return unicode(str(s))
-  return s
 
 
 def resolve_store_path(architecture, spec_hash):
@@ -153,7 +128,19 @@ def validateDefaults(finalPkgSpec, defaults):
                    "\n".join([" - " + x for x in validDefaults])), validDefaults)
 
 def format(s, **kwds):
-  return to_unicode(s) % kwds
+  if sys.version_info[0] >= 3:
+    if isinstance(s, bytes):
+      try:
+        s = s.decode("utf-8")  # to get newlines as such and not as escaped \n
+      except:
+        s = s.decode("latin-1")  # Workaround issue with some special characters of latin-1 which are not understood by unicode
+    else:
+      s = str(s)
+  elif isinstance(s, str):
+    s = unicode(s, "utf-8")  # utf-8 is a safe assumption
+  elif not isinstance(s, unicode):
+    s = unicode(str(s))
+  return s % kwds
 
 def doDetectArch(hasOsRelease, osReleaseLines, platformTuple, platformSystem, platformProcessor):
   if platformSystem == "Darwin":
@@ -465,10 +452,6 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
     packages += spec["requires"]
   return (systemPackages, ownPackages, failedRequirements, validDefaults)
 
-def dockerStatusOutput(cmd, dockerImage=None, executor=getstatusoutput):
-  return executor("docker run --rm --entrypoint= {image} bash -c {command}"
-                  .format(image=dockerImage, command=quote(cmd))
-                  if dockerImage else cmd)
 
 class Hasher:
   def __init__(self):

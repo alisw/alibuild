@@ -1,11 +1,10 @@
 from alibuild_helpers.cmd import execute
-from alibuild_helpers.utilities import format
-from alibuild_helpers.utilities import parseRecipe, getPackageList, getRecipeReader, parseDefaults, readDefaults, validateDefaults
+from alibuild_helpers.utilities import format, parseRecipe, getPackageList, getRecipeReader, parseDefaults, readDefaults, validateDefaults
 from alibuild_helpers.log import debug, error, warning, banner, info
 from alibuild_helpers.log import dieOnError
 from alibuild_helpers.workarea import updateReferenceRepoSpec
 
-from os.path import abspath, basename, join
+from os.path import join
 import os.path as path
 import os, sys
 try:

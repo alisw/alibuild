@@ -1,16 +1,11 @@
 #!/usr/bin/env python
 import os, re, sys
 from os.path import exists, abspath, expanduser
-try:
-  from commands import getstatusoutput
-except ImportError:
-  from subprocess import getstatusoutput
 import logging
 from alibuild_helpers.log import debug, error, banner, info, success, warning
 from alibuild_helpers.log import logger
 from alibuild_helpers.utilities import getPackageList, parseDefaults, readDefaults, validateDefaults
-from alibuild_helpers.utilities import dockerStatusOutput
-from alibuild_helpers.cmd import getStatusOutputBash
+from alibuild_helpers.cmd import getstatusoutput, getStatusOutputBash, dockerStatusOutput
 
 def prunePaths(workDir):
   for x in ["PATH", "LD_LIBRARY_PATH", "DYLD_LIBRARY_PATH"]:

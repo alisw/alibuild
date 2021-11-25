@@ -9,13 +9,11 @@ except ImportError:
 
 import alibuild_helpers.args
 from alibuild_helpers.args import doParseArgs, matchValidArch, finaliseArgs, DEFAULT_WORK_DIR, DEFAULT_CHDIR, ARCHITECTURE_TABLE
-import argparse
 import sys
 import os
 import os.path
 
 import unittest
-import traceback
 import shlex
 
 if (sys.version_info[0] >= 3):

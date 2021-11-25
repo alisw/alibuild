@@ -1,10 +1,8 @@
 import logging
 import sys
 import re
-from os import getenv
-import socket, time
+import time
 import datetime
-from alibuild_helpers.utilities import format, to_unicode
 
 debug, error, warning, info, success = (None, None, None, None, None)
 
@@ -22,20 +20,19 @@ class LogFormatter(logging.Formatter):
                           logging.CRITICAL: "\033[1;37;41m",
                           logging.SUCCESS:  "\033[1;32m" } if sys.stdout.isatty() else {}
   def format(self, record):
-    record.msg = to_unicode(record.msg % record.args)
+    record.msg = record.msg % record.args
     if record.levelno == logging.BANNER and sys.stdout.isatty():
       lines = record.msg.split("\n")
       return "\n\033[1;34m==>\033[m \033[1m%s\033[m" % lines[0] + \
-             "".join([ "\n    \033[1m%s\033[m" % x for x in lines[1:] ])
+             "".join("\n    \033[1m%s\033[m" % x for x in lines[1:])
     elif record.levelno == logging.INFO or record.levelno == logging.BANNER:
       return record.msg
-    return "\n".join([ format(self.fmtstr,
-                              asctime = datetime.datetime.now().strftime("%Y-%m-%d@%H:%M:%S"),
-                              levelname=self.LEVEL_COLORS.get(record.levelno, self.COLOR_RESET) +
-                                        record.levelname +
-                                        self.COLOR_RESET,
-                              message=x)
-                       for x in record.msg.split("\n") ])
+    return "\n".join(self.fmtstr % {
+      "asctime": datetime.datetime.now().strftime("%Y-%m-%d@%H:%M:%S"),
+      "levelname": (self.LEVEL_COLORS.get(record.levelno, self.COLOR_RESET) +
+                    record.levelname + self.COLOR_RESET),
+      "message": x,
+    } for x in record.msg.split("\n"))
 
 class ProgressPrint:
   def __init__(self, begin_msg=""):
