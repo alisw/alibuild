@@ -2,10 +2,6 @@ from alibuild_helpers.log import dieOnError, debug
 from alibuild_helpers.cmd import execute
 from alibuild_helpers.git import partialCloneFilter
 from os.path import dirname, abspath
-try:
-  from commands import getstatusoutput
-except ImportError:
-  from subprocess import getstatusoutput
 from alibuild_helpers.utilities import format
 
 import os
