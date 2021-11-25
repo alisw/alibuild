@@ -31,11 +31,6 @@ def reference_basedir_exists(x):
     "sw/MIRROR": False
   }[x]
 
-def allow_directory_creation(x):
-  if x.startswith("mkdir"):
-    return (0, "")
-  return (1, "")
-
 def allow_git_clone(x, mock_git_clone, mock_git_fetch, **k):
   s = " ".join(x) if isinstance(x, list) else x
   if re.search("^git clone ", s):
@@ -46,19 +41,17 @@ def allow_git_clone(x, mock_git_clone, mock_git_fetch, **k):
 
 class WorkareaTestCase(unittest.TestCase):
 
-    @mock.patch("alibuild_helpers.workarea.getstatusoutput")
     @mock.patch("alibuild_helpers.workarea.execute")
     @mock.patch("alibuild_helpers.workarea.path")
     @mock.patch("alibuild_helpers.workarea.debug")
     @mock.patch("alibuild_helpers.workarea.os")
     @mock.patch("alibuild_helpers.workarea.is_writeable")
-    def test_referenceSourceExistsNonWriteable(self, mock_is_writeable, mock_os, mock_debug, mock_path, mock_execute, mock_getstatusoutput):
+    def test_referenceSourceExistsNonWriteable(self, mock_is_writeable, mock_os, mock_debug, mock_path, mock_execute):
       # Reference sources exists but cannot be written
       # The reference repo is set nevertheless but not updated
       mock_path.exists.side_effect = lambda x: True
       mock_is_writeable.side_effect = lambda x: False
       mock_os.path.join.side_effect = join
-      mock_getstatusoutput.side_effect = allow_directory_creation
       mock_git_clone = MagicMock(return_value=None)
       mock_git_fetch = MagicMock(return_value=None)
       mock_execute.side_effect = lambda x, **k: allow_git_clone(x, mock_git_clone, mock_git_fetch, *k)
@@ -75,19 +68,17 @@ class WorkareaTestCase(unittest.TestCase):
       self.assertEqual(spec.get("reference"), reference)
       self.assertEqual(True, call('Updating references.') in mock_debug.mock_calls)
 
-    @mock.patch("alibuild_helpers.workarea.getstatusoutput")
     @mock.patch("alibuild_helpers.workarea.execute")
     @mock.patch("alibuild_helpers.workarea.path")
     @mock.patch("alibuild_helpers.workarea.debug")
     @mock.patch("alibuild_helpers.workarea.os")
     @mock.patch("alibuild_helpers.workarea.is_writeable")
-    def test_referenceSourceExistsWriteable(self, mock_is_writeable, mock_os, mock_debug, mock_path, mock_execute, mock_getstatusoutput):
+    def test_referenceSourceExistsWriteable(self, mock_is_writeable, mock_os, mock_debug, mock_path, mock_execute):
       # Reference sources exists and can be written
       # The reference repo is set nevertheless but not updated
       mock_path.exists.side_effect = lambda x: True
       mock_is_writeable.side_effect = lambda x: True
       mock_os.path.join.side_effect = join
-      mock_getstatusoutput.side_effect = allow_directory_creation
       mock_git_clone = MagicMock(return_value=None)
       mock_git_fetch = MagicMock(return_value=None)
       mock_execute.side_effect = lambda x, **k: allow_git_clone(x, mock_git_clone, mock_git_fetch, *k)
@@ -104,13 +95,12 @@ class WorkareaTestCase(unittest.TestCase):
       self.assertEqual(spec.get("reference"), reference)
       self.assertEqual(True, call('Updating references.') in mock_debug.mock_calls)
 
-    @mock.patch("alibuild_helpers.workarea.getstatusoutput")
     @mock.patch("alibuild_helpers.workarea.execute")
     @mock.patch("alibuild_helpers.workarea.path")
     @mock.patch("alibuild_helpers.workarea.debug")
     @mock.patch("alibuild_helpers.workarea.os")
     @mock.patch("alibuild_helpers.workarea.is_writeable")
-    def test_referenceBasedirExistsWriteable(self, mock_is_writeable, mock_os, mock_debug, mock_path, mock_execute, mock_getstatusoutput):
+    def test_referenceBasedirExistsWriteable(self, mock_is_writeable, mock_os, mock_debug, mock_path, mock_execute):
       """
       The referenceSources directory exists and it's writeable
       Reference sources are already there
@@ -118,7 +108,6 @@ class WorkareaTestCase(unittest.TestCase):
       mock_path.exists.side_effect = lambda x: True
       mock_is_writeable.side_effect = lambda x: True
       mock_os.path.join.side_effect = join
-      mock_getstatusoutput.side_effect = allow_directory_creation
       mock_git_clone = MagicMock(return_value=None)
       mock_git_fetch = MagicMock(return_value=None)
       mock_execute.side_effect = lambda x, **k: allow_git_clone(x, mock_git_clone, mock_git_fetch, *k)
@@ -132,13 +121,12 @@ class WorkareaTestCase(unittest.TestCase):
       mock_os.makedirs.assert_called_with('%s/sw/MIRROR' % getcwd())
       self.assertEqual(mock_git_fetch.call_count, 1, "Expected one call to git fetch (called %d times instead)" % mock_git_fetch.call_count)
 
-    @mock.patch("alibuild_helpers.workarea.getstatusoutput")
     @mock.patch("alibuild_helpers.workarea.execute")
     @mock.patch("alibuild_helpers.workarea.path")
     @mock.patch("alibuild_helpers.workarea.debug")
     @mock.patch("alibuild_helpers.workarea.os")
     @mock.patch("alibuild_helpers.workarea.is_writeable")
-    def test_referenceBasedirNotExistsWriteable(self, mock_is_writeable, mock_os, mock_debug, mock_path, mock_execute, mock_getstatusoutput):
+    def test_referenceBasedirNotExistsWriteable(self, mock_is_writeable, mock_os, mock_debug, mock_path, mock_execute):
       """
       The referenceSources directory exists and it's writeable
       Reference sources are not already there
@@ -147,7 +135,6 @@ class WorkareaTestCase(unittest.TestCase):
       mock_is_writeable.side_effect = lambda x: False # not writeable
       mock_os.path.join.side_effect = join
       mock_os.makedirs.side_effect = lambda x: True
-      mock_getstatusoutput.side_effect = allow_directory_creation
       mock_git_clone = MagicMock(return_value=None)
       mock_git_fetch = MagicMock(return_value=None)
       mock_execute.side_effect = lambda x, **k: allow_git_clone(x, mock_git_clone, mock_git_fetch, *k)
@@ -162,13 +149,12 @@ class WorkareaTestCase(unittest.TestCase):
       mock_os.makedirs.assert_called_with('%s/sw/MIRROR' % getcwd())
       self.assertEqual(mock_git_clone.call_count, 0, "Expected no calls to git clone (called %d times instead)" % mock_git_clone.call_count)
 
-    @mock.patch("alibuild_helpers.workarea.getstatusoutput")
     @mock.patch("alibuild_helpers.workarea.execute")
     @mock.patch("alibuild_helpers.workarea.path")
     @mock.patch("alibuild_helpers.workarea.debug")
     @mock.patch("alibuild_helpers.workarea.os")
     @mock.patch("alibuild_helpers.workarea.is_writeable")
-    def test_referenceSourceNotExistsWriteable(self, mock_is_writeable, mock_os, mock_debug, mock_path, mock_execute, mock_getstatusoutput):
+    def test_referenceSourceNotExistsWriteable(self, mock_is_writeable, mock_os, mock_debug, mock_path, mock_execute):
       """
       The referenceSources directory does not exist and it's writeable
       Reference sources are not already there
@@ -177,7 +163,6 @@ class WorkareaTestCase(unittest.TestCase):
       mock_is_writeable.side_effect = lambda x: True  # is writeable
       mock_os.path.join.side_effect = join
       mock_os.makedirs.side_effect = lambda x: True
-      mock_getstatusoutput.side_effect = allow_directory_creation
       mock_git_clone = MagicMock(return_value=None)
       mock_git_fetch = MagicMock(return_value=None)
       mock_execute.side_effect = lambda x, **k: allow_git_clone(x, mock_git_clone, mock_git_fetch, *k)
