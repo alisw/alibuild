@@ -55,7 +55,35 @@ def getStatusOutputBash(command):
   return popen.returncode, out
 
 
-def dockerStatusOutput(cmd, dockerImage=None, executor=getstatusoutput):
-  return executor("docker run --rm --entrypoint= {image} bash -c {command}"
-                  .format(image=dockerImage, command=quote(cmd))
-                  if dockerImage else cmd)
+class DockerRunner:
+  """A context manager for running commands inside a Docker container.
+
+  If the Docker image given is None or empty, the commands are run on the host
+  instead.
+  """
+
+  def __init__(self, docker_image):
+    self._docker_image = docker_image
+    self._container = None
+
+  def __enter__(self):
+    if self._docker_image:
+      # "sleep inf" pauses forever, until we kill it.
+      self._container = getoutput(("docker", "run", "--detach", "--rm",
+                                   self._docker_image, "sleep", "inf")).strip()
+
+    def getstatusoutput_docker(cmd):
+      if self._container is None:
+        return getstatusoutput("{} -c {}".format(BASH, quote(cmd)))
+      return getstatusoutput("docker container exec {} bash -c {}"
+                             .format(quote(self._container), quote(cmd)))
+
+    return getstatusoutput_docker
+
+  def __exit__(self, exc_type, exc_value, traceback):
+    if self._container is not None:
+      # 'docker container stop' sends SIGTERM, which doesn't work on 'sleep'
+      # for some reason. Kill it directly instead, so we don't have to wait.
+      getstatusoutput("docker container kill " + quote(self._container))
+    self._container = None
+    return False   # propagate any exception that may have occurred

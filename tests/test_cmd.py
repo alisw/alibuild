@@ -5,7 +5,7 @@ try:
 except ImportError:
     import mock  # Python 2
 
-from alibuild_helpers.cmd import execute, dockerStatusOutput
+from alibuild_helpers.cmd import execute, DockerRunner
 
 import unittest
 
@@ -20,11 +20,24 @@ class CmdTestCase(unittest.TestCase):
         self.assertEqual(err, 127)
         self.assertEqual(mock_debug.mock_calls, [])
 
+    @mock.patch("alibuild_helpers.cmd.getoutput")
     @mock.patch("alibuild_helpers.cmd.getstatusoutput")
-    def test_dockerStatusOutput(self, mock_getstatusoutput):
-        dockerStatusOutput(cmd="echo foo", dockerImage="image", executor=mock_getstatusoutput)
-        self.assertEqual(mock_getstatusoutput.mock_calls,
-                         [mock.call("docker run --rm --entrypoint= image bash -c 'echo foo'")])
+    def test_DockerRunner(self, mock_getstatusoutput, mock_getoutput):
+        mock_getoutput.side_effect = lambda cmd: "container-id\n"
+        with DockerRunner("image") as getstatusoutput_docker:
+            mock_getoutput.assert_called_with(("docker", "run", "--detach", "--rm", "image", "sleep", "inf"))
+            getstatusoutput_docker("echo foo")
+            mock_getstatusoutput.assert_called_with("docker container exec container-id bash -c 'echo foo'")
+        mock_getstatusoutput.assert_called_with("docker container kill container-id")
+
+        mock_getoutput.reset_mock()
+        mock_getstatusoutput.reset_mock()
+        with DockerRunner("") as getstatusoutput_docker:
+            mock_getoutput.assert_not_called()
+            getstatusoutput_docker("echo foo")
+            mock_getstatusoutput.assert_called_with("/bin/bash -c 'echo foo'")
+            mock_getstatusoutput.reset_mock()
+        mock_getstatusoutput.assert_not_called()
 
 
 if __name__ == '__main__':

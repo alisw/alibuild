@@ -3,7 +3,7 @@
 from __future__ import print_function
 from alibuild_helpers.log import debug, error, info, dieOnError
 from alibuild_helpers.utilities import parseDefaults, readDefaults, getPackageList, validateDefaults, format
-from alibuild_helpers.cmd import getStatusOutputBash, dockerStatusOutput, execute
+from alibuild_helpers.cmd import DockerRunner, execute
 from tempfile import NamedTemporaryFile
 from os import remove
 
@@ -22,21 +22,23 @@ def doDeps(args, parser):
   specs = {}
   defaultsReader = lambda: readDefaults(args.configDir, args.defaults, parser.error, args.architecture)
   (err, overrides, taps) = parseDefaults(args.disable, defaultsReader, debug)
-  (systemPackages, ownPackages, failed, validDefaults) = \
-    getPackageList(packages                = [args.package],
-                   specs                   = specs,
-                   configDir               = args.configDir,
-                   preferSystem            = args.preferSystem,
-                   noSystem                = args.noSystem,
-                   architecture            = args.architecture,
-                   disable                 = args.disable,
-                   defaults                = args.defaults,
-                   performPreferCheck      = lambda pkg, cmd : dockerStatusOutput(cmd, dockerImage, executor = getStatusOutputBash),
-                   performRequirementCheck = lambda pkg, cmd : dockerStatusOutput(cmd, dockerImage, executor = getStatusOutputBash),
-                   performValidateDefaults = lambda spec : validateDefaults(spec, args.defaults),
-                   overrides               = overrides,
-                   taps                    = taps,
-                   log                     = debug)
+  with DockerRunner(dockerImage) as getstatusoutput_docker:
+    systemPackages, ownPackages, failed, validDefaults = \
+      getPackageList(packages                = [args.package],
+                     specs                   = specs,
+                     configDir               = args.configDir,
+                     preferSystem            = args.preferSystem,
+                     noSystem                = args.noSystem,
+                     architecture            = args.architecture,
+                     disable                 = args.disable,
+                     defaults                = args.defaults,
+                     performPreferCheck      = lambda pkg, cmd: getstatusoutput_docker(cmd),
+                     performRequirementCheck = lambda pkg, cmd: getstatusoutput_docker(cmd),
+                     performValidateDefaults = lambda spec: validateDefaults(spec, args.defaults),
+                     overrides               = overrides,
+                     taps                    = taps,
+                     log                     = debug)
+
   dieOnError(validDefaults and args.defaults not in validDefaults,
              "Specified default `%s' is not compatible with the packages you want to build.\n" % args.defaults +
              "Valid defaults:\n\n- " +
