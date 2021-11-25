@@ -129,8 +129,6 @@ def doDoctor(args, parser):
   systemInfo()
 
   specs = {}
-  def unreachable():
-    assert(False)
   defaultsReader = lambda : readDefaults(args.configDir, args.defaults, parser.error, args.architecture)
   (err, overrides, taps) = parseDefaults(args.disable, defaultsReader, info)
   if err:
@@ -151,7 +149,6 @@ def doDoctor(args, parser):
                                                             architecture            = args.architecture,
                                                             disable                 = args.disable,
                                                             defaults                = args.defaults,
-                                                            dieOnError              = lambda x, y : unreachable,
                                                             performPreferCheck      = lambda pkg, cmd : checkPreferSystem(pkg, cmd, homebrew_replacement, dockerImage),
                                                             performRequirementCheck = lambda pkg, cmd : checkRequirements(pkg, cmd, homebrew_replacement, dockerImage),
                                                             performValidateDefaults = performValidateDefaults,

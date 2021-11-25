@@ -284,7 +284,6 @@ def doBuild(args, parser):
                                                                         architecture            = args.architecture,
                                                                         disable                 = args.disable,
                                                                         defaults                = args.defaults,
-                                                                        dieOnError              = dieOnError,
                                                                         performPreferCheck      = lambda pkg, cmd : dockerStatusOutput(cmd, dockerImage, executor=getStatusOutputBash),
                                                                         performRequirementCheck = lambda pkg, cmd : dockerStatusOutput(cmd, dockerImage, executor=getStatusOutputBash),
                                                                         performValidateDefaults = lambda spec : validateDefaults(spec, args.defaults),
