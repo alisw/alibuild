@@ -1,17 +1,13 @@
 from os.path import abspath, exists, basename, dirname, join, realpath
 from os import makedirs, unlink, readlink, rmdir
-try:
-  from commands import getstatusoutput
-except ImportError:
-  from subprocess import getstatusoutput
 from alibuild_helpers import __version__
 from alibuild_helpers.analytics import report_event
 from alibuild_helpers.log import debug, error, info, banner, warning
 from alibuild_helpers.log import dieOnError
-from alibuild_helpers.cmd import execute, getStatusOutputBash, BASH
+from alibuild_helpers.cmd import execute, getstatusoutput, getStatusOutputBash, dockerStatusOutput, BASH
 from alibuild_helpers.utilities import star, prunePaths
 from alibuild_helpers.utilities import resolve_store_path
-from alibuild_helpers.utilities import format, dockerStatusOutput, parseDefaults, readDefaults
+from alibuild_helpers.utilities import format, parseDefaults, readDefaults
 from alibuild_helpers.utilities import getPackageList
 from alibuild_helpers.utilities import validateDefaults
 from alibuild_helpers.utilities import Hasher

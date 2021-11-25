@@ -4,17 +4,15 @@ import unittest
 
 # Assuming you are using the mock library to ... mock things
 try:
-    from unittest.mock import patch, call  # In Python 3, mock is built-in
+    from unittest.mock import patch  # In Python 3, mock is built-in
 except ImportError:
-    from mock import patch, call  # Python 2
+    from mock import patch  # Python 2
 
 from alibuild_helpers.utilities import doDetectArch, filterByArchitecture
 from alibuild_helpers.utilities import Hasher
 from alibuild_helpers.utilities import format
 from alibuild_helpers.utilities import asList
-from alibuild_helpers.utilities import dockerStatusOutput
 from alibuild_helpers.utilities import prunePaths
-from alibuild_helpers.utilities import to_unicode
 from alibuild_helpers.utilities import resolve_version
 import os
 
@@ -165,6 +163,14 @@ class TestUtilities(unittest.TestCase):
     self.assertEqual(format(b"%(foo)s", foo="foo"), "foo")
     self.assertRaises(KeyError, format, "%(foo)s", bar="foo")
 
+    t1 = "ताड़िद्दा"
+    t2 = u"\u0924\u093e\u0921\u093c\u093f\u0926\u094d\u0926\u093e"
+    self.assertTrue(format(t1) == t2)
+    self.assertTrue(format(t1) == format(t2))
+    self.assertTrue(format([1,2,3]) == u"[1, 2, 3]")
+    self.assertTrue(format({"a":-1}) == u"{'a': -1}")
+    self.assertTrue(format(123456) == u"123456")
+
   def test_asList(self):
     self.assertEqual(asList("a"), ["a"])
     self.assertEqual(asList(["a"]), ["a"])
@@ -177,12 +183,6 @@ class TestUtilities(unittest.TestCase):
     self.assertEqual(["AliRoot", "GCC"], list(filterByArchitecture("osx_x86-64", ["AliRoot:(?!slc6)", "GCC"])))
     self.assertEqual(["GCC"], list(filterByArchitecture("osx_x86-64", ["AliRoot:slc6", "GCC:osx"])))
     self.assertEqual([], list(filterByArchitecture("osx_x86-64", [])))
-
-  @patch("alibuild_helpers.utilities.getstatusoutput")
-  def test_dockerStatusOutput(self, mock_getstatusoutput):
-    cmd = dockerStatusOutput(cmd="echo foo", dockerImage="image", executor=mock_getstatusoutput)
-    self.assertEqual(mock_getstatusoutput.mock_calls,
-                     [call(u'docker run --rm --entrypoint= image bash -c \'echo foo\'')])
 
   def test_prunePaths(self):
     fake_env = {
@@ -214,15 +214,6 @@ class TestUtilities(unittest.TestCase):
       self.assertTrue(fake_env_copy["LD_LIBRARY_PATH"] == "/sw/lib")
       self.assertTrue(fake_env_copy["DYLD_LIBRARY_PATH"] == "/sw/lib")
       self.assertTrue(fake_env_copy["ALIBUILD_VERSION"] == "v1.0.0")
-
-  def test_to_unicode(self):
-    t1 = "ताड़िद्दा"
-    t2 = u"\u0924\u093e\u0921\u093c\u093f\u0926\u094d\u0926\u093e"
-    self.assertTrue(to_unicode(t1) == t2)
-    self.assertTrue(to_unicode(t1) == to_unicode(t2))
-    self.assertTrue(to_unicode([1,2,3]) == u"[1, 2, 3]")
-    self.assertTrue(to_unicode({"a":-1}) == u"{'a': -1}")
-    self.assertTrue(to_unicode(123456) == u"123456")
 
   def test_resolver(self):
     spec = {"package": "test-pkg",

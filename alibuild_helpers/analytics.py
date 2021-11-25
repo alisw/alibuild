@@ -1,12 +1,11 @@
 #!/usr/bin/env python
 import os, subprocess, sys
-try:
-  from commands import getstatusoutput
-except ImportError:
-  from subprocess import getstatusoutput
-from alibuild_helpers.log import debug, banner
 from os.path import exists, expanduser
 from os import unlink
+
+from alibuild_helpers.cmd import getstatusoutput
+from alibuild_helpers.log import debug, banner
+
 
 def generate_analytics_id():
   getstatusoutput("mkdir -p  ~/.config/alibuild")
