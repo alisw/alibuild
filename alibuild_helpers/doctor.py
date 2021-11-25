@@ -5,7 +5,7 @@ import logging
 from alibuild_helpers.log import debug, error, banner, info, success, warning
 from alibuild_helpers.log import logger
 from alibuild_helpers.utilities import getPackageList, parseDefaults, readDefaults, validateDefaults
-from alibuild_helpers.cmd import getstatusoutput, getStatusOutputBash, dockerStatusOutput
+from alibuild_helpers.cmd import getstatusoutput, DockerRunner
 
 def prunePaths(workDir):
   for x in ["PATH", "LD_LIBRARY_PATH", "DYLD_LIBRARY_PATH"]:
@@ -14,12 +14,12 @@ def prunePaths(workDir):
     workDirEscaped = re.escape("%s" % workDir) + "[^:]*:?"
     os.environ[x] = re.sub(workDirEscaped, "", os.environ[x])
 
-def checkPreferSystem(spec, cmd, homebrew_replacement, dockerImage):
+def checkPreferSystem(spec, cmd, homebrew_replacement, getstatusoutput_docker):
     if cmd == "false":
       debug("Package %s can only be managed via alibuild.", spec["package"])
       return (1, "")
     cmd = homebrew_replacement + cmd
-    err, out = dockerStatusOutput(cmd, dockerImage=dockerImage, executor=getStatusOutputBash)
+    err, out = getstatusoutput_docker(cmd)
     if not err:
       success("Package %s will be picked up from the system.", spec["package"])
       for x in out.split("\n"):
@@ -32,12 +32,12 @@ def checkPreferSystem(spec, cmd, homebrew_replacement, dockerImage):
             spec["package"], cmd, "\n".join("%s: %s" % (spec["package"], x) for x in out.split("\n")))
     return (err, "")
 
-def checkRequirements(spec, cmd, homebrew_replacement, dockerImage):
+def checkRequirements(spec, cmd, homebrew_replacement, getstatusoutput_docker):
     if cmd == "false":
       debug("Package %s is not a system requirement.", spec["package"])
       return (0, "")
     cmd = homebrew_replacement + cmd
-    err, out = dockerStatusOutput(cmd, dockerImage=dockerImage, executor=getStatusOutputBash)
+    err, out = getstatusoutput_docker(cmd)
     if not err:
       success("Required package %s will be picked up from the system.", spec["package"])
       debug("%s", cmd)
@@ -141,20 +141,22 @@ def doDoctor(args, parser):
       error("%s", msg)
     return (ok,msg,valid)
 
-  (fromSystem, own, failed, validDefaults) = getPackageList(packages                = packages,
-                                                            specs                   = specs,
-                                                            configDir               = args.configDir,
-                                                            preferSystem            = args.preferSystem,
-                                                            noSystem                = args.noSystem,
-                                                            architecture            = args.architecture,
-                                                            disable                 = args.disable,
-                                                            defaults                = args.defaults,
-                                                            performPreferCheck      = lambda pkg, cmd : checkPreferSystem(pkg, cmd, homebrew_replacement, dockerImage),
-                                                            performRequirementCheck = lambda pkg, cmd : checkRequirements(pkg, cmd, homebrew_replacement, dockerImage),
-                                                            performValidateDefaults = performValidateDefaults,
-                                                            overrides               = overrides,
-                                                            taps                    = taps,
-                                                            log                     = info)
+  with DockerRunner(dockerImage) as getstatusoutput_docker:
+    fromSystem, own, failed, validDefaults = \
+      getPackageList(packages                = packages,
+                     specs                   = specs,
+                     configDir               = args.configDir,
+                     preferSystem            = args.preferSystem,
+                     noSystem                = args.noSystem,
+                     architecture            = args.architecture,
+                     disable                 = args.disable,
+                     defaults                = args.defaults,
+                     performPreferCheck      = lambda pkg, cmd: checkPreferSystem(pkg, cmd, homebrew_replacement, getstatusoutput_docker),
+                     performRequirementCheck = lambda pkg, cmd: checkRequirements(pkg, cmd, homebrew_replacement, getstatusoutput_docker),
+                     performValidateDefaults = performValidateDefaults,
+                     overrides               = overrides,
+                     taps                    = taps,
+                     log                     = info)
 
   alwaysBuilt = set(x for x in specs) - fromSystem - own - failed
   if alwaysBuilt:

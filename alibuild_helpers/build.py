@@ -4,7 +4,7 @@ from alibuild_helpers import __version__
 from alibuild_helpers.analytics import report_event
 from alibuild_helpers.log import debug, error, info, banner, warning
 from alibuild_helpers.log import dieOnError
-from alibuild_helpers.cmd import execute, getstatusoutput, getStatusOutputBash, dockerStatusOutput, BASH
+from alibuild_helpers.cmd import execute, getstatusoutput, getStatusOutputBash, DockerRunner, BASH
 from alibuild_helpers.utilities import star, prunePaths
 from alibuild_helpers.utilities import resolve_store_path
 from alibuild_helpers.utilities import format, parseDefaults, readDefaults
@@ -267,29 +267,28 @@ def doBuild(args, parser):
   debug("Using %sBuild from %sbuild@%s recipes in %sdist@%s",
         star(), star(), __version__, star(), os.environ["ALIBUILD_ALIDIST_HASH"])
 
-  def get_status(cmd):
-    if dockerImage is not None:
-      err, _ = dockerStatusOutput(cmd, dockerImage, executor=getStatusOutputBash)
-    else:
-      err, _ = getstatusoutput(cmd)
-    return err
-  my_gzip = "pigz" if get_status("which pigz") == 0 else "gzip"
-  my_tar = "tar --ignore-failed-read" if get_status("tar --ignore-failed-read -cvvf /dev/null /dev/zero") == 0 else "tar"
+  with DockerRunner(dockerImage) as getstatusoutput_docker:
+    my_gzip = "pigz" if getstatusoutput_docker("which pigz")[0] == 0 else "gzip"
+    my_tar = ("tar --ignore-failed-read"
+              if getstatusoutput_docker("tar --ignore-failed-read -cvvf "
+                                        "/dev/null /dev/zero")[0] == 0
+              else "tar")
+    systemPackages, ownPackages, failed, validDefaults = \
+      getPackageList(packages                = packages,
+                     specs                   = specs,
+                     configDir               = args.configDir,
+                     preferSystem            = args.preferSystem,
+                     noSystem                = args.noSystem,
+                     architecture            = args.architecture,
+                     disable                 = args.disable,
+                     defaults                = args.defaults,
+                     performPreferCheck      = lambda pkg, cmd: getstatusoutput_docker(cmd),
+                     performRequirementCheck = lambda pkg, cmd: getstatusoutput_docker(cmd),
+                     performValidateDefaults = lambda spec: validateDefaults(spec, args.defaults),
+                     overrides               = overrides,
+                     taps                    = taps,
+                     log                     = debug)
 
-  (systemPackages, ownPackages, failed, validDefaults) = getPackageList(packages                = packages,
-                                                                        specs                   = specs,
-                                                                        configDir               = args.configDir,
-                                                                        preferSystem            = args.preferSystem,
-                                                                        noSystem                = args.noSystem,
-                                                                        architecture            = args.architecture,
-                                                                        disable                 = args.disable,
-                                                                        defaults                = args.defaults,
-                                                                        performPreferCheck      = lambda pkg, cmd : dockerStatusOutput(cmd, dockerImage, executor=getStatusOutputBash),
-                                                                        performRequirementCheck = lambda pkg, cmd : dockerStatusOutput(cmd, dockerImage, executor=getStatusOutputBash),
-                                                                        performValidateDefaults = lambda spec : validateDefaults(spec, args.defaults),
-                                                                        overrides               = overrides,
-                                                                        taps                    = taps,
-                                                                        log                     = debug)
   if validDefaults and args.defaults not in validDefaults:
     error("Specified default `%s' is not compatible with the packages you want to build.\n"
           "Valid defaults:\n\n- %s", args.defaults, "\n- ".join(sorted(validDefaults)))
