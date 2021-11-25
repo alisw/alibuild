@@ -998,9 +998,8 @@ def doBuild(args, parser):
         "-v {workdir}:/sw -v {scriptDir}/build.sh:/build.sh:ro "
         "-e GIT_REFERENCE_OVERRIDE=/mirror -e WORK_DIR_OVERRIDE=/sw "
         "{mirrorVolume} {develVolumes} {additionalEnv} {additionalVolumes} "
-        "{overrideSource} {extraArgs} {image} {bash} -ex /build.sh"
+        "{overrideSource} {extraArgs} {image} bash -ex /build.sh"
       ).format(
-        bash=quote(BASH),
         image=quote(dockerImage),
         workdir=quote(abspath(args.workDir)),
         scriptDir=quote(scriptDir),
