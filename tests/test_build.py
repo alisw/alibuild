@@ -109,12 +109,7 @@ def dummy_getstatusoutput(x):
         "cd /alidist && git rev-parse HEAD": (0, "6cec7b7b3769826219dfa85e5daa6de6522229a0"),
         'which pigz': (1, ""),
         'tar --ignore-failed-read -cvvf /dev/null /dev/zero': (0, ""),
-        'GIT_DIR=/alidist/.git git symbolic-ref -q HEAD': (0, "master")
-    }[x]
-
-
-def dummy_getStatusOutputBash(x):
-    return {
+        'GIT_DIR=/alidist/.git git symbolic-ref -q HEAD': (0, "master"),
         'git ls-remote --heads --tags /sw/MIRROR/root': (0, TEST_ROOT_GIT_REFS),
         'git ls-remote --heads --tags /sw/MIRROR/zlib': (0, TEST_ZLIB_GIT_REFS)
     }[x]
@@ -214,7 +209,6 @@ class BuildTestCase(unittest.TestCase):
     @patch("alibuild_helpers.build.readlink", new=dummy_readlink)
     @patch("alibuild_helpers.build.banner", new=MagicMock(return_value=None))
     @patch("alibuild_helpers.build.debug")
-    @patch("alibuild_helpers.build.getStatusOutputBash", new=dummy_getStatusOutputBash)
     @patch("alibuild_helpers.workarea.is_writeable", new=MagicMock(return_value=True))
     @patch("alibuild_helpers.build.basename", new=MagicMock(return_value="aliBuild"))
     def test_coverDoBuild(self, mock_debug, mock_glob, mock_sys, mock_sync_execute, mock_workarea_execute, mock_execute):
