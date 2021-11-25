@@ -198,6 +198,7 @@ class BuildTestCase(unittest.TestCase):
     @patch("alibuild_helpers.workarea.path.exists", new=dummy_exists)
     @patch("alibuild_helpers.build.sys")
     @patch("alibuild_helpers.build.dieOnError", new=MagicMock())
+    @patch("alibuild_helpers.utilities.dieOnError", new=MagicMock())
     @patch("alibuild_helpers.build.readDefaults",
            new=MagicMock(return_value=(OrderedDict({"package": "defaults-release", "disable": []}), "")))
     @patch("alibuild_helpers.build.makedirs", new=MagicMock(return_value=None))

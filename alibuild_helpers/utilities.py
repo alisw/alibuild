@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import subprocess, yaml
+import yaml
 from os.path import exists
 import hashlib
 from glob import glob
@@ -14,6 +14,7 @@ except ImportError:
   from ordereddict import OrderedDict
 
 from alibuild_helpers.cmd import getoutput, getstatusoutput
+from alibuild_helpers.log import dieOnError
 
 
 class SpecError(Exception):
@@ -353,7 +354,7 @@ def parseDefaults(disable, defaultsGetter, log):
   return (None, overrides, taps)
 
 def getPackageList(packages, specs, configDir, preferSystem, noSystem,
-                   architecture, disable, defaults, dieOnError, performPreferCheck, performRequirementCheck,
+                   architecture, disable, defaults, performPreferCheck, performRequirementCheck,
                    performValidateDefaults, overrides, taps, log):
   systemPackages = set()
   ownPackages = set()
