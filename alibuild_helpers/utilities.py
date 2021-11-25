@@ -13,7 +13,7 @@ try:
 except ImportError:
   from ordereddict import OrderedDict
 
-from alibuild_helpers.cmd import getstatusoutput
+from alibuild_helpers.cmd import getoutput, getstatusoutput
 
 
 class SpecError(Exception):
@@ -179,11 +179,7 @@ def doDetectArch(hasOsRelease, osReleaseLines, platformTuple, platformSystem, pl
   processor = platformProcessor
   if not processor:
     # Sometimes platform.processor returns an empty string
-    stdout, _ = subprocess.Popen(
-      ("uname", "-m"), stdout=subprocess.PIPE,
-      stderr=None, stdin=None
-    ).communicate()
-    processor = stdout.decode("ascii").strip()
+    processor = getoutput(("uname", "-m")).strip()
 
   return "{distro}{version}_{machine}".format(
     distro=distribution, version=version.split(".")[0],

@@ -83,6 +83,7 @@ GETSTATUSOUTPUT_MOCKS = {
 }
 
 class ArgsTestCase(unittest.TestCase):
+  @mock.patch("alibuild_helpers.utilities.getoutput", new=lambda cmd: "x86_64")   # for uname -m
   @mock.patch('alibuild_helpers.args.commands')
   def test_actionParsing(self, mock_commands):
     mock_commands.getstatusoutput.side_effect = lambda x : GETSTATUSOUTPUT_MOCKS[x]
@@ -95,6 +96,7 @@ class ArgsTestCase(unittest.TestCase):
         for k, v in effects:
           self.assertEqual(args[k], v)
 
+  @mock.patch("alibuild_helpers.utilities.getoutput", new=lambda cmd: "x86_64")   # for uname -m
   @mock.patch('alibuild_helpers.args.argparse.ArgumentParser.error')
   def test_failingParsing(self, mock_print):
     mock_print.side_effect = FakeExit("raised")
