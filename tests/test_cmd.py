@@ -24,8 +24,9 @@ class CmdTestCase(unittest.TestCase):
     @mock.patch("alibuild_helpers.cmd.getstatusoutput")
     def test_DockerRunner(self, mock_getstatusoutput, mock_getoutput):
         mock_getoutput.side_effect = lambda cmd: "container-id\n"
-        with DockerRunner("image") as getstatusoutput_docker:
-            mock_getoutput.assert_called_with(("docker", "run", "--detach", "--rm", "image", "sleep", "inf"))
+        with DockerRunner("image", ["extra arg"]) as getstatusoutput_docker:
+            mock_getoutput.assert_called_with(["docker", "run", "--detach", "--rm",
+                                               "extra arg", "image", "sleep", "inf"])
             getstatusoutput_docker("echo foo")
             mock_getstatusoutput.assert_called_with("docker container exec container-id bash -c 'echo foo'")
         mock_getstatusoutput.assert_called_with("docker container kill container-id")

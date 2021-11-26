@@ -141,7 +141,7 @@ def doDoctor(args, parser):
       error("%s", msg)
     return (ok,msg,valid)
 
-  with DockerRunner(dockerImage) as getstatusoutput_docker:
+  with DockerRunner(dockerImage, ["--network=host"]) as getstatusoutput_docker:
     fromSystem, own, failed, validDefaults = \
       getPackageList(packages                = packages,
                      specs                   = specs,

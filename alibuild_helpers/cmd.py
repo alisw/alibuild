@@ -54,15 +54,18 @@ class DockerRunner:
   instead.
   """
 
-  def __init__(self, docker_image):
+  def __init__(self, docker_image, docker_run_args=()):
     self._docker_image = docker_image
+    self._docker_run_args = docker_run_args
     self._container = None
 
   def __enter__(self):
     if self._docker_image:
       # "sleep inf" pauses forever, until we kill it.
-      self._container = getoutput(("docker", "run", "--detach", "--rm",
-                                   self._docker_image, "sleep", "inf")).strip()
+      cmd = ["docker", "run", "--detach", "--rm"]
+      cmd += self._docker_run_args
+      cmd += [self._docker_image, "sleep", "inf"]
+      self._container = getoutput(cmd).strip()
 
     def getstatusoutput_docker(cmd):
       if self._container is None:
