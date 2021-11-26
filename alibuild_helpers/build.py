@@ -267,7 +267,7 @@ def doBuild(args, parser):
   debug("Using %sBuild from %sbuild@%s recipes in %sdist@%s",
         star(), star(), __version__, star(), os.environ["ALIBUILD_ALIDIST_HASH"])
 
-  with DockerRunner(dockerImage) as getstatusoutput_docker:
+  with DockerRunner(dockerImage, ["--network=host"]) as getstatusoutput_docker:
     my_gzip = "pigz" if getstatusoutput_docker("which pigz")[0] == 0 else "gzip"
     my_tar = ("tar --ignore-failed-read"
               if getstatusoutput_docker("tar --ignore-failed-read -cvvf "
@@ -992,7 +992,7 @@ def doBuild(args, parser):
     # will perform the actual build. Otherwise build as usual using bash.
     if args.docker:
       dockerWrapper = (
-        "docker run --rm --entrypoint= --user $(id -u):$(id -g) "
+        "docker run --rm --network=host --entrypoint= --user $(id -u):$(id -g) "
         "-v {workdir}:/sw -v {scriptDir}/build.sh:/build.sh:ro "
         "-e GIT_REFERENCE_OVERRIDE=/mirror -e WORK_DIR_OVERRIDE=/sw "
         "{mirrorVolume} {develVolumes} {additionalEnv} {additionalVolumes} "
