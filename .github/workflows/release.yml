@@ -53,6 +53,8 @@ jobs:
         run: |
           set -x
           cd "$(dirname "$(brew formula alibuild)")"
+          git config user.name alibuild
+          git config user.email 'alibuild@cern.ch'
           git add alibuild.rb
           git commit -m "Update alibuild to ${GITHUB_REF#refs/tags/}"
           git show
