@@ -1,4 +1,5 @@
 from __future__ import print_function
+from textwrap import dedent
 # Assuming you are using the mock library to ... mock things
 try:
     from unittest.mock import patch, call  # In Python 3, mock is built-in
@@ -65,13 +66,15 @@ class CleanTestCase(unittest.TestCase):
         mock_os.readlink.assert_called_with("sw/BUILD/b-latest")
         mock_path.islink.assert_called_with("sw/osx_x86-64/b/v4")
         mock_path.exists.assert_called_with("sw/osx_x86-64/b/v3")
-        self.assertEqual(toDelete, ['sw/TMP', 'sw/BUILD/somethingtodelete',
+        self.assertEqual(toDelete, ['sw/TMP', 'sw/INSTALLROOT', 'sw/BUILD/somethingtodelete',
                                     'sw/osx_x86-64/b/v1', 'sw/osx_x86-64/b/v3'])
         toDelete = decideClean(workDir="sw", architecture="osx_x86-64", aggressiveCleanup=True)
-        self.assertEqual(toDelete, ['sw/TMP', 'sw/TARS/osx_x86-64/store', 'sw/SOURCES', 'sw/BUILD/somethingtodelete',
+        self.assertEqual(toDelete, ['sw/TMP', 'sw/INSTALLROOT', 'sw/TARS/osx_x86-64/store',
+                                    'sw/SOURCES', 'sw/BUILD/somethingtodelete',
                                     'sw/osx_x86-64/b/v1', 'sw/osx_x86-64/b/v3'])
         toDelete = decideClean(workDir="sw", architecture="slc7_x86-64", aggressiveCleanup=True)
-        self.assertEqual(toDelete, ['sw/TMP', 'sw/TARS/slc7_x86-64/store', 'sw/SOURCES', 'sw/BUILD/somethingtodelete'])
+        self.assertEqual(toDelete, ['sw/TMP', 'sw/INSTALLROOT', 'sw/TARS/slc7_x86-64/store',
+                                    'sw/SOURCES', 'sw/BUILD/somethingtodelete'])
 
     @patch('alibuild_helpers.clean.glob')
     @patch('alibuild_helpers.clean.os')
@@ -87,19 +90,40 @@ class CleanTestCase(unittest.TestCase):
           doClean(workDir="sw", architecture="osx_x86-64", aggressiveCleanup=True, dryRun=True)
         self.assertEqual(cm.exception.code, 0)
         mock_shutil.rmtree.assert_not_called()
-        mock_print_results.assert_called_with("This will delete the following directories:\n\nsw/TMP\nsw/TARS/osx_x86-64/store\nsw/SOURCES\nsw/BUILD/somethingtodelete\nsw/osx_x86-64/b/v1\nsw/osx_x86-64/b/v3\n\n--dry-run / -n specified. Doing nothing.")
+        mock_print_results.assert_called_with(dedent("""\
+        This will delete the following directories:
+
+        sw/TMP
+        sw/INSTALLROOT
+        sw/TARS/osx_x86-64/store
+        sw/SOURCES
+        sw/BUILD/somethingtodelete
+        sw/osx_x86-64/b/v1
+        sw/osx_x86-64/b/v3
+
+        --dry-run / -n specified. Doing nothing."""))
 
         with self.assertRaises(SystemExit) as cm:
           doClean(workDir="sw", architecture="osx_x86-64", aggressiveCleanup=True, dryRun=False)
         self.assertEqual(cm.exception.code, 0)
         remove_files_calls = [call('sw/TMP'),
+                              call('sw/INSTALLROOT'),
                               call('sw/TARS/osx_x86-64/store'),
                               call('sw/SOURCES'),
                               call('sw/BUILD/somethingtodelete'),
                               call('sw/osx_x86-64/b/v1'),
                               call('sw/osx_x86-64/b/v3')]
         self.assertEqual(mock_shutil.rmtree.mock_calls, remove_files_calls)
-        mock_print_results.assert_called_with("This will delete the following directories:\n\nsw/TMP\nsw/TARS/osx_x86-64/store\nsw/SOURCES\nsw/BUILD/somethingtodelete\nsw/osx_x86-64/b/v1\nsw/osx_x86-64/b/v3")
+        mock_print_results.assert_called_with(dedent("""\
+        This will delete the following directories:
+
+        sw/TMP
+        sw/INSTALLROOT
+        sw/TARS/osx_x86-64/store
+        sw/SOURCES
+        sw/BUILD/somethingtodelete
+        sw/osx_x86-64/b/v1
+        sw/osx_x86-64/b/v3"""))
 
 
 if __name__ == '__main__':

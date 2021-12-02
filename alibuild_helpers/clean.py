@@ -21,10 +21,11 @@ def decideClean(workDir, architecture, aggressiveCleanup):
   """
   symlinksBuild = [os.readlink(x) for x in glob.glob("%s/BUILD/*-latest*" % workDir)]
   # $WORK_DIR/TMP should always be cleaned up. This does not happen only
-  # in the case we run out of space while unpacking.
+  # in the case we run out of space while unpacking. INSTALLROOT is similar,
+  # though it is not cleaned up automatically in case of build errors.
   # $WORK_DIR/<architecture>/store can be cleaned up as well, because
   # we do not need the actual tarballs after they have been built.
-  toDelete = ["%s/TMP" % workDir]
+  toDelete = ["%s/TMP" % workDir, "%s/INSTALLROOT" % workDir]
   if aggressiveCleanup:
     toDelete += ["%s/TARS/%s/store" % (workDir, architecture),
                  "%s/SOURCES" % (workDir)]
