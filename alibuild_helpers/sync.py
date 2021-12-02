@@ -151,8 +151,7 @@ class HttpRemoteSync:
         break
 
     if store_path is None or use_tarball is None:
-      warning("%s (%s) not fetched: have you tried updating the recipes?",
-              p, ", ".join(spec["remote_hashes"]))
+      debug("Nothing fetched for %s (%s)", p, ", ".join(spec["remote_hashes"]))
       return
 
     links_path = resolve_links_path(self.architecture, spec["package"])

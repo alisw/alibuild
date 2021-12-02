@@ -63,17 +63,16 @@ class SyncTestCase(unittest.TestCase):
     @patch("alibuild_helpers.sync.open", new=lambda fn, mode: BytesIO())
     @patch("os.rename", new=lambda old, new: None)
     @patch("alibuild_helpers.sync.execute", new=lambda cmd, printer=None: 0)
-    @patch("alibuild_helpers.sync.warning")
+    @patch("alibuild_helpers.sync.debug")
     @patch("alibuild_helpers.sync.error")
     @patch("alibuild_helpers.sync.get")
-    def test_http_remote(self, mock_get, mock_error, mock_warning):
+    def test_http_remote(self, mock_get, mock_error, mock_debug):
         mock_get.side_effect = self.mock_get
         syncer = sync.HttpRemoteSync(remoteStore="https://localhost/test",
                                      architecture=ARCHITECTURE,
                                      workdir="/sw", insecure=False)
 
         mock_error.reset_mock()
-        mock_warning.reset_mock()
         self.spec["hash"] = self.spec["remote_revision_hash"] = GOOD_HASH
         self.spec["remote_hashes"] = [GOOD_HASH]
 
@@ -83,7 +82,6 @@ class SyncTestCase(unittest.TestCase):
         syncer.syncDistLinksToRemote("/sw/dist")
 
         mock_error.reset_mock()
-        mock_warning.reset_mock()
         self.spec["hash"] = self.spec["remote_revision_hash"] = BAD_HASH
         self.spec["remote_hashes"] = [BAD_HASH]
 
@@ -101,17 +99,16 @@ class SyncTestCase(unittest.TestCase):
                           self.spec["remote_revision_hash"]))
         self.assertIsInstance(mock_error.call_args_list[0][0][2],
                               sync.PartialDownloadError)
-        mock_warning.assert_not_called()
 
         syncer.syncToRemote("zlib", self.spec)
         syncer.syncDistLinksToRemote("/sw/dist")
 
+        mock_debug.reset_mock()
         self.spec["hash"] = self.spec["remote_revision_hash"] = NONEXISTENT_HASH
         self.spec["remote_hashes"] = [NONEXISTENT_HASH]
         syncer.syncToLocal("zlib", self.spec)
-        mock_warning.assert_called_once_with(
-            "%s (%s) not fetched: have you tried updating the recipes?",
-            "zlib", NONEXISTENT_HASH)
+        mock_debug.assert_called_with("Nothing fetched for %s (%s)",
+                                      "zlib", NONEXISTENT_HASH)
 
     @patch("alibuild_helpers.sync.execute", new=lambda cmd, printer=None: 0)
     @patch("alibuild_helpers.sync.os")
