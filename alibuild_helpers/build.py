@@ -372,25 +372,28 @@ def doBuild(args, parser):
       updateReferenceRepoSpec(args.referenceSources, p, specs[p], args.fetchRepos, not args.docker)
 
       # Retrieve git heads
-      cmd = "git ls-remote --heads --tags %s" % (specs[p].get("reference", specs[p]["source"]))
+      cmd = ("git", "ls-remote", "--heads", "--tags",
+             specs[p].get("reference", specs[p]["source"]))
       if specs[p]["package"] in develPkgs:
          specs[p]["source"] = join(os.getcwd(), specs[p]["package"])
-         cmd = "git ls-remote --heads --tags %s" % specs[p]["source"]
-      debug("Executing %s", cmd)
+         cmd = "git", "ls-remote", "--heads", "--tags", specs[p]["source"]
+      debug("Executing %s", " ".join(cmd))
       err, output = getstatusoutput(cmd)
       if err:
-        raise RuntimeError("Error on '%s': %s" % (cmd, output))
+        raise RuntimeError("Error on %r: %s" % (" ".join(cmd), output))
       specs[p]["git_refs"] = {git_ref: git_hash for git_hash, sep, git_ref in
                               (line.partition("\t") for line in output.splitlines())
                               if sep}
-      return "ok"
-    future_to_download = {executor.submit(downloadTask, p): p for p in [p for p in buildOrder if "source" in specs[p]]}
+      return "%d refs found" % len(specs[p]["git_refs"])
+    future_to_download = {executor.submit(downloadTask, p): p
+                          for p in buildOrder if "source" in specs[p]}
     for future in concurrent.futures.as_completed(future_to_download):
         futurePackage = future_to_download[future]
         try:
             data = future.result()
         except Exception as exc:
-            raise RuntimeError("Error on fetching '%r'. Aborting." % futurePackage)
+            raise RuntimeError("Error on fetching %r: %s. Aborting." %
+                               (futurePackage, exc))
         else:
             debug("%r package updated: %s", futurePackage, data)
 

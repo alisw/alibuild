@@ -17,6 +17,7 @@ try:
 except ImportError:
     from ordereddict import OrderedDict
 
+from alibuild_helpers.cmd import is_string
 from alibuild_helpers.utilities import parseRecipe, resolve_tag
 from alibuild_helpers.build import doBuild, storeHashes
 
@@ -101,17 +102,15 @@ TEST_EXTRA_BUILD_HASH = ("9f9eb8696b7722df52c4703f5fe7acc4b8000ba2" if sys.versi
 
 
 def dummy_getstatusoutput(x):
-    if re.match("/bin/bash --version", x):
-        return (0, "GNU bash, version 3.2.57(1)-release (x86_64-apple-darwin17)\nCopyright (C) 2007 Free Software Foundation, Inc.\n")
-    if re.match("(mkdir -p|ln -snf) [^;]+(;ln -snf [^;]+)*$", x):
+    if is_string(x) and re.match("(mkdir -p|ln -snf) [^;]+(;ln -snf [^;]+)*$", x):
         return (0, "")
     return {
         "cd /alidist && git rev-parse HEAD": (0, "6cec7b7b3769826219dfa85e5daa6de6522229a0"),
         'which pigz': (1, ""),
         'tar --ignore-failed-read -cvvf /dev/null /dev/zero': (0, ""),
         'GIT_DIR=/alidist/.git git symbolic-ref -q HEAD': (0, "master"),
-        'git ls-remote --heads --tags /sw/MIRROR/root': (0, TEST_ROOT_GIT_REFS),
-        'git ls-remote --heads --tags /sw/MIRROR/zlib': (0, TEST_ZLIB_GIT_REFS)
+        ("git", "ls-remote", "--heads", "--tags", "/sw/MIRROR/root"): (0, TEST_ROOT_GIT_REFS),
+        ("git", "ls-remote", "--heads", "--tags", "/sw/MIRROR/zlib"): (0, TEST_ZLIB_GIT_REFS),
     }[x]
 
 

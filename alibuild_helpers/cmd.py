@@ -1,9 +1,5 @@
 import sys
-from subprocess import Popen, PIPE
-try:
-  from commands import getstatusoutput
-except ImportError:
-  from subprocess import getstatusoutput
+from subprocess import Popen, PIPE, STDOUT
 try:
   from shlex import quote  # Python 3.3+
 except ImportError:
@@ -11,11 +7,9 @@ except ImportError:
 
 from alibuild_helpers.log import debug, dieOnError
 
-BASH = "bash" if getstatusoutput("/bin/bash --version")[0] else "/bin/bash"
-
 # Keep the linter happy
 if sys.version_info[0] >= 3:
-  basestring = None
+  basestring = str
 
 
 def is_string(s):
@@ -26,12 +20,22 @@ def is_string(s):
 
 def getoutput(command):
   """Run command, check it succeeded, and return its stdout as a string."""
+  kwargs = {} if sys.version_info.major < 3 else {"encoding": "utf-8"}
   proc = Popen(command, shell=is_string(command), stdout=PIPE, stderr=PIPE,
-               universal_newlines=True)
+               universal_newlines=True, **kwargs)
   stdout, stderr = proc.communicate()
   dieOnError(proc.returncode, "Command %s failed with code %d: %s" %
              (command, proc.returncode, stderr))
   return stdout
+
+
+def getstatusoutput(command):
+  """Run command and return its return code and output (stdout and stderr)."""
+  kwargs = {} if sys.version_info.major < 3 else {"encoding": "utf-8"}
+  proc = Popen(command, shell=is_string(command), stdout=PIPE, stderr=STDOUT,
+               universal_newlines=True, **kwargs)
+  merged_output, _ = proc.communicate()
+  return proc.returncode, merged_output
 
 
 def execute(command, printer=debug):
@@ -45,6 +49,9 @@ def execute(command, printer=debug):
   if out:
     printer(out)
   return popen.returncode
+
+
+BASH = "bash" if getstatusoutput("/bin/bash --version")[0] else "/bin/bash"
 
 
 class DockerRunner:
