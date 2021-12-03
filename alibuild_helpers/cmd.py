@@ -35,6 +35,10 @@ def getstatusoutput(command):
   proc = Popen(command, shell=is_string(command), stdout=PIPE, stderr=STDOUT,
                universal_newlines=True, **kwargs)
   merged_output, _ = proc.communicate()
+  # Strip a single trailing newline, if one exists, to match the behaviour of
+  # subprocess.getstatusoutput.
+  if merged_output.endswith("\n"):
+    merged_output = merged_output[:-1]
   return proc.returncode, merged_output
 
 
