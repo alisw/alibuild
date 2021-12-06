@@ -43,8 +43,9 @@ def getstatusoutput(command):
 
 
 def execute(command, printer=debug):
+  kwargs = {} if sys.version_info.major < 3 else {"encoding": "utf-8"}
   popen = Popen(command, shell=is_string(command), stdout=PIPE,
-                universal_newlines=True)
+                universal_newlines=True, **kwargs)
   lines_iterator = iter(popen.stdout.readline, "")
   for line in lines_iterator:
     if not line: break
