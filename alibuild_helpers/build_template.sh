@@ -98,7 +98,7 @@ if [ -z "$CACHED_TARBALL" ]; then
       else
         # In case there is a stale link / file, for whatever reason.
         rm -rf "$SOURCEDIR"
-        git clone -n $GIT_PARTIAL_CLONE_FILTER ${GIT_REFERENCE:+--reference "$GIT_REFERENCE"} "$SOURCE0" "$SOURCEDIR"
+        LD_LIBRARY_PATH= git clone -n $GIT_PARTIAL_CLONE_FILTER ${GIT_REFERENCE:+--reference "$GIT_REFERENCE"} "$SOURCE0" "$SOURCEDIR"
         cd "$SOURCEDIR"
         git remote set-url --push origin "$WRITE_REPO"
         git checkout -f "$GIT_TAG"
