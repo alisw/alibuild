@@ -212,7 +212,7 @@ If you want to add your own default, you should at least provide:
 
 - **CXXFLAGS**: the CXXFLAGS to use
 - **CFLAGS**: the CFLAGS to use
-- **LDFLAGS**: the LDFLAGS tos use
+- **LDFLAGS**: the LDFLAGS to use
 - **CMAKE_BUILD_TYPE**: the build type which needs to be used by cmake projects
 
 Besides specifying extra global variables, starting from aliBuild
