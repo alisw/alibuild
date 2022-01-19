@@ -48,7 +48,18 @@ jobs:
           s|^  version .*|  version \"${GITHUB_REF#refs/tags/v}\"|
           " alibuild.rb
           rm -f alibuild.rb.bak
-          brew update-python-resources alibuild
+      - name: Regenerate alibuild formula
+        run: |
+          set -x
+          cd "$(dirname "$(brew formula alibuild)")"
+          # Sometimes, brew update-python-resources apparently randomly fails,
+          # blaming pipgrip. Retries should hopefully solve this.
+          attempt=0
+          while [ $((attempt++)) -lt 10 ]; do
+            echo "Attempt $attempt/10..." >&2
+            brew update-python-resources alibuild
+            sleep 300
+          done
       - name: Push updated formula
         run: |
           set -x
