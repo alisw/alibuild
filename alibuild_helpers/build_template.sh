@@ -212,50 +212,53 @@ fi
 
 # Find libraries and executables needing relocation on macOS
 if [[ ${ARCHITECTURE:0:3} == "osx" ]]; then
+  otool_arch=$(echo "${ARCHITECTURE#osx_}" | tr - _)  # otool knows x86_64, not x86-64
 
-  /usr/bin/find ${RELOCATE_PATHS:-bin lib lib64} -type f -not -name '*.py' -not -name '*.pyc' -not -name '*.h' -not -name '*.js' -not -name '*.txt' -not -name '*.dat' -not -name '*.sav' -not -name '*.wav' -not -name '*.png' -not -name '*.css' -not -name '*.cc' | \
-  while read BIN; do
-    MACHOTYPE=$(set +o pipefail; otool -h "$PWD/$BIN" 2> /dev/null | grep filetype -A1 | awk 'END{print $5}')
+  /usr/bin/find ${RELOCATE_PATHS:-bin lib lib64} -type f \
+                -not -name '*.py' -not -name '*.pyc' -not -name '*.h' -not -name '*.js' \
+                -not -name '*.txt' -not -name '*.dat' -not -name '*.sav' -not -name '*.wav' \
+                -not -name '*.png' -not -name '*.css' -not -name '*.cc' |
+    while read -r BIN; do
+      MACHOTYPE=$(set +o pipefail; otool -arch "$otool_arch" -h "$PWD/$BIN" 2> /dev/null | grep filetype -A1 | awk 'END{print $5}')
 
-    # See mach-o/loader.h from XNU sources: 2 == executable, 6 == dylib, 8 == bundle
-    if [[ $MACHOTYPE == 6 || $MACHOTYPE == 8 ]]; then
-      # Only dylibs: relocate LC_ID_DYLIB
-      if otool -D "$PWD/$BIN" 2> /dev/null | tail -n1 | grep -q $PKGHASH; then
-        cat <<EOF >> "$INSTALLROOT/relocate-me.sh"
-install_name_tool -id \$(otool -D "\$PP/$BIN" | tail -n1 | sed -e "s|/[^ ]*INSTALLROOT/\$PH/\$OP|\$WORK_DIR/\$PP|g") "\$PP/$BIN"
+      # See mach-o/loader.h from XNU sources: 2 == executable, 6 == dylib, 8 == bundle
+      if [[ $MACHOTYPE == 6 || $MACHOTYPE == 8 ]]; then
+        # Only dylibs: relocate LC_ID_DYLIB
+        if otool -arch "$otool_arch" -D "$PWD/$BIN" 2> /dev/null | tail -n1 | grep -q "$PKGHASH"; then
+          cat <<EOF >> "$INSTALLROOT/relocate-me.sh"
+install_name_tool -id "\$(otool -arch $otool_arch -D "\$PP/$BIN" | tail -n1 | sed -e "s|/[^ ]*INSTALLROOT/\$PH/\$OP|\$WORK_DIR/\$PP|g")" "\$PP/$BIN"
 EOF
-      elif otool -D "$PWD/$BIN" 2> /dev/null | tail -n1 | grep -vq /; then
-        cat <<EOF >> "$INSTALLROOT/relocate-me.sh"
+        elif otool -arch "$otool_arch" -D "$PWD/$BIN" 2> /dev/null | tail -n1 | grep -vq /; then
+          cat <<EOF >> "$INSTALLROOT/relocate-me.sh"
 install_name_tool -id "\$WORK_DIR/\$PP/$BIN" "\$PP/$BIN"
 EOF
+        fi
       fi
-    fi
 
-    if [[ $MACHOTYPE == 2 || $MACHOTYPE == 6 || $MACHOTYPE == 8 ]]; then
-      # Both libs and binaries: relocate LC_RPATH
-      if otool -l "$PWD/$BIN" 2> /dev/null | grep -A2 LC_RPATH | grep path | grep -q $PKGHASH; then
-        cat <<EOF >> "$INSTALLROOT/relocate-me.sh"
-OLD_RPATHS=\$(otool -l \$PP/$BIN | grep -A2 LC_RPATH | grep path | grep \$PH | sed -e 's|^.*path ||' -e 's| .*$||' | sort -u)
+      if [[ $MACHOTYPE == 2 || $MACHOTYPE == 6 || $MACHOTYPE == 8 ]]; then
+        # Both libs and binaries: relocate LC_RPATH
+        if otool -arch "$otool_arch" -l "$PWD/$BIN" 2> /dev/null | grep -A2 LC_RPATH | grep path | grep -q "$PKGHASH"; then
+          cat <<EOF >> "$INSTALLROOT/relocate-me.sh"
+OLD_RPATHS=\$(otool -arch $otool_arch -l "\$PP/$BIN" | grep -A2 LC_RPATH | grep path | grep "\$PH" | sed -e 's|^.*path ||' -e 's| .*$||' | sort -u)
 for OLD_RPATH in \$OLD_RPATHS; do
   NEW_RPATH=\${OLD_RPATH/#*INSTALLROOT\/\$PH\/\$OP/\$WORK_DIR/\$PP}
   install_name_tool -rpath "\$OLD_RPATH" "\$NEW_RPATH" "\$PP/$BIN"
 done
 EOF
-      fi
+        fi
 
-      # Both libs and binaries: relocate LC_LOAD_DYLIB
-      if otool -l "$PWD/$BIN" 2> /dev/null | grep -A2 LC_LOAD_DYLIB | grep name | grep -q $PKGHASH; then
-        cat <<EOF >> "$INSTALLROOT/relocate-me.sh"
-OLD_LOAD_DYLIBS=\$(otool -l \$PP/$BIN | grep -A2 LC_LOAD_DYLIB | grep name | grep \$PH | sed -e 's|^.*name ||' -e 's| .*$||' | sort -u)
+        # Both libs and binaries: relocate LC_LOAD_DYLIB
+        if otool -arch "$otool_arch" -l "$PWD/$BIN" 2> /dev/null | grep -A2 LC_LOAD_DYLIB | grep name | grep -q $PKGHASH; then
+          cat <<EOF >> "$INSTALLROOT/relocate-me.sh"
+OLD_LOAD_DYLIBS=\$(otool -arch $otool_arch -l "\$PP/$BIN" | grep -A2 LC_LOAD_DYLIB | grep name | grep "\$PH" | sed -e 's|^.*name ||' -e 's| .*$||' | sort -u)
 for OLD_LOAD_DYLIB in \$OLD_LOAD_DYLIBS; do
   NEW_LOAD_DYLIB=\${OLD_LOAD_DYLIB/#*INSTALLROOT\/\$PH\/\$OP/\$WORK_DIR/\$PP}
   install_name_tool -change "\$OLD_LOAD_DYLIB" "\$NEW_LOAD_DYLIB" "\$PP/$BIN"
 done
 EOF
+        fi
       fi
-    fi
-done || true
-
+    done || true
 fi
 
 cat "$INSTALLROOT/relocate-me.sh"
