@@ -170,8 +170,9 @@ def storeHashes(package, specs, isDevelPkg, considerRelocation):
   dh = Hasher()
   for dep in spec.get("requires", []):
     # At this point, our dependencies have a single hash, local or remote.
-    h_all(specs[dep]["hash"])
-    dh(specs[dep]["hash"] + specs[dep].get("devel_hash", ""))
+    hash_and_devel_hash = specs[dep]["hash"] + specs[dep].get("devel_hash", "")
+    h_all(hash_and_devel_hash)
+    dh(hash_and_devel_hash)
 
   if isDevelPkg and "incremental_recipe" in spec:
     h_all(spec["incremental_recipe"])
