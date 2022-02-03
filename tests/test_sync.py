@@ -65,7 +65,7 @@ class SyncTestCase(unittest.TestCase):
     @patch("alibuild_helpers.sync.execute", new=lambda cmd, printer=None: 0)
     @patch("alibuild_helpers.sync.debug")
     @patch("alibuild_helpers.sync.error")
-    @patch("alibuild_helpers.sync.get")
+    @patch("requests.Session.get")
     def test_http_remote(self, mock_get, mock_error, mock_debug):
         mock_get.side_effect = self.mock_get
         syncer = sync.HttpRemoteSync(remoteStore="https://localhost/test",

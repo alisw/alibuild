@@ -6,7 +6,7 @@ import os.path
 import re
 import sys
 import time
-from requests import get
+import requests
 from requests.exceptions import RequestException
 
 from alibuild_helpers.cmd import execute
@@ -37,10 +37,11 @@ class HttpRemoteSync:
     self.writeStore = ""
     self.architecture = architecture
     self.workdir = workdir
-    self.insecure = insecure
     self.httpTimeoutSec = 15
     self.httpConnRetries = 4
     self.httpBackoff = 0.4
+    self._session = requests.Session()
+    self._session.verify = not insecure
 
   def getRetry(self, url, dest=None, returnResult=False, log=True):
     for i in range(0, self.httpConnRetries):
@@ -60,7 +61,7 @@ class HttpRemoteSync:
         if dest or returnResult:
           # Destination specified -- file (dest) or buffer (returnResult).
           # Use requests in stream mode
-          resp = get(url, stream=True, verify=not self.insecure, timeout=self.httpTimeoutSec)
+          resp = self._session.get(url, stream=True, timeout=self.httpTimeoutSec)
           size = int(resp.headers.get("content-length", "-1"))
           downloaded = 0
           reportTime = time.time()
@@ -96,7 +97,7 @@ class HttpRemoteSync:
           if s3Request:
             [bucket, prefix] = s3Request.groups()
             url = "https://s3.cern.ch/swift/v1/%s/?prefix=%s" % (bucket, prefix.lstrip("/"))
-            resp = get(url, verify=not self.insecure, timeout=self.httpTimeoutSec)
+            resp = self._session.get(url, timeout=self.httpTimeoutSec)
             if resp.status_code == 404:
               # No need to retry any further
               return None
@@ -105,7 +106,7 @@ class HttpRemoteSync:
                     for x in resp.text.split()]
           else:
             # No destination specified: JSON request
-            resp = get(url, verify=not self.insecure, timeout=self.httpTimeoutSec)
+            resp = self._session.get(url, timeout=self.httpTimeoutSec)
             if resp.status_code == 404:
               # No need to retry any further
               return None
