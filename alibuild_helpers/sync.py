@@ -6,7 +6,7 @@ import os.path
 import re
 import sys
 import time
-from requests import get
+import requests
 from requests.exceptions import RequestException
 
 from alibuild_helpers.cmd import execute
@@ -42,7 +42,8 @@ class HttpRemoteSync:
     self.httpConnRetries = 4
     self.httpBackoff = 0.4
 
-  def getRetry(self, url, dest=None, returnResult=False, log=True):
+  def getRetry(self, url, dest=None, returnResult=False, log=True, session=None):
+    get = session.get if session is not None else requests.get
     for i in range(0, self.httpConnRetries):
       if i > 0:
         pauseSec = self.httpBackoff * (2 ** (i - 1))
@@ -139,63 +140,67 @@ class HttpRemoteSync:
                 p, pkg_hash)
           return
 
-    debug("Updating remote store for package %s; trying hashes %s",
-          p, ", ".join(spec["remote_hashes"]))
-    store_path = use_tarball = None
-    # Find the first tarball that matches any possible hash and fetch it.
-    for pkg_hash in spec["remote_hashes"]:
-      store_path = resolve_store_path(self.architecture, pkg_hash)
-      tarballs = self.getRetry("%s/%s/" % (self.remoteStore, store_path))
-      if tarballs:
-        use_tarball = tarballs[0]["name"]
-        break
+    with requests.Session() as session:
+      debug("Updating remote store for package %s; trying hashes %s",
+            p, ", ".join(spec["remote_hashes"]))
+      store_path = use_tarball = None
+      # Find the first tarball that matches any possible hash and fetch it.
+      for pkg_hash in spec["remote_hashes"]:
+        store_path = resolve_store_path(self.architecture, pkg_hash)
+        tarballs = self.getRetry("%s/%s/" % (self.remoteStore, store_path),
+                                 session=session)
+        if tarballs:
+          use_tarball = tarballs[0]["name"]
+          break
 
-    if store_path is None or use_tarball is None:
-      debug("Nothing fetched for %s (%s)", p, ", ".join(spec["remote_hashes"]))
-      return
+      if store_path is None or use_tarball is None:
+        debug("Nothing fetched for %s (%s)", p, ", ".join(spec["remote_hashes"]))
+        return
 
-    links_path = resolve_links_path(self.architecture, spec["package"])
-    execute("mkdir -p {}/{} {}/{}".format(self.workdir, store_path,
-                                          self.workdir, links_path))
+      links_path = resolve_links_path(self.architecture, spec["package"])
+      execute("mkdir -p {}/{} {}/{}".format(self.workdir, store_path,
+                                            self.workdir, links_path))
 
-    destPath = os.path.join(self.workdir, store_path, use_tarball)
-    if not os.path.isfile(destPath):
-      # Do not download twice
-      self.getRetry("/".join((self.remoteStore, store_path, use_tarball)),
-                    destPath)
+      destPath = os.path.join(self.workdir, store_path, use_tarball)
+      if not os.path.isfile(destPath):
+        # Do not download twice
+        self.getRetry("/".join((self.remoteStore, store_path, use_tarball)),
+                      destPath, session=session)
 
-    # Fetch manifest file with initial symlinks. This file is updated
-    # regularly; we use it to avoid many small network requests.
-    manifest = self.getRetry("%s/%s.manifest" % (self.remoteStore, links_path),
-                             returnResult=True)
-    symlinks = {
-      linkname.decode("utf-8"): target.decode("utf-8")
-      for linkname, sep, target in (line.partition(b"\t")
-                                    for line in manifest.splitlines())
-      if sep and linkname and target
-    }
-    # If we've just downloaded a tarball, add a symlink to it.
-    # We need to strip the leading TARS/ first, though.
-    assert store_path.startswith("TARS/"), store_path
-    symlinks[use_tarball] = os.path.join(store_path[len("TARS/"):], use_tarball)
-    # Now add any remaining symlinks that aren't in the manifest yet. There
-    # should always be relatively few of these, as the separate network
-    # requests are a bit expensive.
-    for link in self.getRetry("%s/%s/" % (self.remoteStore, links_path)):
-      linkname = link["name"]
-      if linkname in symlinks:
-        # This symlink is already present in the manifest.
-        continue
-      if os.path.islink(os.path.join(self.workdir, links_path, linkname)):
-        # We have this symlink locally. With local revisions, we won't produce
-        # revisions that will conflict with remote revisions unless we upload
-        # them anyway, so there's no need to redownload.
-        continue
-      # This symlink isn't in the manifest yet, and we don't have it locally,
-      # so download it individually.
-      symlinks[linkname] = self.getRetry(
-        "/".join((self.remoteStore, links_path, linkname)),
-        returnResult=True, log=False).decode("utf-8").rstrip("\r\n")
+      # Fetch manifest file with initial symlinks. This file is updated
+      # regularly; we use it to avoid many small network requests.
+      manifest = self.getRetry("%s/%s.manifest" % (self.remoteStore, links_path),
+                               returnResult=True, session=session)
+      symlinks = {
+        linkname.decode("utf-8"): target.decode("utf-8")
+        for linkname, sep, target in (line.partition(b"\t")
+                                      for line in manifest.splitlines())
+        if sep and linkname and target
+      }
+      # If we've just downloaded a tarball, add a symlink to it.
+      # We need to strip the leading TARS/ first, though.
+      assert store_path.startswith("TARS/"), store_path
+      symlinks[use_tarball] = os.path.join(store_path[len("TARS/"):], use_tarball)
+      # Now add any remaining symlinks that aren't in the manifest yet. There
+      # should always be relatively few of these, as the separate network
+      # requests are a bit expensive.
+      for link in self.getRetry("%s/%s/" % (self.remoteStore, links_path),
+                                session=session):
+        linkname = link["name"]
+        if linkname in symlinks:
+          # This symlink is already present in the manifest.
+          continue
+        if os.path.islink(os.path.join(self.workdir, links_path, linkname)):
+          # We have this symlink locally. With local revisions, we won't produce
+          # revisions that will conflict with remote revisions unless we upload
+          # them anyway, so there's no need to redownload.
+          continue
+        # This symlink isn't in the manifest yet, and we don't have it locally,
+        # so download it individually.
+        symlinks[linkname] = \
+            self.getRetry("/".join((self.remoteStore, links_path, linkname)),
+                          returnResult=True, log=False, session=session) \
+                .decode("utf-8").rstrip("\r\n")
     for linkname, target in symlinks.items():
       execute("ln -nsf ../../{target} {workdir}/{linkdir}/{name}".format(
         workdir=self.workdir, linkdir=links_path, name=linkname,
