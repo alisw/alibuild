@@ -49,7 +49,7 @@ def readHashFile(fn):
     return "0"
 
 def getDirectoryHash(d):
-  err, out = getstatusoutput("GIT_DIR=\"%s\" git rev-parse HEAD" % d)
+  err, out = getstatusoutput("GIT_DIR=\"%s/.git\" git rev-parse HEAD" % d)
   dieOnError(err, "Impossible to find reference for %s" % d)
   return out
 
