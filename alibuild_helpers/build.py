@@ -49,7 +49,13 @@ def readHashFile(fn):
     return "0"
 
 def getDirectoryHash(d):
-  err, out = getstatusoutput("git --git-dir=%s/.git rev-parse HEAD" % quote(d))
+  # We can't use git --git-dir=%s/.git or git -C %s here as the former requires
+  # that the directory we're inspecting to be the root of a git directory, not
+  # just contained in one (and that breaks CI tests), and the latter isn't
+  # supported by the git version we have on slc6.
+  # Silence cd as shell configuration can cause the new directory to be echoed.
+  err, out = getstatusoutput("cd %s >/dev/null 2>&1 && "
+                             "git rev-parse HEAD" % quote(d))
   dieOnError(err, "Impossible to find reference for %s" % d)
   return out
 
