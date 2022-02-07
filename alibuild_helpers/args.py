@@ -94,6 +94,7 @@ def doParseArgs(star):
                                   "%(metavar)s is a comma-separated list."))
   build_parser.add_argument("--force-tracked", dest="forceTracked", default=False, action="store_true",
                             help=("Do not pick up any packages from a local checkout. "))
+  build_parser.add_argument("--plugin", dest="plugin", default="legacy", help=("Plugin to use to do the actual build. "))
   build_parser.add_argument("--disable", dest="disable", default=[], metavar="PACKAGE", action="append",
                             help="Do not build %(metavar)s and all its (unique) dependencies.")
 

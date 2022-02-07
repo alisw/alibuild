@@ -529,6 +529,11 @@ def doBuild(args, parser):
                      ),
                args.architecture)
 
+  if args.plugin != "legacy":
+    build_plugin = __import__("alibuild_helpers.%s_plugin" % args.plugin, fromlist=[''])
+    build_plugin.build_plugin(specs, args, buildOrder)
+    return
+
   while buildOrder:
     packageIterations += 1
     if packageIterations > 20:

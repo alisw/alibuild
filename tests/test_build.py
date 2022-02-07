@@ -259,6 +259,7 @@ class BuildTestCase(unittest.TestCase):
             noDevel=[],
             fetchRepos=False,
             forceTracked=False,
+            plugin="legacy"
         )
         mock_sys.version_info = sys.version_info
 
