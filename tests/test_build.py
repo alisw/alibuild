@@ -258,6 +258,7 @@ class BuildTestCase(unittest.TestCase):
             autoCleanup=False,
             noDevel=[],
             fetchRepos=False,
+            forceTracked=False,
         )
         mock_sys.version_info = sys.version_info
 

@@ -346,17 +346,19 @@ def doBuild(args, parser):
               "hour": str(now.hour).zfill(2) }
 
   # Check if any of the packages can be picked up from a local checkout
-  develCandidates = [basename(d) for d in glob("*") if os.path.isdir(d)]
-  develCandidatesUpper = [basename(d).upper() for d in glob("*") if os.path.isdir(d)]
-  develPkgs = [p for p in buildOrder
-               if p in develCandidates and p not in args.noDevel]
-  develPkgsUpper = [(p, p.upper()) for p in buildOrder
-                    if p.upper() in develCandidatesUpper and p not in args.noDevel]
-  if set(develPkgs) != {x for x, _ in develPkgsUpper}:
-    error("The following development packages have the wrong spelling: %s.\n"
-          "Please check your local checkout and adapt to the correct one indicated.",
-          ", ".join({x.strip() for x, _ in develPkgsUpper} - set(develPkgs)))
-    return 1
+  develPkgs = []
+  if not args.forceTracked:
+    develCandidates = [basename(d) for d in glob("*") if os.path.isdir(d)]
+    develCandidatesUpper = [basename(d).upper() for d in glob("*") if os.path.isdir(d)]
+    develPkgs = [p for p in buildOrder
+                 if p in develCandidates and p not in args.noDevel]
+    develPkgsUpper = [(p, p.upper()) for p in buildOrder
+                      if p.upper() in develCandidatesUpper and p not in args.noDevel]
+    if set(develPkgs) != {x for x, _ in develPkgsUpper}:
+      error("The following development packages have the wrong spelling: %s.\n"
+            "Please check your local checkout and adapt to the correct one indicated.",
+            ", ".join({x.strip() for x, _ in develPkgsUpper} - set(develPkgs)))
+      return 1
 
   if buildOrder:
     banner("Packages will be built in the following order:\n - %s",

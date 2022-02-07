@@ -228,6 +228,12 @@ def filterByArchitecture(arch, requires):
     if re.match(matcher, arch):
       yield require
 
+def disabledByArchitecture(arch, requires):
+  for r in requires:
+    require, matcher = ":" in r and r.split(":", 1) or (r, ".*")
+    if not re.match(matcher, arch):
+      yield require
+
 def readDefaults(configDir, defaults, error, architecture):
   defaultsFilename = "%s/defaults-%s.sh" % (configDir, defaults)
   if not exists(defaultsFilename):
@@ -420,6 +426,7 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
       else:
         disable.append(spec["package"])
 
+    spec["disabled"] = disable
     if spec["package"] in disable:
       continue
 
@@ -432,6 +439,9 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
           validDefaults = None  # no valid default works for all current packages
 
     # For the moment we treat build_requires just as requires.
+    fn = lambda what: disabledByArchitecture(architecture, spec.get(what, []))
+    spec["disabled"] += [x for x in fn("requires")]
+    spec["disabled"] += [x for x in fn("build_requires")]
     fn = lambda what: filterByArchitecture(architecture, spec.get(what, []))
     spec["requires"] = [x for x in fn("requires") if not x in disable]
     spec["build_requires"] = [x for x in fn("build_requires") if not x in disable]

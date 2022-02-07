@@ -92,6 +92,8 @@ def doParseArgs(star):
   build_parser.add_argument("--no-local", dest="noDevel", metavar="PKGLIST", default="", type=csv_list,
                             help=("Do not pick up the following packages from a local checkout. "
                                   "%(metavar)s is a comma-separated list."))
+  build_parser.add_argument("--force-tracked", dest="forceTracked", default=False, action="store_true",
+                            help=("Do not pick up any packages from a local checkout. "))
   build_parser.add_argument("--disable", dest="disable", default=[], metavar="PACKAGE", action="append",
                             help="Do not build %(metavar)s and all its (unique) dependencies.")
 
