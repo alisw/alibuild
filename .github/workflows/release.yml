@@ -55,9 +55,9 @@ jobs:
           # Sometimes, brew update-python-resources apparently randomly fails,
           # blaming pipgrip. Retries should hopefully solve this.
           attempt=0
-          while [ $((attempt++)) -lt 10 ]; do
-            echo "Attempt $attempt/10..." >&2
-            brew update-python-resources alibuild
+          while [ $((attempt++)) -lt 5 ]; do
+            echo "Attempt $attempt/5..." >&2
+            brew update-python-resources alibuild && break
             sleep 300
           done
       - name: Push updated formula
