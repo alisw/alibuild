@@ -78,26 +78,36 @@ The following entries are mandatory in the header:
 The following entries are optional in the header:
 
   - `source`: URL of a Git repository from which the source is downloaded.
-    Notice it's good practice to make sure that they are already patched, so
-    that you can easily point to the actual sources used by the software.
-  - `tag`: tag in the above mentioned repository which points to the software
-    to be built.
-  - `env`: dictionary whose key-value pairs are environment variables to be inherited by the build
-    environment **of the package dependencies**,
-    *e.g.*:
+    It's good practice to make sure that they are already patched, so that you
+    can easily point to the actual sources used by the software.
+  - `write_repo`: in case the repository URL to be used for developing is
+    different from the `source`, set this key. It is used by `aliBuild init`,
+    which will initialise your local repository with the `upstream` remote
+    pointing at this URL instead of the one in `source`.
+  - `tag`: git reference in the above mentioned repository which points to the
+    software to be built. This can be a tag name, a branch name or a commit
+    hash.
+  - `env`: dictionary whose key-value pairs are environment variables to be set
+    after the recipe is built. The values are interpreted as the contents of a
+    double-quoted shell string, so you can reference other environment variables
+    as `$VARIABLE`, which will be substituted each time another recipe is built.
+    For example:
 
     ```yaml
     env:
       "$ROOTSYS": $ROOT_ROOT
     ```
 
-    **Notice this affects only the environment 
-    of the dependent packages, not the current recipe. If you meant to set them for the current recipe, simply use export in the recipe itself.**.
-
+    These variables **will not** be available in the recipe iteself, as they are
+    intended to be used to point to build products of the current recipe. If you
+    need to set an environment variable for use in the recipe, use
+    `export VARIABLE=value` in the recipe body.
   - `prepend_path`: dictionary whose key-value pairs are an environment variable
     name and a path to be prepended to it, as it happens in `LD_LIBRARY_PATH`.
-    You can append multiple paths to a single variable by specifying a list too,
-    *e.g.*:
+    This happens only after the package declaring the `prepend_path` in question
+    is built, so it is not available in the same recipe (just like variables
+    declared using `env`). You can append multiple paths to a single variable
+    by specifying a list too, *e.g.*:
 
     ```yaml
     prepend_path:
@@ -106,13 +116,11 @@ The following entries are optional in the header:
     ```
 
     will result in prepending `$FOO_ROOT/binexec/foobar` to `$PATH`, and both
-    `$FOO_ROOT/sub/lib` and `lib64` to `LD_LIBRARY_PATH`. **Notice this affects only the environment 
-    of the dependent packages, not the current recipe. If you meant to set them for the current recipe, simply use export in the recipe itself.**.
+    `$FOO_ROOT/sub/lib` and `lib64` to `LD_LIBRARY_PATH`.
   - `append_path`: same as `prepend_path` but paths are appended rather than
-    prepended. **Notice this affects  only the environment of the dependent packages, not the current recipe.
-    If you meant to set them for the current recipe, simply use export in the recipe itself.**.
-  - `requires`: a list of run-time and build-time dependency for the package,
-    *e.g.*:
+    prepended. Like `append_path` and `env`, this **does not** affect the
+    environment of the current recipe.
+  - `requires`: a list of run-time dependencies for the package, *e.g.*:
 
     ```yaml
     package: AliRoot
@@ -135,21 +143,27 @@ The following entries are optional in the header:
 
     will make sure that `IgProf` is only built on platforms whose name does not
     begin with `osx`.
-  - `build_requires`: currently behaves just like `requires` with the exception
-    that packages in this list are not included in the dependency graph
-    produced by alideps.
+  - `build_requires`: a list of build-time dependencies for the package. Like
+    `requires`, these packages will be built before the current package is
+    built.
+
+    Packages in this list are marked specially in the dependency graph
+    produced by `aliDeps`. Other tools treat these packages differently from
+    `requires`: for instance, RPMs produced for a package won't depend on its
+    `build_requires`, and `alibuild-generate-module` won't pull in build
+    requirements' modulefiles.
   - `force_rebuild`: set it to `true` to force re-running the build recipe every
     time you invoke alibuild on it.
   - `prefer_system_check`: a script which is used to determine whether
     or not the system equivalent of the package can be used. See also
-    `prefer_system`. If the `--no-system` option is specified, our own
-    version of the tool is used. Shell exit code is used to steer the build: if
-    the check returns 0, the system package is used and the recipe is not
-    run. If it returns non-zero, our own version of the package is
-    built through the recipe.
+    `prefer_system`. If the `--no-system` option is specified, this key is not
+    checked. The shell exit code is used to steer the build: if the check
+    returns 0, the system package is used and the recipe is not run. If it
+    returns non-zero, our own version of the package is built through the
+    recipe.
   - `prefer_system`: a regular expression for architectures which should
-    use the `prefer_system_check` by default to determine if the system
-    version of the tool can be used. When the rule matches, the result of
+    use the `prefer_system_check` by default to determine if the system version
+    of the tool can be used. When the rule matches, the result of
     `prefer_system_check` determines whether to build the recipe. When the rule
     does not match, the check is skipped and the recipe is run. Using the switch
     `--always-prefer-system` runs the check always (even when the regular
