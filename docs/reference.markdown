@@ -52,12 +52,22 @@ The following entries are mandatory in the header:
     of the package. Notice you can actually use some special formatting
     substitutions which will be replaced with the associated value on build.
     Valid substitutions are:
-      - `%(branch_basename)s`
-      - `%(branch_stream)s`
-      - `%(commit_hash)s`
-      - `%(short_hash)s`
-      - `%(tag)s`
-      - `%(tag_basename)s`
+      - `%(branch_basename)s`: the name of the current alidist branch, without
+        the leading `refs/heads/`.
+      - `%(branch_stream)s`: in case the alidist branch ends in `-patches`, the
+        name of branch without `-patches`. If the branch does not end in
+        `-patches`, the `tag` field of the recipe is used.
+      - `%(commit_hash)s`: if the `tag` field is a git tag, then the tag name.
+        If it is a branch or raw git commit hash instead, then the raw git
+        commit hash pointing to the `HEAD` of that branch, or said commit hash.
+      - `%(short_hash)s`: like `%(commit_hash)s`, but cut off after 10 characters.
+      - `%(tag)s`: the `tag` key specified in the recipe.
+      - `%(tag_basename)s` if the `tag` resembles a path, *e.g.*
+        `refs/tags/a/b/c`, returns the last part of the path, `c` in this case.
+      - `%(defaults_upper)s`: if building with `release` defaults, this is the
+        empty string; else, this is an underscore and then the name defaults,
+        uppercased, with `-` replaced by `_`. For example, if building with
+        `o2-dataflow` defaults, `%(default_upper)s` would be `_O2_DATAFLOW`.
       - `%(year)s`
       - `%(month)s`
       - `%(day)s`
@@ -72,8 +82,6 @@ The following entries are optional in the header:
     that you can easily point to the actual sources used by the software.
   - `tag`: tag in the above mentioned repository which points to the software
     to be built.
-  - `tag_basename`: if the tag resembles a path, *e.g.* `a/b/c`, returns the
-    last part of the path, `c` in this case.
   - `env`: dictionary whose key-value pairs are environment variables to be inherited by the build
     environment **of the package dependencies**,
     *e.g.*:
@@ -149,10 +157,6 @@ The following entries are optional in the header:
   - `relocate_paths`: a list of toplevel paths scanned recursively to perform
     relocation of executables and dynamic libraries **on macOS only**. If not
     specified, defaults to `bin`, `lib` and `lib64`.
-  - `branch_basename`: the name of the current alidist branch.
-  - `branch_stream`: in case the alidist branch ends in `-patches`, the name of
-    branch without `-patches`. If the branch does not end in `-patches`, the
-    `tag` field of the recipe is used.
 
 ### The body
 
