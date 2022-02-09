@@ -12,7 +12,7 @@ layout: main
 
 ## Recipe formats
 
-The recipes are found in the a separate repository. The repository can be 
+The recipes are found in the a separate repository. The repository can be
 specified via the `-c` option and defaults to _alidist_.
 
 The recipes themselves are called `<package>.sh` where `<package>` is the name
@@ -31,15 +31,17 @@ defined when the script is invoked.
 
 An example recipe for `zlib` is the following:
 
-    package: zlib
-    version: v1.2.8
-    source: https://github.com/star-externals/zlib
-    tag: v1.2.8
-    ---
-    #!/bin/bash -ex
-    ./configure --prefix=$INSTALLROOT
-    make ${JOBS+-j $JOBS}
-    make install
+```yaml
+package: zlib
+version: v1.2.8
+source: https://github.com/star-externals/zlib
+tag: v1.2.8
+---
+#!/bin/bash -ex
+./configure --prefix=$INSTALLROOT
+make ${JOBS+-j $JOBS}
+make install
+```
 
 ### The header
 
@@ -70,15 +72,17 @@ The following entries are optional in the header:
     that you can easily point to the actual sources used by the software.
   - `tag`: tag in the above mentioned repository which points to the software
     to be built.
-  - `tag_basename`: if the tag resembles a path, e.g. `a/b/c`, returns the 
+  - `tag_basename`: if the tag resembles a path, *e.g.* `a/b/c`, returns the
     last part of the path, `c` in this case.
   - `env`: dictionary whose key-value pairs are environment variables to be inherited by the build
     environment **of the package dependencies**,
     *e.g.*:
 
-        env:
-          "$ROOTSYS": $ROOT_ROOT
-          
+    ```yaml
+    env:
+      "$ROOTSYS": $ROOT_ROOT
+    ```
+
     **Notice this affects only the environment 
     of the dependent packages, not the current recipe. If you meant to set them for the current recipe, simply use export in the recipe itself.**.
 
@@ -87,9 +91,11 @@ The following entries are optional in the header:
     You can append multiple paths to a single variable by specifying a list too,
     *e.g.*:
 
-        prepend_path:
-          "PATH": "$FOO_ROOT/binexec/foobar"
-          "LD_LIBRARY_PATH": [ "$FOO_ROOT/sub/lib", "$FOO_ROOT/sub/lib64" ]
+    ```yaml
+    prepend_path:
+      "PATH": "$FOO_ROOT/binexec/foobar"
+      "LD_LIBRARY_PATH": [ "$FOO_ROOT/sub/lib", "$FOO_ROOT/sub/lib64" ]
+    ```
 
     will result in prepending `$FOO_ROOT/binexec/foobar` to `$PATH`, and both
     `$FOO_ROOT/sub/lib` and `lib64` to `LD_LIBRARY_PATH`. **Notice this affects only the environment 
@@ -97,30 +103,35 @@ The following entries are optional in the header:
   - `append_path`: same as `prepend_path` but paths are appended rather than
     prepended. **Notice this affects  only the environment of the dependent packages, not the current recipe.
     If you meant to set them for the current recipe, simply use export in the recipe itself.**.
-  - `requires`: a list of run-time and build-time dependency for the package. E.g.:
+  - `requires`: a list of run-time and build-time dependency for the package,
+    *e.g.*:
 
-        package: AliRoot
-        requires:
-          - ROOT
-        ...
+    ```yaml
+    package: AliRoot
+    requires:
+      - ROOT
+      ...
+    ```
 
     The specified dependencies will be built before building the given package.
     You can specify platform-specific dependencies by appending `:<regexp>` to
-    the dependency name. Such a reqular expression will be matched against the
-    architecture provided via `--architecture` and if it does not match it will
-    not be included. For instance:
+    the dependency name. Such a regular expression will be matched against the
+    architecture provided via `--architecture`, and if it does not match, the
+    requirement will not be included. For instance:
 
-        package: AliRoot-test
-        requires:
-          - "igprof:(?!osx).*"
-        ...
+    ```yaml
+    package: AliRoot-test
+    requires:
+      - "igprof:(?!osx).*"
+    ```
 
     will make sure that `IgProf` is only built on platforms whose name does not
     begin with `osx`.
   - `build_requires`: currently behaves just like `requires` with the exception
     that packages in this list are not included in the dependency graph
     produced by alideps.
-  - `force_rebuild`: set it to `true` to force re-running the build recipe.
+  - `force_rebuild`: set it to `true` to force re-running the build recipe every
+    time you invoke alibuild on it.
   - `prefer_system_check`: a script which is used to determine whether
     or not the system equivalent of the package can be used. See also
     `prefer_system`. If the `--no-system` option is specified, our own
@@ -208,18 +219,22 @@ string accordingly. For example you could trigger a debug build by
 adding `--defaults debug`, which will pick up `defaults-debug.sh`, and
 then have:
 
-    version: %(tag)s%(defaults_upper)s
+```yaml
+version: %(tag)s%(defaults_upper)s
+```
 
 in one of your recipes, which will expand to:
 
-    version: SOME_TAG_DEBUG
+```yaml
+version: SOME_TAG_DEBUG
+```
 
 If you want to add your own default, you should at least provide:
 
-- **CXXFLAGS**: the CXXFLAGS to use
-- **CFLAGS**: the CFLAGS to use
-- **LDFLAGS**: the LDFLAGS to use
-- **CMAKE_BUILD_TYPE**: the build type which needs to be used by cmake projects
+- `CXXFLAGS`: the `CXXFLAGS` to use
+- `CFLAGS`: the `CFLAGS` to use
+- `LDFLAGS`: the `LDFLAGS` to use
+- `CMAKE_BUILD_TYPE`: the build type which needs to be used by cmake projects
 
 Besides specifying extra global variables, starting from aliBuild
 1.4.0, it's also possible to use defaults to override metadata of other
@@ -227,22 +242,26 @@ packages . This is done by specifying the `overrides` dictionary in the
 metadata of your defaults file. For example to switch between ROOT6 and
 ROOT5 you should do something like:
 
-    ...
-    overrides:
-      ROOT:
-        version: "v6-06-04"
-        tag: "v6-06-04"
-    ...
+```yaml
+...
+overrides:
+  ROOT:
+    version: "v6-06-04"
+    tag: "v6-06-04"
+...
+```
 
 this will replace the `version` and `tag` metadata of `root.sh` with the
 one specified in the override. Notice that is also possible to override
 completely a recipe, picking it up from a given commit hash, branch or
 tag in alidist. You can do so by adding such git reference after the name
-of the external to override. E.g.:
+of the external to override. For example:
 
+```yaml
+overrides:
+  ROOT@abcedf123456:
     ...
-    overrides:
-      ROOT@abcedf123456:
+```
 
 will pick `root.sh` as found in the commit `abcedf123456`.
 
@@ -256,7 +275,7 @@ You can limit which defaults can be applied to a given package by using the
 
 Architecture defaults are similar to normal defaults but they are
 always sourced, if available in alidist, and should never be provided on the
-command line. 
+command line.
 
 Their filename is always:
 
@@ -265,46 +284,72 @@ Their filename is always:
 where `<arch>` is the current architecture. They have precedence over normal
 defaults.
 
-## Relocation 
+## Relocation
 
-aliBuild supports relocating binary packages so that the scratch space used for builds (e.g. /build) and the actual installation folder (i.e. /cvmfs/alice.cern.ch ) do not need to be the same. By design this is done automatically, and
-the user should not have to care about it. The procedure takes care of relocating scripts and, on macOS, to embed the correct paths for the dynamic libraries dependencies, so that SIP does not need to be disabled. The internal procedure is
-roughly as follows:
+aliBuild supports relocating binary packages so that the scratch space used for
+builds (*e.g.* `/build`) and the actual installation folder (*i.e.*
+`/cvmfs/alice.cern.ch`) do not need to be the same. By design this is done
+automatically, and the user should not have to care about it. The procedure
+takes care of relocating scripts and, on macOS, to embed the correct paths for
+the dynamic libraries dependencies, so that SIP does not need to be disabled.
+The internal procedure is roughly as follows:
 
-* The build happens in `BUILD/<package>-latest/<package>` and installs byproducts in `INSTALLROOT=<work-dir>/INSTALLROOT/<package-hash>/<architecture>/<package>/<version>-<revisions>`. This way we know that every file which contains `<package-hash>` needs to be relocated.
-* Once the build is completed, aliBuild looks for the above mentioned `<package-hash>` and generates a script in the `$INSTALLROOT/relocate-me.sh` which can be used to relocate the binary installation, once it has been unpacked.
-* The path under `<work-dir>/INSTALLROOT/<package-hash>` is tarred up in a binary tarball.
+* The build happens in `BUILD/<package>-latest/<package>` and installs
+  byproducts in
+  `INSTALLROOT=<work-dir>/INSTALLROOT/<package-hash>/<architecture>/<package>/<version>-<revisions>`.
+  This way we know that every file which contains `<package-hash>` needs to be
+  relocated.
+* Once the build is completed, aliBuild looks for the above mentioned
+  `<package-hash>` and generates a script in the `$INSTALLROOT/relocate-me.sh`
+  which can be used to relocate the binary installation, once it has been
+  unpacked.
+* The path under `<work-dir>/INSTALLROOT/<package-hash>` is tarred up in a
+  binary tarball.
 
-When a tarball is installed, either because it was downloaded by aliBuild or by some other script (e.g. the CVMFS publisher, the following happens:
+When a tarball is installed, either because it was downloaded by aliBuild or by
+some other script (*e.g.* the CVMFS publisher, the following happens:
 
 * The tarball is expanded.
 * The relocation script `relocate-me.sh` is executed with something similar to:
 
-```
-WORK_DIR=<new-installation-workdir> relocate-me.sh
-```
+  ```bash
+  WORK_DIR=<new-installation-workdir> relocate-me.sh
+  ```
 
-which will take the path up to the `≤package-hash≥` and re-map it to the newly specified WORK_DIR.
+  which will take the path up to the `<package-hash>` and re-map it to the newly
+  specified `WORK_DIR`.
 
-Notice that the special variable `@@PKGREVISION@$PKGHASH@@` can be used to have the actual revision of the package in the relocated file.
+Notice that the special variable `@@PKGREVISION@$PKGHASH@@` can be used to have
+the actual revision of the package in the relocated file.
 
 ## Build environment
 
-Before each package is built, aliBuild will populate the environment with build related information. For a complete list of those see [the body section](#the-body). After the build is done the user has access to the environment of the build by sourcing the `<work-dir>/<architecture>/<package>/<version>/etc/profile.d/init.sh` file. E.g.:
+Before each package is built, aliBuild will populate the environment with build
+related information. For a complete list of those see
+[the body section](#the-body). After the build is done the user has access to
+the environment of the build by sourcing the
+`<work-dir>/<architecture>/<package>/<version>/etc/profile.d/init.sh` file.
+For example:
 
 ```bash
 WORK_DIR=<work-dir> source <work-dir>/<architecture>/<package>/<version>/etc/profile.d/init.sh
 ```
 
-Notice that for development packages, we also generate a `.envrc` file in `<work-dir>/BUILD/<package>-<version>/<package>/.envrc` which can be used to load the build environment via [direnv](https://direnv.net), e.g. for easy IDE integration (see for example https://aliceo2group.github.io/advanced/ides.html).
+Notice that for development packages, we also generate a `.envrc` file in
+`<work-dir>/BUILD/<package>-<version>/<package>/.envrc` which can be used to
+load the build environment via [direnv](https://direnv.net), *e.g.* for easy
+[IDE integration](https://aliceo2group.github.io/advanced/ides.html).
 
 ## Runtime environment
 
-Runtime environment is usually provided via [environment modules](https://modules.readthedocs.io/en/latest/). 
+Runtime environment is usually provided via
+[environment modules](https://modules.readthedocs.io/en/latest/).
 
-While the build environment is automatically generated, it is responsibility of the recipe to create a module file in `$INSTALLROOT/etc/modulefiles/$PKGNAME`. For example:
+While the build environment is automatically generated, it is responsibility of
+the recipe to create a module file in `$INSTALLROOT/etc/modulefiles/$PKGNAME`.
+For example:
 
-```
+```bash
 # ModuleFile
 mkdir -p etc/modulefiles
 cat > etc/modulefiles/$PKGNAME <<EoF
@@ -333,10 +378,19 @@ mkdir -p $MODULEDIR && rsync -a --delete etc/modulefiles/ $MODULEDIR
 
 Please keep in mind the following reccomendation when writing the modulefile:
 
-* Do not use runtime environment variables which are usually not set by a given tool. For example avoid exposing `<package>_ROOT`. This is because if we build in a mode where system dependencies are used, we cannot rely on their presence.
-* Use `<package>_REVISION` to guard inclusion of extra dependencies. This will make sure that only dependencies which were actually built via `aliBuild` will be included in the modulefile.
+* Do not use runtime environment variables which are usually not set by a given
+  tool. For example avoid exposing `<package>_ROOT`. This is because if we build
+  in a mode where system dependencies are used, we cannot rely on their
+  presence.
+* Use `<package>_REVISION` to guard inclusion of extra dependencies. This will
+  make sure that only dependencies which were actually built via `aliBuild` will
+  be included in the modulefile.
 
-It's also now possible to generate automatically the initial part of the modulefile, up to the `# Our environment` line, by using the `alibuild-recipe-tools` helper scripts. In order to do this you need to add `alibuild-recipe-tools` as a `build_requires` of your package and substitute the module creation with:
+It's also now possible to generate automatically the initial part of the
+modulefile, up to the `# Our environment` line, by using the
+`alibuild-recipe-tools` helper scripts. In order to do this you need to add
+`alibuild-recipe-tools` as a `build_requires` of your package and substitute the
+module creation with:
 
 ```bash
 #ModuleFile
@@ -345,7 +399,9 @@ alibuild-generate-module > etc/modulefiles/$PKGNAME
 mkdir -p $INSTALLROOT/etc/modulefiles && rsync -a --delete etc/modulefiles/ $INSTALLROOT/etc/modulefiles
 ```
 
-One can also make sure that PATH and LD_LIBRARY_PATH are properly amended by passing the option `--bin` and `--lib` (respectively). Or you can simply append extra information via:
+One can also make sure that `PATH` and `LD_LIBRARY_PATH` are properly amended by
+passing the option `--bin` and `--lib` (respectively). Or you can simply append
+extra information via:
 
 ```bash
 alibuild-generate-module > etc/modulefiles/$PKGNAME
