@@ -98,7 +98,7 @@ The following entries are optional in the header:
       "$ROOTSYS": $ROOT_ROOT
     ```
 
-    These variables **will not** be available in the recipe iteself, as they are
+    These variables **will not** be available in the recipe itself, as they are
     intended to be used to point to build products of the current recipe. If you
     need to set an environment variable for use in the recipe, use
     `export VARIABLE=value` in the recipe body.
@@ -210,7 +210,7 @@ Some environment variables are made available to the script.
    at runtime.
  - `RUNTIME_REQUIRES`: space-separated list of all runtime dependencies only.
 
-For each dependency already built, the corresponding enviornment file is loaded.
+For each dependency already built, the corresponding environment file is loaded.
 This will include, apart from custom variables and the usual `PATH` and library
 paths, the following specific variables (`<PACKAGE>` is the package name,
 uppercased):
@@ -394,7 +394,7 @@ MODULEDIR="$INSTALLROOT/etc/modulefiles"
 mkdir -p $MODULEDIR && rsync -a --delete etc/modulefiles/ $MODULEDIR
 ```
 
-Please keep in mind the following reccomendation when writing the modulefile:
+Please keep in mind the following recommendation when writing the modulefile:
 
 * Do not use runtime environment variables which are usually not set by a given
   tool. For example avoid exposing `<package>_ROOT`. This is because if we build
