@@ -72,11 +72,15 @@ The following entries are optional in the header:
     to be built.
   - `tag_basename`: if the tag resembles a path, e.g. `a/b/c`, returns the 
     last part of the path, `c` in this case.
-  - `env`: dictionary whose key-value pairs are environment variables to be set,
+  - `env`: dictionary whose key-value pairs are environment variables to be inherited by the build
+    environment **of the package dependencies**,
     *e.g.*:
 
         env:
           "$ROOTSYS": $ROOT_ROOT
+          
+    **Notice this affects only the environment 
+    of the dependent packages, not the current recipe. If you meant to set them for the current recipe, simply use export in the recipe itself.**.
 
   - `prepend_path`: dictionary whose key-value pairs are an environment variable
     name and a path to be prepended to it, as it happens in `LD_LIBRARY_PATH`.
@@ -88,9 +92,11 @@ The following entries are optional in the header:
           "LD_LIBRARY_PATH": [ "$FOO_ROOT/sub/lib", "$FOO_ROOT/sub/lib64" ]
 
     will result in prepending `$FOO_ROOT/binexec/foobar` to `$PATH`, and both
-    `$FOO_ROOT/sub/lib` and `lib64` to `LD_LIBRARY_PATH`.
+    `$FOO_ROOT/sub/lib` and `lib64` to `LD_LIBRARY_PATH`. **Notice this affects only the environment 
+    of the dependent packages, not the current recipe. If you meant to set them for the current recipe, simply use export in the recipe itself.**.
   - `append_path`: same as `prepend_path` but paths are appended rather than
-    prepended.
+    prepended. **Notice this affects  only the environment of the dependent packages, not the current recipe.
+    If you meant to set them for the current recipe, simply use export in the recipe itself.**.
   - `requires`: a list of run-time and build-time dependency for the package. E.g.:
 
         package: AliRoot
