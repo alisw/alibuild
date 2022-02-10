@@ -426,7 +426,7 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
       else:
         disable.append(spec["package"])
 
-    spec["disabled"] = disable
+    spec["disabled"] = disable.copy()
     if spec["package"] in disable:
       continue
 
