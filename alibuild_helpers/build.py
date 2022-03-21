@@ -117,9 +117,9 @@ def storeHashes(package, specs, isDevelPkg, considerRelocation):
   def hash_data_for_key(key):
     if sys.version_info[0] < 3 and key in spec and isinstance(spec[key], OrderedDict):
       # Python 2: use YAML dict order to prevent changing hashes
-      return str(yaml.safe_load(yamlDump(spec[x])))
+      return str(yaml.safe_load(yamlDump(spec[key])))
     else:
-      return str(spec.get(x, "none"))
+      return str(spec.get(key, "none"))
 
   for x in ("recipe", "version", "package"):
     h_all(hash_data_for_key(x))
