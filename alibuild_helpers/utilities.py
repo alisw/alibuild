@@ -13,7 +13,8 @@ try:
 except ImportError:
   from ordereddict import OrderedDict
 
-from alibuild_helpers.cmd import getoutput, getstatusoutput
+from alibuild_helpers.cmd import getoutput
+from alibuild_helpers.git import git
 from alibuild_helpers.log import dieOnError
 
 
@@ -279,9 +280,9 @@ class GitReader(object):
     self.url, self.configDir = url, configDir
   def __call__(self):
     m = re.search(r'^dist:(.*)@([^@]+)$', self.url)
-    fn,gh = m.groups()
-    err,d = getstatusoutput(format("GIT_DIR=%(dist)s/.git git show %(gh)s:%(fn)s.sh",
-                                   dist=self.configDir, gh=gh, fn=fn.lower()))
+    fn, gh = m.groups()
+    err, d = git(("show", "{gh}:{fn}.sh".format(gh=gh, fn=fn.lower())),
+                 directory=self.configDir)
     if err:
       raise RuntimeError(format("Cannot read recipe %(fn)s from reference %(gh)s.\n" +
                                 "Make sure you run first (this will not alter your recipes):\n" +

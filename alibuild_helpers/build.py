@@ -13,7 +13,7 @@ from alibuild_helpers.utilities import validateDefaults
 from alibuild_helpers.utilities import Hasher
 from alibuild_helpers.utilities import yamlDump
 from alibuild_helpers.utilities import resolve_tag, resolve_version
-from alibuild_helpers.git import partialCloneFilter
+from alibuild_helpers.git import git, partialCloneFilter
 from alibuild_helpers.sync import (NoRemoteSync, HttpRemoteSync, S3RemoteSync,
                                    Boto3RemoteSync, RsyncRemoteSync)
 import yaml
@@ -37,10 +37,12 @@ import shutil
 import sys
 import time
 
+
 def writeAll(fn, txt):
   f = open(fn, "w")
   f.write(txt)
   f.close()
+
 
 def readHashFile(fn):
   try:
@@ -48,16 +50,6 @@ def readHashFile(fn):
   except IOError:
     return "0"
 
-def getDirectoryHash(d):
-  # We can't use git --git-dir=%s/.git or git -C %s here as the former requires
-  # that the directory we're inspecting to be the root of a git directory, not
-  # just contained in one (and that breaks CI tests), and the latter isn't
-  # supported by the git version we have on slc6.
-  # Silence cd as shell configuration can cause the new directory to be echoed.
-  err, out = getstatusoutput("cd %s >/dev/null 2>&1 && "
-                             "git rev-parse HEAD" % quote(d))
-  dieOnError(err, "Impossible to find reference for %s" % d)
-  return out
 
 # Creates a directory in the store which contains symlinks to the package
 # and its direct / indirect dependencies
@@ -250,7 +242,7 @@ def doBuild(args, parser):
           star(), args.configDir, star())
     return 1
 
-  err, value = getstatusoutput("GIT_DIR=%s/.git git symbolic-ref -q HEAD" % args.configDir)
+  _, value = git(("symbolic-ref", "-q", "HEAD"), directory=args.configDir, check=False)
   branch_basename = re.sub("refs/heads/", "", value)
   branch_stream = re.sub("-patches$", "", branch_basename)
   # In case the basename and the stream are the same,
@@ -267,7 +259,7 @@ def doBuild(args, parser):
   if not exists(specDir):
     makedirs(specDir)
 
-  os.environ["ALIBUILD_ALIDIST_HASH"] = getDirectoryHash(args.configDir)
+  os.environ["ALIBUILD_ALIDIST_HASH"] = git(("rev-parse", "HEAD"), directory=args.configDir)
 
   debug("Building for architecture %s", args.architecture)
   debug("Number of parallel builds: %d", args.jobs)
@@ -381,15 +373,12 @@ def doBuild(args, parser):
       updateReferenceRepoSpec(args.referenceSources, p, specs[p], args.fetchRepos, not args.docker)
 
       # Retrieve git heads
-      cmd = ("git", "ls-remote", "--heads", "--tags",
+      cmd = ("ls-remote", "--heads", "--tags",
              specs[p].get("reference", specs[p]["source"]))
       if specs[p]["package"] in develPkgs:
          specs[p]["source"] = join(os.getcwd(), specs[p]["package"])
-         cmd = "git", "ls-remote", "--heads", "--tags", specs[p]["source"]
-      debug("Executing %s", " ".join(cmd))
-      err, output = getstatusoutput(cmd)
-      if err:
-        raise RuntimeError("Error on %r: %s" % (" ".join(cmd), output))
+         cmd = "ls-remote", "--heads", "--tags", specs[p]["source"]
+      output = git(cmd)
       specs[p]["git_refs"] = {git_ref: git_hash for git_hash, sep, git_ref in
                               (line.partition("\t") for line in output.splitlines())
                               if sep}
@@ -427,9 +416,7 @@ def doBuild(args, parser):
       # different or if there are extra changes on top.
       if spec["package"] in develPkgs:
         # Devel package: we get the commit hash from the checked source, not from remote.
-        cmd = "cd %s && git rev-parse HEAD" % spec["source"]
-        err, out = getstatusoutput(cmd)
-        dieOnError(err, "Unable to detect current commit hash.")
+        out = git(("rev-parse", "HEAD"), directory=spec["source"])
         spec["commit_hash"] = out.strip()
         cmd = "cd %s && git diff -r HEAD && git status --porcelain" % spec["source"]
         h = Hasher()
@@ -437,15 +424,9 @@ def doBuild(args, parser):
         debug("Command %s returned %d", cmd, err)
         dieOnError(err, "Unable to detect source code changes.")
         spec["devel_hash"] = spec["commit_hash"] + h.hexdigest()
-        cmd = "cd %s && git rev-parse --abbrev-ref HEAD" % spec["source"]
-        err, out = getstatusoutput(cmd)
+        out = git(("rev-parse", "--abbrev-ref", "HEAD"), directory=spec["source"])
         if out == "HEAD":
-          err, out = getstatusoutput("cd %s && git rev-parse HEAD" % spec["source"])
-          out = out[0:10]
-        if err:
-          error("Error, unable to lookup changes in development package %s. Is it a git clone?",
-                spec["source"])
-          return 1
+          out = git(("rev-parse", "HEAD"), directory=spec["source"])[:10]
         develPackageBranch = out.replace("/", "-")
         spec["tag"] = args.develPrefix if "develPrefix" in args else develPackageBranch
         spec["commit_hash"] = "0"

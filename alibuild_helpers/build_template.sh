@@ -12,6 +12,25 @@ set +h
 function hash() { true; }
 export WORK_DIR="${WORK_DIR_OVERRIDE:-%(workDir)s}"
 
+# Insert our own git and curl wrapper scripts into $PATH, patched to use the
+# system OpenSSL, instead of the one we build ourselves.
+tmpdir=$(mktemp -d)
+export PATH="$tmpdir:$PATH"
+trap -- 'rm -rf "$tmpdir"' EXIT  # clean up on exit
+for executable in git curl; do
+  system_executable=$(command -v "$executable")
+  # Create a wrapper script that cleans up the environment, so we don't see the
+  # OpenSSL built by aliBuild.
+  cat << EOF > "$tmpdir/$executable"
+#!/bin/sh
+exec env -u LD_LIBRARY_PATH -u DYLD_LIBRARY_PATH $system_executable "\$@"
+EOF
+  chmod +x "$tmpdir/$executable"
+  if [ "$(command -v "$executable")" != "$tmpdir/$executable" ]; then
+    echo "WARNING: failed to install $executable wrapper script" >&2
+  fi
+done
+
 # From our dependencies
 %(dependencies)s
 
