@@ -7,10 +7,10 @@ import sys
 import unittest
 # Assuming you are using the mock library to ... mock things
 try:
-    from unittest.mock import patch, MagicMock, DEFAULT  # In Python 3, mock is built-in
+    from unittest.mock import call, patch, MagicMock, DEFAULT  # In Python 3, mock is built-in
     from io import StringIO
 except ImportError:
-    from mock import patch, MagicMock, DEFAULT  # Python 2
+    from mock import call, patch, MagicMock, DEFAULT  # Python 2
     from StringIO import StringIO
 try:
     from collections import OrderedDict
@@ -101,59 +101,69 @@ TEST_EXTRA_BUILD_HASH = ("9f9eb8696b7722df52c4703f5fe7acc4b8000ba2" if sys.versi
                          "5afae57bfc6a374e74c1c4427698ab5edebce0bc")
 
 
+GIT_CLONE_ZLIB_ARGS = ("clone", "--bare", "https://github.com/star-externals/zlib",
+                       "/sw/MIRROR/zlib", "--filter=blob:none"), ".", True
+GIT_FETCH_ROOT_ARGS = ("fetch", "-f", "--tags", "https://github.com/root-mirror/root",
+                       "+refs/heads/*:refs/heads/*"), "/sw/MIRROR/root", False
+
+
+def dummy_git(args, directory=".", check=True):
+    return {
+        (("symbolic-ref", "-q", "HEAD"), "/alidist", False): (0, "master"),
+        (("rev-parse", "HEAD"), "/alidist", True): "6cec7b7b3769826219dfa85e5daa6de6522229a0",
+        (("ls-remote", "--heads", "--tags", "/sw/MIRROR/root"), ".", True): TEST_ROOT_GIT_REFS,
+        (("ls-remote", "--heads", "--tags", "/sw/MIRROR/zlib"), ".", True): TEST_ZLIB_GIT_REFS,
+        GIT_CLONE_ZLIB_ARGS: "",
+        GIT_FETCH_ROOT_ARGS: (0, ""),
+    }[(tuple(args), directory, check)]
+
+
 def dummy_getstatusoutput(x):
     if is_string(x) and re.match("(mkdir -p|ln -snf) [^;]+(;ln -snf [^;]+)*$", x):
         return (0, "")
     return {
-        "cd /alidist >/dev/null 2>&1 && git rev-parse HEAD": (0, "6cec7b7b3769826219dfa85e5daa6de6522229a0"),
         'which pigz': (1, ""),
         'tar --ignore-failed-read -cvvf /dev/null /dev/zero': (0, ""),
-        'GIT_DIR=/alidist/.git git symbolic-ref -q HEAD': (0, "master"),
-        ("git", "ls-remote", "--heads", "--tags", "/sw/MIRROR/root"): (0, TEST_ROOT_GIT_REFS),
-        ("git", "ls-remote", "--heads", "--tags", "/sw/MIRROR/zlib"): (0, TEST_ZLIB_GIT_REFS),
     }[x]
 
 
 TIMES_ASKED = {}
 
 
-def dummy_open(x, mode="r"):
+def dummy_open(x, mode="r", encoding=None, errors=None):
+    if x.endswith("/fetch-log.txt") and mode == "w":
+        return MagicMock(__enter__=lambda _: StringIO())
     if x.endswith("/alibuild_helpers/build_template.sh"):
         return DEFAULT  # actually open the real build_template.sh
     if mode == "r":
-        threshold, result = {
-            "/sw/BUILD/%s/defaults-release/.build_succeeded" % TEST_DEFAULT_RELEASE_BUILD_HASH: (0, StringIO("0")),
-            "/sw/BUILD/%s/zlib/.build_succeeded" % TEST_ZLIB_BUILD_HASH: (0, StringIO("0")),
-            "/sw/BUILD/%s/ROOT/.build_succeeded" % TEST_ROOT_BUILD_HASH: (0, StringIO("0")),
-            "/sw/osx_x86-64/defaults-release/v1-1/.build-hash": (1, StringIO(TEST_DEFAULT_RELEASE_BUILD_HASH)),
-            "/sw/osx_x86-64/zlib/v1.2.3-local1/.build-hash": (1, StringIO(TEST_ZLIB_BUILD_HASH)),
-            "/sw/osx_x86-64/ROOT/v6-08-30-local1/.build-hash": (1, StringIO(TEST_ROOT_BUILD_HASH))
-        }[x]
+        try:
+            threshold, result = {
+                "/sw/BUILD/%s/defaults-release/.build_succeeded" % TEST_DEFAULT_RELEASE_BUILD_HASH: (0, StringIO("0")),
+                "/sw/BUILD/%s/zlib/.build_succeeded" % TEST_ZLIB_BUILD_HASH: (0, StringIO("0")),
+                "/sw/BUILD/%s/ROOT/.build_succeeded" % TEST_ROOT_BUILD_HASH: (0, StringIO("0")),
+                "/sw/osx_x86-64/defaults-release/v1-1/.build-hash": (1, StringIO(TEST_DEFAULT_RELEASE_BUILD_HASH)),
+                "/sw/osx_x86-64/zlib/v1.2.3-local1/.build-hash": (1, StringIO(TEST_ZLIB_BUILD_HASH)),
+                "/sw/osx_x86-64/ROOT/v6-08-30-local1/.build-hash": (1, StringIO(TEST_ROOT_BUILD_HASH))
+            }[x]
+        except KeyError:
+            return DEFAULT
         if threshold > TIMES_ASKED.get(x, 0):
             result = None
         TIMES_ASKED[x] = TIMES_ASKED.get(x, 0) + 1
         if not result:
             raise IOError
         return result
-    return StringIO()
+    return DEFAULT
 
 
-def dummy_execute(x, mock_git_clone, mock_git_fetch, **kwds):
+def dummy_execute(x, **kwds):
     s = " ".join(x) if isinstance(x, list) else x
     if re.match(".*ln -sfn.*TARS", s):
-        return 0
-    if re.search("^git clone --filter=blob:none --bare", s):
-        mock_git_clone()
-    elif re.search("&& git fetch -f --tags", s):
-        mock_git_fetch()
         return 0
     return {
         "/bin/bash -e -x /sw/SPECS/osx_x86-64/defaults-release/v1-1/build.sh 2>&1": 0,
         '/bin/bash -e -x /sw/SPECS/osx_x86-64/zlib/v1.2.3-local1/build.sh 2>&1': 0,
         '/bin/bash -e -x /sw/SPECS/osx_x86-64/ROOT/v6-08-30-local1/build.sh 2>&1': 0,
-        "git clone --filter=blob:none --bare https://github.com/star-externals/zlib /sw/MIRROR/zlib": 0,
-        "git clone --filter=blob:none --bare https://github.com/root-mirror/root /sw/MIRROR/root": 0,
-        "cat /sw/MIRROR/fetch-log.txt": 0,
     }[s]
 
 
@@ -170,13 +180,11 @@ def dummy_exists(x):
         return False
     return {
         "/alidist": True,
+        "/sw": True,
         "/sw/SPECS": False,
-        "/alidist/.git": True,
-        "alibuild_helpers/.git": False,
         "/sw/MIRROR/root": True,
         "/sw/MIRROR/zlib": False,
-        "/sw/MIRROR/fetch-log.txt": False,
-    }[x]
+    }.get(x, DEFAULT)
 
 
 git_mock = MagicMock(partialCloneFilter="--filter=blob:none")
@@ -187,12 +195,13 @@ sys.modules["alibuild_helpers.git"] = git_mock
 class BuildTestCase(unittest.TestCase):
     @patch("alibuild_helpers.analytics", new=MagicMock())
     @patch("requests.Session.get", new=MagicMock())
-    @patch("alibuild_helpers.build.execute")
-    @patch("alibuild_helpers.workarea.execute")
-    @patch("alibuild_helpers.sync.execute")
+    @patch("alibuild_helpers.build.git", new=dummy_git)
+    @patch("alibuild_helpers.workarea.git")
+    @patch("alibuild_helpers.build.execute", new=dummy_execute)
+    @patch("alibuild_helpers.sync.execute", new=dummy_execute)
     @patch("alibuild_helpers.build.getstatusoutput", new=dummy_getstatusoutput)
-    @patch("alibuild_helpers.build.exists", new=dummy_exists)
-    @patch("alibuild_helpers.workarea.path.exists", new=dummy_exists)
+    @patch("alibuild_helpers.build.exists", new=MagicMock(side_effect=dummy_exists))
+    @patch("os.path.exists", new=MagicMock(side_effect=dummy_exists))
     @patch("alibuild_helpers.build.sys")
     @patch("alibuild_helpers.build.dieOnError", new=MagicMock())
     @patch("alibuild_helpers.utilities.dieOnError", new=MagicMock())
@@ -206,6 +215,7 @@ class BuildTestCase(unittest.TestCase):
     }[x])
     @patch("alibuild_helpers.sync.open", new=MagicMock(side_effect=dummy_open))
     @patch("alibuild_helpers.build.open", new=MagicMock(side_effect=dummy_open))
+    @patch("codecs.open", new=MagicMock(side_effect=dummy_open))
     @patch("alibuild_helpers.build.shutil", new=MagicMock())
     @patch("alibuild_helpers.build.glob")
     @patch("alibuild_helpers.build.readlink", new=dummy_readlink)
@@ -213,7 +223,8 @@ class BuildTestCase(unittest.TestCase):
     @patch("alibuild_helpers.build.debug")
     @patch("alibuild_helpers.workarea.is_writeable", new=MagicMock(return_value=True))
     @patch("alibuild_helpers.build.basename", new=MagicMock(return_value="aliBuild"))
-    def test_coverDoBuild(self, mock_debug, mock_glob, mock_sys, mock_sync_execute, mock_workarea_execute, mock_execute):
+    def test_coverDoBuild(self, mock_debug, mock_glob, mock_sys, mock_workarea_git):
+        mock_workarea_git.side_effect = dummy_git
         mock_debug.side_effect = lambda *args: None
         mock_glob.side_effect = lambda x: {
             "*": ["zlib"],
@@ -229,12 +240,6 @@ class BuildTestCase(unittest.TestCase):
              (TEST_DEFAULT_RELEASE_BUILD_HASH[:2], TEST_DEFAULT_RELEASE_BUILD_HASH)],
         }[x]
         os.environ["ALIBUILD_NO_ANALYTICS"] = "1"
-
-        mock_git_clone = MagicMock(return_value=None)
-        mock_git_fetch = MagicMock(return_value=None)
-        mock_execute.side_effect = lambda x, **kwds: dummy_execute(x, mock_git_clone, mock_git_fetch, **kwds)
-        mock_workarea_execute.side_effect = lambda x, **kwds: dummy_execute(x, mock_git_clone, mock_git_fetch, **kwds)
-        mock_sync_execute.side_effect = lambda x, **kwds: dummy_execute(x, mock_git_clone, mock_git_fetch, **kwds)
 
         mock_parser = MagicMock()
         args = Namespace(
@@ -263,28 +268,32 @@ class BuildTestCase(unittest.TestCase):
         )
         mock_sys.version_info = sys.version_info
 
-        mock_git_clone.reset_mock()
-        mock_git_fetch.reset_mock()
+        mock_workarea_git.reset_mock()
         mock_debug.reset_mock()
         exit_code = doBuild(args, mock_parser)
         self.assertEqual(exit_code, 0)
         mock_debug.assert_called_with("Everything done")
-        mock_git_clone.assert_called_once()
-        mock_git_fetch.assert_not_called()
+        mock_workarea_git.assert_called_once_with(list(GIT_CLONE_ZLIB_ARGS[0]))
 
         # Force fetching repos
-        mock_git_clone.reset_mock()
-        mock_git_fetch.reset_mock()
+        mock_workarea_git.reset_mock()
         mock_debug.reset_mock()
         args.fetchRepos = True
         exit_code = doBuild(args, mock_parser)
         self.assertEqual(exit_code, 0)
         mock_debug.assert_called_with("Everything done")
         mock_glob.assert_called_with("/sw/TARS/osx_x86-64/ROOT/ROOT-v6-08-30-*.osx_x86-64.tar.gz")
-        mock_git_clone.assert_called_once()
-        mock_git_fetch.assert_called_once()
+        fetch_args, fetch_dir, fetch_check = GIT_FETCH_ROOT_ARGS
+        # We can't compare directly against the list of calls here as they
+        # might happen in any order.
+        self.assertEqual(mock_workarea_git.call_count, 2)
+        mock_workarea_git.has_calls([
+            call(list(GIT_CLONE_ZLIB_ARGS[0])),
+            call(fetch_args, directory=fetch_dir, check=fetch_check),
+        ])
 
     def test_hashing(self):
+        """Check that the hashes assigned to packages remain constant."""
         def setup_spec(script):
             err, spec, recipe = parseRecipe(lambda: script)
             self.assertIsNone(err)
