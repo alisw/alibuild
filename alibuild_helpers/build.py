@@ -4,7 +4,7 @@ from alibuild_helpers import __version__
 from alibuild_helpers.analytics import report_event
 from alibuild_helpers.log import debug, error, info, banner, warning
 from alibuild_helpers.log import dieOnError
-from alibuild_helpers.cmd import execute, getstatusoutput, DockerRunner, BASH
+from alibuild_helpers.cmd import execute, getstatusoutput, DockerRunner, BASH, install_wrapper_script
 from alibuild_helpers.utilities import star, prunePaths
 from alibuild_helpers.utilities import resolve_store_path
 from alibuild_helpers.utilities import format, parseDefaults, readDefaults
@@ -265,6 +265,8 @@ def doBuild(args, parser):
   debug("Number of parallel builds: %d", args.jobs)
   debug("Using %sBuild from %sbuild@%s recipes in %sdist@%s",
         star(), star(), __version__, star(), os.environ["ALIBUILD_ALIDIST_HASH"])
+
+  install_wrapper_script("git", workDir)
 
   with DockerRunner(dockerImage, ["--network=host"]) as getstatusoutput_docker:
     my_gzip = "pigz" if getstatusoutput_docker("which pigz")[0] == 0 else "gzip"

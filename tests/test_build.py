@@ -223,6 +223,7 @@ class BuildTestCase(unittest.TestCase):
     @patch("alibuild_helpers.build.debug")
     @patch("alibuild_helpers.workarea.is_writeable", new=MagicMock(return_value=True))
     @patch("alibuild_helpers.build.basename", new=MagicMock(return_value="aliBuild"))
+    @patch("alibuild_helpers.build.install_wrapper_script", new=MagicMock())
     def test_coverDoBuild(self, mock_debug, mock_glob, mock_sys, mock_workarea_git):
         mock_workarea_git.side_effect = dummy_git
         mock_debug.side_effect = lambda *args: None

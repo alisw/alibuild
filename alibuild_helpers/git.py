@@ -1,4 +1,7 @@
-import shlex
+try:
+  from shlex import quote  # Python 3.3+
+except ImportError:
+  from pipes import quote  # Python 2.7
 from alibuild_helpers.cmd import getstatusoutput
 from alibuild_helpers.log import debug
 
@@ -22,8 +25,8 @@ def git(args, directory=".", check=True):
   set -e +x
   cd {directory} >/dev/null 2>&1
   exec env -u LD_LIBRARY_PATH -u DYLD_LIBRARY_PATH git {args}
-  """.format(directory=shlex.quote(directory),
-             args=" ".join(map(shlex.quote, args))))
+  """.format(directory=quote(directory),
+             args=" ".join(map(quote, args))))
   if check and err != 0:
     raise RuntimeError("Error {} from git {}: {}".format(err, " ".join(args), output))
   return output if check else (err, output)
