@@ -24,7 +24,7 @@ def git(args, directory=".", check=True):
   err, output = getstatusoutput("""\
   set -e +x
   cd {directory} >/dev/null 2>&1
-  exec env -u LD_LIBRARY_PATH -u DYLD_LIBRARY_PATH git {args}
+  exec git {args}
   """.format(directory=quote(directory),
              args=" ".join(map(quote, args))))
   if check and err != 0:
