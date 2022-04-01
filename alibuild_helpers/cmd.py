@@ -18,23 +18,40 @@ def is_string(s):
   return isinstance(s, basestring)
 
 
+def decode_with_fallback(data):
+  """Try to decode DATA as utf-8; if that doesn't work, fall back to latin-1.
+
+  This combination should cover every possible byte string, as latin-1 covers
+  every possible single byte.
+  """
+  if sys.version_info[0] >= 3:
+    if isinstance(data, bytes):
+      try:
+        return data.decode("utf-8")
+      except UnicodeDecodeError:
+        return data.decode("latin-1")
+    else:
+      return str(data)
+  elif isinstance(data, str):
+    return unicode(data, "utf-8")  # utf-8 is a safe assumption
+  elif not isinstance(data, unicode):
+    return unicode(str(data))
+
+
 def getoutput(command):
   """Run command, check it succeeded, and return its stdout as a string."""
-  kwargs = {} if sys.version_info.major < 3 else {"encoding": "utf-8"}
-  proc = Popen(command, shell=is_string(command), stdout=PIPE, stderr=PIPE,
-               universal_newlines=True, **kwargs)
+  proc = Popen(command, shell=is_string(command), stdout=PIPE, stderr=PIPE)
   stdout, stderr = proc.communicate()
   dieOnError(proc.returncode, "Command %s failed with code %d: %s" %
-             (command, proc.returncode, stderr))
-  return stdout
+             (command, proc.returncode, decode_with_fallback(stderr)))
+  return decode_with_fallback(stdout)
 
 
 def getstatusoutput(command):
   """Run command and return its return code and output (stdout and stderr)."""
-  kwargs = {} if sys.version_info.major < 3 else {"encoding": "utf-8"}
-  proc = Popen(command, shell=is_string(command), stdout=PIPE, stderr=STDOUT,
-               universal_newlines=True, **kwargs)
+  proc = Popen(command, shell=is_string(command), stdout=PIPE, stderr=STDOUT)
   merged_output, _ = proc.communicate()
+  merged_output = decode_with_fallback(merged_output)
   # Strip a single trailing newline, if one exists, to match the behaviour of
   # subprocess.getstatusoutput.
   if merged_output.endswith("\n"):
@@ -43,16 +60,12 @@ def getstatusoutput(command):
 
 
 def execute(command, printer=debug):
-  kwargs = {} if sys.version_info.major < 3 else {"encoding": "utf-8"}
-  popen = Popen(command, shell=is_string(command), stdout=PIPE,
-                universal_newlines=True, **kwargs)
-  lines_iterator = iter(popen.stdout.readline, "")
-  for line in lines_iterator:
-    if not line: break
-    printer("%s", line.strip("\n"))
-  out = popen.communicate()[0].strip("\n")
+  popen = Popen(command, shell=is_string(command), stdout=PIPE, stderr=STDOUT)
+  for line in iter(popen.stdout.readline, b""):
+    printer("%s", decode_with_fallback(line).strip("\n"))
+  out = decode_with_fallback(popen.communicate()[0]).strip("\n")
   if out:
-    printer(out)
+    printer("%s", out)
   return popen.returncode
 
 
