@@ -22,10 +22,6 @@ class SpecError(Exception):
 
 asList = lambda x : x if type(x) == list else [x]
 
-# Keep the linter happy
-if sys.version_info[0] >= 3:
-  unicode = None
-
 def star():
   return re.sub("build.*$", "", basename(sys.argv[0]).lower())
 

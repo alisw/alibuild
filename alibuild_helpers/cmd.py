@@ -10,6 +10,7 @@ from alibuild_helpers.log import debug, dieOnError
 # Keep the linter happy
 if sys.version_info[0] >= 3:
   basestring = str
+  unicode = None
 
 
 def is_string(s):
@@ -36,6 +37,7 @@ def decode_with_fallback(data):
     return unicode(data, "utf-8")  # utf-8 is a safe assumption
   elif not isinstance(data, unicode):
     return unicode(str(data))
+  return data
 
 
 def getoutput(command):
