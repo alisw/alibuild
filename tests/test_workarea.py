@@ -1,182 +1,99 @@
 from __future__ import print_function
-# Assumin you are using the mock library to ... mock things
-try:
-    from unittest import mock
-    from unittest.mock import patch, call, MagicMock  # In Python 3, mock is built-in
-except ImportError:
-    import mock
-    from mock import patch, call, MagicMock  # Python 2
-try:
-  from collections import OrderedDict
-except ImportError:
-  from ordereddict import OrderedDict
-
-from alibuild_helpers.workarea import updateReferenceRepo, updateReferenceRepoSpec
-from os.path import abspath, join
 from os import getcwd
-
-import re
 import unittest
+try:
+    from unittest.mock import patch, call, MagicMock, DEFAULT  # In Python 3, mock is built-in
+except ImportError:
+    from mock import patch, call, MagicMock, DEFAULT  # Python 2
+try:
+    from collections import OrderedDict
+except ImportError:
+    from ordereddict import OrderedDict
 
-def reference_sources_do_not_exists(x):
-  if x.endswith("/aliroot"):
-    return False
-  return True
+from alibuild_helpers.workarea import updateReferenceRepoSpec
 
-def reference_basedir_exists(x):
-  if x.endswith("/aliroot"):
-    return False
-  return {
-    "sw": True,
-    "sw/MIRROR": False
-  }[x]
-
-def allow_git_clone(x, mock_git_clone, mock_git_fetch, **k):
-  s = " ".join(x) if isinstance(x, list) else x
-  if re.search("^git clone ", s):
-    mock_git_clone()
-  elif re.search("&& git fetch -f --tags", s):
-    mock_git_fetch()
-  return 0
 
 class WorkareaTestCase(unittest.TestCase):
 
-    @mock.patch("alibuild_helpers.workarea.execute")
-    @mock.patch("alibuild_helpers.workarea.path")
-    @mock.patch("alibuild_helpers.workarea.debug")
-    @mock.patch("alibuild_helpers.workarea.os")
-    @mock.patch("alibuild_helpers.workarea.is_writeable")
-    def test_referenceSourceExistsNonWriteable(self, mock_is_writeable, mock_os, mock_debug, mock_path, mock_execute):
-      # Reference sources exists but cannot be written
-      # The reference repo is set nevertheless but not updated
-      mock_path.exists.side_effect = lambda x: True
-      mock_is_writeable.side_effect = lambda x: False
-      mock_os.path.join.side_effect = join
-      mock_git_clone = MagicMock(return_value=None)
-      mock_git_fetch = MagicMock(return_value=None)
-      mock_execute.side_effect = lambda x, **k: allow_git_clone(x, mock_git_clone, mock_git_fetch, *k)
-      spec = OrderedDict({"source": "https://github.com/alisw/AliRoot"})
-      referenceSources = "sw/MIRROR"
-      reference = abspath(referenceSources) + "/aliroot"
-      mock_os.makedirs.reset_mock()
-      mock_git_clone.reset_mock()
-      mock_git_fetch.reset_mock()
-      updateReferenceRepoSpec(referenceSources=referenceSources, p="AliRoot", spec=spec, fetch=True)
-      mock_os.makedirs.assert_called_with('%s/sw/MIRROR' % getcwd())
-      self.assertEqual(mock_git_fetch.call_count, 0, "Expected no calls to git fetch (called %d times instead)" % mock_git_fetch.call_count)
-      self.assertEqual(mock_git_clone.call_count, 0, "Expected no calls to git clone (called %d times instead)" % mock_git_clone.call_count)
-      self.assertEqual(spec.get("reference"), reference)
-      self.assertEqual(True, call('Updating references.') in mock_debug.mock_calls)
+    @patch("os.path.exists")
+    @patch("os.makedirs")
+    @patch("alibuild_helpers.workarea.git")
+    @patch("alibuild_helpers.workarea.debug", new=MagicMock())
+    @patch("alibuild_helpers.workarea.is_writeable", new=MagicMock(return_value=False))
+    def test_reference_sources_reused(self, mock_git, mock_makedirs, mock_exists):
+        """Check mirrors are reused when pre-existing, but not writable.
 
-    @mock.patch("alibuild_helpers.workarea.execute")
-    @mock.patch("alibuild_helpers.workarea.path")
-    @mock.patch("alibuild_helpers.workarea.debug")
-    @mock.patch("alibuild_helpers.workarea.os")
-    @mock.patch("alibuild_helpers.workarea.is_writeable")
-    def test_referenceSourceExistsWriteable(self, mock_is_writeable, mock_os, mock_debug, mock_path, mock_execute):
-      # Reference sources exists and can be written
-      # The reference repo is set nevertheless but not updated
-      mock_path.exists.side_effect = lambda x: True
-      mock_is_writeable.side_effect = lambda x: True
-      mock_os.path.join.side_effect = join
-      mock_git_clone = MagicMock(return_value=None)
-      mock_git_fetch = MagicMock(return_value=None)
-      mock_execute.side_effect = lambda x, **k: allow_git_clone(x, mock_git_clone, mock_git_fetch, *k)
-      spec = OrderedDict({"source": "https://github.com/alisw/AliRoot"})
-      referenceSources = "sw/MIRROR"
-      reference = abspath(referenceSources) + "/aliroot"
-      mock_os.makedirs.reset_mock()
-      mock_git_clone.reset_mock()
-      mock_git_fetch.reset_mock()
-      updateReferenceRepoSpec(referenceSources=referenceSources, p="AliRoot", spec=spec, fetch=True)
-      mock_os.makedirs.assert_called_with('%s/sw/MIRROR' % getcwd())
-      self.assertEqual(mock_git_fetch.call_count, 1, "Expected one call to git fetch (called %d times instead)" % mock_git_fetch.call_count)
-      self.assertEqual(mock_git_clone.call_count, 0, "Expected no calls to git clone (called %d times instead)" % mock_git_clone.call_count)
-      self.assertEqual(spec.get("reference"), reference)
-      self.assertEqual(True, call('Updating references.') in mock_debug.mock_calls)
+        In this case, make sure nothing is fetched, even when requested.
+        """
+        mock_exists.return_value = True
+        spec = OrderedDict({"source": "https://github.com/alisw/AliRoot"})
+        updateReferenceRepoSpec(referenceSources="sw/MIRROR", p="AliRoot",
+                                spec=spec, fetch=True)
+        mock_exists.assert_called_with("%s/sw/MIRROR/aliroot" % getcwd())
+        mock_makedirs.assert_called_with("%s/sw/MIRROR" % getcwd())
+        mock_git.assert_not_called()
+        self.assertEqual(spec.get("reference"), "%s/sw/MIRROR/aliroot" % getcwd())
 
-    @mock.patch("alibuild_helpers.workarea.execute")
-    @mock.patch("alibuild_helpers.workarea.path")
-    @mock.patch("alibuild_helpers.workarea.debug")
-    @mock.patch("alibuild_helpers.workarea.os")
-    @mock.patch("alibuild_helpers.workarea.is_writeable")
-    def test_referenceBasedirExistsWriteable(self, mock_is_writeable, mock_os, mock_debug, mock_path, mock_execute):
-      """
-      The referenceSources directory exists and it's writeable
-      Reference sources are already there
-      """
-      mock_path.exists.side_effect = lambda x: True
-      mock_is_writeable.side_effect = lambda x: True
-      mock_os.path.join.side_effect = join
-      mock_git_clone = MagicMock(return_value=None)
-      mock_git_fetch = MagicMock(return_value=None)
-      mock_execute.side_effect = lambda x, **k: allow_git_clone(x, mock_git_clone, mock_git_fetch, *k)
-      spec = OrderedDict({"source": "https://github.com/alisw/AliRoot"})
-      referenceSources = "sw/MIRROR"
-      reference = abspath(referenceSources) + "/aliroot"
-      mock_os.makedirs.reset_mock()
-      mock_git_clone.reset_mock()
-      mock_git_fetch.reset_mock()
-      updateReferenceRepo(referenceSources=referenceSources, p="AliRoot", spec=spec)
-      mock_os.makedirs.assert_called_with('%s/sw/MIRROR' % getcwd())
-      self.assertEqual(mock_git_fetch.call_count, 1, "Expected one call to git fetch (called %d times instead)" % mock_git_fetch.call_count)
+    @patch("os.path.exists")
+    @patch("os.makedirs")
+    @patch("codecs.open")
+    @patch("alibuild_helpers.workarea.git")
+    @patch("alibuild_helpers.workarea.debug", new=MagicMock())
+    @patch("alibuild_helpers.workarea.is_writeable", new=MagicMock(return_value=True))
+    def test_reference_sources_updated(self, mock_git, mock_open, mock_makedirs, mock_exists):
+        """Check mirrors are updated when possible and git output is logged."""
+        mock_exists.return_value = True
+        mock_git.return_value = 0, "sentinel output"
+        mock_open.return_value = MagicMock(
+            __enter__=lambda *args, **kw: MagicMock(
+                write=lambda output: self.assertEqual(output, "sentinel output")))
+        spec = OrderedDict({"source": "https://github.com/alisw/AliRoot"})
+        updateReferenceRepoSpec(referenceSources="sw/MIRROR", p="AliRoot",
+                                spec=spec, fetch=True)
+        mock_exists.assert_called_with("%s/sw/MIRROR/aliroot" % getcwd())
+        mock_makedirs.assert_called_with("%s/sw/MIRROR" % getcwd())
+        mock_git.assert_called_once_with(
+            ("fetch", "-f", "--tags", spec["source"],
+                "+refs/heads/*:refs/heads/*"),
+            directory="%s/sw/MIRROR/aliroot" % getcwd(), check=False
+        )
+        self.assertEqual(spec.get("reference"), "%s/sw/MIRROR/aliroot" % getcwd())
 
-    @mock.patch("alibuild_helpers.workarea.execute")
-    @mock.patch("alibuild_helpers.workarea.path")
-    @mock.patch("alibuild_helpers.workarea.debug")
-    @mock.patch("alibuild_helpers.workarea.os")
-    @mock.patch("alibuild_helpers.workarea.is_writeable")
-    def test_referenceBasedirNotExistsWriteable(self, mock_is_writeable, mock_os, mock_debug, mock_path, mock_execute):
-      """
-      The referenceSources directory exists and it's writeable
-      Reference sources are not already there
-      """
-      mock_path.exists.side_effect = reference_sources_do_not_exists
-      mock_is_writeable.side_effect = lambda x: False # not writeable
-      mock_os.path.join.side_effect = join
-      mock_os.makedirs.side_effect = lambda x: True
-      mock_git_clone = MagicMock(return_value=None)
-      mock_git_fetch = MagicMock(return_value=None)
-      mock_execute.side_effect = lambda x, **k: allow_git_clone(x, mock_git_clone, mock_git_fetch, *k)
-      spec = OrderedDict({"source": "https://github.com/alisw/AliRoot"})
-      referenceSources = "sw/MIRROR"
-      reference = abspath(referenceSources) + "/aliroot"
-      mock_os.makedirs.reset_mock()
-      mock_git_clone.reset_mock()
-      mock_git_fetch.reset_mock()
-      updateReferenceRepo(referenceSources=referenceSources, p="AliRoot", spec=spec)
-      mock_path.exists.assert_called_with('%s/sw/MIRROR/aliroot' % getcwd())
-      mock_os.makedirs.assert_called_with('%s/sw/MIRROR' % getcwd())
-      self.assertEqual(mock_git_clone.call_count, 0, "Expected no calls to git clone (called %d times instead)" % mock_git_clone.call_count)
+    @patch("os.path.exists")
+    @patch("os.makedirs")
+    @patch("alibuild_helpers.workarea.git")
+    @patch("alibuild_helpers.workarea.debug", new=MagicMock())
+    @patch("alibuild_helpers.workarea.is_writeable", new=MagicMock(return_value=False))
+    def test_reference_sources_not_writable(self, mock_git, mock_makedirs, mock_exists):
+        """Check nothing is fetched when mirror directory isn't writable."""
+        mock_exists.side_effect = lambda path: not path.endswith("/aliroot")
+        spec = OrderedDict({"source": "https://github.com/alisw/AliRoot"})
+        updateReferenceRepoSpec(referenceSources="sw/MIRROR", p="AliRoot",
+                                spec=spec, fetch=True)
+        mock_exists.assert_called_with("%s/sw/MIRROR/aliroot" % getcwd())
+        mock_makedirs.assert_called_with("%s/sw/MIRROR" % getcwd())
+        mock_git.assert_not_called()
+        self.assertNotIn("reference", spec,
+                         "should delete spec['reference'], as no mirror exists")
 
-    @mock.patch("alibuild_helpers.workarea.execute")
-    @mock.patch("alibuild_helpers.workarea.path")
-    @mock.patch("alibuild_helpers.workarea.debug")
-    @mock.patch("alibuild_helpers.workarea.os")
-    @mock.patch("alibuild_helpers.workarea.is_writeable")
-    def test_referenceSourceNotExistsWriteable(self, mock_is_writeable, mock_os, mock_debug, mock_path, mock_execute):
-      """
-      The referenceSources directory does not exist and it's writeable
-      Reference sources are not already there
-      """
-      mock_path.exists.side_effect = reference_sources_do_not_exists
-      mock_is_writeable.side_effect = lambda x: True  # is writeable
-      mock_os.path.join.side_effect = join
-      mock_os.makedirs.side_effect = lambda x: True
-      mock_git_clone = MagicMock(return_value=None)
-      mock_git_fetch = MagicMock(return_value=None)
-      mock_execute.side_effect = lambda x, **k: allow_git_clone(x, mock_git_clone, mock_git_fetch, *k)
-      spec = OrderedDict({"source": "https://github.com/alisw/AliRoot"})
-      referenceSources = "sw/MIRROR"
-      reference = abspath(referenceSources) + "/aliroot"
-      mock_os.makedirs.reset_mock()
-      mock_git_clone.reset_mock()
-      mock_git_fetch.reset_mock()
-      updateReferenceRepo(referenceSources=referenceSources, p="AliRoot", spec=spec)
-      mock_path.exists.assert_called_with('%s/sw/MIRROR/aliroot' % getcwd())
-      mock_os.makedirs.assert_called_with('%s/sw/MIRROR' % getcwd())
-      self.assertEqual(mock_git_clone.call_count, 1, "Expected only one call to git clone (called %d times instead)" % mock_git_clone.call_count)
+    @patch("os.path.exists")
+    @patch("os.makedirs")
+    @patch("alibuild_helpers.workarea.git")
+    @patch("alibuild_helpers.workarea.debug", new=MagicMock())
+    @patch("alibuild_helpers.workarea.is_writeable", new=MagicMock(return_value=True))
+    def test_reference_sources_created(self, mock_git, mock_makedirs, mock_exists):
+        """Check the mirror directory is created when possible."""
+        mock_exists.side_effect = lambda path: not path.endswith("/aliroot")
+        spec = OrderedDict({"source": "https://github.com/alisw/AliRoot"})
+        updateReferenceRepoSpec(referenceSources="sw/MIRROR", p="AliRoot",
+                                spec=spec, fetch=True)
+        mock_exists.assert_called_with("%s/sw/MIRROR/aliroot" % getcwd())
+        mock_makedirs.assert_called_with("%s/sw/MIRROR" % getcwd())
+        mock_git.assert_called_once_with(["clone", "--bare", spec["source"],
+                                          "%s/sw/MIRROR/aliroot" % getcwd(),
+                                          "--filter=blob:none"])
+        self.assertEqual(spec.get("reference"), "%s/sw/MIRROR/aliroot" % getcwd())
 
 
 if __name__ == '__main__':
-  unittest.main()
+    unittest.main()

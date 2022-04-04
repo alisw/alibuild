@@ -1,5 +1,6 @@
 from alibuild_helpers.cmd import execute
-from alibuild_helpers.utilities import format, parseRecipe, getPackageList, getRecipeReader, parseDefaults, readDefaults, validateDefaults
+from alibuild_helpers.git import git
+from alibuild_helpers.utilities import getPackageList, parseDefaults, readDefaults, validateDefaults
 from alibuild_helpers.log import debug, error, warning, banner, info
 from alibuild_helpers.log import dieOnError
 from alibuild_helpers.workarea import updateReferenceRepoSpec
@@ -37,13 +38,12 @@ def doInit(args):
   if path.exists(args.configDir):
     warning("using existing recipes from %s", args.configDir)
   else:
-    cmd = format("git clone --origin upstream %(repo)s%(branch)s %(cd)s",
-                 repo=args.dist["repo"] if ":" in args.dist["repo"] else "https://github.com/%s" % args.dist["repo"],
-                 branch=" -b "+args.dist["ver"] if args.dist["ver"] else "",
-                 cd=args.configDir)
-    debug("%s", cmd)
-    err = execute(cmd)
-    dieOnError(err!=0, "cannot clone recipes")
+    cmd = ["clone", "--origin", "upstream",
+           args.dist["repo"] if ":" in args.dist["repo"] else "https://github.com/" + args.dist["repo"]]
+    if args.dist["ver"]:
+      cmd.extend(["-b", args.dist["ver"]])
+    cmd.append(args.configDir)
+    git(cmd)
 
   # Use standard functions supporting overrides and taps. Ignore all disables
   # and system packages as they are irrelevant in this context
@@ -82,17 +82,14 @@ def doInit(args):
     debug("cloning %s%s for development", spec["package"], " version "+p["ver"] if p["ver"] else "")
 
     updateReferenceRepoSpec(args.referenceSources, spec["package"], spec, True, False)
-    cmd = format("git clone --origin upstream %(readRepo)s%(branch)s --reference %(refSource)s %(cd)s && " +
-                 "cd %(cd)s && git remote set-url --push upstream %(writeRepo)s",
-                 readRepo=spec["source"],
-                 writeRepo=writeRepo,
-                 branch=" -b "+p["ver"] if p["ver"] else "",
-                 refSource=join(args.referenceSources, spec["package"].lower()),
-                 cd=dest)
-    debug("%s", cmd)
-    err = execute(cmd)
-    dieOnError(err!=0, "cannot clone %s%s" %
-                       (spec["package"], " version "+p["ver"] if p["ver"] else ""))
+
+    cmd = ["clone", "--origin", "upstream", spec["source"],
+           "--reference", join(args.referenceSources, spec["package"].lower())]
+    if p["ver"]:
+      cmd.extend(["-b", p["ver"]])
+    cmd.append(dest)
+    git(cmd)
+    git(("remote", "set-url", "--push", "upstream", writeRepo), directory=dest)
 
     # Make it point relatively to the mirrors for relocation: as per Git specifics, the path has to
     # be relative to the repository's `.git` directory. Don't do it if no common path is found
