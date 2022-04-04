@@ -15,6 +15,10 @@ export WORK_DIR="${WORK_DIR_OVERRIDE:-%(workDir)s}"
 # From our dependencies
 %(dependencies)s
 
+# Insert our own wrapper scripts into $PATH, patched to use the system OpenSSL,
+# instead of the one we build ourselves.
+export PATH=$WORK_DIR/wrapper-scripts:$PATH
+
 # The following environment variables are setup by
 # the aliBuild script itself
 #

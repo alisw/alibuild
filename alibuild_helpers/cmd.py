@@ -1,5 +1,8 @@
+import os
+import os.path
 import sys
 from subprocess import Popen, PIPE, STDOUT
+from textwrap import dedent
 try:
   from shlex import quote  # Python 3.3+
 except ImportError:
@@ -109,3 +112,25 @@ class DockerRunner:
       getstatusoutput("docker container kill " + quote(self._container))
     self._container = None
     return False   # propagate any exception that may have occurred
+
+
+def install_wrapper_script(name, work_dir):
+  script_dir = os.path.join(work_dir, "wrapper-scripts")
+  try:
+    os.makedirs(script_dir)
+  except OSError as exc:
+    # Errno 17 means the directory already exists.
+    if exc.errno != 17:
+      raise
+  # Create a wrapper script that cleans up the environment, so we don't see the
+  # OpenSSL built by aliBuild.
+  with open(os.path.join(script_dir, name), "w") as scriptf:
+    # Compute the "real" executable path each time, as the wrapper script might
+    # be called on the host or in a container.
+    scriptf.write(dedent("""\
+    #!/bin/sh
+    exec env -u LD_LIBRARY_PATH -u DYLD_LIBRARY_PATH \\
+         "$(which -a "$(basename "$0")" | grep -Fxv "$0" | head -1)" "$@"
+    """))
+    os.fchmod(scriptf.fileno(), 0o755)  # make the wrapper script executable
+  os.environ["PATH"] = script_dir + ":" + os.environ["PATH"]
