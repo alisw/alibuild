@@ -13,7 +13,7 @@ try:
 except ImportError:
   from ordereddict import OrderedDict
 
-from alibuild_helpers.cmd import getoutput
+from alibuild_helpers.cmd import decode_with_fallback, getoutput
 from alibuild_helpers.git import git
 from alibuild_helpers.log import dieOnError
 
@@ -22,10 +22,6 @@ class SpecError(Exception):
   pass
 
 asList = lambda x : x if type(x) == list else [x]
-
-# Keep the linter happy
-if sys.version_info[0] >= 3:
-  unicode = None
 
 def star():
   return re.sub("build.*$", "", basename(sys.argv[0]).lower())
@@ -129,20 +125,10 @@ def validateDefaults(finalPkgSpec, defaults):
                    defaults,
                    "\n".join([" - " + x for x in validDefaults])), validDefaults)
 
+
 def format(s, **kwds):
-  if sys.version_info[0] >= 3:
-    if isinstance(s, bytes):
-      try:
-        s = s.decode("utf-8")  # to get newlines as such and not as escaped \n
-      except:
-        s = s.decode("latin-1")  # Workaround issue with some special characters of latin-1 which are not understood by unicode
-    else:
-      s = str(s)
-  elif isinstance(s, str):
-    s = unicode(s, "utf-8")  # utf-8 is a safe assumption
-  elif not isinstance(s, unicode):
-    s = unicode(str(s))
-  return s % kwds
+  return decode_with_fallback(s) % kwds
+
 
 def doDetectArch(hasOsRelease, osReleaseLines, platformTuple, platformSystem, platformProcessor):
   if platformSystem == "Darwin":
