@@ -64,7 +64,7 @@ def updateReferenceRepo(referenceSources, p, spec, fetch=True, usePartialClone=T
 
   if not os.path.exists(referenceRepo):
     cmd = ["clone", "--bare", spec["source"], referenceRepo]
-    if usePartialClone:
+    if usePartialClone and partialCloneFilter:
       cmd.append(partialCloneFilter)
     git(cmd)
   elif fetch:
