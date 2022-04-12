@@ -30,6 +30,7 @@ try:
 except ImportError:
   from pipes import quote  # Python 2.7
 
+import importlib
 import socket
 import os
 import re
@@ -498,6 +499,12 @@ def doBuild(args, parser):
     # a build_requires only anymore, so we drop it from the list.
     spec["full_build_requires"] = set(spec["full_build_requires"]) - spec["full_runtime_requires"]
 
+  # Use the selected plugin to build, instead of the default behaviour, if a
+  # plugin was selected.
+  if args.plugin != "legacy":
+    return importlib.import_module("alibuild_helpers.%s_plugin" % args.plugin) \
+                    .build_plugin(specs, args, buildOrder)
+
   debug("We will build packages in the following order: %s", " ".join(buildOrder))
   if args.dryRun:
     info("--dry-run / -n specified. Not building.")
@@ -517,11 +524,6 @@ def doBuild(args, parser):
                       deps=",".join(buildOrder[:-1])
                      ),
                args.architecture)
-
-  if args.plugin != "legacy":
-    build_plugin = __import__("alibuild_helpers.%s_plugin" % args.plugin, fromlist=[''])
-    build_plugin.build_plugin(specs, args, buildOrder)
-    return
 
   while buildOrder:
     packageIterations += 1

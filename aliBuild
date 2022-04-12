@@ -105,7 +105,7 @@ if __name__ == "__main__":
 
   if not decideAnalytics(exists(expanduser("~/.config/alibuild/disable-analytics")),
                          exists(expanduser("~/.config/alibuild/analytics-uuid")),
-                         sys.stdout.isatty(),
+                         sys.stdin.isatty(),
                          askForAnalytics):
     os.environ["ALIBUILD_NO_ANALYTICS"] = "1"
   else:
