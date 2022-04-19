@@ -19,9 +19,6 @@ DEFAULT_WORK_DIR = os.environ.get("ALIBUILD_WORK_DIR") or os.environ.get("ALICE_
 # cd to this directory before start
 DEFAULT_CHDIR = os.environ.get("ALIBUILD_CHDIR") or "."
 
-def csv_list(s):
-  return s.split(',')
-
 
 # This is syntactic sugar for the --dist option (which should really be called
 # --dist-tag). It can be either:
@@ -89,20 +86,23 @@ def doParseArgs(star):
                             help=("Fetch updates to repositories in MIRRORDIR. Required but nonexistent "
                                   "repositories are always cloned, even if this option is not given."))
 
-  build_parser.add_argument("--no-local", dest="noDevel", metavar="PKGLIST", default="", type=csv_list,
+  build_parser.add_argument("--no-local", dest="noDevel", metavar="PACKAGE", default=[], action="append",
                             help=("Do not pick up the following packages from a local checkout. "
-                                  "%(metavar)s is a comma-separated list."))
+                                  "You can specify this option multiple times or separate "
+                                  "multiple arguments with commas."))
   build_parser.add_argument("--force-tracked", dest="forceTracked", default=False, action="store_true",
                             help=("Do not pick up any packages from a local checkout. "))
   build_parser.add_argument("--plugin", dest="plugin", default="legacy", help=("Plugin to use to do the actual build. "))
   build_parser.add_argument("--disable", dest="disable", default=[], metavar="PACKAGE", action="append",
                             help=("Do not build %(metavar)s and all its (unique) dependencies. "
-                                  "You can specify this option multiple times."))
+                                  "You can specify this option multiple times or separate "
+                                  "multiple arguments with commas."))
   build_parser.add_argument("--force-rebuild", default=[], metavar="PACKAGE", action="append",
                             help=("Always rebuild the following packages from scratch, even if "
                                   "they were built before. Specifying a package here has the "
                                   "same effect as adding 'force_rebuild: true' to its recipe "
-                                  "in CONFIGDIR. You can specify this option multiple times."))
+                                  "in CONFIGDIR. You can specify this option multiple times or "
+                                  "separate multiple arguments with commas."))
 
   build_docker = build_parser.add_argument_group(title="Build inside a container", description="""\
   Builds can be done inside a Docker container, to make it easier to get a
@@ -197,7 +197,9 @@ def doParseArgs(star):
   deps_parser.add_argument("--defaults", dest="defaults", default="release", metavar="DEFAULT",
                            help="Use defaults from CONFIGDIR/defaults-%(metavar)s.sh.")
   deps_parser.add_argument("--disable", dest="disable", default=[], metavar="PACKAGE", action="append",
-                           help="Do not build %(metavar)s and all its (unique) dependencies.")
+                           help=("Assume we're not building %(metavar)s and all its (unique) dependencies. "
+                                 "You can specify this option multiple times or separate multiple arguments "
+                                 "with commas."))
 
   deps_graph = deps_parser.add_argument_group(title="Customise graph output")
   deps_graph.add_argument("--neat", dest="neat", action="store_true",
@@ -243,7 +245,9 @@ def doParseArgs(star):
   doctor_parser.add_argument("--defaults", dest="defaults", default="release", metavar="DEFAULT",
                              help="Use defaults from CONFIGDIR/defaults-%(metavar)s.sh.")
   doctor_parser.add_argument("--disable", dest="disable", default=[], metavar="PACKAGE", action="append",
-                             help="Assume we're not building %(metavar)s and all its (unique) dependencies.")
+                             help=("Assume we're not building %(metavar)s and all its (unique) dependencies. "
+                                   "You can specify this option multiple times or separate multiple arguments "
+                                   "with commas."))
 
   doctor_system = doctor_parser.add_mutually_exclusive_group()
   doctor_system.add_argument("--always-prefer-system", dest="preferSystem", action="store_true",
@@ -367,8 +371,12 @@ def finaliseArgs(args, parser, star):
                  "Alternatively, you can use the `--force-unknown-architecture' option."
                  .format(table=ARCHITECTURE_TABLE, architecture=args.architecture))
 
+  if "noDevel" in args:
+    args.noDevel = normalise_multiple_options(args.noDevel)
   if "disable" in args:
     args.disable = normalise_multiple_options(args.disable)
+  if "force_rebuild" in args:
+    args.force_rebuild = normalise_multiple_options(args.force_rebuild)
 
   if args.action in ["build", "init"]:
     args.referenceSources = format(args.referenceSources, workDir=args.workDir)
