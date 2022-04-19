@@ -289,6 +289,7 @@ def doBuild(args, parser):
                      noSystem                = args.noSystem,
                      architecture            = args.architecture,
                      disable                 = args.disable,
+                     force_rebuild           = args.force_rebuild,
                      defaults                = args.defaults,
                      performPreferCheck      = lambda pkg, cmd: getstatusoutput_docker(cmd),
                      performRequirementCheck = lambda pkg, cmd: getstatusoutput_docker(cmd),
