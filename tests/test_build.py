@@ -253,6 +253,7 @@ class BuildTestCase(unittest.TestCase):
             pkgname=["root"],
             configDir="/alidist",
             disable=[],
+            force_rebuild=[],
             defaults="release",
             jobs=2,
             preferSystem=[],

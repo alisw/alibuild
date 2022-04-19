@@ -348,7 +348,7 @@ def parseDefaults(disable, defaultsGetter, log):
 
 def getPackageList(packages, specs, configDir, preferSystem, noSystem,
                    architecture, disable, defaults, performPreferCheck, performRequirementCheck,
-                   performValidateDefaults, overrides, taps, log):
+                   performValidateDefaults, overrides, taps, log, force_rebuild=()):
   systemPackages = set()
   ownPackages = set()
   failedRequirements = set()
@@ -442,6 +442,7 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
     spec["tag"] = spec.get("tag", spec["version"])
     spec["version"] = spec["version"].replace("/", "_")
     spec["recipe"] = recipe.strip("\n")
+    spec["force_rebuild"] = spec["package"] in force_rebuild
     specs[spec["package"]] = spec
     packages += spec["requires"]
   return (systemPackages, ownPackages, failedRequirements, validDefaults)

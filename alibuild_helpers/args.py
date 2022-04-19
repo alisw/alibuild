@@ -96,7 +96,13 @@ def doParseArgs(star):
                             help=("Do not pick up any packages from a local checkout. "))
   build_parser.add_argument("--plugin", dest="plugin", default="legacy", help=("Plugin to use to do the actual build. "))
   build_parser.add_argument("--disable", dest="disable", default=[], metavar="PACKAGE", action="append",
-                            help="Do not build %(metavar)s and all its (unique) dependencies.")
+                            help=("Do not build %(metavar)s and all its (unique) dependencies. "
+                                  "You can specify this option multiple times."))
+  build_parser.add_argument("--force-rebuild", default=[], metavar="PACKAGE", action="append",
+                            help=("Always rebuild the following packages from scratch, even if "
+                                  "they were built before. Specifying a package here has the "
+                                  "same effect as adding 'force_rebuild: true' to its recipe "
+                                  "in CONFIGDIR. You can specify this option multiple times."))
 
   build_docker = build_parser.add_argument_group(title="Build inside a container", description="""\
   Builds can be done inside a Docker container, to make it easier to get a
