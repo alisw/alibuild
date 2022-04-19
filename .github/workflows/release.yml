@@ -4,27 +4,27 @@ on:
     types: [published]
 jobs:
   pypi:
-    name: Build aliBuild release and publish it on Pypi
+    name: Publish release on PyPI
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
     steps:
       - name: Checkout alibuild
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Set up Python
-        uses: actions/setup-python@v1
+        uses: actions/setup-python@v3
         with:
-          python-version: 3.9
+          python-version: 3.x
       - name: Replace the hard-coded version number
         run: sed -i "s/LAST_TAG/${GITHUB_REF#refs/tags/}/g" alibuild_helpers/__init__.py
       - name: Build the Python distribution
         run: python setup.py sdist
       - name: Publish distribution to PyPI
-        uses: pypa/gh-action-pypi-publish@v1.4.2
+        uses: pypa/gh-action-pypi-publish@v1.5.0
         with:
           user: __token__
           password: ${{ secrets.pypi_password }}
   brew:
-    name: Update alibuild Homebrew formula
+    name: Update Homebrew formula
     needs: pypi
     runs-on: macos-latest
     if: startsWith(github.ref, 'refs/tags/') && !github.event.release.prerelease
@@ -36,7 +36,6 @@ jobs:
       - name: Update alibuild formula with new version
         run: |
           set -x
-          cd "$(dirname "$(brew formula alibuild)")"
           json=$(curl -fSsL "https://pypi.org/pypi/alibuild/${GITHUB_REF#refs/tags/}/json")
           sha=$(echo "$json" | jq -r '.urls[0].digests.sha256')
           url=$(echo "$json" | jq -r '.urls[0].url')
@@ -46,12 +45,11 @@ jobs:
           s|^  url .*|  url \"$url\"|;
           s|^  sha256 .*|  sha256 \"$sha\"|;
           s|^  version .*|  version \"${GITHUB_REF#refs/tags/v}\"|
-          " alibuild.rb
-          rm -f alibuild.rb.bak
+          " "$(brew formula alibuild)"
+          rm -f "$(brew formula alibuild).bak"
       - name: Regenerate alibuild formula
         run: |
           set -x
-          cd "$(dirname "$(brew formula alibuild)")"
           # Sometimes, brew update-python-resources apparently randomly fails,
           # blaming pipgrip. Retries should hopefully solve this.
           attempt=0
