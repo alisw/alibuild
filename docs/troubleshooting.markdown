@@ -192,44 +192,22 @@ fails, you have two options:
 
   and simply run alibuild by invoking `alibuild/aliBuild`.
 
-### Environment Modules is not available for my system
+### I am changing an uncommitted file in a development package, but it is not updated in the installation folder.
 
-On some legacy systems (for instance, Ubuntu 12.04) there is no way to install
-the package `environment-modules` via a package manager. This package is
-required by `alienv`, and the first time you start it you would get a message
-like:
+If you add a file to a development package and the build recipe is
+able to handle uncommitted files, it will be copied the first time.
 
-    ERROR: Environment Modules was not found on your system.
-           Get it with: apt-get install environment-modules
+However alibuild considers any untracked file as the same, and therefore unless
+the file is added or committed to the local clone of the development package any
+subsequent rebuild will ignore the changes. This can be worked around in two ways:
 
-but the suggested command does not work. In this case you need to compile it by
-hand. The only requirements are a valid C compiler and the development version
-of TCL 8.5.
+1. You add the file to your local clone via git add / git commit
+2. You add an incremental_recipe which is able to handle uncommitted files
 
-If you are on Ubuntu 12.04 (`environment-modules` appeared from 12.10) you can
-get the prerequisites with:
-
-```bash
-sudo apt-get install build-essential tcl8.5-dev
-```
-
-Download the [tarball for version 3.2.10](https://downloads.sourceforge.net/project/modules/Modules/modules-3.2.10/modules-3.2.10.tar.gz), unpack it, configure and build
-it:
-
-```bash
-curl -LO https://downloads.sourceforge.net/project/modules/Modules/modules-3.2.10/modules-3.2.10.tar.gz
-tar xzf modules-3.2.10.tar.gz
-cd modules-3.2.10/
-./configure --disable-versioning --exec-prefix=/usr/local
-make && sudo make install
-```
-
-You might want to slightly change the command above to do the installation in
-a user directory (specify a different prefix and do not use `sudo`).
-
-`alienv` needs the `modulecmd` in the `$PATH` in order to work. Just fire
-`alienv` right afterwards, and if you get the help screen instead of the error
-above then you are set.
+What 1. does is to make alibuild aware of the changes of the new file, so you
+will get a new build for each change to the file. What 2. does is to always
+execute the incremental recipe to refresh the installation folder on each aliBuild
+invokation, possibly updating untracked files if so specified in the recipe itself.
 
 ### How do I set compilation options for AliRoot and / or AliPhysics?
 
