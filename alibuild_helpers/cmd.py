@@ -92,7 +92,7 @@ class DockerRunner:
   def __enter__(self):
     if self._docker_image:
       # "sleep inf" pauses forever, until we kill it.
-      cmd = ["docker", "run", "--detach", "--rm"]
+      cmd = ["docker", "run", "--detach", "--rm", "--entrypoint="]
       cmd += self._docker_run_args
       cmd += [self._docker_image, "sleep", "inf"]
       self._container = getoutput(cmd).strip()
