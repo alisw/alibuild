@@ -525,10 +525,10 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
             else:
               systemPackages.add(spec["package"])
 
-    dieOnError(("system_requirement" in spec) and recipe.strip("\n\t "),
-               "System requirements %s cannot have a recipe" % spec["package"])
     if re.match(spec.get("system_requirement", "(?!.*)"), architecture):
-      cmd = spec.get("system_requirement_check", "false")
+      # system_requirement fallsback to the prefer_system_check rule
+      # if the system_requirement_check does not exist.
+      cmd = spec.get("system_requirement_check", spec.get("prefer_system_check", "false"))
       if not spec["package"] in requirementsCache:
         requirementsCache[spec["package"]] = performRequirementCheck(spec, cmd.strip())
 
