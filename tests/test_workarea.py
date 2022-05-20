@@ -13,12 +13,19 @@ except ImportError:
 from alibuild_helpers.workarea import updateReferenceRepoSpec
 
 
+MOCK_SPEC = OrderedDict((
+    ("package", "AliRoot"),
+    ("source", "https://github.com/alisw/AliRoot"),
+))
+
+
+@patch("alibuild_helpers.workarea.debug", new=MagicMock())
+@patch("alibuild_helpers.workarea.info", new=MagicMock())
 class WorkareaTestCase(unittest.TestCase):
 
     @patch("os.path.exists")
     @patch("os.makedirs")
     @patch("alibuild_helpers.workarea.git")
-    @patch("alibuild_helpers.workarea.debug", new=MagicMock())
     @patch("alibuild_helpers.workarea.is_writeable", new=MagicMock(return_value=False))
     def test_reference_sources_reused(self, mock_git, mock_makedirs, mock_exists):
         """Check mirrors are reused when pre-existing, but not writable.
@@ -26,7 +33,7 @@ class WorkareaTestCase(unittest.TestCase):
         In this case, make sure nothing is fetched, even when requested.
         """
         mock_exists.return_value = True
-        spec = OrderedDict({"source": "https://github.com/alisw/AliRoot"})
+        spec = MOCK_SPEC.copy()
         updateReferenceRepoSpec(referenceSources="sw/MIRROR", p="AliRoot",
                                 spec=spec, fetch=True)
         mock_exists.assert_called_with("%s/sw/MIRROR/aliroot" % getcwd())
@@ -38,7 +45,6 @@ class WorkareaTestCase(unittest.TestCase):
     @patch("os.makedirs")
     @patch("codecs.open")
     @patch("alibuild_helpers.workarea.git")
-    @patch("alibuild_helpers.workarea.debug", new=MagicMock())
     @patch("alibuild_helpers.workarea.is_writeable", new=MagicMock(return_value=True))
     def test_reference_sources_updated(self, mock_git, mock_open, mock_makedirs, mock_exists):
         """Check mirrors are updated when possible and git output is logged."""
@@ -47,27 +53,24 @@ class WorkareaTestCase(unittest.TestCase):
         mock_open.return_value = MagicMock(
             __enter__=lambda *args, **kw: MagicMock(
                 write=lambda output: self.assertEqual(output, "sentinel output")))
-        spec = OrderedDict({"source": "https://github.com/alisw/AliRoot"})
+        spec = MOCK_SPEC.copy()
         updateReferenceRepoSpec(referenceSources="sw/MIRROR", p="AliRoot",
                                 spec=spec, fetch=True)
         mock_exists.assert_called_with("%s/sw/MIRROR/aliroot" % getcwd())
         mock_makedirs.assert_called_with("%s/sw/MIRROR" % getcwd())
-        mock_git.assert_called_once_with(
-            ("fetch", "-f", "--tags", spec["source"],
-                "+refs/heads/*:refs/heads/*"),
-            directory="%s/sw/MIRROR/aliroot" % getcwd(), check=False
-        )
+        mock_git.assert_called_once_with((
+            "fetch", "-f", "--tags", spec["source"], "+refs/heads/*:refs/heads/*",
+        ), directory="%s/sw/MIRROR/aliroot" % getcwd(), check=False)
         self.assertEqual(spec.get("reference"), "%s/sw/MIRROR/aliroot" % getcwd())
 
     @patch("os.path.exists")
     @patch("os.makedirs")
     @patch("alibuild_helpers.workarea.git")
-    @patch("alibuild_helpers.workarea.debug", new=MagicMock())
     @patch("alibuild_helpers.workarea.is_writeable", new=MagicMock(return_value=False))
     def test_reference_sources_not_writable(self, mock_git, mock_makedirs, mock_exists):
         """Check nothing is fetched when mirror directory isn't writable."""
         mock_exists.side_effect = lambda path: not path.endswith("/aliroot")
-        spec = OrderedDict({"source": "https://github.com/alisw/AliRoot"})
+        spec = MOCK_SPEC.copy()
         updateReferenceRepoSpec(referenceSources="sw/MIRROR", p="AliRoot",
                                 spec=spec, fetch=True)
         mock_exists.assert_called_with("%s/sw/MIRROR/aliroot" % getcwd())
@@ -79,12 +82,11 @@ class WorkareaTestCase(unittest.TestCase):
     @patch("os.path.exists")
     @patch("os.makedirs")
     @patch("alibuild_helpers.workarea.git")
-    @patch("alibuild_helpers.workarea.debug", new=MagicMock())
     @patch("alibuild_helpers.workarea.is_writeable", new=MagicMock(return_value=True))
     def test_reference_sources_created(self, mock_git, mock_makedirs, mock_exists):
         """Check the mirror directory is created when possible."""
         mock_exists.side_effect = lambda path: not path.endswith("/aliroot")
-        spec = OrderedDict({"source": "https://github.com/alisw/AliRoot"})
+        spec = MOCK_SPEC.copy()
         updateReferenceRepoSpec(referenceSources="sw/MIRROR", p="AliRoot",
                                 spec=spec, fetch=True)
         mock_exists.assert_called_with("%s/sw/MIRROR/aliroot" % getcwd())
