@@ -201,8 +201,7 @@ Some environment variables are made available to the script.
  - `BUILDDIR`: the working directory. This is, *e.g.*, the "build directory"
    for CMake, *i.e.* the directory from where you invoke `cmake`. You should not
    write files outside this directory.
- - `BUILD_ROOT`: it contains `BUILDDIR` and the logfile for the build
- - `CONFIG_DIR`: directory containing all the build recipes.
+ - `BUILDROOT`: it contains `BUILDDIR` and the log file for the build.
  - `SOURCEDIR`: where the sources are cloned.
  - `REQUIRES`: space-separated list of all dependencies, both runtime and build
    only.
