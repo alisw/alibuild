@@ -7,7 +7,7 @@ try:
 except ImportError:
   from ordereddict import OrderedDict
 
-from alibuild_helpers.log import dieOnError, debug
+from alibuild_helpers.log import dieOnError, debug, info
 from alibuild_helpers.git import git, partialCloneFilter
 
 
@@ -66,17 +66,23 @@ def updateReferenceRepo(referenceSources, p, spec, fetch=True, usePartialClone=T
     cmd = ["clone", "--bare", spec["source"], referenceRepo]
     if usePartialClone and partialCloneFilter:
       cmd.append(partialCloneFilter)
+    # This might take a long time, so show the user what's going on.
+    info("Cloning git repository for %s...", spec["package"])
     git(cmd)
+    info("Done cloning git repository for %s", spec["package"])
   elif fetch:
     with codecs.open(os.path.join(os.path.dirname(referenceRepo),
                                   "fetch-log.txt"),
                      "w", encoding="utf-8", errors="replace") as logf:
+      # This might take a long time, so show the user what's going on.
+      info("Updating git repository for %s...", spec["package"])
       err, output = git(("fetch", "-f", "--tags", spec["source"],
                          "+refs/heads/*:refs/heads/*"),
                         directory=referenceRepo, check=False)
       logf.write(output)
       debug(output)
       dieOnError(err, "Error while updating reference repo for %s." % spec["source"])
+      info("Done updating git repository for %s", spec["package"])
   return referenceRepo  # reference is read-write
 
 
