@@ -468,7 +468,7 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
       architectureREMatches = re.match(architectureRE, architecture)
     except:
       dieOnError(True, "Malformed entry architecture: %s in %s" % (architecture, spec["package"]))
-    if architectureREMatches == "False":
+    if not architectureREMatches:
       disable.append(spec["package"])
 
     # If --always-prefer-system is passed or if prefer_system is set to true
