@@ -94,6 +94,9 @@ def doDeps(args, parser):
   fp.write(dot)
   fp.close()
 
+  # Check if we have dot in PATH
+  if not execute(["dot", "-V"]):
+    dieOnError(True, "Could not find dot in PATH. Please install graphviz and add it to PATH.")
   try:
     if args.neat:
       execute(format("tred %(dotFile)s > %(dotFile)s.0 && mv %(dotFile)s.0 %(dotFile)s",
