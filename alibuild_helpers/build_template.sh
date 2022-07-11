@@ -72,6 +72,9 @@ fi
 rm -fr "$WORK_DIR/INSTALLROOT/$PKGHASH"
 # We remove the build directory only if we are not in incremental mode.
 if [[ "$INCREMENTAL_BUILD_HASH" == 0 ]]; then
+  # Golang installs stuff without write permissions for ourselves sometimes.
+  # This makes a plain `rm -rf` fail, so give ourselves write permission first.
+  chmod -R o+w "$BUILDROOT"
   rm -rf "$BUILDROOT"
 fi
 mkdir -p "$INSTALLROOT" "$BUILDROOT" "$BUILDDIR" "$WORK_DIR/INSTALLROOT/$PKGHASH/$PKGPATH"
