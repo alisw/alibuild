@@ -95,7 +95,9 @@ def doDeps(args, parser):
   fp.close()
 
   # Check if we have dot in PATH
-  if not execute(["dot", "-V"]):
+  try:
+    execute(["dot", "-V"])
+  except Exception as e:
     dieOnError(True, "Could not find dot in PATH. Please install graphviz and add it to PATH.")
   try:
     if args.neat:
