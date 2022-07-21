@@ -204,7 +204,7 @@ class HttpRemoteSync:
     for linkname, target in symlinks.items():
       execute("ln -nsf ../../{target} {workdir}/{linkdir}/{name}".format(
         workdir=self.workdir, linkdir=links_path, name=linkname,
-        target=target))
+        target=target.lstrip("./")))
 
   def syncToRemote(self, p, spec):
     pass
