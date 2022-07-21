@@ -34,6 +34,7 @@ class LogFormatter(logging.Formatter):
       "message": x,
     } for x in record.msg.split("\n"))
 
+
 class ProgressPrint:
   def __init__(self, begin_msg=""):
     self.count = -1
@@ -41,6 +42,7 @@ class ProgressPrint:
     self.STAGES = [ ".", "..", "...", "....", ".....", "....", "...", ".." ]
     self.begin_msg = begin_msg
     self.percent = -1
+
   def __call__(self, txt, *args):
     txt %= args
     if time.time()-self.lasttime < 0.5:
@@ -48,7 +50,7 @@ class ProgressPrint:
     if self.count == -1 and self.begin_msg:
       sys.stderr.write("\033[1;35m==>\033[m "+self.begin_msg)
     self.erase()
-    m = re.search("((^|[^0-9])([0-9]{1,2})%|\[([0-9]+)/([0-9]+)\])", txt)
+    m = re.search(r"((^|[^0-9])([0-9]{1,2})%|\[([0-9]+)/([0-9]+)\])", txt)
     if m:
       if m.group(3) is not None:
         self.percent = int(m.group(3))
@@ -62,11 +64,15 @@ class ProgressPrint:
     self.count = (self.count+1) % len(self.STAGES)
     sys.stderr.write(self.STAGES[self.count])
     self.lasttime = time.time()
+    sys.stderr.flush()
+
   def erase(self):
     nerase = len(self.STAGES[self.count]) if self.count > -1 else 0
     if self.percent > -1:
       nerase = nerase + 7
     sys.stderr.write("\b"*nerase+" "*nerase+"\b"*nerase)
+    sys.stderr.flush()
+
   def end(self, msg="", error=False):
     if self.count == -1:
       return
@@ -74,6 +80,8 @@ class ProgressPrint:
     if msg:
       sys.stderr.write(": %s%s\033[m" % ("\033[31m" if error else "\033[32m", msg))
     sys.stderr.write("\n")
+    sys.stderr.flush()
+
 
 # Add loglevel BANNER (same as INFO but with more emphasis on ttys)
 logging.BANNER = 25
