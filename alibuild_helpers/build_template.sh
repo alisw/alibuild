@@ -211,7 +211,11 @@ PP=\${PKGPATH:-${PKGPATH}}
 PH=${PKGHASH}
 EoF
 
-cat "$INSTALLROOT/.original-unrelocated" | xargs -n1 -I{} echo "sed -e \"s|/[^ ;:]*INSTALLROOT/\$PH/\$OP|\$WORK_DIR/\$PP|g;s|[@][@]PKGREVISION[@]\$PH[@][@]|$PKGREVISION|g\" \$PP/{}.unrelocated > \$PP/{}" >> "$INSTALLROOT/relocate-me.sh"
+while read -r unrelocated; do
+  echo "sed -e \"s|/[^ ;:]*INSTALLROOT/\$PH/\$OP|\$WORK_DIR/\$PP|g; s|[@][@]PKGREVISION[@]\$PH[@][@]|$PKGREVISION|g\"" \
+       "\$PP/$unrelocated.unrelocated > \$PP/$unrelocated"
+done < "$INSTALLROOT/.original-unrelocated" >> "$INSTALLROOT/relocate-me.sh"
+
 # Always relocate the modulefile (if present) so that it works also in devel mode.
 if [[ ! -s "$INSTALLROOT/.original-unrelocated" && -f "$INSTALLROOT/etc/modulefiles/$PKGNAME" ]]; then
   echo "mv -f \$PP/etc/modulefiles/$PKGNAME \$PP/etc/modulefiles/${PKGNAME}.forced-relocation && sed -e \"s|[@][@]PKGREVISION[@]\$PH[@][@]|$PKGREVISION|g\" \$PP/etc/modulefiles/${PKGNAME}.forced-relocation > \$PP/etc/modulefiles/$PKGNAME" >> "$INSTALLROOT/relocate-me.sh"
