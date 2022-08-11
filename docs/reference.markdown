@@ -88,7 +88,7 @@ The following entries are optional in the header:
     software to be built. This can be a tag name, a branch name or a commit
     hash.
   - `env`: dictionary whose key-value pairs are environment variables to be set
-    after the recipe is built. The values are interpreted as the contents of a
+    _after_ the recipe is built. The values are interpreted as the contents of a
     double-quoted shell string, so you can reference other environment variables
     as `$VARIABLE`, which will be substituted each time another recipe is built.
     For example:
@@ -104,7 +104,7 @@ The following entries are optional in the header:
     `export VARIABLE=value` in the recipe body.
   - `prepend_path`: dictionary whose key-value pairs are an environment variable
     name and a path to be prepended to it, as it happens in `LD_LIBRARY_PATH`.
-    This happens only after the package declaring the `prepend_path` in question
+    This happens only _after_ the package declaring the `prepend_path` in question
     is built, so it is not available in the same recipe (just like variables
     declared using `env`). You can append multiple paths to a single variable
     by specifying a list too, *e.g.*:
@@ -120,7 +120,9 @@ The following entries are optional in the header:
   - `append_path`: same as `prepend_path` but paths are appended rather than
     prepended. Like `append_path` and `env`, this **does not** affect the
     environment of the current recipe.
-  - `requires`: a list of run-time dependencies for the package, *e.g.*:
+  - `requires`: a list of dependencies for the package, 
+    that will be needed **both** at _built-time_ and _run-time_, 
+    *e.g.*:
 
     ```yaml
     package: AliRoot
@@ -129,7 +131,9 @@ The following entries are optional in the header:
       ...
     ```
 
-    The specified dependencies will be built before building the given package.
+    The specified dependencies will be built before building the given package; 
+    the "required" corresponding binaries, libraries and environment variables 
+    will be made available (by loading the dependency module) before the current built starts.
     You can specify platform-specific dependencies by appending `:<regexp>` to
     the dependency name. Such a regular expression will be matched against the
     architecture provided via `--architecture`, and if it does not match, the
@@ -143,15 +147,20 @@ The following entries are optional in the header:
 
     will make sure that `IgProf` is only built on platforms whose name does not
     begin with `osx`.
-  - `build_requires`: a list of build-time dependencies for the package. Like
+  - `build_requires`: a list of build-time _only_ dependencies for the package. Like
     `requires`, these packages will be built before the current package is
     built.
-
-    Packages in this list are marked specially in the dependency graph
+  
+   Packages in this list are marked specially in the dependency graph
     produced by `aliDeps`. Other tools treat these packages differently from
     `requires`: for instance, RPMs produced for a package won't depend on its
     `build_requires`, and `alibuild-generate-module` won't pull in build
     requirements' modulefiles.
+    
+  - `runtime_requires` : a list of run-time _only_ dependencies for the package.   
+    The corresponding module(s) will be loaded together with the current one. 
+    FIXME : how it will appear in aliDeps ?
+    
   - `force_rebuild`: set it to `true` to force re-running the build recipe every
     time you invoke alibuild on it.
   - `prefer_system_check`: a script which is used to determine whether
@@ -203,10 +212,10 @@ Some environment variables are made available to the script.
    write files outside this directory.
  - `BUILDROOT`: it contains `BUILDDIR` and the log file for the build.
  - `SOURCEDIR`: where the sources are cloned.
- - `REQUIRES`: space-separated list of all dependencies, both runtime and build
-   only.
- - `BUILD_REQUIRES`: space-separated list of all build dependencies, not needed
-   at runtime.
+ - `REQUIRES`: space-separated list of all dependencies, needed at **both** 
+   runtime and built-time.
+ - `BUILD_REQUIRES`: space-separated list of all build dependencies, that are needed
+   at built-time only but not at runtime.
  - `RUNTIME_REQUIRES`: space-separated list of all runtime dependencies only.
 
 For each dependency already built, the corresponding environment file is loaded.
