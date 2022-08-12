@@ -133,7 +133,9 @@ The following entries are optional in the header:
 
     The specified dependencies will be built before building the given package; 
     the "required" corresponding binaries, libraries and environment variables 
-    will be made available (by loading the dependency module) before the current built starts.
+    will be made available (by loading the build environment of the dependency) 
+    before the current built starts.
+    
     You can specify platform-specific dependencies by appending `:<regexp>` to
     the dependency name. Such a regular expression will be matched against the
     architecture provided via `--architecture`, and if it does not match, the
