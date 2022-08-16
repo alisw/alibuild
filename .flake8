@@ -1,0 +1,6 @@
+[flake8]
+# E111 = indent not a multiple of 4
+# E114 = indent not a multiple of 4 (comment)
+# E501 = line too long
+ignore = E111,E114,E501
+exclude = .git,.tox

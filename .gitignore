@@ -10,3 +10,4 @@ _site
 .coverage
 # For unit tests
 build.log
+.tox
