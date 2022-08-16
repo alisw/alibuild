@@ -1,4 +1,4 @@
-package: defaults-release
+package: defaults-o2
 version: v1
 env:
   CXXFLAGS: "-fPIC -g -O2 -std=c++11"
