@@ -17,6 +17,7 @@ jobs:
   unittest:
     name: python${{ matrix.python-version }}
     runs-on: ubuntu-latest
+
     strategy:
       matrix:
         python-version:
@@ -45,8 +46,9 @@ jobs:
         run: tox -p
 
       - name: Upload coverage information
+        if: ${{ always() && github.event.repository.owner.name == 'alisw' }}
         run: |
-          coverage combine -a .tox/coverage.*
+          coverage combine .tox/coverage.*
           bash <(curl -s https://codecov.io/bash)
 
   documentation:
