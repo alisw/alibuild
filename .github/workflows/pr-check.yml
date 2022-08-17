@@ -43,7 +43,7 @@ jobs:
           python -m pip install --upgrade tox tox-gh-actions coverage
 
       - name: Run tests
-        run: tox -p
+        run: tox
 
       - name: Upload coverage information
         if: ${{ always() && github.event.repository.owner.name == 'alisw' }}
