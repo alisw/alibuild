@@ -74,7 +74,7 @@ For example, on Centos7:
 {: #loading-the-package-environment}
 
 Environment for packages built using aliBuild is managed by [Environment
-Modules](http://modules.sourceforge.net) and a wrapper script called alienv.
+Modules](https://modules.sourceforge.net) and a wrapper script called alienv.
 Notice you will need the package `environment-modules` on Linux or `modules` on
 macOS for the following to work.
 

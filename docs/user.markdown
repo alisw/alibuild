@@ -371,7 +371,7 @@ Please run `aliDeps --help` for further information.
 ### Loading the package environment
 
 Environment for packages built using aliBuild is managed by
-[Environment Modules](http://modules.sourceforge.net) and the wrapper script
+[Environment Modules](https://modules.sourceforge.net) and the wrapper script
 `alienv`. To list the available packages you can do:
 
     alienv q

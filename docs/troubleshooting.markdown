@@ -91,7 +91,7 @@ it can happen this is not the case. If so, you can usually get it via:
     sudo apt-get install python-pip # (Ubuntu / Debian alikes)
 
 Alternatively you can try to install it by hand by following the [instructions
-here](https://pip.pypa.io/en/stable/installing/#installing-with-get-pip-py).
+here](https://pip.pypa.io/en/stable/installation/#supported-methods).
 
 ### Package branch was updated, but aliBuild does not rebuild it
 
