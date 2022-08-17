@@ -67,7 +67,7 @@ package your own software.
     </div>
     <div class="pure-u-1-3"><h3>Integrates with modules</h3>
       Easily setup your work environment using `alienv`, which is based on
-      standard <a href="https://modules.sourceforge.net">modulefiles</a>.
+      standard <a href="http://modules.sourceforge.net">modulefiles</a>.
       <br/><a href="quick.html#loading-the-package-environment">Read more</a>
     </div>
 </div>
