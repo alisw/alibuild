@@ -22,7 +22,7 @@ filenames are lowercase: _e.g._ the recipe for `ROOT` will be in `root.sh`.
 The recipe itself is made up of two parts: an header, and the actual build
 script, separated by three dashes (`---`) standalone.
 
-The header is in [YAML](http://yaml.org) format and contains metadata about the
+The header is in [YAML](https://yaml.org) format and contains metadata about the
 package, like its name, version and where to find the sources.
 
 The build script is a standard build script which is invoked by the tool to
