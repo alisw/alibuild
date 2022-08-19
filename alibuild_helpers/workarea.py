@@ -11,7 +11,8 @@ from alibuild_helpers.log import dieOnError, debug, info
 from alibuild_helpers.git import git, partialCloneFilter
 
 
-def updateReferenceRepoSpec(referenceSources, p, spec, fetch, usePartialClone=True):
+def updateReferenceRepoSpec(referenceSources, p, spec,
+                            fetch=True, usePartialClone=True, allowGitPrompt=True):
   """
   Update source reference area whenever possible, and set the spec's "reference"
   if available for reading.
@@ -21,11 +22,14 @@ def updateReferenceRepoSpec(referenceSources, p, spec, fetch, usePartialClone=Tr
   @spec             : the spec of the package to be updated (an OrderedDict)
   @fetch            : whether to fetch updates: if False, only clone if not found
   """
-  spec["reference"] = updateReferenceRepo(referenceSources, p, spec, fetch, usePartialClone)
+  spec["reference"] = updateReferenceRepo(referenceSources, p, spec, fetch,
+                                          usePartialClone, allowGitPrompt)
   if not spec["reference"]:
     del spec["reference"]
 
-def updateReferenceRepo(referenceSources, p, spec, fetch=True, usePartialClone=True):
+
+def updateReferenceRepo(referenceSources, p, spec,
+                        fetch=True, usePartialClone=True, allowGitPrompt=True):
   """
   Update source reference area, if possible.
   If the area is already there and cannot be written, assume it maintained
@@ -68,7 +72,7 @@ def updateReferenceRepo(referenceSources, p, spec, fetch=True, usePartialClone=T
       cmd.append(partialCloneFilter)
     # This might take a long time, so show the user what's going on.
     info("Cloning git repository for %s...", spec["package"])
-    git(cmd)
+    git(cmd, prompt=allowGitPrompt)
     info("Done cloning git repository for %s", spec["package"])
   elif fetch:
     with codecs.open(os.path.join(os.path.dirname(referenceRepo),
@@ -78,7 +82,8 @@ def updateReferenceRepo(referenceSources, p, spec, fetch=True, usePartialClone=T
       info("Updating git repository for %s...", spec["package"])
       err, output = git(("fetch", "-f", "--tags", spec["source"],
                          "+refs/heads/*:refs/heads/*"),
-                        directory=referenceRepo, check=False)
+                        directory=referenceRepo, check=False,
+                        prompt=allowGitPrompt)
       logf.write(output)
       debug(output)
       dieOnError(err, "Error while updating reference repo for %s." % spec["source"])

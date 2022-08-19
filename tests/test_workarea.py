@@ -60,7 +60,7 @@ class WorkareaTestCase(unittest.TestCase):
         mock_makedirs.assert_called_with("%s/sw/MIRROR" % getcwd())
         mock_git.assert_called_once_with((
             "fetch", "-f", "--tags", spec["source"], "+refs/heads/*:refs/heads/*",
-        ), directory="%s/sw/MIRROR/aliroot" % getcwd(), check=False)
+        ), directory="%s/sw/MIRROR/aliroot" % getcwd(), check=False, prompt=True)
         self.assertEqual(spec.get("reference"), "%s/sw/MIRROR/aliroot" % getcwd())
 
     @patch("os.path.exists")
@@ -93,7 +93,7 @@ class WorkareaTestCase(unittest.TestCase):
         mock_makedirs.assert_called_with("%s/sw/MIRROR" % getcwd())
         mock_git.assert_called_once_with(["clone", "--bare", spec["source"],
                                           "%s/sw/MIRROR/aliroot" % getcwd(),
-                                          "--filter=blob:none"])
+                                          "--filter=blob:none"], prompt=True)
         self.assertEqual(spec.get("reference"), "%s/sw/MIRROR/aliroot" % getcwd())
 
 
