@@ -1,3 +1,4 @@
+---
 # This workflow will install Python dependencies, run tests and lint with a
 # variety of Python versions. For more information see:
 # https://help.github.com/actions/language-and-framework-guides/using-python-with-github-actions
@@ -16,6 +17,7 @@ jobs:
   unittest:
     name: python${{ matrix.python-version }}
     runs-on: ubuntu-latest
+
     strategy:
       matrix:
         python-version:
@@ -27,75 +29,45 @@ jobs:
           - '3.10'
 
     steps:
-    - uses: actions/checkout@v2
+      - uses: actions/checkout@v2
 
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v1
-      with:
-        python-version: ${{ matrix.python-version }}
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
 
-    - name: Install flake8
-      run: |
-        python -m pip install --upgrade pip
-        python -m pip install --upgrade flake8
+      - name: Install test dependencies
+        run: |
+          sudo apt update -y
+          sudo apt install -y curl libcurl4-gnutls-dev build-essential gfortran libmysqlclient-dev xorg-dev libglu1-mesa-dev libfftw3-dev libxml2-dev git unzip autoconf automake autopoint texinfo gettext libtool libtool-bin pkg-config bison flex libperl-dev libbz2-dev swig liblzma-dev libnanomsg-dev rsync lsb-release unzip environment-modules libglfw3-dev libtbb-dev python3-venv libncurses-dev environment-modules libxml2-dev libxslt1-dev
+          python -m pip install --upgrade tox tox-gh-actions coverage
 
-    - name: Lint with flake8
-      run: |
-        # stop the build if there are Python syntax errors or undefined names
-        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-        # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
-        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+      - name: Run tests
+        run: tox
 
-    - name: Install test dependencies
-      run: |
-        sudo apt update -y
-        sudo apt install -y curl libcurl4-gnutls-dev build-essential gfortran libmysqlclient-dev xorg-dev libglu1-mesa-dev libfftw3-dev libxml2-dev git unzip autoconf automake autopoint texinfo gettext libtool libtool-bin pkg-config bison flex libperl-dev libbz2-dev swig liblzma-dev libnanomsg-dev rsync lsb-release unzip environment-modules libglfw3-dev libtbb-dev python3-venv libncurses-dev environment-modules libxml2-dev libxslt1-dev
-        python -m pip install --upgrade pylint mock coverage codecov distro -r requirements.txt
+      - name: Upload coverage information
+        if: ${{ always() && github.event.repository.owner.name == 'alisw' }}
+        run: |
+          coverage combine .tox/coverage.*
+          bash <(curl -s https://codecov.io/bash)
 
-    - name: Run tests
-      run: |
-        set -x
-        cd ..
-        git clone -b O2-v1.3.0 https://github.com/alisw/alidist
-        cat /etc/os-release
-        export PATH=~/.local/bin:$PATH PYTHONPATH=~/.local/lib/python${{ matrix.python-version }}/site-packages:$PYTHONPATH
-        #find . -iname "*.py" | xargs pylint --rcfile alibuild/.pylintrc
-        coverage run -a alibuild/aliBuild analytics off
-        time coverage run -a alibuild/aliBuild --help
-        coverage run -a alibuild/aliBuild analytics off
-        test -e ~/.config/alibuild/disable-analytics
-        test ! -e ~/.config/alibuild/analytics-uuid
-        coverage run -a alibuild/aliBuild analytics on
-        test ! -e ~/.config/alibuild/disable-analytics
-        test -e ~/.config/alibuild/analytics-uuid
-        coverage run -a alibuild/aliBuild analytics off
-        test -e ~/.config/alibuild/disable-analytics
-        test -e ~/.config/alibuild/analytics-uuid
-        PYTHONPATH="alibuild:$PYTHONPATH" time coverage run -a -m unittest discover alibuild/tests
-        time coverage run -a alibuild/aliBuild -z test-init init zlib
-        pushd test-init/alidist && git status && popd
-        pushd test-init/zlib && git status && popd
-        time coverage run -a alibuild/aliBuild -c alibuild/tests/testdist build non-existsting --no-system --disable GCC-Toolchain || true
-        time coverage run -a alibuild/aliBuild -c alibuild/tests/testdist build broken1 --no-system --disable GCC-Toolchain 2>&1 | grep "Header missing"
-        time coverage run -a alibuild/aliBuild -c alibuild/tests/testdist build broken2 --no-system --disable GCC-Toolchain 2>&1 | grep "Empty recipe"
-        time coverage run -a alibuild/aliBuild -c alibuild/tests/testdist build broken3 --no-system --disable GCC-Toolchain 2>&1 | grep "Unable to parse"
-        time coverage run -a alibuild/aliBuild -c alibuild/tests/testdist build broken4 --no-system --disable GCC-Toolchain 2>&1 | grep "Malformed header"
-        time coverage run -a alibuild/aliBuild -c alibuild/tests/testdist build broken5 --no-system --disable GCC-Toolchain 2>&1 | grep "Missing package"
-        time coverage run -a alibuild/aliBuild -c alibuild/tests/testdist build broken6 --no-system --disable GCC-Toolchain 2>&1 | grep scanning
-        time coverage run -a alibuild/aliBuild -c alibuild/tests/testdist build broken7 --no-system --disable GCC-Toolchain 2>&1 | grep "Malformed entry prefer_system"
-        time coverage run -a alibuild/aliBuild build zlib --no-system --disable GCC-Toolchain
-        alibuild/alienv q
-        alibuild/alienv setenv zlib/latest -c bash -c '[[ $LD_LIBRARY_PATH == */zlib/* ]]'
-        time coverage run -a alibuild/aliDoctor AliPhysics
-        time coverage run -a alibuild/aliBuild build zlib --dry-run
-        time coverage run -a alibuild/aliBuild --aggressive-cleanup --docker -a slc7_x86-64 --always-prefer-system -d build zlib
-        time coverage run -a alibuild/aliBuild --aggressive-cleanup --docker -a slc7_x86-64 --debug --always-prefer-system -d build zlib
-        #time coverage run -a alibuild/aliBuild --aggressive-cleanup --docker -a ubuntu1510_x86-64 -d build zlib
-        time coverage run -a alibuild/aliBuild init zlib
-        # Test for devel packages
-        time coverage run -a alibuild/aliBuild --aggressive-cleanup --docker -a slc7_x86-64 --always-prefer-system -d build zlib
-        time coverage run -a alibuild/aliBuild version
-        bash <(curl -s https://codecov.io/bash)
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.x
+
+      - name: Install dependencies
+        run: python -m pip install --upgrade tox tox-gh-actions
+
+      - name: Run linters
+        run: tox -e lint
 
   documentation:
     name: documentation
@@ -104,10 +76,10 @@ jobs:
       image: jekyll/jekyll
 
     steps:
-    - uses: actions/checkout@v2
+      - uses: actions/checkout@v2
 
-    - name: Test documentation
-      run: |
-        chmod -R a+rwX .
-        jekyll build -s docs -d _site --baseurl .
-        script/custom_htmlproofer.rb
+      - name: Test documentation
+        run: |
+          chmod -R a+rwX .
+          jekyll build -s docs -d _site --baseurl .
+          script/custom_htmlproofer.rb

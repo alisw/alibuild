@@ -1,3 +1,6 @@
+[MAIN]
+ignore=.git,.tox
+
 [FORMAT]
 indent-string='  '
 max-line-length=80
@@ -11,6 +14,35 @@ variable-naming-style=camelCase
 max-attributes=15
 
 [MESSAGES CONTROL]
-disable-checker=wrong-hanging-indentation,invalid-name,indent-after-paren,bad-continuation,import-outside-toplevel,no-else-break
-disable=bad-continuation,bad-whitespace,import-error,ungrouped-imports,missing-docstring,invalid-name,multiple-imports,unidiomatic-typecheck,line-too-long,unused-variable,too-few-public-methods,bare-except,trailing-whitespace,too-many-locals,too-many-branches,too-many-statements,unused-argument,fixme,redefined-builtin,consider-using-ternary,no-else-return,superfluous-parens,too-many-arguments,old-style-class,bad-indentation,wrong-import-order,unused-import,logging-not-lazy,anomalous-backslash-in-string,no-self-use,trailing-newlines,expression-not-assigned,pointless-statement,inconsistent-return-statements,attribute-defined-outside-init,broad-except, deprecated-lambda, duplicate-code, len-as-condition, multiple-statements, no-init, no-value-for-parameter, protected-access,redefined-outer-name, singleton-comparison,super-init-not-called,too-many-lines,too-many-nested-blocks,too-many-return-statements,unneeded-not,too-many-ancestors,deprecated-method,useless-import-alias,useless-object-inheritance,consider-using-set-comprehension,undefined-variable,useless-import-alias,too-many-ancestors,consider-using-dict-comprehension,invalid-envvar-default,import-outside-toplevel,no-else-break
-
+disable=attribute-defined-outside-init,
+        bad-indentation,
+        bare-except,
+        broad-except,
+        consider-using-f-string,
+        fixme,
+        import-outside-toplevel,
+        invalid-envvar-default,
+        invalid-name,
+        line-too-long,
+        missing-docstring,
+        multiple-imports,
+        multiple-statements,
+        no-else-break,
+        no-else-return,
+        protected-access,
+        redefined-builtin,
+        redefined-outer-name,
+        redundant-u-string-prefix,
+        super-init-not-called,
+        too-few-public-methods,
+        too-many-ancestors,
+        too-many-arguments,
+        too-many-branches,
+        too-many-lines,
+        too-many-locals,
+        too-many-nested-blocks,
+        too-many-return-statements,
+        too-many-statements,
+        ungrouped-imports,
+        unused-argument,
+        wrong-import-order,
