@@ -9,6 +9,11 @@ layout: main
     2. [The body](#the-body)
     3. [Defaults, common requirements for builds](#defaults)
 2. [Relocation](#relocation)
+3. [Build environment](#build-environment)
+4. [Runtime environment: module file](#runtime-environment)
+    1. [Creating a module file](#creating-a-module-file)
+    2. [Generating (partially) a module file: alibuild-recipe-tools](#generating-in-part-a-module-file)
+
 
 ## Recipe formats
 
@@ -370,6 +375,8 @@ load the build environment via [direnv](https://direnv.net), *e.g.* for easy
 
 ## Runtime environment
 
+### Creating a module file
+
 Runtime environment is usually provided via
 [environment modules](https://modules.readthedocs.io/en/latest/).
 
@@ -413,6 +420,9 @@ Please keep in mind the following recommendation when writing the modulefile:
 * Use `<package>_REVISION` to guard inclusion of extra dependencies. This will
   make sure that only dependencies which were actually built via `aliBuild` will
   be included in the modulefile.
+
+
+### Generating in part a module file
 
 It's also now possible to generate automatically the initial part of the
 modulefile, up to the `# Our environment` line, by using the
