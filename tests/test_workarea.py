@@ -1,10 +1,9 @@
-from __future__ import print_function
 from os import getcwd
 import unittest
 try:
-    from unittest.mock import patch, call, MagicMock, DEFAULT  # In Python 3, mock is built-in
+    from unittest.mock import patch, MagicMock  # In Python 3, mock is built-in
 except ImportError:
-    from mock import patch, call, MagicMock, DEFAULT  # Python 2
+    from mock import patch, MagicMock  # Python 2
 try:
     from collections import OrderedDict
 except ImportError:
@@ -21,6 +20,8 @@ MOCK_SPEC = OrderedDict((
 
 @patch("alibuild_helpers.workarea.debug", new=MagicMock())
 @patch("alibuild_helpers.workarea.info", new=MagicMock())
+@patch("alibuild_helpers.workarea.clone_speedup_options",
+       new=MagicMock(return_value=["--filter=blob:none"]))
 class WorkareaTestCase(unittest.TestCase):
 
     @patch("os.path.exists")

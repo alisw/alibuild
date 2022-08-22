@@ -6,12 +6,12 @@ from alibuild_helpers.cmd import getstatusoutput
 from alibuild_helpers.log import debug
 
 
-def __partialCloneFilter():
-  err, out = getstatusoutput("LANG=C git clone --filter=blob:none 2>&1 | grep 'unknown option'")
-  return err and "--filter=blob:none" or ""
-
-
-partialCloneFilter = __partialCloneFilter()
+def clone_speedup_options():
+  """Return a list of options supported by the system git which speed up cloning."""
+  _, out = getstatusoutput("LANG=C git clone --filter=blob:none")
+  if "unknown option" not in out and "invalid filter-spec" not in out:
+    return ["--filter=blob:none"]
+  return []
 
 
 def git(args, directory=".", check=True, prompt=True):

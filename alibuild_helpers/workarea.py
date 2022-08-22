@@ -8,7 +8,7 @@ except ImportError:
   from ordereddict import OrderedDict
 
 from alibuild_helpers.log import dieOnError, debug, info
-from alibuild_helpers.git import git, partialCloneFilter
+from alibuild_helpers.git import git, clone_speedup_options
 
 
 def updateReferenceRepoSpec(referenceSources, p, spec,
@@ -68,8 +68,8 @@ def updateReferenceRepo(referenceSources, p, spec,
 
   if not os.path.exists(referenceRepo):
     cmd = ["clone", "--bare", spec["source"], referenceRepo]
-    if usePartialClone and partialCloneFilter:
-      cmd.append(partialCloneFilter)
+    if usePartialClone:
+      cmd.extend(clone_speedup_options())
     # This might take a long time, so show the user what's going on.
     info("Cloning git repository for %s...", spec["package"])
     git(cmd, prompt=allowGitPrompt)

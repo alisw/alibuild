@@ -13,7 +13,7 @@ from alibuild_helpers.utilities import validateDefaults
 from alibuild_helpers.utilities import Hasher
 from alibuild_helpers.utilities import yamlDump
 from alibuild_helpers.utilities import resolve_tag, resolve_version
-from alibuild_helpers.git import git, partialCloneFilter
+from alibuild_helpers.git import git, clone_speedup_options
 from alibuild_helpers.sync import (NoRemoteSync, HttpRemoteSync, S3RemoteSync,
                                    Boto3RemoteSync, RsyncRemoteSync)
 import yaml
@@ -938,10 +938,6 @@ def doBuild(args, parser):
     if "reference" in spec:
       referenceStatement = "export GIT_REFERENCE=${GIT_REFERENCE_OVERRIDE:-%s}/%s" % (dirname(spec["reference"]), basename(spec["reference"]))
 
-    partialCloneStatement = ""
-    if partialCloneFilter and not args.docker:
-      partialCloneStatement = "export GIT_PARTIAL_CLONE_FILTER='--filter=blob:none'"
-
     debug("spec = %r", spec)
 
     cmd_raw = ""
@@ -982,20 +978,18 @@ def doBuild(args, parser):
                  sourceDir=source and (dirname(source) + "/") or "",
                  sourceName=source and basename(source) or "",
                  referenceStatement=referenceStatement,
-                 partialCloneStatement=partialCloneStatement,
+                 gitOptionsStatement="" if args.docker else
+                   "export GIT_CLONE_SPEEDUP=" + quote(" ".join(clone_speedup_options())),
                  requires=" ".join(spec["requires"]),
                  build_requires=" ".join(spec["build_requires"]),
                  runtime_requires=" ".join(spec["runtime_requires"])
                 )
 
-    commonPath = "%s/%%s/%s/%s/%s-%s" % (workDir,
-                                         args.architecture,
-                                         spec["package"],
-                                         spec["version"],
-                                         spec["revision"])
-    scriptDir = commonPath % "SPECS"
+    scriptDir = join(workDir, "SPECS", args.architecture, spec["package"],
+                     spec["version"] + "-" + spec["revision"])
 
     err, out = getstatusoutput("mkdir -p %s" % scriptDir)
+    dieOnError(err, "Failed to create script dir %s: %s" % (scriptDir, out))
     writeAll("%s/build.sh" % scriptDir, cmd)
     writeAll("%s/%s.sh" % (scriptDir, spec["package"]), spec["recipe"])
 

@@ -1,4 +1,3 @@
-from alibuild_helpers.cmd import execute
 from alibuild_helpers.git import git
 from alibuild_helpers.utilities import getPackageList, parseDefaults, readDefaults, validateDefaults
 from alibuild_helpers.log import debug, error, warning, banner, info
@@ -8,10 +7,6 @@ from alibuild_helpers.workarea import updateReferenceRepoSpec
 from os.path import join
 import os.path as path
 import os, sys
-try:
-  from collections import OrderedDict
-except ImportError:
-  from ordereddict import OrderedDict
 
 def parsePackagesDefinition(pkgname):
   return [ dict(zip(["name","ver"], y.split("@")[0:2]))

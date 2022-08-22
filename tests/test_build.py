@@ -187,11 +187,11 @@ def dummy_exists(x):
     }.get(x, DEFAULT)
 
 
-git_mock = MagicMock(partialCloneFilter="--filter=blob:none")
-sys.modules["alibuild_helpers.git"] = git_mock
-
-
 # A few errors we should handle, together with the expected result
+@patch("alibuild_helpers.build.clone_speedup_options",
+       new=MagicMock(return_value=["--filter=blob:none"]))
+@patch("alibuild_helpers.workarea.clone_speedup_options",
+       new=MagicMock(return_value=["--filter=blob:none"]))
 class BuildTestCase(unittest.TestCase):
     @patch("alibuild_helpers.analytics", new=MagicMock())
     @patch("requests.Session.get", new=MagicMock())
