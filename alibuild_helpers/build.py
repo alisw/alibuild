@@ -106,7 +106,10 @@ def update_git_repos(args, specs, buildOrder, develPkgs):
     # Now execute git commands for private packages one-by-one, so the user can
     # type their username and password without multiple prompts interfering.
     for package in requires_auth:
-        banner("If prompted now, enter your username and password for %s below",
+        banner("If prompted now, enter your username and password for %s below\n"
+               "If you are prompted too often, see: "
+               "https://alisw.github.io/alibuild/troubleshooting.html"
+               "#alibuild-keeps-asking-for-my-password",
                specs[package]["source"])
         update_repo(package, git_prompt=True)
         debug("%r package updated: %d refs found", package,

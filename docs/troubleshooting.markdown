@@ -301,7 +301,7 @@ and then adapt you PATH to pickup the local installation, e.g. via:
     export PATH=~/.local/bin:$PATH
 
 
-### aliBuild and/or git keep asking for my username and password
+### aliBuild keeps asking for my password
 
 Some packages you may need to build have their source code in a protected repository on CERN GitLab.
 This means that you may be asked for a username and password when you run `aliBuild build`.
