@@ -46,7 +46,7 @@ jobs:
         run: tox
 
       - name: Upload coverage information
-        if: ${{ always() && github.event.repository.owner.name == 'alisw' }}
+        if: ${{ always() && github.event.repository.owner.login == 'alisw' }}
         run: |
           coverage combine .tox/coverage.*
           bash <(curl -s https://codecov.io/bash)
