@@ -1,12 +1,11 @@
+import os
 import unittest
 
 from alibuild_helpers.git import git
 
+EXISTING_REPO = "https://github.com/alisw/alibuild"
 MISSING_REPO = "https://github.com/alisw/nonexistent"
-MISSING_REPO_ERROR_MSG = (
-    "Error 128 from git ls-remote -ht " + MISSING_REPO + ": fatal: could "
-    "not read Username for 'https://github.com': terminal prompts disabled"
-)
+PRIVATE_REPO = "https://gitlab.cern.ch/ALICEPrivateExternals/FLUKA.git"
 
 
 err, out = git(("--help",), check=False)
@@ -15,11 +14,34 @@ err, out = git(("--help",), check=False)
 class GitWrapperTestCase(unittest.TestCase):
     """Make sure the git() wrapper function is working."""
 
-    def test_git_missing_repo(self):
-        """Check we get the right exception when credentials are required."""
-        try:
-            git(("ls-remote", "-ht", MISSING_REPO), prompt=False)
-        except RuntimeError as exc:
-            self.assertTupleEqual(exc.args, (MISSING_REPO_ERROR_MSG,))
+    def setUp(self):
+        # Disable reading all git configuration files, including the user's, in
+        # case they have access to PRIVATE_REPO.
+        self._prev_git_config_global = os.environ.get("GIT_CONFIG_GLOBAL")
+        os.environ["GIT_CONFIG_GLOBAL"] = os.devnull
+
+    def tearDown(self):
+        # Restore the original value of GIT_CONFIG_GLOBAL, if any.
+        if self._prev_git_config_global is None:
+            del os.environ["GIT_CONFIG_GLOBAL"]
         else:
-            self.fail("expected git(...) to raise a RuntimeError")
+            os.environ["GIT_CONFIG_GLOBAL"] = self._prev_git_config_global
+
+    def test_git_existing_repo(self):
+        """Check git can read an existing repo."""
+        err, out = git(("ls-remote", "-ht", EXISTING_REPO),
+                       check=False, prompt=False)
+        self.assertEqual(err, 0, "git output:\n" + out)
+        self.assertTrue(out, "expected non-empty output from git")
+
+    def test_git_missing_repo(self):
+        """Check we get the right exception when a repo doesn't exist."""
+        self.assertRaises(RuntimeError, git, (
+            "ls-remote", "-ht", MISSING_REPO,
+        ), prompt=False)
+
+    def test_git_private_repo(self):
+        """Check we get the right exception when credentials are required."""
+        self.assertRaises(RuntimeError, git, (
+            "ls-remote", "-ht", PRIVATE_REPO,
+        ), prompt=False)
