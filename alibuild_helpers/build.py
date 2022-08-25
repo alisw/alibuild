@@ -13,7 +13,7 @@ from alibuild_helpers.utilities import validateDefaults
 from alibuild_helpers.utilities import Hasher
 from alibuild_helpers.utilities import yamlDump
 from alibuild_helpers.utilities import resolve_tag, resolve_version
-from alibuild_helpers.git import git, partialCloneFilter
+from alibuild_helpers.git import git, clone_speedup_options
 from alibuild_helpers.sync import (NoRemoteSync, HttpRemoteSync, S3RemoteSync,
                                    Boto3RemoteSync, RsyncRemoteSync)
 import yaml
@@ -30,6 +30,7 @@ try:
 except ImportError:
   from pipes import quote  # Python 2.7
 
+import concurrent.futures
 import importlib
 import socket
 import os
@@ -50,6 +51,69 @@ def readHashFile(fn):
     return open(fn).read().strip("\n")
   except IOError:
     return "0"
+
+
+def update_git_repos(args, specs, buildOrder, develPkgs):
+    """Update and/or fetch required git repositories in parallel.
+
+    If any repository fails to be fetched, then it is retried, while allowing the
+    user to input their credentials if required.
+    """
+
+    def update_repo(package, git_prompt):
+        updateReferenceRepoSpec(args.referenceSources, package, specs[package],
+                                fetch=args.fetchRepos,
+                                usePartialClone=not args.docker,
+                                allowGitPrompt=git_prompt)
+
+        # Retrieve git heads
+        cmd = ["ls-remote", "--heads", "--tags"]
+        if package in develPkgs:
+            specs[package]["source"] = \
+                os.path.join(os.getcwd(), specs[package]["package"])
+            cmd.append(specs[package]["source"])
+        else:
+            cmd.append(specs[package].get("reference", specs[package]["source"]))
+
+        output = git(cmd, prompt=git_prompt)
+        specs[package]["git_refs"] = {
+            git_ref: git_hash for git_hash, sep, git_ref
+            in (line.partition("\t") for line in output.splitlines()) if sep
+        }
+
+    requires_auth = set()
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+        future_to_download = {
+          executor.submit(update_repo, package, git_prompt=False): package
+          for package in buildOrder if "source" in specs[package]
+        }
+        for future in concurrent.futures.as_completed(future_to_download):
+            futurePackage = future_to_download[future]
+            try:
+                future.result()
+            except RuntimeError as exc:
+                # Git failed. Let's assume this is because the user needs to
+                # supply a password.
+                debug("%r requires auth; will prompt later", futurePackage)
+                requires_auth.add(futurePackage)
+            except Exception as exc:
+                raise RuntimeError("Error on fetching %r: %s. Aborting." %
+                                   (futurePackage, exc))
+            else:
+                debug("%r package updated: %d refs found", futurePackage,
+                      len(specs[futurePackage]["git_refs"]))
+
+    # Now execute git commands for private packages one-by-one, so the user can
+    # type their username and password without multiple prompts interfering.
+    for package in requires_auth:
+        banner("If prompted now, enter your username and password for %s below\n"
+               "If you are prompted too often, see: "
+               "https://alisw.github.io/alibuild/troubleshooting.html"
+               "#alibuild-keeps-asking-for-my-password",
+               specs[package]["source"])
+        update_repo(package, git_prompt=True)
+        debug("%r package updated: %d refs found", package,
+              len(specs[package]["git_refs"]))
 
 
 # Creates a directory in the store which contains symlinks to the package
@@ -377,33 +441,7 @@ def doBuild(args, parser):
            os.getcwd(), star())
 
   # Clone/update repos
-  import concurrent.futures
-  with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-    def downloadTask(p):
-      updateReferenceRepoSpec(args.referenceSources, p, specs[p], args.fetchRepos, not args.docker)
-
-      # Retrieve git heads
-      cmd = ("ls-remote", "--heads", "--tags",
-             specs[p].get("reference", specs[p]["source"]))
-      if specs[p]["package"] in develPkgs:
-         specs[p]["source"] = join(os.getcwd(), specs[p]["package"])
-         cmd = "ls-remote", "--heads", "--tags", specs[p]["source"]
-      output = git(cmd)
-      specs[p]["git_refs"] = {git_ref: git_hash for git_hash, sep, git_ref in
-                              (line.partition("\t") for line in output.splitlines())
-                              if sep}
-      return "%d refs found" % len(specs[p]["git_refs"])
-    future_to_download = {executor.submit(downloadTask, p): p
-                          for p in buildOrder if "source" in specs[p]}
-    for future in concurrent.futures.as_completed(future_to_download):
-        futurePackage = future_to_download[future]
-        try:
-            data = future.result()
-        except Exception as exc:
-            raise RuntimeError("Error on fetching %r: %s. Aborting." %
-                               (futurePackage, exc))
-        else:
-            debug("%r package updated: %s", futurePackage, data)
+  update_git_repos(args, specs, buildOrder, develPkgs)
 
   # Resolve the tag to the actual commit ref
   for p in buildOrder:
@@ -900,10 +938,6 @@ def doBuild(args, parser):
     if "reference" in spec:
       referenceStatement = "export GIT_REFERENCE=${GIT_REFERENCE_OVERRIDE:-%s}/%s" % (dirname(spec["reference"]), basename(spec["reference"]))
 
-    partialCloneStatement = ""
-    if partialCloneFilter and not args.docker:
-      partialCloneStatement = "export GIT_PARTIAL_CLONE_FILTER='--filter=blob:none'"
-
     debug("spec = %r", spec)
 
     cmd_raw = ""
@@ -944,20 +978,18 @@ def doBuild(args, parser):
                  sourceDir=source and (dirname(source) + "/") or "",
                  sourceName=source and basename(source) or "",
                  referenceStatement=referenceStatement,
-                 partialCloneStatement=partialCloneStatement,
+                 gitOptionsStatement="" if args.docker else
+                   "export GIT_CLONE_SPEEDUP=" + quote(" ".join(clone_speedup_options())),
                  requires=" ".join(spec["requires"]),
                  build_requires=" ".join(spec["build_requires"]),
                  runtime_requires=" ".join(spec["runtime_requires"])
                 )
 
-    commonPath = "%s/%%s/%s/%s/%s-%s" % (workDir,
-                                         args.architecture,
-                                         spec["package"],
-                                         spec["version"],
-                                         spec["revision"])
-    scriptDir = commonPath % "SPECS"
+    scriptDir = join(workDir, "SPECS", args.architecture, spec["package"],
+                     spec["version"] + "-" + spec["revision"])
 
     err, out = getstatusoutput("mkdir -p %s" % scriptDir)
+    dieOnError(err, "Failed to create script dir %s: %s" % (scriptDir, out))
     writeAll("%s/build.sh" % scriptDir, cmd)
     writeAll("%s/%s.sh" % (scriptDir, spec["package"]), spec["recipe"])
 

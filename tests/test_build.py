@@ -107,7 +107,7 @@ GIT_FETCH_ROOT_ARGS = ("fetch", "-f", "--tags", "https://github.com/root-mirror/
                        "+refs/heads/*:refs/heads/*"), "/sw/MIRROR/root", False
 
 
-def dummy_git(args, directory=".", check=True):
+def dummy_git(args, directory=".", check=True, prompt=True):
     return {
         (("symbolic-ref", "-q", "HEAD"), "/alidist", False): (0, "master"),
         (("rev-parse", "HEAD"), "/alidist", True): "6cec7b7b3769826219dfa85e5daa6de6522229a0",
@@ -187,11 +187,11 @@ def dummy_exists(x):
     }.get(x, DEFAULT)
 
 
-git_mock = MagicMock(partialCloneFilter="--filter=blob:none")
-sys.modules["alibuild_helpers.git"] = git_mock
-
-
 # A few errors we should handle, together with the expected result
+@patch("alibuild_helpers.build.clone_speedup_options",
+       new=MagicMock(return_value=["--filter=blob:none"]))
+@patch("alibuild_helpers.workarea.clone_speedup_options",
+       new=MagicMock(return_value=["--filter=blob:none"]))
 class BuildTestCase(unittest.TestCase):
     @patch("alibuild_helpers.analytics", new=MagicMock())
     @patch("requests.Session.get", new=MagicMock())
@@ -275,7 +275,8 @@ class BuildTestCase(unittest.TestCase):
         exit_code = doBuild(args, mock_parser)
         self.assertEqual(exit_code, 0)
         mock_debug.assert_called_with("Everything done")
-        mock_workarea_git.assert_called_once_with(list(GIT_CLONE_ZLIB_ARGS[0]))
+        mock_workarea_git.assert_called_once_with(list(GIT_CLONE_ZLIB_ARGS[0]),
+                                                  prompt=False)
 
         # Force fetching repos
         mock_workarea_git.reset_mock()

@@ -1,23 +1,16 @@
-from __future__ import print_function
 from argparse import Namespace
 import os.path as path
-import sys
 import unittest
 try:
-    from unittest import mock
-    from unittest.mock import call, MagicMock  # In Python 3, mock is built-in
+    from unittest.mock import MagicMock, call, patch  # In Python 3, mock is built-in
     from io import StringIO
 except ImportError:
-    import mock
-    from mock import call, MagicMock  # Python 2
+    from mock import MagicMock, call, patch  # Python 2
     from StringIO import StringIO
 try:
     from collections import OrderedDict
 except ImportError:
     from ordereddict import OrderedDict
-
-git_mock = MagicMock(partialCloneFilter="--filter=blob:none")
-sys.modules["alibuild_helpers.git"] = git_mock
 
 from alibuild_helpers.init import doInit, parsePackagesDefinition
 
@@ -47,9 +40,9 @@ class InitTestCase(unittest.TestCase):
                        [{'ver': '', 'name': 'AliRoot'},
                         {'ver': 'v5-08-16-01', 'name': 'AliPhysics'}])
 
-    @mock.patch("alibuild_helpers.init.info")
-    @mock.patch("alibuild_helpers.init.path")
-    @mock.patch("alibuild_helpers.init.os")
+    @patch("alibuild_helpers.init.info")
+    @patch("alibuild_helpers.init.path")
+    @patch("alibuild_helpers.init.os")
     def test_doDryRunInit(self, mock_os, mock_path,  mock_info):
       fake_dist = {"repo": "alisw/alidist", "ver": "master"}
       args = Namespace(
@@ -66,14 +59,14 @@ class InitTestCase(unittest.TestCase):
       self.assertRaises(SystemExit, doInit, args)
       self.assertEqual(mock_info.mock_calls, [call('This will initialise local checkouts for %s\n--dry-run / -n specified. Doing nothing.', 'zlib,AliRoot')])
 
-    @mock.patch("alibuild_helpers.init.banner")
-    @mock.patch("alibuild_helpers.init.info")
-    @mock.patch("alibuild_helpers.init.path")
-    @mock.patch("alibuild_helpers.init.os")
-    @mock.patch("alibuild_helpers.init.git")
-    @mock.patch("alibuild_helpers.init.updateReferenceRepoSpec")
-    @mock.patch("alibuild_helpers.utilities.open")
-    @mock.patch("alibuild_helpers.init.readDefaults")
+    @patch("alibuild_helpers.init.banner")
+    @patch("alibuild_helpers.init.info")
+    @patch("alibuild_helpers.init.path")
+    @patch("alibuild_helpers.init.os")
+    @patch("alibuild_helpers.init.git")
+    @patch("alibuild_helpers.init.updateReferenceRepoSpec")
+    @patch("alibuild_helpers.utilities.open")
+    @patch("alibuild_helpers.init.readDefaults")
     def test_doRealInit(self, mock_read_defaults, mock_open, mock_update_reference, mock_git, mock_os, mock_path,  mock_info, mock_banner):
       fake_dist = {"repo": "alisw/alidist", "ver": "master"}
       mock_open.side_effect = lambda x: {

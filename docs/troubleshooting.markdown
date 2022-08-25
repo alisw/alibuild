@@ -299,3 +299,35 @@ This means that you need to do (only once):
 and then adapt you PATH to pickup the local installation, e.g. via:
 
     export PATH=~/.local/bin:$PATH
+
+
+### aliBuild keeps asking for my password
+
+Some packages you may need to build have their source code in a protected repository on CERN GitLab.
+This means that you may be asked for a username and password when you run `aliBuild build`.
+See below for ways to avoid being prompted too often.
+
+#### SSH authentication
+
+You can use an SSH key to authenticate with CERN GitLab.
+This way, you will not be prompted for your GitLab password at all.
+To do this, find your public key (this usually lives in `~/.ssh/id_rsa.pub`) and copy the contents of the file into [your user settings on CERN GitLab][gitlab-ssh-key].
+If you have no SSH key, you can generate one using the `ssh-keygen` command.
+Then, configure git to use SSH to authenticate with CERN GitLab using the following command:
+
+```bash
+git config --global 'url.ssh://git@gitlab.cern.ch:7999/.insteadof' 'https://gitlab.cern.ch/'
+```
+
+[gitlab-ssh-key]: https://gitlab.cern.ch/-/profile/keys
+
+#### Caching passwords
+
+If you prefer not to use SSH keys as described above, you can alternatively configure git to remember the passwords you input for a short time (such as a few hours).
+In order to do this, run the command below (which remembers your passwords for an hour each time you type them into git).
+
+```bash
+git config --global credential.helper 'cache --timeout 3600'
+```
+
+You can adjust the timeout (3600 seconds, above) to your liking, if you would prefer git to remember your passwords for longer.
