@@ -67,7 +67,7 @@ def doParseArgs(star):
   build_parser.add_argument("pkgname", metavar="PACKAGE", nargs="+",
                             help="One of the packages in CONFIGDIR. May be specified multiple times.")
 
-  build_parser.add_argument("--defaults", dest="defaults", default="release", metavar="DEFAULT",
+  build_parser.add_argument("--defaults", dest="defaults", default="o2", metavar="DEFAULT",
                             help="Use defaults from CONFIGDIR/defaults-%(metavar)s.sh.")
   build_parser.add_argument("-a", "--architecture", dest="architecture", metavar="ARCH", default=detectedArch,
                             help=("Build as if on the specified architecture. When used with --docker, build "
@@ -194,7 +194,7 @@ def doParseArgs(star):
                            help=("Resolve dependencies as if on the specified architecture. When used with "
                                  "--docker, use a Docker image for the specified architecture. Default is "
                                  "the current system architecture, which is '%(default)s'."))
-  deps_parser.add_argument("--defaults", dest="defaults", default="release", metavar="DEFAULT",
+  deps_parser.add_argument("--defaults", dest="defaults", default="o2", metavar="DEFAULT",
                            help="Use defaults from CONFIGDIR/defaults-%(metavar)s.sh.")
   deps_parser.add_argument("--disable", dest="disable", default=[], metavar="PACKAGE", action="append",
                            help=("Assume we're not building %(metavar)s and all its (unique) dependencies. "
@@ -242,7 +242,7 @@ def doParseArgs(star):
                              help=("Resolve requirements as if on the specified architecture. When used with "
                                    "--docker, use a Docker image for the specified architecture. Default is "
                                    "the current system architecture, which is '%(default)s'."))
-  doctor_parser.add_argument("--defaults", dest="defaults", default="release", metavar="DEFAULT",
+  doctor_parser.add_argument("--defaults", dest="defaults", default="o2", metavar="DEFAULT",
                              help="Use defaults from CONFIGDIR/defaults-%(metavar)s.sh.")
   doctor_parser.add_argument("--disable", dest="disable", default=[], metavar="PACKAGE", action="append",
                              help=("Assume we're not building %(metavar)s and all its (unique) dependencies. "
@@ -283,7 +283,7 @@ def doParseArgs(star):
                            help=("Parse defaults using the specified architecture. Default is "
                                  "the current system architecture, which is '%(default)s'."))
 
-  init_parser.add_argument("--defaults", dest="defaults", default="release", metavar="DEFAULT",
+  init_parser.add_argument("--defaults", dest="defaults", default="o2", metavar="DEFAULT",
                            help="Use defaults from CONFIGDIR/defaults-%(metavar)s.sh.")
   init_parser.add_argument("-z", "--devel-prefix", dest="develPrefix", default=".",
                            help=("Directory under which to clone the repository of build recipes. "
