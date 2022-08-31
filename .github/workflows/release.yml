@@ -1,7 +1,10 @@
+---
 name: Release
-on:
+
+'on':
   release:
     types: [published]
+
 jobs:
   pypi:
     name: Publish release on PyPI
@@ -23,6 +26,7 @@ jobs:
         with:
           user: __token__
           password: ${{ secrets.pypi_password }}
+
   brew:
     name: Update Homebrew formula
     needs: pypi
@@ -67,6 +71,6 @@ jobs:
           git add alibuild.rb
           git commit -m "Update alibuild to ${GITHUB_REF#refs/tags/}"
           git show
-          git push https://alibuild:$GITHUB_TOKEN@github.com/alisw/homebrew-system-deps master
+          git push "https://alibuild:$GITHUB_TOKEN@github.com/alisw/homebrew-system-deps" master
         env:
           GITHUB_TOKEN: ${{ secrets.homebrew_repo_token }}
