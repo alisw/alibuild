@@ -1029,10 +1029,11 @@ def doBuild(args, parser):
     ]
     # Add the extra environment as passed from the command line.
     buildEnvironment += [e.partition('=')[::2] for e in args.environment]
+
     # In case the --docker options is passed, we setup a docker container which
     # will perform the actual build. Otherwise build as usual using bash.
     if args.docker:
-      dockerWrapper = (
+      build_command = (
         "docker run --rm --network=host --entrypoint= --user $(id -u):$(id -g) "
         "-v {workdir}:/sw -v {scriptDir}/build.sh:/build.sh:ro "
         "-e GIT_REFERENCE_OVERRIDE=/mirror -e WORK_DIR_OVERRIDE=/sw "
@@ -1054,16 +1055,14 @@ def doBuild(args, parser):
         mirrorVolume=("-v %s:/mirror" % quote(dirname(spec["reference"]))
                       if "reference" in spec else ""),
       )
-      debug("Docker command: %s", dockerWrapper)
-      err = execute(dockerWrapper)
-
     else:
-      progress = ProgressPrint("%s is being built (use --debug for full output)" % spec["package"])
-      for k,v in buildEnvironment:
-        os.environ[k] = str(v)
-      err = execute("%s -e -x %s/build.sh 2>&1" % (BASH, scriptDir),
-                    printer=debug if args.debug or not sys.stdout.isatty() else progress)
-      progress.end("failed" if err else "ok", err)
+      os.environ.update(buildEnvironment)
+      build_command = "%s -e -x %s/build.sh 2>&1" % (BASH, quote(scriptDir))
+
+    debug("Build command: %s", build_command)
+    progress = ProgressPrint("%s is being built (use --debug for full output)" % spec["package"])
+    err = execute(build_command, printer=debug if args.debug or not sys.stdout.isatty() else progress)
+    progress.end("failed" if err else "ok", err)
     report_event("BuildError" if err else "BuildSuccess",
                  spec["package"],
                  format("%(a)s %(v)s %(c)s %(h)s",
