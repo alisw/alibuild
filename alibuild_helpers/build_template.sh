@@ -286,19 +286,26 @@ mkdir -p "${WORK_DIR}/TARS/$HASH_PATH" \
          "${WORK_DIR}/TARS/$ARCHITECTURE/$PKGNAME"
 
 PACKAGE_WITH_REV=$PKGNAME-$PKGVERSION-$PKGREVISION.$ARCHITECTURE.tar.gz
-# Avoid having broken left overs if the tar fails
-tar -czf "$WORK_DIR/TARS/$HASH_PATH/$PACKAGE_WITH_REV.processing" -C "$WORK_DIR/INSTALLROOT/$PKGHASH" .
-mv "$WORK_DIR/TARS/$HASH_PATH/$PACKAGE_WITH_REV.processing" \
-   "$WORK_DIR/TARS/$HASH_PATH/$PACKAGE_WITH_REV"
+if [ -n "$CACHED_TARBALL" ]; then
+  # If we already have a cached tarball, no need to repack another one. Just
+  # copy stuff from INSTALLROOT to WORK_DIR.
+  cp -a "$WORK_DIR/INSTALLROOT/$PKGHASH"/* "$WORK_DIR"
+else
+  # Avoid having broken left overs if the tar fails
+  tar -czf "$WORK_DIR/TARS/$HASH_PATH/$PACKAGE_WITH_REV.processing" -C "$WORK_DIR/INSTALLROOT/$PKGHASH" .
+  mv "$WORK_DIR/TARS/$HASH_PATH/$PACKAGE_WITH_REV.processing" \
+     "$WORK_DIR/TARS/$HASH_PATH/$PACKAGE_WITH_REV"
 
-ln -nfs \
-  "../../$HASH_PATH/$PACKAGE_WITH_REV" \
-  "$WORK_DIR/TARS/$ARCHITECTURE/$PKGNAME/$PACKAGE_WITH_REV"
+  ln -nfs \
+     "../../$HASH_PATH/$PACKAGE_WITH_REV" \
+     "$WORK_DIR/TARS/$ARCHITECTURE/$PKGNAME/$PACKAGE_WITH_REV"
 
-# Unpack, and relocate
+  tar -xzf "$WORK_DIR/TARS/$HASH_PATH/$PACKAGE_WITH_REV" -C "$WORK_DIR"
+fi
+[ "X$CAN_DELETE" = X1 ] && rm -f "$WORK_DIR/TARS/$HASH_PATH/$PACKAGE_WITH_REV"
+
+# We've unpacked, now relocate.
 cd "$WORK_DIR"
-tar -xzf "$WORK_DIR/TARS/$HASH_PATH/$PACKAGE_WITH_REV"
-[ "X$CAN_DELETE" = X1 ] && rm "$WORK_DIR/TARS/$HASH_PATH/$PACKAGE_WITH_REV"
 bash -ex "$ARCHITECTURE/$PKGNAME/$PKGVERSION-$PKGREVISION/relocate-me.sh"
 # Last package built gets a "latest" mark.
 ln -snf $PKGVERSION-$PKGREVISION $ARCHITECTURE/$PKGNAME/latest
