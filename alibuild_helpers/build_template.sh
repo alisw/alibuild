@@ -286,33 +286,33 @@ mkdir -p "${WORK_DIR}/TARS/$HASH_PATH" \
          "${WORK_DIR}/TARS/$ARCHITECTURE/$PKGNAME"
 
 PACKAGE_WITH_REV=$PKGNAME-$PKGVERSION-$PKGREVISION.$ARCHITECTURE.tar.gz
-if [ -n "$CACHED_TARBALL" ]; then
-  # If we already have a cached tarball, no need to repack another one. Just
-  # copy stuff from INSTALLROOT to WORK_DIR.
-  cp -a "$WORK_DIR/INSTALLROOT/$PKGHASH"/* "$WORK_DIR"
-else
+# Copy and tar/compress (if applicable) in parallel.
+rsync -a "$WORK_DIR/INSTALLROOT/$PKGHASH" "$WORK_DIR" & rsync_pid=$!
+if [ "$CAN_DELETE" = 1 ]; then
+  # We're deleting the tarball anyway, so no point in creating a new one.
+  # There might be an old existing tarball, and we should delete it.
+  rm -f "$WORK_DIR/TARS/$HASH_PATH/$PACKAGE_WITH_REV"
+elif [ -z "$CACHED_TARBALL" ]; then
+  # We don't have an existing tarball, and we want to keep the one we create now.
   # Avoid having broken left overs if the tar fails
-  tar -czf "$WORK_DIR/TARS/$HASH_PATH/$PACKAGE_WITH_REV.processing" -C "$WORK_DIR/INSTALLROOT/$PKGHASH" .
+  tar -czf "$WORK_DIR/TARS/$HASH_PATH/$PACKAGE_WITH_REV.processing" \
+      -C "$WORK_DIR/INSTALLROOT/$PKGHASH" .
   mv "$WORK_DIR/TARS/$HASH_PATH/$PACKAGE_WITH_REV.processing" \
      "$WORK_DIR/TARS/$HASH_PATH/$PACKAGE_WITH_REV"
-
-  ln -nfs \
-     "../../$HASH_PATH/$PACKAGE_WITH_REV" \
+  ln -nfs "../../$HASH_PATH/$PACKAGE_WITH_REV" \
      "$WORK_DIR/TARS/$ARCHITECTURE/$PKGNAME/$PACKAGE_WITH_REV"
-
-  tar -xzf "$WORK_DIR/TARS/$HASH_PATH/$PACKAGE_WITH_REV" -C "$WORK_DIR"
 fi
-[ "X$CAN_DELETE" = X1 ] && rm -f "$WORK_DIR/TARS/$HASH_PATH/$PACKAGE_WITH_REV"
+wait "$rsync_pid"
 
-# We've unpacked, now relocate.
+# We've copied files into their final place; now relocate.
 cd "$WORK_DIR"
 bash -ex "$ARCHITECTURE/$PKGNAME/$PKGVERSION-$PKGREVISION/relocate-me.sh"
 # Last package built gets a "latest" mark.
-ln -snf $PKGVERSION-$PKGREVISION $ARCHITECTURE/$PKGNAME/latest
+ln -snf "$PKGVERSION-$PKGREVISION" "$ARCHITECTURE/$PKGNAME/latest"
 
 # Latest package built for a given devel prefix gets latest-$BUILD_FAMILY
-if [[ $BUILD_FAMILY ]]; then
-  ln -snf $PKGVERSION-$PKGREVISION $ARCHITECTURE/$PKGNAME/latest-$BUILD_FAMILY
+if [ -n "$BUILD_FAMILY" ]; then
+  ln -snf "$PKGVERSION-$PKGREVISION" "$ARCHITECTURE/$PKGNAME/latest-$BUILD_FAMILY"
 fi
 
 # Mark the build as successful with a placeholder. Allows running incremental
