@@ -51,6 +51,9 @@ mkdir -p "$WORK_DIR/BUILD" "$WORK_DIR/SOURCES" "$WORK_DIR/TARS" \
          "$WORK_DIR/SPECS" "$WORK_DIR/INSTALLROOT"
 export BUILDROOT="$WORK_DIR/BUILD/$PKGHASH"
 
+# Maybe tarballs aren't fully synced to disk and that's what kills unpacking?
+sync
+
 # In case the repository is local, it means we are in development mode, so we
 # install directly in $WORK_DIR/$PKGPATH so that we can do make install
 # directly into BUILD/$PKGPATH and have changes being propagated.
