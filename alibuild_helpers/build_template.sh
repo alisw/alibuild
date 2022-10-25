@@ -292,8 +292,8 @@ if [ "$CAN_DELETE" = 1 ]; then
 elif [ -z "$CACHED_TARBALL" ]; then
   # We don't have an existing tarball, and we want to keep the one we create now.
   # Avoid having broken left overs if the tar fails
-  tar -czf "$WORK_DIR/TARS/$HASH_PATH/$PACKAGE_WITH_REV.processing" \
-      -C "$WORK_DIR/INSTALLROOT/$PKGHASH" .
+  tar -cf "$WORK_DIR/TARS/$HASH_PATH/$PACKAGE_WITH_REV.processing" \
+      -C "$WORK_DIR/INSTALLROOT/$PKGHASH" -I "$MY_GZIP" .
   mv "$WORK_DIR/TARS/$HASH_PATH/$PACKAGE_WITH_REV.processing" \
      "$WORK_DIR/TARS/$HASH_PATH/$PACKAGE_WITH_REV"
   ln -nfs "../../$HASH_PATH/$PACKAGE_WITH_REV" \
