@@ -9,6 +9,7 @@ from alibuild_helpers.cmd import execute, DockerRunner
 
 import unittest
 
+
 class CmdTestCase(unittest.TestCase):
     @mock.patch("alibuild_helpers.cmd.debug")
     def test_execute(self, mock_debug):
@@ -25,7 +26,7 @@ class CmdTestCase(unittest.TestCase):
     def test_DockerRunner(self, mock_getstatusoutput, mock_getoutput):
         mock_getoutput.side_effect = lambda cmd: "container-id\n"
         with DockerRunner("image", ["extra arg"]) as getstatusoutput_docker:
-            mock_getoutput.assert_called_with(["docker", "run", "--detach", "--rm",
+            mock_getoutput.assert_called_with(["docker", "run", "--detach", "--rm", "--entrypoint=",
                                                "extra arg", "image", "sleep", "inf"])
             getstatusoutput_docker("echo foo")
             mock_getstatusoutput.assert_called_with("docker container exec container-id bash -c 'echo foo'")
