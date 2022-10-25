@@ -51,9 +51,6 @@ mkdir -p "$WORK_DIR/BUILD" "$WORK_DIR/SOURCES" "$WORK_DIR/TARS" \
          "$WORK_DIR/SPECS" "$WORK_DIR/INSTALLROOT"
 export BUILDROOT="$WORK_DIR/BUILD/$PKGHASH"
 
-# Maybe tarballs aren't fully synced to disk and that's what kills unpacking?
-sync
-
 # In case the repository is local, it means we are in development mode, so we
 # install directly in $WORK_DIR/$PKGPATH so that we can do make install
 # directly into BUILD/$PKGPATH and have changes being propagated.
@@ -308,11 +305,11 @@ wait "$rsync_pid"
 cd "$WORK_DIR"
 bash -ex "$ARCHITECTURE/$PKGNAME/$PKGVERSION-$PKGREVISION/relocate-me.sh"
 # Last package built gets a "latest" mark.
-ln -snf "$PKGVERSION-$PKGREVISION" "$ARCHITECTURE/$PKGNAME/latest"
+ln -snf $PKGVERSION-$PKGREVISION $ARCHITECTURE/$PKGNAME/latest
 
 # Latest package built for a given devel prefix gets latest-$BUILD_FAMILY
-if [ -n "$BUILD_FAMILY" ]; then
-  ln -snf "$PKGVERSION-$PKGREVISION" "$ARCHITECTURE/$PKGNAME/latest-$BUILD_FAMILY"
+if [[ $BUILD_FAMILY ]]; then
+  ln -snf $PKGVERSION-$PKGREVISION $ARCHITECTURE/$PKGNAME/latest-$BUILD_FAMILY
 fi
 
 # Mark the build as successful with a placeholder. Allows running incremental
