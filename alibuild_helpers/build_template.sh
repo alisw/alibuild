@@ -284,7 +284,8 @@ mkdir -p "${WORK_DIR}/TARS/$HASH_PATH" \
 
 PACKAGE_WITH_REV=$PKGNAME-$PKGVERSION-$PKGREVISION.$ARCHITECTURE.tar.gz
 # Copy and tar/compress (if applicable) in parallel.
-rsync -a "$WORK_DIR/INSTALLROOT/$PKGHASH/" "$WORK_DIR" & rsync_pid=$!
+# Use -H to match tar's behaviour of preserving hardlinks.
+rsync -aH "$WORK_DIR/INSTALLROOT/$PKGHASH/" "$WORK_DIR" & rsync_pid=$!
 if [ "$CAN_DELETE" = 1 ]; then
   # We're deleting the tarball anyway, so no point in creating a new one.
   # There might be an old existing tarball, and we should delete it.
