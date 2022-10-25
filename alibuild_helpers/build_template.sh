@@ -143,7 +143,7 @@ else
   # files.
   rm -rf "$BUILDROOT/log"
   mkdir -p $WORK_DIR/TMP/$PKGHASH
-  $MY_GZIP -dc $CACHED_TARBALL | $MY_TAR -C $WORK_DIR/TMP/$PKGHASH -x
+  tar -xzf "$CACHED_TARBALL" -C "$WORK_DIR/TMP/$PKGHASH"
   mkdir -p $(dirname $INSTALLROOT)
   rm -rf $INSTALLROOT
   mv $WORK_DIR/TMP/$PKGHASH/$ARCHITECTURE/$PKGNAME/$PKGVERSION-* $INSTALLROOT
@@ -283,18 +283,27 @@ mkdir -p "${WORK_DIR}/TARS/$HASH_PATH" \
          "${WORK_DIR}/TARS/$ARCHITECTURE/$PKGNAME"
 
 PACKAGE_WITH_REV=$PKGNAME-$PKGVERSION-$PKGREVISION.$ARCHITECTURE.tar.gz
-# Avoid having broken left overs if the tar fails
-$MY_TAR -C $WORK_DIR/INSTALLROOT/$PKGHASH -c . | $MY_GZIP -c > "$WORK_DIR/TARS/$HASH_PATH/${PACKAGE_WITH_REV}.processing"
-mv $WORK_DIR/TARS/$HASH_PATH/${PACKAGE_WITH_REV}.processing $WORK_DIR/TARS/$HASH_PATH/$PACKAGE_WITH_REV
+# Copy and tar/compress (if applicable) in parallel.
+# Use -H to match tar's behaviour of preserving hardlinks.
+rsync -aH "$WORK_DIR/INSTALLROOT/$PKGHASH/" "$WORK_DIR" & rsync_pid=$!
+if [ "$CAN_DELETE" = 1 ]; then
+  # We're deleting the tarball anyway, so no point in creating a new one.
+  # There might be an old existing tarball, and we should delete it.
+  rm -f "$WORK_DIR/TARS/$HASH_PATH/$PACKAGE_WITH_REV"
+elif [ -z "$CACHED_TARBALL" ]; then
+  # We don't have an existing tarball, and we want to keep the one we create now.
+  # Avoid having broken left overs if the tar fails
+  tar -cf "$WORK_DIR/TARS/$HASH_PATH/$PACKAGE_WITH_REV.processing" \
+      -C "$WORK_DIR/INSTALLROOT/$PKGHASH" -I "$MY_GZIP" .
+  mv "$WORK_DIR/TARS/$HASH_PATH/$PACKAGE_WITH_REV.processing" \
+     "$WORK_DIR/TARS/$HASH_PATH/$PACKAGE_WITH_REV"
+  ln -nfs "../../$HASH_PATH/$PACKAGE_WITH_REV" \
+     "$WORK_DIR/TARS/$ARCHITECTURE/$PKGNAME/$PACKAGE_WITH_REV"
+fi
+wait "$rsync_pid"
 
-ln -nfs \
-  "../../$HASH_PATH/$PACKAGE_WITH_REV" \
-  "$WORK_DIR/TARS/$ARCHITECTURE/$PKGNAME/$PACKAGE_WITH_REV"
-
-# Unpack, and relocate
+# We've copied files into their final place; now relocate.
 cd "$WORK_DIR"
-$MY_GZIP -dc "$WORK_DIR/TARS/$HASH_PATH/$PACKAGE_WITH_REV" | $MY_TAR -x
-[ "X$CAN_DELETE" = X1 ] && rm "$WORK_DIR/TARS/$HASH_PATH/$PACKAGE_WITH_REV"
 bash -ex "$ARCHITECTURE/$PKGNAME/$PKGVERSION-$PKGREVISION/relocate-me.sh"
 # Last package built gets a "latest" mark.
 ln -snf $PKGVERSION-$PKGREVISION $ARCHITECTURE/$PKGNAME/latest
