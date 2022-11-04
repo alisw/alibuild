@@ -2,8 +2,13 @@ import os
 import os.path
 import sys
 import time
-from subprocess import Popen, PIPE, STDOUT, TimeoutExpired
+from subprocess import Popen, PIPE, STDOUT
 from textwrap import dedent
+try:
+  from subprocess import TimeoutExpired
+except ImportError:
+  class TimeoutExpired(Exception):
+    """Stub exception for Python 2."""
 try:
   from shlex import quote  # Python 3.3+
 except ImportError:
