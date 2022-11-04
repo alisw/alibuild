@@ -5,6 +5,9 @@ except ImportError:
 from alibuild_helpers.cmd import getstatusoutput
 from alibuild_helpers.log import debug
 
+GIT_COMMAND_TIMEOUT_SEC = 120
+"""How many seconds to let any git command execute before being terminated."""
+
 
 def clone_speedup_options():
   """Return a list of options supported by the system git which speed up cloning."""
@@ -25,10 +28,12 @@ def git(args, directory=".", check=True, prompt=True):
   set -e +x
   cd {directory} >/dev/null 2>&1
   {prompt_var} git {args}
-  """.format(directory=quote(directory),
-             args=" ".join(map(quote, args)),
-             # GIT_TERMINAL_PROMPT is only supported in git 2.3+.
-             prompt_var="GIT_TERMINAL_PROMPT=0" if not prompt else ""))
+  """.format(
+    directory=quote(directory),
+    args=" ".join(map(quote, args)),
+    # GIT_TERMINAL_PROMPT is only supported in git 2.3+.
+    prompt_var="GIT_TERMINAL_PROMPT=0" if not prompt else "",
+  ), timeout=GIT_COMMAND_TIMEOUT_SEC)
   if check and err != 0:
     raise RuntimeError("Error {} from git {}: {}".format(err, " ".join(args), output))
   return output if check else (err, output)
