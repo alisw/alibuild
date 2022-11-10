@@ -102,7 +102,7 @@ TEST_EXTRA_BUILD_HASH = ("9f9eb8696b7722df52c4703f5fe7acc4b8000ba2" if sys.versi
 
 
 GIT_CLONE_ZLIB_ARGS = ("clone", "--bare", "https://github.com/star-externals/zlib",
-                       "/sw/MIRROR/zlib", "--filter=blob:none"), ".", True
+                       "/sw/MIRROR/zlib", "--filter=blob:none"), ".", False
 GIT_FETCH_ROOT_ARGS = ("fetch", "-f", "--tags", "https://github.com/root-mirror/root",
                        "+refs/heads/*:refs/heads/*"), "/sw/MIRROR/root", False
 
@@ -111,9 +111,9 @@ def dummy_git(args, directory=".", check=True, prompt=True):
     return {
         (("symbolic-ref", "-q", "HEAD"), "/alidist", False): (0, "master"),
         (("rev-parse", "HEAD"), "/alidist", True): "6cec7b7b3769826219dfa85e5daa6de6522229a0",
-        (("ls-remote", "--heads", "--tags", "/sw/MIRROR/root"), ".", True): TEST_ROOT_GIT_REFS,
-        (("ls-remote", "--heads", "--tags", "/sw/MIRROR/zlib"), ".", True): TEST_ZLIB_GIT_REFS,
-        GIT_CLONE_ZLIB_ARGS: "",
+        (("ls-remote", "--heads", "--tags", "/sw/MIRROR/root"), ".", False): (0, TEST_ROOT_GIT_REFS),
+        (("ls-remote", "--heads", "--tags", "/sw/MIRROR/zlib"), ".", False): (0, TEST_ZLIB_GIT_REFS),
+        GIT_CLONE_ZLIB_ARGS: (0, ""),
         GIT_FETCH_ROOT_ARGS: (0, ""),
     }[(tuple(args), directory, check)]
 
@@ -270,13 +270,23 @@ class BuildTestCase(unittest.TestCase):
         )
         mock_sys.version_info = sys.version_info
 
+        clone_args, clone_dir, clone_check = GIT_CLONE_ZLIB_ARGS
+        fetch_args, fetch_dir, fetch_check = GIT_FETCH_ROOT_ARGS
+        common_calls = [
+            call(list(clone_args), directory=clone_dir, check=clone_check, prompt=False),
+            call(["ls-remote", "--heads", "--tags", args.referenceSources + "/zlib"],
+                 directory=".", check=False, prompt=False),
+            call(["ls-remote", "--heads", "--tags", args.referenceSources + "/root"],
+                 directory=".", check=False, prompt=False),
+        ]
+
         mock_workarea_git.reset_mock()
         mock_debug.reset_mock()
         exit_code = doBuild(args, mock_parser)
         self.assertEqual(exit_code, 0)
         mock_debug.assert_called_with("Everything done")
-        mock_workarea_git.assert_called_once_with(list(GIT_CLONE_ZLIB_ARGS[0]),
-                                                  prompt=False)
+        self.assertEqual(mock_workarea_git.call_count, len(common_calls))
+        mock_workarea_git.has_calls(common_calls)
 
         # Force fetching repos
         mock_workarea_git.reset_mock()
@@ -286,12 +296,10 @@ class BuildTestCase(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         mock_debug.assert_called_with("Everything done")
         mock_glob.assert_called_with("/sw/TARS/osx_x86-64/ROOT/ROOT-v6-08-30-*.osx_x86-64.tar.gz")
-        fetch_args, fetch_dir, fetch_check = GIT_FETCH_ROOT_ARGS
         # We can't compare directly against the list of calls here as they
         # might happen in any order.
-        self.assertEqual(mock_workarea_git.call_count, 2)
-        mock_workarea_git.has_calls([
-            call(list(GIT_CLONE_ZLIB_ARGS[0])),
+        self.assertEqual(mock_workarea_git.call_count, len(common_calls) + 1)
+        mock_workarea_git.has_calls(common_calls + [
             call(fetch_args, directory=fetch_dir, check=fetch_check),
         ])
 
