@@ -513,27 +513,57 @@ class Boto3RemoteSync:
     if tar_exists and link_exists:
       debug("%s exists on S3 already, not uploading", tarballNameWithRev)
       return
-    if tar_exists or link_exists:
-      warning("%s exists already but %s does not, overwriting!",
-              tar_path if tar_exists else link_path,
-              link_path if tar_exists else tar_path)
+    dieOnError(tar_exists or link_exists,
+               "%s already exists on S3 but %s does not, aborting!" %
+               (tar_path if tar_exists else link_path,
+                link_path if tar_exists else tar_path))
     debug("Uploading tarball and symlink for %s %s-%s (%s) to S3",
           p, spec["version"], spec["revision"], spec["hash"])
-    self.s3.upload_file(Bucket=self.writeStore, Key=tar_path,
-                        Filename=os.path.join(self.workdir, tar_path))
+    # Upload the smaller file first, so that any parallel uploads are more
+    # likely to find it and fail.
     self.s3.put_object(Bucket=self.writeStore, Key=link_path,
                        Body=os.readlink(os.path.join(self.workdir, link_path))
                               .lstrip("./").encode("utf-8"))
+    self.s3.upload_file(Bucket=self.writeStore, Key=tar_path,
+                        Filename=os.path.join(self.workdir, tar_path))
 
   def syncDistLinksToRemote(self, link_dir):
     if not self.writeStore:
       return
+
+    symlinks = []
     for fname in os.listdir(os.path.join(self.workdir, link_dir)):
       link_key = os.path.join(link_dir, fname)
       path = os.path.join(self.workdir, link_key)
       if not os.path.islink(path) or self._s3_key_exists(link_key):
         continue
       hash_path = re.sub(r"^(\.\./)*", "", os.readlink(path))
+      symlinks.append((link_key, hash_path))
+
+    # To make sure there are no conflicts, see if anything already exists in
+    # our symlink directory.
+    symlinks_existing = {
+      item['Key'] for item in self.s3.list_objects_v2(
+        Bucket=self.writeStore, Prefix=link_dir,
+      )['Contents']
+    }
+
+    # If all the symlinks we would upload already exist, skip uploading. We
+    # probably just downloaded a prebuilt package earlier, and it already has
+    # symlinks available.
+    if all(link_key in symlinks_existing for link_key, _ in symlinks):
+      debug("All dist symlinks already exist on S3, skipping upload")
+      return
+
+    # Excluding our own symlinks (above), if there is anything in our link_dir
+    # on the remote, something else is uploading symlinks (or already has)!
+    dieOnError(symlinks_existing,
+               "Conflicts detected in %s on S3; aborting: %s" %
+               (link_dir, ", ".join(symlinks_existing)))
+
+    for link_key, hash_path in symlinks:
+      if link_key in symlinks_existing:
+        continue
       self.s3.put_object(Bucket=self.writeStore,
                          Key=link_key,
                          Body=os.fsencode(hash_path),
