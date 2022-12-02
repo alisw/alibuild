@@ -1140,9 +1140,8 @@ def doBuild(args, parser):
 
     # Make sure not to upload local-only packages! These might have been
     # produced in a previous run with a read-only remote store.
-    if spec["revision"].startswith("local"):
-      continue   # Skip upload below.
-    syncHelper.syncToRemote(p, spec)
+    if not spec["revision"].startswith("local"):
+      syncHelper.syncToRemote(p, spec)
 
   banner("Build of %s successfully completed on `%s'.\n"
          "Your software installation is at:"
