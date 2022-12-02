@@ -10,7 +10,7 @@ import requests
 from requests.exceptions import RequestException
 
 from alibuild_helpers.cmd import execute
-from alibuild_helpers.log import debug, warning, error, dieOnError
+from alibuild_helpers.log import debug, error, dieOnError
 from alibuild_helpers.utilities import format, resolve_store_path, resolve_links_path
 
 
