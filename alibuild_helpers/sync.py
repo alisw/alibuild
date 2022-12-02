@@ -530,23 +530,19 @@ class Boto3RemoteSync:
   def syncDistLinksToRemote(self, link_dir):
     if not self.writeStore:
       return
+    debug("Syncing dist symlinks to S3")
 
     symlinks = []
     for fname in os.listdir(os.path.join(self.workdir, link_dir)):
       link_key = os.path.join(link_dir, fname)
       path = os.path.join(self.workdir, link_key)
-      if not os.path.islink(path) or self._s3_key_exists(link_key):
-        continue
-      hash_path = re.sub(r"^(\.\./)*", "", os.readlink(path))
-      symlinks.append((link_key, hash_path))
+      if os.path.islink(path):
+        hash_path = re.sub(r"^(\.\./)*", "", os.readlink(path))
+        symlinks.append((link_key, hash_path))
 
     # To make sure there are no conflicts, see if anything already exists in
     # our symlink directory.
-    symlinks_existing = {
-      item['Key'] for item in self.s3.list_objects_v2(
-        Bucket=self.writeStore, Prefix=link_dir,
-      )['Contents']
-    }
+    symlinks_existing = frozenset(self._s3_listdir(link_dir))
 
     # If all the symlinks we would upload already exist, skip uploading. We
     # probably just downloaded a prebuilt package earlier, and it already has
@@ -559,13 +555,12 @@ class Boto3RemoteSync:
     # on the remote, something else is uploading symlinks (or already has)!
     dieOnError(symlinks_existing,
                "Conflicts detected in %s on S3; aborting: %s" %
-               (link_dir, ", ".join(symlinks_existing)))
+               (link_dir, ", ".join(sorted(symlinks_existing))))
 
     for link_key, hash_path in symlinks:
-      if link_key in symlinks_existing:
-        continue
       self.s3.put_object(Bucket=self.writeStore,
                          Key=link_key,
                          Body=os.fsencode(hash_path),
                          ACL="public-read",
                          WebsiteRedirectLocation=hash_path)
+    debug("Uploaded %d dist symlinks to S3", len(symlinks))
