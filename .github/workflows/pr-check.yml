@@ -46,11 +46,18 @@ jobs:
       - name: Run tests
         run: tox
 
+      - name: Convert coverage information
+        if: ${{ always() && github.event.repository.owner.login == 'alisw' }}
+        run: |
+          coverage combine .tox/coverage.*
+          # Codecov only understands XML, JSON and LCOV files.
+          coverage lcov -o coverage.lcov
+
       - name: Upload coverage information
         if: ${{ always() && github.event.repository.owner.login == 'alisw' }}
         uses: codecov/codecov-action@v3
         with:
-          directory: .tox
+          files: coverage.lcov
 
   lint:
     name: lint
