@@ -54,13 +54,13 @@ jobs:
           # Apparently, patching os.readlink in unit tests interferes with
           # finding some source files, but our source shouldn't be affected, so
           # ignore these errors.
-          coverage lcov --ignore-errors -o coverage.lcov
+          coverage json --ignore-errors -o coverage.json
 
       - name: Upload coverage information
         if: ${{ always() && github.event.repository.owner.login == 'alisw' }}
         uses: codecov/codecov-action@v3
         with:
-          files: coverage.lcov
+          files: coverage.json
 
   lint:
     name: lint
