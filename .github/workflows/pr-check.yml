@@ -51,7 +51,10 @@ jobs:
         run: |
           coverage combine .tox/coverage.*
           # Codecov only understands XML, JSON and LCOV files.
-          coverage lcov -o coverage.lcov
+          # Apparently, patching os.readlink in unit tests interferes with
+          # finding some source files, but our source shouldn't be affected, so
+          # ignore these errors.
+          coverage lcov --ignore-errors -o coverage.lcov
 
       - name: Upload coverage information
         if: ${{ always() && github.event.repository.owner.login == 'alisw' }}
