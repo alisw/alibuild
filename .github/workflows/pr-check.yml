@@ -47,9 +47,9 @@ jobs:
 
       - name: Upload coverage information
         if: ${{ always() && github.event.repository.owner.login == 'alisw' }}
-        run: |
-          coverage combine .tox/coverage.*
-          bash <(curl -s https://codecov.io/bash)
+        uses: codecov/codecov-action@v3
+        with:
+          directory: .tox
 
   lint:
     name: lint
