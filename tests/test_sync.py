@@ -171,6 +171,8 @@ class SyncTestCase(unittest.TestCase):
 
 
 @unittest.skipIf(sys.version_info < (3, 6), "python >= 3.6 is required for boto3")
+@patch("alibuild_helpers.log.error", new=MagicMock())
+@patch("alibuild_helpers.sync.Boto3RemoteSync._s3_init", new=MagicMock())
 class Boto3TestCase(unittest.TestCase):
     """Check the b3:// remote is working properly."""
 
@@ -256,11 +258,10 @@ class Boto3TestCase(unittest.TestCase):
     @patch("glob.glob", new=MagicMock(return_value=[]))
     @patch("os.listdir", new=MagicMock(return_value=[]))
     @patch("os.makedirs", new=MagicMock())
-    # file does not exist locally: force download
+    # Pretend file does not exist locally to force download.
     @patch("os.path.exists", new=MagicMock(return_value=False))
     @patch("os.path.isfile", new=MagicMock(return_value=False))
     @patch("os.path.islink", new=MagicMock(return_value=False))
-    @patch("alibuild_helpers.sync.Boto3RemoteSync._s3_init", new=MagicMock())
     @patch("alibuild_helpers.sync.execute", new=MagicMock(return_value=0))
     def test_tarball_download(self):
         """Test boto3 behaviour when downloading tarballs from the remote."""
@@ -282,8 +283,6 @@ class Boto3TestCase(unittest.TestCase):
         b3sync.s3.download_file.assert_not_called()
 
     @patch("os.readlink", new=MagicMock(return_value="dummy path"))
-    @patch("alibuild_helpers.log.error", new=MagicMock())
-    @patch("alibuild_helpers.sync.Boto3RemoteSync._s3_init", new=MagicMock())
     def test_tarball_upload(self):
         """Test boto3 behaviour when building packages for upload locally."""
         b3sync = sync.Boto3RemoteSync(
@@ -323,8 +322,6 @@ class Boto3TestCase(unittest.TestCase):
     ))
     @patch("os.readlink", new=MagicMock(return_value="dummy path"))
     @patch("os.path.islink", new=MagicMock(return_value=True))
-    @patch("alibuild_helpers.log.error", new=MagicMock())
-    @patch("alibuild_helpers.sync.Boto3RemoteSync._s3_init", new=MagicMock())
     def test_dist_links_upload(self):
         """Make sure dist links are uploaded properly when possible."""
         b3sync = sync.Boto3RemoteSync(
