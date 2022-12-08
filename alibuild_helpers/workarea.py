@@ -47,8 +47,8 @@ def logged_git(package, referenceSources,
     with codecs.open(os.path.join(referenceSources, FETCH_LOG_NAME),
                      "a", encoding="utf-8", errors="replace") as logf:
       logf.write("Git command for package %r failed.\n"
-                 "Command: git %s\nExit code: %d\n" %
-                 (package, directory, " ".join(command), err))
+                 "Command: git %s\nIn directory: %s\nExit code: %d\n" %
+                 (package, " ".join(command), directory, err))
   dieOnError(err, "Error during git %s for reference repo for %s." %
              (command[0], package))
   info("Done git %s for repository for %s", command[0], package)
