@@ -273,8 +273,8 @@ def storeHashes(package, specs, isDevelPkg, considerRelocation):
 def hash_local_changes(directory):
   """Produce a hash of all local changes in the given git repo.
 
-  If there are untracked files, this function will fail and produce an error
-  message, as we cannot detect changes to those files.
+  If there are untracked files, this function returns a unique hash to force a
+  rebuild, and logs a warning, as we cannot detect changes to those files.
   """
   class UntrackedChangesError(Exception):
     """Signal that we cannot detect code changes due to untracked files."""
