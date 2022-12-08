@@ -16,7 +16,7 @@ name: Check PR
 jobs:
   unittest:
     name: python${{ matrix.python-version }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
 
     strategy:
       matrix:
