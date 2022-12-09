@@ -530,7 +530,7 @@ class Boto3RemoteSync:
   def syncDistLinksToRemote(self, link_dir):
     if not self.writeStore:
       return
-    debug("Syncing dist symlinks to S3")
+    debug("Syncing dist symlinks to S3 from %s", link_dir)
 
     symlinks = []
     for fname in os.listdir(os.path.join(self.workdir, link_dir)):
