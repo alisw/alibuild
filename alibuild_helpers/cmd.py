@@ -162,5 +162,8 @@ def install_wrapper_script(name, work_dir):
     exec env -u LD_LIBRARY_PATH -u DYLD_LIBRARY_PATH \\
          "$(which -a "$(basename "$0")" | grep -Fxv "$0" | head -1)" "$@"
     """))
-    os.fchmod(scriptf.fileno(), 0o755)  # make the wrapper script executable
+    try:
+      os.fchmod(scriptf.fileno(), 0o775)  # make the wrapper script executable
+    except Exception:
+      pass
   os.environ["PATH"] = script_dir + ":" + os.environ["PATH"]
