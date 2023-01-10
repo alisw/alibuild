@@ -17,7 +17,7 @@ from alibuild_helpers.git import git, clone_speedup_options
 from alibuild_helpers.sync import (NoRemoteSync, HttpRemoteSync, S3RemoteSync,
                                    Boto3RemoteSync, RsyncRemoteSync)
 import yaml
-from alibuild_helpers.workarea import updateReferenceRepoSpec
+from alibuild_helpers.workarea import cleanup_git_log, logged_git, updateReferenceRepoSpec
 from alibuild_helpers.log import logger_handler, LogFormatter, ProgressPrint
 from datetime import datetime
 from glob import glob
@@ -75,7 +75,8 @@ def update_git_repos(args, specs, buildOrder, develPkgs):
         else:
             cmd.append(specs[package].get("reference", specs[package]["source"]))
 
-        output = git(cmd, prompt=git_prompt)
+        output = logged_git(package, args.referenceSources,
+                            cmd, ".", prompt=git_prompt, logOutput=False)
         specs[package]["git_refs"] = {
             git_ref: git_hash for git_hash, sep, git_ref
             in (line.partition("\t") for line in output.splitlines()) if sep

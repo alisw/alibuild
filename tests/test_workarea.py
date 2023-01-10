@@ -86,15 +86,17 @@ class WorkareaTestCase(unittest.TestCase):
     @patch("alibuild_helpers.workarea.is_writeable", new=MagicMock(return_value=True))
     def test_reference_sources_created(self, mock_git, mock_makedirs, mock_exists):
         """Check the mirror directory is created when possible."""
+        mock_git.return_value = 0, ""
         mock_exists.side_effect = lambda path: not path.endswith("/aliroot")
         spec = MOCK_SPEC.copy()
         updateReferenceRepoSpec(referenceSources="sw/MIRROR", p="AliRoot",
                                 spec=spec, fetch=True)
         mock_exists.assert_called_with("%s/sw/MIRROR/aliroot" % getcwd())
         mock_makedirs.assert_called_with("%s/sw/MIRROR" % getcwd())
-        mock_git.assert_called_once_with(["clone", "--bare", spec["source"],
-                                          "%s/sw/MIRROR/aliroot" % getcwd(),
-                                          "--filter=blob:none"], prompt=True)
+        mock_git.assert_called_once_with([
+            "clone", "--bare", spec["source"],
+            "%s/sw/MIRROR/aliroot" % getcwd(), "--filter=blob:none",
+        ], directory=".", check=False, prompt=True)
         self.assertEqual(spec.get("reference"), "%s/sw/MIRROR/aliroot" % getcwd())
 
 

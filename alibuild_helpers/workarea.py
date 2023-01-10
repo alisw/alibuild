@@ -1,4 +1,5 @@
 import codecs
+import errno
 import os
 import os.path
 import tempfile
@@ -9,6 +10,49 @@ except ImportError:
 
 from alibuild_helpers.log import dieOnError, debug, info
 from alibuild_helpers.git import git, clone_speedup_options
+
+FETCH_LOG_NAME = "fetch-log.txt"
+
+
+def cleanup_git_log(referenceSources):
+  """Remove a stale fetch-log.txt.
+
+  You must call this function before running updateReferenceRepoSpec or
+  updateReferenceRepo any number of times. This is not done automatically, so
+  that running those functions in parallel works properly.
+  """
+  try:
+    os.unlink(os.path.join(referenceSources, FETCH_LOG_NAME))
+  except OSError as exc:
+    # Ignore errors when deleting a nonexistent file.
+    dieOnError(exc.errno != errno.ENOENT,
+               "Could not delete stale git log: %s" % exc)
+
+
+def logged_git(package, referenceSources,
+               command, directory, prompt, logOutput=True):
+  """Run a git command, but produce an output file if it fails.
+
+  This is useful in CI, so that we can pick up git failures and show them in
+  the final produced log. For this reason, the file we write in this function
+  must not contain any secrets. We only output the git command we ran, its exit
+  code, and the package name, so this should be safe.
+  """
+  # This might take a long time, so show the user what's going on.
+  info("Git %s for repository for %s...", command[0], package)
+  err, output = git(command, directory=directory, check=False, prompt=prompt)
+  if logOutput:
+    debug(output)
+  if err:
+    with codecs.open(os.path.join(referenceSources, FETCH_LOG_NAME),
+                     "a", encoding="utf-8", errors="replace") as logf:
+      logf.write("Git command for package %r failed.\n"
+                 "Command: git %s\nIn directory: %s\nExit code: %d\n" %
+                 (package, " ".join(command), directory, err))
+  dieOnError(err, "Error during git %s for reference repo for %s." %
+             (command[0], package))
+  info("Done git %s for repository for %s", command[0], package)
+  return output
 
 
 def updateReferenceRepoSpec(referenceSources, p, spec,
@@ -70,24 +114,12 @@ def updateReferenceRepo(referenceSources, p, spec,
     cmd = ["clone", "--bare", spec["source"], referenceRepo]
     if usePartialClone:
       cmd.extend(clone_speedup_options())
-    # This might take a long time, so show the user what's going on.
-    info("Cloning git repository for %s...", spec["package"])
-    git(cmd, prompt=allowGitPrompt)
-    info("Done cloning git repository for %s", spec["package"])
+    logged_git(p, referenceSources, cmd, ".", allowGitPrompt)
   elif fetch:
-    with codecs.open(os.path.join(os.path.dirname(referenceRepo),
-                                  "fetch-log.txt"),
-                     "w", encoding="utf-8", errors="replace") as logf:
-      # This might take a long time, so show the user what's going on.
-      info("Updating git repository for %s...", spec["package"])
-      err, output = git(("fetch", "-f", "--tags", spec["source"],
-                         "+refs/heads/*:refs/heads/*"),
-                        directory=referenceRepo, check=False,
-                        prompt=allowGitPrompt)
-      logf.write(output)
-      debug(output)
-      dieOnError(err, "Error while updating reference repo for %s." % spec["source"])
-      info("Done updating git repository for %s", spec["package"])
+    logged_git(p, referenceSources, (
+      "fetch", "-f", "--tags", spec["source"], "+refs/heads/*:refs/heads/*",
+    ), referenceRepo, allowGitPrompt)
+
   return referenceRepo  # reference is read-write
 
 

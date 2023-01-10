@@ -1,6 +1,7 @@
 import argparse
 from alibuild_helpers.utilities import format, detectArch
 from alibuild_helpers.utilities import normalise_multiple_options
+from alibuild_helpers.workarea import cleanup_git_log
 import multiprocessing
 
 import re
@@ -380,6 +381,9 @@ def finaliseArgs(args, parser, star):
 
   if args.action in ["build", "init"]:
     args.referenceSources = format(args.referenceSources, workDir=args.workDir)
+    # Do this cleanup as early as possible to avoid false positives due to
+    # stale git logs from previous invocations.
+    cleanup_git_log(args.referenceSources)
 
   if args.action == "build":
     args.configDir = args.configDir
