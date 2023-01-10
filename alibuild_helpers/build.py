@@ -148,8 +148,6 @@ def createDistLinks(spec, specs, args, syncHelper, repoType, requiresType):
   for g in [ links[i:i+10] for i in range(0, len(links), 10) ]:
     execute(" && ".join([cmd] + g))
 
-  syncHelper.syncDistLinksToRemote(target)
-
 
 def storeHashes(package, specs, isDevelPkg, considerRelocation):
   """Calculate various hashes for package, and store them in specs[package].

@@ -110,7 +110,6 @@ class SyncTestCase(unittest.TestCase):
         syncer.syncToLocal(PACKAGE, GOOD_SPEC)
         mock_error.assert_not_called()
         syncer.syncToRemote(PACKAGE, GOOD_SPEC)
-        syncer.syncDistLinksToRemote(dist_dir(GOOD_SPEC))
 
         # Try bad spec
         mock_error.reset_mock()
@@ -131,7 +130,6 @@ class SyncTestCase(unittest.TestCase):
                               sync.PartialDownloadError)
 
         syncer.syncToRemote(PACKAGE, BAD_SPEC)
-        syncer.syncDistLinksToRemote(dist_dir(BAD_SPEC))
 
         # Try missing spec
         mock_debug.reset_mock()
@@ -164,7 +162,6 @@ class SyncTestCase(unittest.TestCase):
             for syncer in syncers:
                 syncer.syncToLocal(PACKAGE, spec)
                 syncer.syncToRemote(PACKAGE, spec)
-                syncer.syncDistLinksToRemote(dist_dir(spec))
 
         for syncer in syncers:
             syncer.syncToLocal(PACKAGE, MISSING_SPEC)
@@ -282,7 +279,14 @@ class Boto3TestCase(unittest.TestCase):
         b3sync.syncToLocal(PACKAGE, MISSING_SPEC)
         b3sync.s3.download_file.assert_not_called()
 
+    @patch("os.listdir", new=lambda path: (
+        [tarball_name(GOOD_SPEC)] if path.endswith("-" + GOOD_SPEC["revision"]) else
+        [tarball_name(BAD_SPEC)] if path.endswith("-" + BAD_SPEC["revision"]) else
+        [] if path.endswith("-" + MISSING_SPEC["revision"]) else
+        NotImplemented
+    ))
     @patch("os.readlink", new=MagicMock(return_value="dummy path"))
+    @patch("os.path.islink", new=MagicMock(return_value=True))
     def test_tarball_upload(self):
         """Test boto3 behaviour when building packages for upload locally."""
         b3sync = sync.Boto3RemoteSync(
@@ -313,39 +317,6 @@ class Boto3TestCase(unittest.TestCase):
         self.assertRaises(SystemExit, b3sync.syncToRemote, PACKAGE, BAD_SPEC)
         b3sync.s3.put_object.assert_not_called()
         b3sync.s3.upload_file.assert_not_called()
-
-    @patch("os.listdir", new=lambda path: (
-        [tarball_name(GOOD_SPEC)] if path.endswith("-" + GOOD_SPEC["revision"]) else
-        [tarball_name(BAD_SPEC)] if path.endswith("-" + BAD_SPEC["revision"]) else
-        [] if path.endswith("-" + MISSING_SPEC["revision"]) else
-        NotImplemented
-    ))
-    @patch("os.readlink", new=MagicMock(return_value="dummy path"))
-    @patch("os.path.islink", new=MagicMock(return_value=True))
-    def test_dist_links_upload(self):
-        """Make sure dist links are uploaded properly when possible."""
-        b3sync = sync.Boto3RemoteSync(
-            remoteStore="b3://localhost", writeStore="b3://localhost",
-            architecture=ARCHITECTURE, workdir="/sw")
-        b3sync.s3 = self.mock_s3()
-
-        # For GOOD_SPEC, everything is already present on the remote, so
-        # nothing should be uploaded.
-        b3sync.s3.put_object.reset_mock()
-        b3sync.syncDistLinksToRemote(dist_dir(GOOD_SPEC))
-        b3sync.s3.put_object.assert_not_called()
-
-        # For MISSING_SPEC, we have no symlinks locally, so nothing should be
-        # uploaded.
-        b3sync.s3.put_object.reset_mock()
-        b3sync.syncDistLinksToRemote(dist_dir(MISSING_SPEC))
-        b3sync.s3.put_object.assert_not_called()
-
-        # For BAD_SPEC, the remote has a different set of symlinks than we do,
-        # so we should fail with an error before the upload.
-        b3sync.s3.put_object.reset_mock()
-        self.assertRaises(SystemExit, b3sync.syncDistLinksToRemote, dist_dir(BAD_SPEC))
-        b3sync.s3.put_object.assert_not_called()
 
 
 if __name__ == '__main__':
