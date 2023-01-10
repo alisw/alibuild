@@ -11,7 +11,7 @@ from requests.exceptions import RequestException
 
 from alibuild_helpers.cmd import execute
 from alibuild_helpers.log import debug, error, dieOnError
-from alibuild_helpers.utilities import format, resolve_store_path, resolve_links_path
+from alibuild_helpers.utilities import resolve_store_path, resolve_links_path
 
 
 class NoRemoteSync:
@@ -19,8 +19,6 @@ class NoRemoteSync:
   def syncToLocal(self, p, spec):
     pass
   def syncToRemote(self, p, spec):
-    pass
-  def syncDistLinksToRemote(self, link_dir):
     pass
 
 class PartialDownloadError(Exception):
@@ -209,9 +207,6 @@ class HttpRemoteSync:
   def syncToRemote(self, p, spec):
     pass
 
-  def syncDistLinksToRemote(self, link_dir):
-    pass
-
 
 class RsyncRemoteSync:
   """Helper class to sync package build directory using RSync."""
@@ -255,25 +250,25 @@ class RsyncRemoteSync:
   def syncToRemote(self, p, spec):
     if not self.writeStore:
       return
-    tarballNameWithRev = format("%(package)s-%(version)s-%(revision)s.%(architecture)s.tar.gz",
-                                architecture=self.architecture,
-                                **spec)
-    cmd = format("cd %(workdir)s && "
-                 "rsync -avR --ignore-existing %(storePath)s/%(tarballNameWithRev)s  %(remoteStore)s/ &&"
-                 "rsync -avR --ignore-existing %(linksPath)s/%(tarballNameWithRev)s  %(remoteStore)s/",
-                 workdir=self.workdir,
-                 remoteStore=self.remoteStore,
-                 storePath=resolve_store_path(self.architecture, spec["hash"]),
-                 linksPath=resolve_links_path(self.architecture, p),
-                 tarballNameWithRev=tarballNameWithRev)
-    err = execute(cmd)
-    dieOnError(err, "Unable to upload tarball.")
-
-  def syncDistLinksToRemote(self, link_dir):
-    if not self.writeStore:
-      return
-    execute("cd {w} && rsync -avR --ignore-existing {t}/ {rs}/".format(
-      w=self.workdir, rs=self.writeStore, t=link_dir))
+    dieOnError(execute("""\
+    set -e
+    cd {workdir}
+    tarball={package}-{version}-{revision}.{arch}.tar.gz
+    rsync -avR --ignore-existing "{links_path}/$tarball" {remote}/
+    for link_dir in dist dist-direct dist-runtime; do
+      rsync -avR --ignore-existing "TARS/{arch}/$link_dir/{package}/{package}-{version}-{revision}/" {remote}/
+    done
+    rsync -avR --ignore-existing "{store_path}/$tarball" {remote}/
+    """.format(
+      workdir=self.workdir,
+      remote=self.remoteStore,
+      store_path=resolve_store_path(self.architecture, spec["hash"]),
+      links_path=resolve_links_path(self.architecture, p),
+      arch=self.architecture,
+      package=p,
+      version=spec["version"],
+      revision=spec["revision"],
+    )), "Unable to upload tarball.")
 
 
 class S3RemoteSync:
@@ -327,37 +322,43 @@ class S3RemoteSync:
   def syncToRemote(self, p, spec):
     if not self.writeStore:
       return
-    tarballNameWithRev = format("%(package)s-%(version)s-%(revision)s.%(architecture)s.tar.gz",
-                                architecture=self.architecture,
-                                **spec)
-    cmd = format("cd %(workdir)s && "
-                 "TARSHA256=`sha256sum %(storePath)s/%(tarballNameWithRev)s | awk '{ print $1 }'` && "
-                 "s3cmd put -s -v --host s3.cern.ch --host-bucket %(b)s.s3.cern.ch %(storePath)s/%(tarballNameWithRev)s s3://%(b)s/%(storePath)s/ 2>&1 || true\n"
-                 "HASHEDURL=`readlink %(linksPath)s/%(tarballNameWithRev)s | sed -e's|^../../||'` && "
-                 "echo $HASHEDURL | s3cmd put -s -v --host s3.cern.ch --host-bucket %(b)s.s3.cern.ch - s3://%(b)s/%(linksPath)s/%(tarballNameWithRev)s 2>&1 || true\n",
-                 workdir=self.workdir,
-                 b=self.remoteStore,
-                 storePath=resolve_store_path(self.architecture, spec["hash"]),
-                 linksPath=resolve_links_path(self.architecture, p),
-                 tarballNameWithRev=tarballNameWithRev)
-    err = execute(cmd)
-    dieOnError(err, "Unable to upload tarball.")
+    dieOnError(execute("""\
+    set -e
+    put () {{
+      s3cmd put -s -v --host s3.cern.ch --host-bucket {bucket}.s3.cern.ch "$@" 2>&1
+    }}
+    tarball={package}-{version}-{revision}.{arch}.tar.gz
+    cd {workdir}
 
-  def syncDistLinksToRemote(self, link_dir):
-    if not self.writeStore:
-      return
-    execute("""\
-    cd {w} || exit 1
-    find {t} -type l | while read -r x; do
-      hashedurl=$(readlink "$x" | sed 's|.*/[.][.]/TARS|TARS|') || exit 1
-      echo $hashedurl |
-        s3cmd put --skip-existing -q -P -s \
-                  --add-header="x-amz-website-redirect-location:\
-https://s3.cern.ch/swift/v1/{b}/$hashedurl" \
-                  --host s3.cern.ch --host-bucket {b}.s3.cern.ch \
-                  - "s3://{b}/$x" 2>&1
+    # First, upload "main" symlink, to reserve this revision number, in case
+    # the below steps fail.
+    readlink "{links_path}/$tarball" | sed 's|^\\.\\./\\.\\./||' |
+      put - "s3://{bucket}/{links_path}/$tarball"
+
+    # Then, upload dist symlink trees -- these must be in place before the main
+    # tarball.
+    find TARS/{arch}/{{dist,dist-direct,dist-runtime}}/{package}/{package}-{version}-{revision}/ \
+         -type l | while read -r link; do
+      hashedurl=$(readlink "$link" | sed 's|.*/\\.\\./TARS|TARS|')
+      echo "$hashedurl" |
+        put --skip-existing -q -P \\
+            --add-header="x-amz-website-redirect-location:\
+https://s3.cern.ch/swift/v1/{bucket}/$hashedurl" \\
+            - "s3://{bucket}/$link" 2>&1
     done
-    """.format(w=self.workdir, b=self.writeStore, t=link_dir))
+
+    # Finally, upload the tarball.
+    put "{store_path}/$tarball" s3://{bucket}/{store_path}/
+    """.format(
+      workdir=self.workdir,
+      bucket=self.remoteStore,
+      store_path=resolve_store_path(self.architecture, spec["hash"]),
+      links_path=resolve_links_path(self.architecture, p),
+      arch=self.architecture,
+      package=p,
+      version=spec["version"],
+      revision=spec["revision"],
+    )), "Unable to upload tarball.")
 
 
 class Boto3RemoteSync:
@@ -502,65 +503,77 @@ class Boto3RemoteSync:
   def syncToRemote(self, p, spec):
     if not self.writeStore:
       return
-    tarballNameWithRev = ("{package}-{version}-{revision}.{architecture}.tar.gz"
-                          .format(architecture=self.architecture, **spec))
+
+    dist_symlinks = {}
+    for link_dir in ("dist", "dist-direct", "dist-runtime"):
+      link_dir = "TARS/{arch}/{link_dir}/{package}/{package}-{version}-{revision}" \
+        .format(arch=self.architecture, link_dir=link_dir, **spec)
+
+      debug("Syncing dist symlinks to S3 from %s", link_dir)
+
+      symlinks = []
+      for fname in os.listdir(os.path.join(self.workdir, link_dir)):
+        link_key = os.path.join(link_dir, fname)
+        path = os.path.join(self.workdir, link_key)
+        if os.path.islink(path):
+          hash_path = re.sub(r"^(\.\./)*", "", os.readlink(path))
+          symlinks.append((link_key, hash_path))
+
+      # To make sure there are no conflicts, see if anything already exists in
+      # our symlink directory.
+      symlinks_existing = frozenset(self._s3_listdir(link_dir))
+
+      # If all the symlinks we would upload already exist, skip uploading. We
+      # probably just downloaded a prebuilt package earlier, and it already has
+      # symlinks available.
+      if all(link_key in symlinks_existing for link_key, _ in symlinks):
+        debug("All %s symlinks already exist on S3, skipping upload", link_dir)
+        continue
+
+      # Excluding our own symlinks (above), if there is anything in our link_dir
+      # on the remote, something else is uploading symlinks (or already has)!
+      dieOnError(symlinks_existing,
+                 "Conflicts detected in %s on S3; aborting: %s" %
+                 (link_dir, ", ".join(sorted(symlinks_existing))))
+
+      dist_symlinks[link_dir] = symlinks
+
+    tarball = "{package}-{version}-{revision}.{architecture}.tar.gz" \
+      .format(architecture=self.architecture, **spec)
     tar_path = os.path.join(resolve_store_path(self.architecture, spec["hash"]),
-                            tarballNameWithRev)
+                            tarball)
     link_path = os.path.join(resolve_links_path(self.architecture, p),
-                             tarballNameWithRev)
+                             tarball)
     tar_exists = self._s3_key_exists(tar_path)
     link_exists = self._s3_key_exists(link_path)
     if tar_exists and link_exists:
-      debug("%s exists on S3 already, not uploading", tarballNameWithRev)
+      debug("%s exists on S3 already, not uploading", tarball)
       return
     dieOnError(tar_exists or link_exists,
                "%s already exists on S3 but %s does not, aborting!" %
                (tar_path if tar_exists else link_path,
                 link_path if tar_exists else tar_path))
-    debug("Uploading tarball and symlink for %s %s-%s (%s) to S3",
+
+    debug("Uploading tarball and symlinks for %s %s-%s (%s) to S3",
           p, spec["version"], spec["revision"], spec["hash"])
+
     # Upload the smaller file first, so that any parallel uploads are more
     # likely to find it and fail.
     self.s3.put_object(Bucket=self.writeStore, Key=link_path,
                        Body=os.readlink(os.path.join(self.workdir, link_path))
                               .lstrip("./").encode("utf-8"))
+
+    # Second, upload dist symlinks. These should be in place before the main
+    # tarball, to avoid races in the publisher.
+    for link_dir, symlinks in dist_symlinks.items():
+      for link_key, hash_path in symlinks:
+        self.s3.put_object(Bucket=self.writeStore,
+                           Key=link_key,
+                           Body=os.fsencode(hash_path),
+                           ACL="public-read",
+                           WebsiteRedirectLocation=hash_path)
+      debug("Uploaded %d dist symlinks to S3 from %s",
+            len(symlinks), link_dir)
+
     self.s3.upload_file(Bucket=self.writeStore, Key=tar_path,
                         Filename=os.path.join(self.workdir, tar_path))
-
-  def syncDistLinksToRemote(self, link_dir):
-    if not self.writeStore:
-      return
-    debug("Syncing dist symlinks to S3 from %s", link_dir)
-
-    symlinks = []
-    for fname in os.listdir(os.path.join(self.workdir, link_dir)):
-      link_key = os.path.join(link_dir, fname)
-      path = os.path.join(self.workdir, link_key)
-      if os.path.islink(path):
-        hash_path = re.sub(r"^(\.\./)*", "", os.readlink(path))
-        symlinks.append((link_key, hash_path))
-
-    # To make sure there are no conflicts, see if anything already exists in
-    # our symlink directory.
-    symlinks_existing = frozenset(self._s3_listdir(link_dir))
-
-    # If all the symlinks we would upload already exist, skip uploading. We
-    # probably just downloaded a prebuilt package earlier, and it already has
-    # symlinks available.
-    if all(link_key in symlinks_existing for link_key, _ in symlinks):
-      debug("All dist symlinks already exist on S3, skipping upload")
-      return
-
-    # Excluding our own symlinks (above), if there is anything in our link_dir
-    # on the remote, something else is uploading symlinks (or already has)!
-    dieOnError(symlinks_existing,
-               "Conflicts detected in %s on S3; aborting: %s" %
-               (link_dir, ", ".join(sorted(symlinks_existing))))
-
-    for link_key, hash_path in symlinks:
-      self.s3.put_object(Bucket=self.writeStore,
-                         Key=link_key,
-                         Body=os.fsencode(hash_path),
-                         ACL="public-read",
-                         WebsiteRedirectLocation=hash_path)
-    debug("Uploaded %d dist symlinks to S3", len(symlinks))
