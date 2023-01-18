@@ -163,4 +163,10 @@ def install_wrapper_script(name, work_dir):
          "$(which -a "$(basename "$0")" | grep -Fxv "$0" | head -1)" "$@"
     """))
     os.fchmod(scriptf.fileno(), 0o755)  # make the wrapper script executable
+  # If $PATH is empty, this is bad, because we need to fall back to the "real"
+  # executable that our script is wrapping.
+  dieOnError(not os.environ.get("PATH"),
+             "$PATH is unset or empty. Cannot find any executables. Try "
+             "rerunning this command inside a login shell (e.g. `bash -l`). "
+             "If that doesn't work, run `export PATH` manually.")
   os.environ["PATH"] = script_dir + ":" + os.environ["PATH"]
