@@ -250,7 +250,7 @@ def storeHashes(package, specs, isDevelPkg, considerRelocation):
     ih(spec["incremental_recipe"])
     spec["incremental_hash"] = ih.hexdigest()
   elif isDevelPkg:
-    h_all(spec.get("devel_hash"))
+    h_all(spec["devel_hash"])
 
   if considerRelocation and "relocate_paths" in spec:
     h_all("relocate:"+" ".join(sorted(spec["relocate_paths"])))
@@ -482,6 +482,18 @@ def doBuild(args, parser):
     spec = specs[p]
     spec["commit_hash"] = "0"
     develPackageBranch = ""
+    # This is a development package (i.e. a local directory named like
+    # spec["package"]), but there is no "source" key in its alidist recipe,
+    # so there shouldn't be any code for it! Presumably, a user has
+    # mistakenly named a local directory after one of our packages.
+    dieOnError("source" not in spec and spec["package"] in develPkgs,
+               "Found a directory called {package} here, but we're not "
+               "expecting any code for the package {package}. If this is a "
+               "mistake, please rename the {package} directory or use the "
+               "'--no-local {package}' option. If {star}Build should pick up "
+               "source code from this directory, add a 'source:' key to "
+               "alidist/{recipe}.sh instead."
+               .format(package=p, recipe=p.lower(), star=star()))
     if "source" in spec:
       # Tag may contain date params like %(year)s, %(month)s, %(day)s, %(hour).
       spec["tag"] = resolve_tag(spec)
