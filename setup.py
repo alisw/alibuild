@@ -7,8 +7,8 @@ from setuptools import setup, find_packages
 # To use a consistent encoding
 from codecs import open
 from os import path
+from textwrap import dedent
 import sys
-import alibuild_helpers
 
 here = path.abspath(path.dirname(__file__))
 
@@ -24,8 +24,6 @@ if sys.version_info >= (3, 6):
 
 setup(
     name='alibuild',
-
-    version=alibuild_helpers.__version__,
 
     description='ALICE Build Tool',
     long_description=long_description,
@@ -73,6 +71,12 @@ setup(
     # Alternatively, if you want to distribute just a my_module.py, uncomment
     # this:
     #   py_modules=["my_module"],
+
+    # Single-source our package version using setuptools_scm. This makes it
+    # PEP440-compliant, and it always references the alibuild commit that
+    # aliBuild was built from.
+    use_scm_version={'write_to': 'alibuild_helpers/_version.py'},
+    setup_requires=['setuptools_scm'],
 
     # List run-time dependencies here.  These will be installed by pip when
     # your project is installed. For an analysis of "install_requires" vs pip's

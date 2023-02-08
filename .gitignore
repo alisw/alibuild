@@ -11,3 +11,5 @@ _site
 # For unit tests
 build.log
 .tox
+# For setuptools_scm
+alibuild_helpers/_version.py
