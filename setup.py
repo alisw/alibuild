@@ -6,14 +6,14 @@
 from setuptools import setup, find_packages
 # To use a consistent encoding
 from codecs import open
-from os import path
+import os.path
 import sys
 import alibuild_helpers
 
-here = path.abspath(path.dirname(__file__))
+here = os.path.abspath(os.path.dirname(__file__))
 
 # Get the long description from the README file
-with open(path.join(here, 'README.rst'), encoding='utf-8') as f:
+with open(os.path.join(here, 'README.rst'), encoding='utf-8') as f:
     long_description = f.read()
 
 install_requires = ['pyyaml', 'requests', 'distro', 'jinja2']
@@ -57,10 +57,11 @@ setup(
 
         # Specify the Python versions you support here. In particular, ensure
         # that you indicate whether you support Python 2, Python 3 or both.
-        'Programming Language :: Python :: 2.6',
-        'Programming Language :: Python :: 2.7',
-        'Programming Language :: Python :: 3.8',
-        'Programming Language :: Python :: 3.9'
+        'Programming Language :: Python :: 2.7',   # slc6
+        'Programming Language :: Python :: 3.6',   # slc7, slc8, cs8
+        'Programming Language :: Python :: 3.8',   # MacOS
+        'Programming Language :: Python :: 3.9',   # alma9
+        'Programming Language :: Python :: 3.10',
     ],
 
     # What does your project relate to?
