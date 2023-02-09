@@ -76,7 +76,13 @@ setup(
     # PEP440-compliant, and it always references the alibuild commit that
     # aliBuild was built from.
     use_scm_version={'write_to': 'alibuild_helpers/_version.py'},
-    setup_requires=['setuptools_scm'],
+    setup_requires=[
+        # The 6.* series removed support for Python 2.7.
+        'setuptools_scm<6.0.0' if sys.version_info < (3, 0) else
+        # The 7.* series removed support for Python 3.6.
+        'setuptools_scm<7.0.0' if sys.version_info < (3, 7) else
+        'setuptools_scm'
+    ],
 
     # List run-time dependencies here.  These will be installed by pip when
     # your project is installed. For an analysis of "install_requires" vs pip's
