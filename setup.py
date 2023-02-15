@@ -6,14 +6,13 @@
 from setuptools import setup, find_packages
 # To use a consistent encoding
 from codecs import open
-from os import path
+import os.path
 import sys
-import alibuild_helpers
 
-here = path.abspath(path.dirname(__file__))
+here = os.path.abspath(os.path.dirname(__file__))
 
 # Get the long description from the README file
-with open(path.join(here, 'README.rst'), encoding='utf-8') as f:
+with open(os.path.join(here, 'README.rst'), encoding='utf-8') as f:
     long_description = f.read()
 
 install_requires = ['pyyaml', 'requests', 'distro', 'jinja2']
@@ -24,8 +23,6 @@ if sys.version_info >= (3, 6):
 
 setup(
     name='alibuild',
-
-    version=alibuild_helpers.__version__,
 
     description='ALICE Build Tool',
     long_description=long_description,
@@ -57,10 +54,11 @@ setup(
 
         # Specify the Python versions you support here. In particular, ensure
         # that you indicate whether you support Python 2, Python 3 or both.
-        'Programming Language :: Python :: 2.6',
-        'Programming Language :: Python :: 2.7',
-        'Programming Language :: Python :: 3.8',
-        'Programming Language :: Python :: 3.9'
+        'Programming Language :: Python :: 2.7',   # slc6
+        'Programming Language :: Python :: 3.6',   # slc7, slc8, cs8
+        'Programming Language :: Python :: 3.8',   # MacOS
+        'Programming Language :: Python :: 3.9',   # alma9
+        'Programming Language :: Python :: 3.10',
     ],
 
     # What does your project relate to?
@@ -73,6 +71,18 @@ setup(
     # Alternatively, if you want to distribute just a my_module.py, uncomment
     # this:
     #   py_modules=["my_module"],
+
+    # Single-source our package version using setuptools_scm. This makes it
+    # PEP440-compliant, and it always references the alibuild commit that
+    # aliBuild was built from.
+    use_scm_version={'write_to': 'alibuild_helpers/_version.py'},
+    setup_requires=[
+        # The 6.* series removed support for Python 2.7.
+        'setuptools_scm<6.0.0' if sys.version_info < (3, 0) else
+        # The 7.* series removed support for Python 3.6.
+        'setuptools_scm<7.0.0' if sys.version_info < (3, 7) else
+        'setuptools_scm'
+    ],
 
     # List run-time dependencies here.  These will be installed by pip when
     # your project is installed. For an analysis of "install_requires" vs pip's

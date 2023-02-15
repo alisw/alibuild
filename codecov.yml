@@ -1,3 +1,7 @@
+---
 coverage:
   fixes:
     - "alibuild/::"
+# Disable long, annoying overview comment in PRs; only set statuses with links
+# to codecov.io.
+comment: false

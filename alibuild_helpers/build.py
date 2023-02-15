@@ -17,7 +17,7 @@ from alibuild_helpers.git import git, clone_speedup_options
 from alibuild_helpers.sync import (NoRemoteSync, HttpRemoteSync, S3RemoteSync,
                                    Boto3RemoteSync, RsyncRemoteSync)
 import yaml
-from alibuild_helpers.workarea import updateReferenceRepoSpec
+from alibuild_helpers.workarea import cleanup_git_log, logged_git, updateReferenceRepoSpec
 from alibuild_helpers.log import logger_handler, LogFormatter, ProgressPrint
 from datetime import datetime
 from glob import glob
@@ -75,7 +75,8 @@ def update_git_repos(args, specs, buildOrder, develPkgs):
         else:
             cmd.append(specs[package].get("reference", specs[package]["source"]))
 
-        output = git(cmd, prompt=git_prompt)
+        output = logged_git(package, args.referenceSources,
+                            cmd, ".", prompt=git_prompt, logOutput=False)
         specs[package]["git_refs"] = {
             git_ref: git_hash for git_hash, sep, git_ref
             in (line.partition("\t") for line in output.splitlines()) if sep
@@ -249,7 +250,7 @@ def storeHashes(package, specs, isDevelPkg, considerRelocation):
     ih(spec["incremental_recipe"])
     spec["incremental_hash"] = ih.hexdigest()
   elif isDevelPkg:
-    h_all(spec.get("devel_hash"))
+    h_all(spec["devel_hash"])
 
   if considerRelocation and "relocate_paths" in spec:
     h_all("relocate:"+" ".join(sorted(spec["relocate_paths"])))
@@ -268,6 +269,39 @@ def storeHashes(package, specs, isDevelPkg, considerRelocation):
   spec["local_revision_hash"] = h_default.hexdigest()
   spec["local_hashes"] = [spec["local_revision_hash"]] + \
     list({h.hexdigest() for _, _, h, in h_alternatives} - {spec["local_revision_hash"]})
+
+
+def hash_local_changes(directory):
+  """Produce a hash of all local changes in the given git repo.
+
+  If there are untracked files, this function returns a unique hash to force a
+  rebuild, and logs a warning, as we cannot detect changes to those files.
+  """
+  class UntrackedChangesError(Exception):
+    """Signal that we cannot detect code changes due to untracked files."""
+  h = Hasher()
+  def hash_output(msg, args):
+    lines = msg % args
+    # `git status --porcelain` indicates untracked files using "??".
+    # Lines from `git diff` never start with "??".
+    if any(line.startswith("?? ") for line in lines.split("\n")):
+      raise UntrackedChangesError()
+    h(lines)
+  cmd = "cd %s && git diff -r HEAD && git status --porcelain" % directory
+  try:
+    err = execute(cmd, hash_output)
+    debug("Command %s returned %d", cmd, err)
+    dieOnError(err, "Unable to detect source code changes.")
+  except UntrackedChangesError:
+    warning("You have untracked changes in %s, so %sBuild cannot detect "
+            "whether it needs to rebuild the package. Therefore, the package "
+            "is being rebuilt unconditionally. Please use 'git add' and/or "
+            "'git commit' to track your changes in git.", directory, star())
+    # If there are untracked changes, always rebuild (hopefully incrementally)
+    # and let CMake figure out what needs to be rebuilt. Force a rebuild by
+    # changing the hash to something basically random.
+    h(str(time.time()))
+  return h.hexdigest()
 
 
 def better_tarball(spec, old, new):
@@ -448,6 +482,18 @@ def doBuild(args, parser):
     spec = specs[p]
     spec["commit_hash"] = "0"
     develPackageBranch = ""
+    # This is a development package (i.e. a local directory named like
+    # spec["package"]), but there is no "source" key in its alidist recipe,
+    # so there shouldn't be any code for it! Presumably, a user has
+    # mistakenly named a local directory after one of our packages.
+    dieOnError("source" not in spec and spec["package"] in develPkgs,
+               "Found a directory called {package} here, but we're not "
+               "expecting any code for the package {package}. If this is a "
+               "mistake, please rename the {package} directory or use the "
+               "'--no-local {package}' option. If {star}Build should pick up "
+               "source code from this directory, add a 'source:' key to "
+               "alidist/{recipe}.sh instead."
+               .format(package=p, recipe=p.lower(), star=star()))
     if "source" in spec:
       # Tag may contain date params like %(year)s, %(month)s, %(day)s, %(hour).
       spec["tag"] = resolve_tag(spec)
@@ -466,12 +512,7 @@ def doBuild(args, parser):
         # Devel package: we get the commit hash from the checked source, not from remote.
         out = git(("rev-parse", "HEAD"), directory=spec["source"])
         spec["commit_hash"] = out.strip()
-        cmd = "cd %s && git diff -r HEAD && git status --porcelain" % spec["source"]
-        h = Hasher()
-        err = execute(cmd, lambda s, *a: h(s % a))
-        debug("Command %s returned %d", cmd, err)
-        dieOnError(err, "Unable to detect source code changes.")
-        spec["devel_hash"] = spec["commit_hash"] + h.hexdigest()
+        spec["devel_hash"] = spec["commit_hash"] + hash_local_changes(spec["source"])
         out = git(("rev-parse", "--abbrev-ref", "HEAD"), directory=spec["source"])
         if out == "HEAD":
           out = git(("rev-parse", "HEAD"), directory=spec["source"])[:10]

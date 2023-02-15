@@ -17,8 +17,6 @@ jobs:
         uses: actions/setup-python@v3
         with:
           python-version: 3.x
-      - name: Replace the hard-coded version number
-        run: sed -i "s/LAST_TAG/${GITHUB_REF#refs/tags/}/g" alibuild_helpers/__init__.py
       - name: Build the Python distribution
         run: python setup.py sdist
       - name: Publish distribution to PyPI
