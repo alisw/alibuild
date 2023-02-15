@@ -8,6 +8,7 @@ _site
 .rubyversion
 *,cover
 .coverage
+.mypy_cache
 # For unit tests
 build.log
 .tox
