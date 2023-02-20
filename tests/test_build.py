@@ -192,6 +192,7 @@ def dummy_exists(x):
        new=MagicMock(return_value=["--filter=blob:none"]))
 @patch("alibuild_helpers.workarea.clone_speedup_options",
        new=MagicMock(return_value=["--filter=blob:none"]))
+@patch("alibuild_helpers.build.BASH", new="/bin/bash")
 class BuildTestCase(unittest.TestCase):
     @patch("alibuild_helpers.analytics", new=MagicMock())
     @patch("requests.Session.get", new=MagicMock())

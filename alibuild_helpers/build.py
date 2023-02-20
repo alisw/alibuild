@@ -5,7 +5,7 @@ from alibuild_helpers.analytics import report_event
 from alibuild_helpers.log import debug, error, info, banner, warning
 from alibuild_helpers.log import dieOnError
 from alibuild_helpers.cmd import execute, getstatusoutput, DockerRunner, BASH, install_wrapper_script
-from alibuild_helpers.utilities import star, prunePaths
+from alibuild_helpers.utilities import prunePaths
 from alibuild_helpers.utilities import resolve_store_path
 from alibuild_helpers.utilities import format, parseDefaults, readDefaults
 from alibuild_helpers.utilities import getPackageList
@@ -293,10 +293,10 @@ def hash_local_changes(directory):
     debug("Command %s returned %d", cmd, err)
     dieOnError(err, "Unable to detect source code changes.")
   except UntrackedChangesError:
-    warning("You have untracked changes in %s, so %sBuild cannot detect "
+    warning("You have untracked changes in %s, so aliBuild cannot detect "
             "whether it needs to rebuild the package. Therefore, the package "
             "is being rebuilt unconditionally. Please use 'git add' and/or "
-            "'git commit' to track your changes in git.", directory, star())
+            "'git commit' to track your changes in git.", directory)
     # If there are untracked changes, always rebuild (hopefully incrementally)
     # and let CMake figure out what needs to be rebuilt. Force a rebuild by
     # changing the hash to something basically random.
@@ -341,10 +341,9 @@ def doBuild(args, parser):
   prunePaths(workDir)
 
   if not exists(args.configDir):
-    error('Cannot find %sdist recipes under directory "%s".\n'
+    error('Cannot find alidist recipes under directory "%s".\n'
           'Maybe you need to "cd" to the right directory or '
-          'you forgot to run "%sBuild init"?',
-          star(), args.configDir, star())
+          'you forgot to run "aliBuild init"?', args.configDir)
     return 1
 
   _, value = git(("symbolic-ref", "-q", "HEAD"), directory=args.configDir, check=False)
@@ -368,8 +367,8 @@ def doBuild(args, parser):
 
   debug("Building for architecture %s", args.architecture)
   debug("Number of parallel builds: %d", args.jobs)
-  debug("Using %sBuild from %sbuild@%s recipes in %sdist@%s",
-        star(), star(), __version__, star(), os.environ["ALIBUILD_ALIDIST_HASH"])
+  debug("Using aliBuild from alibuild@%s recipes in alidist@%s",
+        __version__, os.environ["ALIBUILD_ALIDIST_HASH"])
 
   install_wrapper_script("git", workDir)
 
@@ -403,8 +402,8 @@ def doBuild(args, parser):
 
   if failed:
     error("The following packages are system requirements and could not be found:\n\n- %s\n\n"
-          "Please run:\n\n\t%sDoctor --defaults %s %s\n\nto get a full diagnosis.",
-          "\n- ".join(sorted(list(failed))), star(), args.defaults, args.pkgname.pop())
+          "Please run:\n\n\taliDoctor --defaults %s %s\n\nto get a full diagnosis.",
+          "\n- ".join(sorted(list(failed))), args.defaults, args.pkgname.pop())
     return 1
 
   for x in specs.values():
@@ -413,8 +412,8 @@ def doBuild(args, parser):
     x["runtime_requires"] = [r for r in x["runtime_requires"] if not r in args.disable]
 
   if systemPackages:
-    banner("%sBuild can take the following packages from the system and will not build them:\n  %s",
-           star(), ", ".join(systemPackages))
+    banner("aliBuild can take the following packages from the system and will not build them:\n  %s",
+           ", ".join(systemPackages))
   if ownPackages:
     banner("The following packages cannot be taken from the system and will be built:\n  %s",
            ", ".join(ownPackages))
@@ -469,10 +468,10 @@ def doBuild(args, parser):
     banner("You have packages in development mode.\n"
            "This means their source code can be freely modified under:\n\n"
            "  %s/<package_name>\n\n"
-           "%sBuild does not automatically update such packages to avoid work loss.\n"
+           "aliBuild does not automatically update such packages to avoid work loss.\n"
            "In most cases this is achieved by doing in the package source directory:\n\n"
            "  git pull --rebase\n",
-           os.getcwd(), star())
+           os.getcwd())
 
   # Clone/update repos
   update_git_repos(args, specs, buildOrder, develPkgs)
@@ -490,10 +489,10 @@ def doBuild(args, parser):
                "Found a directory called {package} here, but we're not "
                "expecting any code for the package {package}. If this is a "
                "mistake, please rename the {package} directory or use the "
-               "'--no-local {package}' option. If {star}Build should pick up "
+               "'--no-local {package}' option. If aliBuild should pick up "
                "source code from this directory, add a 'source:' key to "
                "alidist/{recipe}.sh instead."
-               .format(package=p, recipe=p.lower(), star=star()))
+               .format(package=p, recipe=p.lower()))
     if "source" in spec:
       # Tag may contain date params like %(year)s, %(month)s, %(day)s, %(hour).
       spec["tag"] = resolve_tag(spec)

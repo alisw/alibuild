@@ -17,7 +17,7 @@ from alibuild_helpers.doctor import doDoctor
 from alibuild_helpers.deps import doDeps
 from alibuild_helpers.log import info, warning, debug, logger, error
 from alibuild_helpers.utilities import detectArch
-from alibuild_helpers.build import doBuild, star
+from alibuild_helpers.build import doBuild
 
 
 def doMain(args, parser):
@@ -85,7 +85,7 @@ def doMain(args, parser):
 
 
 if __name__ == "__main__":
-  args, parser = doParseArgs(star())
+  args, parser = doParseArgs()
 
   # This is valid for everything
   logger.setLevel(logging.DEBUG if args.debug else logging.INFO)

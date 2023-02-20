@@ -25,14 +25,14 @@ DEFAULT_CHDIR = os.environ.get("ALIBUILD_CHDIR") or "."
 # --dist-tag). It can be either:
 # - A tag name
 # - A repository spec in the for org/repo@tag
-def alidist_string(s, star):
+def alidist_string(s):
   repo, have_repo_spec, ver = s.partition("@")
   if not have_repo_spec:
-    repo, ver = "alisw/%sdist" % star, s
+    repo, ver = "alisw/alidist", s
   return {"repo": repo, "ver": ver}
 
 
-def doParseArgs(star):
+def doParseArgs():
   detectedArch = detectArch()
   parser = argparse.ArgumentParser(epilog="""\
   For help about each option, specify --help after the option itself. For
@@ -148,14 +148,14 @@ def doParseArgs(star):
   build_remote.add_argument("--insecure", dest="insecure", action="store_true",
                             help="Don't validate TLS certificates when connecting to an https:// remote store.")
 
-  build_dirs = build_parser.add_argument_group(title="Customise %sBuild directories" % star)
+  build_dirs = build_parser.add_argument_group(title="Customise aliBuild directories")
   build_dirs.add_argument("-C", "--chdir", metavar="DIR", dest="chdir", default=DEFAULT_CHDIR,
                           help=("Change to the specified directory before building. "
                                 "Alternatively, set ALIBUILD_CHDIR. Default '%(default)s'."))
   build_dirs.add_argument("-w", "--work-dir", dest="workDir", default=DEFAULT_WORK_DIR,
                           help=("The toplevel directory under which builds should be done and build results "
                                 "should be installed. Default '%(default)s'."))
-  build_dirs.add_argument("-c", "--config-dir", dest="configDir", default="%sdist" % star,
+  build_dirs.add_argument("-c", "--config-dir", dest="configDir", default="alidist",
                           help="The directory containing build recipes. Default '%(default)s'.")
   build_dirs.add_argument("--reference-sources", dest="referenceSources", metavar="MIRRORDIR",
                           default="%(workDir)s/MIRROR",
@@ -180,7 +180,7 @@ def doParseArgs(star):
                                   "architecture, which is '%(default)s'."))
   clean_parser.add_argument("--aggressive-cleanup", dest="aggressiveCleanup", action="store_true",
                             help="Delete as much build data as possible when cleaning up.")
-  clean_dirs = clean_parser.add_argument_group(title="Customise %sBuild directories" % star)
+  clean_dirs = clean_parser.add_argument_group(title="Customise aliBuild directories")
   clean_dirs.add_argument("-C", "--chdir", metavar="DIR", dest="chdir", default=DEFAULT_CHDIR,
                           help=("Change to the specified directory before cleaning up. "
                                 "Alternatively, set ALIBUILD_CHDIR. Default '%(default)s'."))
@@ -225,8 +225,8 @@ def doParseArgs(star):
                                  "Passed through verbatim -- separate multiple arguments "
                                  "with spaces, and make sure quoting is correct! Implies --docker."))
 
-  deps_parser.add_argument_group(title="Customise %sBuild directories" % star) \
-             .add_argument("-c", "--config-dir", dest="configDir", default="%sdist" % star,
+  deps_parser.add_argument_group(title="Customise aliBuild directories") \
+             .add_argument("-c", "--config-dir", dest="configDir", default="alidist",
                            help="The directory containing build recipes. Default '%(default)s'.")
 
   deps_system = deps_parser.add_mutually_exclusive_group()
@@ -267,14 +267,14 @@ def doParseArgs(star):
                              help=("The Docker image to use. Implies --docker. By default, an image "
                                    "is chosen based on the current or selected architecture."))
 
-  doctor_dirs = doctor_parser.add_argument_group(title="Customise %sBuild directories" % star)
+  doctor_dirs = doctor_parser.add_argument_group(title="Customise aliBuild directories")
   doctor_dirs.add_argument("-C", "--chdir", metavar="DIR", dest="chdir", default=DEFAULT_CHDIR,
                            help=("Change to the specified directory before doing anything. "
                                  "Alternatively, set ALIBUILD_CHDIR. Default '%(default)s'."))
   doctor_dirs.add_argument("-w", "--work-dir", dest="workDir", default=DEFAULT_WORK_DIR,  # TODO: previous default was "workDir".
                            help=("The toplevel directory under which builds should be done and build results "
                                  "should be installed. Default '%(default)s'."))
-  doctor_dirs.add_argument("-c", "--config", dest="configDir", default="%sdist" % star,
+  doctor_dirs.add_argument("-c", "--config", dest="configDir", default="alidist",
                            help="The directory containing build recipes. Default '%(default)s'.")
 
   # Options for the init subcommand
@@ -291,20 +291,20 @@ def doParseArgs(star):
                                  "See also: -c/--config-dir. Default '%(default)s'."))
 
   init_parser.add_argument("--dist", metavar="[USER/REPO@]BRANCH", dest="dist", default="",
-                           type=lambda x: alidist_string(x, star),
+                           type=alidist_string,
                            help=("Download the given repository containing build recipes into "
                                  "CONFIGDIR. Syntax: [user/repo@]branch or [url@]branch. The "
-                                 "default repo is 'alisw/%sdist; the default branch is the "
-                                 "repository's main branch." % star))
+                                 "default repo is 'alisw/alidist; the default branch is the "
+                                 "repository's main branch."))
 
-  init_dirs = init_parser.add_argument_group(title="Customise %sBuild directories" % star)
+  init_dirs = init_parser.add_argument_group(title="Customise aliBuild directories")
   init_dirs.add_argument("-C", "--chdir", metavar="DIR", dest="chdir", default=DEFAULT_CHDIR,
                          help=("Change to the specified directory before doing anything. "
                                "Alternatively, set ALIBUILD_CHDIR. Default '%(default)s'."))
   init_dirs.add_argument("-w", "--work-dir", dest="workDir", default=DEFAULT_WORK_DIR,
                          help=("The toplevel directory under which builds should be done and "
                                "build results should be installed. Default '%(default)s'."))
-  init_dirs.add_argument("-c", "--config-dir", dest="configDir", default="%%(prefix)s%sdist" % star,
+  init_dirs.add_argument("-c", "--config-dir", dest="configDir", default="%(prefix)salidist",
                          help=("The directory where build recipes will be placed. '%%(prefix)s' will "
                                "be replaced with 'DEVELPREFIX/'. Default '%(default)s'."))
   init_dirs.add_argument("--reference-sources", dest="referenceSources", metavar="MIRRORDIR",
@@ -328,7 +328,7 @@ def doParseArgs(star):
     return 2
   rest.sort(key=optionOrder)
   sys.argv = [prog] + rest
-  args = finaliseArgs(parser.parse_args(), parser, star)
+  args = finaliseArgs(parser.parse_args(), parser)
   return (args, parser)
 
 VALID_ARCHS_RE = "^slc[5-9]_(x86-64|ppc64|aarch64)$|^(ubuntu|ubt|osx|fedora)[0-9]*_(x86-64|arm64)$"
@@ -356,7 +356,7 @@ On Mac, x86-64:
 
 S3_SUPPORTED_ARCHS = "slc7_x86-64", "slc8_x86-64", "ubuntu2004_x86-64"
 
-def finaliseArgs(args, parser, star):
+def finaliseArgs(args, parser):
 
   # Nothing to finalise for version or analytics
   if args.action in ["version", "analytics", "architecture"]:

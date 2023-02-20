@@ -93,7 +93,7 @@ class ArgsTestCase(unittest.TestCase):
       (alibuild_helpers.args.DEFAULT_WORK_DIR,
        alibuild_helpers.args.DEFAULT_CHDIR) = env or ("sw", ".")
       with patch.object(sys, "argv", ["alibuild"] + shlex.split(cmd)):
-        args, parser = doParseArgs("ali")
+        args, parser = doParseArgs()
         args = vars(args)
         for k, v in effects:
           self.assertEqual(args[k], v)
@@ -105,7 +105,7 @@ class ArgsTestCase(unittest.TestCase):
     for (cmd, calls) in PARSER_ERRORS.items():
       mock_print.mock_calls = []
       with patch.object(sys, "argv", ["alibuild"] + shlex.split(cmd)):
-        self.assertRaises(FakeExit, lambda : doParseArgs("ali"))
+        self.assertRaises(FakeExit, doParseArgs)
         self.assertEqual(mock_print.mock_calls, calls)
 
   def test_validArchitectures(self):

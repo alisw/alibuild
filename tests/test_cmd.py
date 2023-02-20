@@ -10,6 +10,7 @@ from alibuild_helpers.cmd import execute, DockerRunner
 import unittest
 
 
+@mock.patch("alibuild_helpers.cmd.BASH", new="/bin/bash")
 class CmdTestCase(unittest.TestCase):
     @mock.patch("alibuild_helpers.cmd.debug")
     def test_execute(self, mock_debug):
