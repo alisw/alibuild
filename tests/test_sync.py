@@ -46,10 +46,6 @@ def tarball_name(spec):
 TAR_NAMES = tarball_name(GOOD_SPEC), tarball_name(BAD_SPEC), tarball_name(MISSING_SPEC)
 
 
-def dist_dir(spec):
-    return "/sw/dist/{package}/{package}-{version}-{revision}".format(**spec)
-
-
 class MockRequest:
     def __init__(self, j, simulate_err=False):
         self.j = j
