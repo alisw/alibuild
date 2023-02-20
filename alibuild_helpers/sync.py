@@ -11,7 +11,7 @@ from requests.exceptions import RequestException
 
 from alibuild_helpers.cmd import execute
 from alibuild_helpers.log import debug, warning, error, dieOnError
-from alibuild_helpers.utilities import format, star, resolve_store_path, resolve_links_path
+from alibuild_helpers.utilities import format, resolve_store_path, resolve_links_path
 
 
 class NoRemoteSync:
@@ -395,7 +395,7 @@ class Boto3RemoteSync:
                              aws_secret_access_key=os.environ["AWS_SECRET_ACCESS_KEY"])
     except KeyError:
       error("you must pass the AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY env "
-            "variables to %sBuild in order to use the S3 remote store", star())
+            "variables to aliBuild in order to use the S3 remote store")
       sys.exit(1)
 
   def _s3_listdir(self, dirname):

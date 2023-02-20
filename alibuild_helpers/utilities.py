@@ -23,9 +23,6 @@ class SpecError(Exception):
 
 asList = lambda x : x if type(x) == list else [x]
 
-def star():
-  return re.sub("build.*$", "", basename(sys.argv[0]).lower())
-
 
 def resolve_store_path(architecture, spec_hash):
   """Return the path where a tarball with the given hash is to be stored.
