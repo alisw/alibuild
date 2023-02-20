@@ -3,7 +3,7 @@
 # Single-source a PEP440-compliant version using setuptools_scm.
 try:
     # This is an sdist or wheel, and it's properly installed.
-    from alibuild_helpers._version import __version__
+    from alibuild_helpers._version import version as __version__
 except ImportError:
     # We're probably running directly from a source checkout.
     try:
