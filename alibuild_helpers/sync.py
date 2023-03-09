@@ -509,7 +509,7 @@ class Boto3RemoteSync:
       link_dir = "TARS/{arch}/{link_dir}/{package}/{package}-{version}-{revision}" \
         .format(arch=self.architecture, link_dir=link_dir, **spec)
 
-      debug("Syncing dist symlinks to S3 from %s", link_dir)
+      debug("Comparing dist symlinks against S3 from %s", link_dir)
 
       symlinks = []
       for fname in os.listdir(os.path.join(self.workdir, link_dir)):
