@@ -341,8 +341,8 @@ On Linux, x86-64:
    RHEL6 / SLC6 compatible: slc6_x86-64
    RHEL7 / CC7 compatible: slc7_x86-64
    RHEL8 / CC8 compatible: slc8_x86-64
-   Ubuntu 18.04 compatible: ubuntu1804_x86-64
    Ubuntu 20.04 compatible: ubuntu2004_x86-64
+   Ubuntu 22.04 compatible: ubuntu2204_x86-64
    Fedora 33 compatible: fedora33_x86-64
    Fedora 34 compatible: fedora34_x86-64
 
@@ -354,7 +354,7 @@ On Mac, x86-64:
    Big Sur: osx_arm64
 """
 
-S3_SUPPORTED_ARCHS = "slc7_x86-64", "slc8_x86-64", "ubuntu2004_x86-64"
+S3_SUPPORTED_ARCHS = "slc7_x86-64", "slc8_x86-64", "ubuntu2004_x86-64", "ubuntu2204_x86-64"
 
 def finaliseArgs(args, parser):
 
