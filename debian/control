@@ -1,6 +1,6 @@
 Source: python3-alibuild
 Maintainer: Giulio Eulisse <giulio.eulisse@cern.ch>
-Build-Depends: debhelper,dh-python,python3-all,python3-setuptools
+Build-Depends: debhelper,dh-python,python3-all,python3-setuptools,python3-setuptools-scm
 Section: devel
 Priority: optional
 Standards-Version: 3.9.6
