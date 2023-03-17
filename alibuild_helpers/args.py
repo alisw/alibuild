@@ -413,7 +413,7 @@ def finaliseArgs(args, parser):
     # in docker the docker image is given by the first part of the
     # architecture we want to build for.
     if args.docker and not "dockerImage" in args:
-      args.dockerImage = "alisw/%s-builder" % args.architecture.split("_")[0]
+      args.dockerImage = "registry.cern.ch/alisw/%s-builder" % args.architecture.split("_")[0]
 
     if args.remoteStore.endswith("::rw") and args.writeStore:
       parser.error("cannot specify ::rw and --write-store at the same time")
