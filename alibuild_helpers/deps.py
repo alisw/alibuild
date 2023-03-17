@@ -16,7 +16,7 @@ def doDeps(args, parser):
   # In case we are using Docker
   dockerImage = args.dockerImage if "dockerImage" in args else ""
   if args.docker and not dockerImage:
-    dockerImage = "alisw/%s-builder" % args.architecture.split("_")[0]
+    dockerImage = "registry.cern.ch/alisw/%s-builder" % args.architecture.split("_")[0]
 
   # Resolve all the package parsing boilerplate
   specs = {}

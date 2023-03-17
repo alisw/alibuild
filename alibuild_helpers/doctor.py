@@ -110,7 +110,7 @@ def doDoctor(args, parser):
 
   dockerImage = args.dockerImage if "dockerImage" in args else ""
   if args.docker and not dockerImage:
-    dockerImage = "alisw/%s-builder" % args.architecture.split("_")[0]
+    dockerImage = "registry.cern.ch/alisw/%s-builder" % args.architecture.split("_")[0]
 
   logger.setLevel(logging.BANNER)
   if args.debug:
