@@ -709,10 +709,21 @@ def doBuild(args, parser):
         continue
       rev_hash, revision = match.groups()
 
-      if not (("local" in revision and rev_hash in spec["local_hashes"]) or
-              ("local" not in revision and rev_hash in spec["remote_hashes"])):
-        # This tarball's hash doesn't match what we need. Remember that its
-        # revision number is taken, in case we assign our own later.
+      hash_matches = (
+        ("local" in revision and rev_hash in spec["local_hashes"]) or
+        ("local" not in revision and rev_hash in spec["remote_hashes"])
+      )
+      if (not hash_matches) or (hash_matches and not exists(realpath(symlink))):
+        # Either:
+        # 1. This tarball's hash doesn't match what we need, or:
+        # 2. This symlink is a hash match, but we don't have the right tarball.
+        #    It should have been downloaded from the remote if it was a hash
+        #    match, so this implies it doesn't exist on the remote -- probably
+        #    because this symlink refers to a partial upload, e.g. from an
+        #    interrupted aliBuild.
+        # Either way, we can't reuse the tarball that this symlink points to,
+        # but we should remember that its revision number is taken, to avoid
+        # conflicts in case we assign our own revision number later.
         if revision.startswith(revisionPrefix) and revision[len(revisionPrefix):].isdigit():
           # Strip revisionPrefix; the rest is an integer. Convert it to an int
           # so we can get a sensible max() existing revision below.

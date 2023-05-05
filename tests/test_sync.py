@@ -283,6 +283,7 @@ class Boto3TestCase(unittest.TestCase):
     ))
     @patch("os.readlink", new=MagicMock(return_value="dummy path"))
     @patch("os.path.islink", new=MagicMock(return_value=True))
+    @patch("os.stat", new=MagicMock(return_value=MagicMock(st_size=42)))
     def test_tarball_upload(self):
         """Test boto3 behaviour when building packages for upload locally."""
         b3sync = sync.Boto3RemoteSync(

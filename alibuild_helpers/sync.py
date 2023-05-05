@@ -533,8 +533,10 @@ class Boto3RemoteSync:
       # Excluding our own symlinks (above), if there is anything in our link_dir
       # on the remote, something else is uploading symlinks (or already has)!
       dieOnError(symlinks_existing,
-                 "Conflicts detected in %s on S3; aborting: %s" %
-                 (link_dir, ", ".join(sorted(symlinks_existing))))
+                 "Conflicts detected in %s on S3; aborting. "
+                 "S3 symlinks: %s; local symlinks: %s." %
+                 (link_dir, ", ".join(sorted(symlinks_existing)),
+                  ", ".join(sorted(link_key for link_key, _ in symlinks))))
 
       dist_symlinks[link_dir] = symlinks
 
@@ -554,11 +556,10 @@ class Boto3RemoteSync:
                (tar_path if tar_exists else link_path,
                 link_path if tar_exists else tar_path))
 
-    debug("Uploading tarball and symlinks for %s %s-%s (%s) to S3",
-          p, spec["version"], spec["revision"], spec["hash"])
-
     # Upload the smaller file first, so that any parallel uploads are more
     # likely to find it and fail.
+    debug("Uploading main symlink for %s %s-%s (%s) to S3",
+          p, spec["version"], spec["revision"], spec["hash"])
     self.s3.put_object(Bucket=self.writeStore, Key=link_path,
                        Body=os.readlink(os.path.join(self.workdir, link_path))
                               .lstrip("./").encode("utf-8"))
@@ -566,14 +567,20 @@ class Boto3RemoteSync:
     # Second, upload dist symlinks. These should be in place before the main
     # tarball, to avoid races in the publisher.
     for link_dir, symlinks in dist_symlinks.items():
+      debug("Uploading %d dist symlinks to S3 from %s", len(symlinks), link_dir)
       for link_key, hash_path in symlinks:
         self.s3.put_object(Bucket=self.writeStore,
                            Key=link_key,
                            Body=os.fsencode(hash_path),
                            ACL="public-read",
                            WebsiteRedirectLocation=hash_path)
-      debug("Uploaded %d dist symlinks to S3 from %s",
-            len(symlinks), link_dir)
 
+    # Upload the actual tarball last. Publishing scripts look for this, so this
+    # way they won't publish anything until the full dependency tree is on S3.
+    debug("Uploading %.2f MiB tarball for %s %s-%s (%s) to S3",
+          os.stat(tar_path).st_size / 1024**2,
+          p, spec["version"], spec["revision"], spec["hash"])
     self.s3.upload_file(Bucket=self.writeStore, Key=tar_path,
                         Filename=os.path.join(self.workdir, tar_path))
+
+    debug("Uploads finished successfully")
