@@ -11,9 +11,11 @@ except ImportError:
     except ImportError:
         __version__ = '(could not detect version)'
     else:
+        import os.path
+        source_root = os.path.join(os.path.dirname(__file__), os.path.pardir)
         try:
-            __version__ = get_version()
+            __version__ = get_version(root=source_root)
         except LookupError:
             __version__ = '(could not detect version)'
         finally:
-            del get_version
+            del get_version, source_root
