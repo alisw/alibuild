@@ -5,8 +5,8 @@ layout: main
 ---
 
 <div style="text-align:center;width:100%">
-  [![PyPI version](https://badge.fury.io/py/alibuild.svg)](https://badge.fury.io/py/alibuild)
-  [![Check PR](https://github.com/alisw/alibuild/actions/workflows/pr-check.yml/badge.svg?branch=master&event=push)](https://github.com/alisw/alibuild/actions/workflows/pr-check.yml)
+  <a href="https://badge.fury.io/py/alibuild"><img src="https://badge.fury.io/py/alibuild.svg" alt="PyPI version" height="22"></a>
+  <a href="https://github.com/alisw/alibuild/actions/workflows/pr-check.yml"><img src="https://github.com/alisw/alibuild/actions/workflows/pr-check.yml/badge.svg?branch=master&event=push" alt="Build status" height="22"></a>
 </div>
 
 A simple build tool for ALICE experiment software and its externals. Recipes
