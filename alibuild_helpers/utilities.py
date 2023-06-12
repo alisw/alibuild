@@ -383,18 +383,51 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
     except TypeError as e:
       dieOnError(True, "Malformed entry prefer_system: %s in %s" % (systemRE, spec["package"]))
     if not noSystem and (preferSystem or systemREMatches):
-      cmd = "REQUESTED_VERSION=%s\n" % resolve_version(spec, defaults, "unavailable", "unavailable")
-      cmd += spec.get("prefer_system_check", "false").strip()
-      if not spec["package"] in testCache:
-        testCache[spec["package"]] = performPreferCheck(spec, cmd.strip())
-
-      err, output = testCache[spec["package"]]
-
-      if not err:
-        systemPackages.update([spec["package"]])
-        disable.append(spec["package"])
+      prefer_system_check = spec.get("prefer_system_check", "false")
+      requested_version = resolve_version(spec, defaults, "unavailable", "unavailable")
+      if isinstance(prefer_system_check, str):
+        cmd = "REQUESTED_VERSION=%s\n%s" % (requested_version, prefer_system_check)
+        cmd = cmd.strip()
+        if cmd not in testCache:
+          testCache[cmd] = performPreferCheck(spec, cmd)
+        err, _ = testCache[cmd]
+        if not err:
+          systemPackages.add(spec["package"])
+          disable.append(spec["package"])
+        else:
+          ownPackages.update([spec["package"]])
+      elif isinstance(prefer_system_check, list):
+        for system_check_spec in prefer_system_check:
+          try:
+            if not re.match(system_check_spec.get("architecture", ".*"), architecture):
+              continue
+          except TypeError as e:
+            dieOnError(True, "Malformed entry architecture: %s in %s" % (systemRE, spec["package"]))
+          cmd = "REQUESTED_VERSION=%s\n%s" % (requested_version, system_check_spec.get("check", "false"))
+          cmd = cmd.strip()
+          if cmd not in testCache:
+            testCache[cmd] = performPreferCheck(spec, cmd)
+          err, _ = testCache[cmd]
+          if err:
+            continue
+          systemPackages.add(spec["package"])
+          if system_check_spec.get("disable", False):
+            disable.append(spec["package"])
+            break
+          override = system_check_spec.copy()
+          # Remove special keys, so they don't end up in the final spec.
+          del override["check"], override["architecture"], override["disable"], override["package"]
+          # Remove all keys except for the package name and version, and those
+          # explicitly specified as overrides. We must keep the package name
+          # the same, since it is used to specify dependencies. The version is
+          # required for all specs, but it doesn't matter too much what we put
+          # there (but it will influence the package's hash).
+          spec = {"package": spec["package"], "version": requested_version}
+          spec.update(override)
+          recipe = ""
+          break
       else:
-        ownPackages.update([spec["package"]])
+        dieOnError(True, "invalid prefer_system_check: %r" % prefer_system_check)
 
     dieOnError(("system_requirement" in spec) and recipe.strip("\n\t "),
                "System requirements %s cannot have a recipe" % spec["package"])
