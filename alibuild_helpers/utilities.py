@@ -4,6 +4,7 @@ from os.path import exists
 import hashlib
 from glob import glob
 from os.path import basename, join
+from textwrap import dedent
 import sys
 import os
 import re
@@ -12,6 +13,10 @@ try:
   from collections import OrderedDict
 except ImportError:
   from ordereddict import OrderedDict
+try:
+  from shlex import quote  # Python 3.3+
+except ImportError:
+  from pipes import quote  # Python 2.7
 
 from alibuild_helpers.cmd import decode_with_fallback, getoutput
 from alibuild_helpers.git import git
@@ -383,51 +388,49 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
     except TypeError as e:
       dieOnError(True, "Malformed entry prefer_system: %s in %s" % (systemRE, spec["package"]))
     if not noSystem and (preferSystem or systemREMatches):
-      prefer_system_check = spec.get("prefer_system_check", "false")
       requested_version = resolve_version(spec, defaults, "unavailable", "unavailable")
-      if isinstance(prefer_system_check, str):
-        cmd = "REQUESTED_VERSION=%s\n%s" % (requested_version, prefer_system_check)
-        cmd = cmd.strip()
-        if cmd not in testCache:
-          testCache[cmd] = performPreferCheck(spec, cmd)
-        err, _ = testCache[cmd]
-        if not err:
-          systemPackages.add(spec["package"])
+      cmd = dedent("""\
+      REQUESTED_VERSION={version}
+      alibuild_system_replace () {{
+        echo "alibuild_system_replace: $1"
+        exit 0
+      }}
+      {check}
+      """).format(
+        version=quote(requested_version),
+        check=spec.get("prefer_system_check", "false"),
+      ).strip()
+      if spec["package"] not in testCache:
+        testCache[spec["package"]] = performPreferCheck(spec, cmd)
+      err, output = testCache[spec["package"]]
+      if err:
+        # prefer_system_check errored; this means we must build the package ourselves.
+        ownPackages.update([spec["package"]])
+      else:
+        # prefer_system_check succeeded; this means we should use the system package.
+        match = re.search(r"^alibuild_system_replace:(?P<key>.*)$", output, re.MULTILINE)
+        systemPackages.add(spec["package"])
+        if not match:
+          # No replacement spec name given. Fall back to old system package
+          # behaviour and just disable the package.
           disable.append(spec["package"])
         else:
-          ownPackages.update([spec["package"]])
-      elif isinstance(prefer_system_check, list):
-        for system_check_spec in prefer_system_check:
+          # The check printed the name of a replacement; use it.
+          key = match.group("key").strip()
           try:
-            if not re.match(system_check_spec.get("architecture", ".*"), architecture):
-              continue
-          except TypeError as e:
-            dieOnError(True, "Malformed entry architecture: %s in %s" % (systemRE, spec["package"]))
-          cmd = "REQUESTED_VERSION=%s\n%s" % (requested_version, system_check_spec.get("check", "false"))
-          cmd = cmd.strip()
-          if cmd not in testCache:
-            testCache[cmd] = performPreferCheck(spec, cmd)
-          err, _ = testCache[cmd]
-          if err:
-            continue
-          systemPackages.add(spec["package"])
-          if system_check_spec.get("disable", False):
-            disable.append(spec["package"])
-            break
-          override = system_check_spec.copy()
-          # Remove special keys, so they don't end up in the final spec.
-          del override["check"], override["architecture"], override["disable"], override["package"]
-          # Remove all keys except for the package name and version, and those
-          # explicitly specified as overrides. We must keep the package name
-          # the same, since it is used to specify dependencies. The version is
-          # required for all specs, but it doesn't matter too much what we put
-          # there (but it will influence the package's hash).
-          spec = {"package": spec["package"], "version": requested_version}
-          spec.update(override)
-          recipe = ""
-          break
-      else:
-        dieOnError(True, "invalid prefer_system_check: %r" % prefer_system_check)
+            replacement = spec["prefer_system_replacement_specs"][key]
+          except KeyError as exc:
+            dieOnError(True, "Could not find named replacement spec for "
+                       "system package: %s (error was: %s)", key, exc)
+          else:
+            # We must keep the package name the same, since it is used to
+            # specify dependencies.
+            replacement["package"] = spec["package"]
+            # The version is required for all specs. What we put there will
+            # influence the package's hash, so allow the user to override it.
+            replacement.setdefault("version", requested_version)
+            spec = replacement
+            recipe = ""
 
     dieOnError(("system_requirement" in spec) and recipe.strip("\n\t "),
                "System requirements %s cannot have a recipe" % spec["package"])
