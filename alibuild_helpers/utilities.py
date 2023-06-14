@@ -4,7 +4,6 @@ from os.path import exists
 import hashlib
 from glob import glob
 from os.path import basename, join
-from textwrap import dedent
 import sys
 import os
 import re
@@ -389,14 +388,7 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
       dieOnError(True, "Malformed entry prefer_system: %s in %s" % (systemRE, spec["package"]))
     if not noSystem and (preferSystem or systemREMatches):
       requested_version = resolve_version(spec, defaults, "unavailable", "unavailable")
-      cmd = dedent("""\
-      REQUESTED_VERSION={version}
-      alibuild_system_replace () {{
-        echo "alibuild_system_replace: $1"
-        exit 0
-      }}
-      {check}
-      """).format(
+      cmd = "REQUESTED_VERSION={version}\n{check}".format(
         version=quote(requested_version),
         check=spec.get("prefer_system_check", "false"),
       ).strip()
