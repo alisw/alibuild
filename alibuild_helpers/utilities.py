@@ -397,7 +397,7 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
       err, output = testCache[spec["package"]]
       if err:
         # prefer_system_check errored; this means we must build the package ourselves.
-        ownPackages.update([spec["package"]])
+        ownPackages.add(spec["package"])
       else:
         # prefer_system_check succeeded; this means we should use the system package.
         match = re.search(r"^alibuild_system_replace:(?P<key>.*)$", output, re.MULTILINE)
@@ -422,7 +422,7 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
             # influence the package's hash, so allow the user to override it.
             replacement.setdefault("version", requested_version)
             spec = replacement
-            recipe = ""
+            recipe = replacement.get("recipe", "")
 
     dieOnError(("system_requirement" in spec) and recipe.strip("\n\t "),
                "System requirements %s cannot have a recipe" % spec["package"])
