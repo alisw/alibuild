@@ -13,6 +13,9 @@ name: Check PR
     branches:
       - master
 
+permissions:
+  contents: read
+
 jobs:
   unittest:
     name: python${{ matrix.python-version }}

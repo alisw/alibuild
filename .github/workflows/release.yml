@@ -5,6 +5,9 @@ name: Release
   release:
     types: [published]
 
+permissions:
+  contents: read
+
 jobs:
   pypi:
     name: Publish release on PyPI
