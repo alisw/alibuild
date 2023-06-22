@@ -13,6 +13,8 @@ name: Check PR
     branches:
       - master
 
+permissions: {}
+
 jobs:
   unittest:
     name: python${{ matrix.python-version }}
@@ -21,7 +23,6 @@ jobs:
     strategy:
       matrix:
         python-version:
-          - '2.7'
           - '3.6.8'   # slc7, slc8 and cs8 containers
           - '3.7'
           - '3.8'
