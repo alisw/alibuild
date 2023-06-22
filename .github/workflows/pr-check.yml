@@ -13,8 +13,7 @@ name: Check PR
     branches:
       - master
 
-permissions:
-  contents: read
+permissions: {}
 
 jobs:
   unittest:
