@@ -93,9 +93,9 @@ EoF
 function installHint() {
   if [[ $UNAME == Darwin ]]; then
     CMD='brew install modules'
-  elif which apt-get > /dev/null 2>&1; then
+  elif command -v apt-get > /dev/null 2>&1; then
     CMD='apt-get install environment-modules'
-  elif which yum > /dev/null 2>&1; then
+  elif command -v yum > /dev/null 2>&1; then
     CMD='yum install environment-modules'
   fi
   printf "${ER}ERROR: Environment Modules was not found on your system.\n" >&2
@@ -237,8 +237,8 @@ WORK_DIR=$(cd "$WORK_DIR"; pwd)
 [[ -z "$ARCHITECTURE" ]] && { printHelp "Cannot autodetect architecture"; false; }
 
 # Look for modulecmd (v3) or modulecmd-compat (>= v4)
-MODULECMD=$(which modulecmd 2> /dev/null || true)
-[[ -x "$MODULECMD" ]] || MODULECMD="$(dirname $(which envml 2> /dev/null || true) 2> /dev/null || true)/../libexec/modulecmd-compat"
+MODULECMD=$(command -v modulecmd 2> /dev/null || true)
+[[ -x "$MODULECMD" ]] || MODULECMD="$(dirname $(command -v envml 2> /dev/null || true) 2> /dev/null || true)/../libexec/modulecmd-compat"
 [[ -x "$MODULECMD" ]] || MODULECMD="$(brew --prefix modules 2> /dev/null || true)/libexec/modulecmd-compat"
 [[ -x "$MODULECMD" ]] || { installHint; false; }
 
