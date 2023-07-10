@@ -401,19 +401,19 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
       else:
         # prefer_system_check succeeded; this means we should use the system package.
         match = re.search(r"^alibuild_system_replace:(?P<key>.*)$", output, re.MULTILINE)
-        systemPackages.add(spec["package"])
         if not match:
           # No replacement spec name given. Fall back to old system package
           # behaviour and just disable the package.
+          systemPackages.add(spec["package"])
           disable.append(spec["package"])
         else:
           # The check printed the name of a replacement; use it.
           key = match.group("key").strip()
           try:
             replacement = spec["prefer_system_replacement_specs"][key]
-          except KeyError as exc:
+          except KeyError:
             dieOnError(True, "Could not find named replacement spec for "
-                       "system package: %s (error was: %s)", key, exc)
+                       "%s: %s" % (spec["package"], key))
           else:
             # We must keep the package name the same, since it is used to
             # specify dependencies.
@@ -423,6 +423,14 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
             replacement.setdefault("version", requested_version)
             spec = replacement
             recipe = replacement.get("recipe", "")
+            # If there's an explicitly-specified recipe, we're still building
+            # the package. If not, aliBuild will still "build" it, but it's
+            # basically instantaneous, so report to the user that we're taking
+            # it from the system.
+            if recipe:
+              ownPackages.add(spec["package"])
+            else:
+              systemPackages.add(spec["package"])
 
     dieOnError(("system_requirement" in spec) and recipe.strip("\n\t "),
                "System requirements %s cannot have a recipe" % spec["package"])
