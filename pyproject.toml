@@ -1,0 +1,54 @@
+[build-system]
+requires = ["setuptools>=45", "setuptools_scm[toml]>=6.2"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = 'alibuild'
+dynamic = ['readme', 'version']
+description='ALICE Build Tool'
+authors = [
+  {name = 'Giulio Eulisse', email = 'giulio.eulisse@cern.ch'},
+  {name = 'Timo Wilken', email = 'timo.wilken@cern.ch'},
+]
+
+license={text = 'GPL'}
+
+classifiers=[
+    'Development Status :: 5 - Production',
+
+    'Intended Audience :: Developers',
+    'Topic :: Software Development :: Build Tools',
+    'License :: OSI Approved :: GNU General Public License v3 (GPLv3)',
+    'Programming Language :: Python :: 2.7',   # slc6
+    'Programming Language :: Python :: 3.6',   # slc7, slc8, cs8
+    'Programming Language :: Python :: 3.8',   # MacOS
+    'Programming Language :: Python :: 3.9',   # alma9
+    'Programming Language :: Python :: 3.10',
+]
+
+keywords = ['HEP', 
+  'ALICE'
+]
+
+dependencies = [
+  "pyyaml", 
+  'requests', 
+  'distro',
+  'jinja2',
+  'boto3'
+]
+
+[project.urls]
+homepage = 'https://alisw.github.io/alibuild'
+
+[scripts]
+aliBuild = {path = "aliBuild"}
+alienv = {path = "alienv"}
+aliDoctor = {path = "aliDoctor"}
+aliDeps = {path = "aliDeps"}
+pb = {path = "pb"}
+[tool.setuptools_scm]
+write_to = "alibuild_helpers/_version.py"
+
+[tool.setuptools.package-data]
+alibuild_helpers = ['build_template.sh']
