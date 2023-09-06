@@ -8,7 +8,7 @@ try:
 except ImportError:
   from ordereddict import OrderedDict
 
-from alibuild_helpers.log import dieOnError, debug, info
+from alibuild_helpers.log import dieOnError, debug, info, error
 from alibuild_helpers.git import git, clone_speedup_options
 
 FETCH_LOG_NAME = "fetch-log.txt"
@@ -44,11 +44,14 @@ def logged_git(package, referenceSources,
   if logOutput:
     debug(output)
   if err:
-    with codecs.open(os.path.join(referenceSources, FETCH_LOG_NAME),
-                     "a", encoding="utf-8", errors="replace") as logf:
-      logf.write("Git command for package %r failed.\n"
-                 "Command: git %s\nIn directory: %s\nExit code: %d\n" %
-                 (package, " ".join(command), directory, err))
+    try:
+      with codecs.open(os.path.join(referenceSources, FETCH_LOG_NAME),
+                       "a", encoding="utf-8", errors="replace") as logf:
+        logf.write("Git command for package %r failed.\n"
+                   "Command: git %s\nIn directory: %s\nExit code: %d\n" %
+                   (package, " ".join(command), directory, err))
+    except OSError as exc:
+      error("Could not write error log from git command:", exc_info=exc)
   dieOnError(err, "Error during git %s for reference repo for %s." %
              (command[0], package))
   info("Done git %s for repository for %s", command[0], package)
