@@ -5,7 +5,8 @@ name: Release
   release:
     types: [published]
 
-permissions: {}
+permissions:
+  contents: read  # required for github.ref to be set
 
 jobs:
   pypi:
