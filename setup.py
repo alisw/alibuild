@@ -26,6 +26,7 @@ setup(
 
     description='ALICE Build Tool',
     long_description=long_description,
+    long_description_content_type='text/x-rst',
 
     # The project's main homepage.
     url='https://alisw.github.io/alibuild',
@@ -37,13 +38,10 @@ setup(
     # Choose your license
     license='GPL',
 
-    # See https://pypi.python.org/pypi?%3Aaction=list_classifiers
+    # See https://pypi.org/classifiers/
     classifiers=[
-        # How mature is this project? Common values are
-        #   3 - Alpha
-        #   4 - Beta
-        #   5 - Production/Stable
-        'Development Status :: 4 - Beta',
+        # How mature is this project?
+        'Development Status :: 5 - Production/Stable',
 
         # Indicate who your project is intended for
         'Intended Audience :: Developers',
@@ -59,6 +57,7 @@ setup(
         'Programming Language :: Python :: 3.8',   # MacOS
         'Programming Language :: Python :: 3.9',   # alma9
         'Programming Language :: Python :: 3.10',
+        'Programming Language :: Python :: 3.11',
     ],
 
     # What does your project relate to?

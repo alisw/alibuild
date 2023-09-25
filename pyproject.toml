@@ -5,17 +5,16 @@ build-backend = "setuptools.build_meta"
 [project]
 name = 'alibuild'
 dynamic = ['readme', 'version']
-description='ALICE Build Tool'
+description = 'ALICE Build Tool'
+keywords = ['HEP', 'ALICE']
+license = {text = 'GPL'}
 authors = [
   {name = 'Giulio Eulisse', email = 'giulio.eulisse@cern.ch'},
   {name = 'Timo Wilken', email = 'timo.wilken@cern.ch'},
 ]
 
-license={text = 'GPL'}
-
-classifiers=[
-    'Development Status :: 5 - Production',
-
+classifiers = [
+    'Development Status :: 5 - Production/Stable',
     'Intended Audience :: Developers',
     'Topic :: Software Development :: Build Tools',
     'License :: OSI Approved :: GNU General Public License v3 (GPLv3)',
@@ -24,18 +23,15 @@ classifiers=[
     'Programming Language :: Python :: 3.8',   # MacOS
     'Programming Language :: Python :: 3.9',   # alma9
     'Programming Language :: Python :: 3.10',
-]
-
-keywords = ['HEP', 
-  'ALICE'
+    'Programming Language :: Python :: 3.11',
 ]
 
 dependencies = [
-  "pyyaml", 
+  'pyyaml',
   'requests', 
   'distro',
   'jinja2',
-  'boto3'
+  'boto3',
 ]
 
 [project.urls]
@@ -47,6 +43,7 @@ alienv = {path = "alienv"}
 aliDoctor = {path = "aliDoctor"}
 aliDeps = {path = "aliDeps"}
 pb = {path = "pb"}
+
 [tool.setuptools_scm]
 write_to = "alibuild_helpers/_version.py"
 
