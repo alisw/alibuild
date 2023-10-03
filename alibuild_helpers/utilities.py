@@ -12,6 +12,10 @@ try:
   from collections import OrderedDict
 except ImportError:
   from ordereddict import OrderedDict
+try:
+  from shlex import quote  # Python 3.3+
+except ImportError:
+  from pipes import quote  # Python 2.7
 
 from alibuild_helpers.cmd import decode_with_fallback, getoutput
 from alibuild_helpers.git import git
@@ -383,18 +387,50 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
     except TypeError as e:
       dieOnError(True, "Malformed entry prefer_system: %s in %s" % (systemRE, spec["package"]))
     if not noSystem and (preferSystem or systemREMatches):
-      cmd = "REQUESTED_VERSION=%s\n" % resolve_version(spec, defaults, "unavailable", "unavailable")
-      cmd += spec.get("prefer_system_check", "false").strip()
-      if not spec["package"] in testCache:
-        testCache[spec["package"]] = performPreferCheck(spec, cmd.strip())
-
+      requested_version = resolve_version(spec, defaults, "unavailable", "unavailable")
+      cmd = "REQUESTED_VERSION={version}\n{check}".format(
+        version=quote(requested_version),
+        check=spec.get("prefer_system_check", "false"),
+      ).strip()
+      if spec["package"] not in testCache:
+        testCache[spec["package"]] = performPreferCheck(spec, cmd)
       err, output = testCache[spec["package"]]
-
-      if not err:
-        systemPackages.update([spec["package"]])
-        disable.append(spec["package"])
+      if err:
+        # prefer_system_check errored; this means we must build the package ourselves.
+        ownPackages.add(spec["package"])
       else:
-        ownPackages.update([spec["package"]])
+        # prefer_system_check succeeded; this means we should use the system package.
+        match = re.search(r"^alibuild_system_replace:(?P<key>.*)$", output, re.MULTILINE)
+        if not match:
+          # No replacement spec name given. Fall back to old system package
+          # behaviour and just disable the package.
+          systemPackages.add(spec["package"])
+          disable.append(spec["package"])
+        else:
+          # The check printed the name of a replacement; use it.
+          key = match.group("key").strip()
+          try:
+            replacement = spec["prefer_system_replacement_specs"][key]
+          except KeyError:
+            dieOnError(True, "Could not find named replacement spec for "
+                       "%s: %s" % (spec["package"], key))
+          else:
+            # We must keep the package name the same, since it is used to
+            # specify dependencies.
+            replacement["package"] = spec["package"]
+            # The version is required for all specs. What we put there will
+            # influence the package's hash, so allow the user to override it.
+            replacement.setdefault("version", requested_version)
+            spec = replacement
+            recipe = replacement.get("recipe", "")
+            # If there's an explicitly-specified recipe, we're still building
+            # the package. If not, aliBuild will still "build" it, but it's
+            # basically instantaneous, so report to the user that we're taking
+            # it from the system.
+            if recipe:
+              ownPackages.add(spec["package"])
+            else:
+              systemPackages.add(spec["package"])
 
     dieOnError(("system_requirement" in spec) and recipe.strip("\n\t "),
                "System requirements %s cannot have a recipe" % spec["package"])
