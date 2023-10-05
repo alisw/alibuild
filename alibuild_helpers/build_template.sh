@@ -13,7 +13,7 @@ function hash() { true; }
 export WORK_DIR="${WORK_DIR_OVERRIDE:-%(workDir)s}"
 
 # From our dependencies
-%(dependencies)s
+%(source_dependencies)s
 
 # Insert our own wrapper scripts into $PATH, patched to use the system OpenSSL,
 # instead of the one we build ourselves.
@@ -83,6 +83,24 @@ ln -snf $PKGHASH $WORK_DIR/BUILD/$PKGNAME-latest
 if [[ $DEVEL_PREFIX ]]; then
   ln -snf $PKGHASH $WORK_DIR/BUILD/$PKGNAME-latest-$DEVEL_PREFIX
 fi
+
+# Create etc/profile/init.sh early, to help with debugging failed builds.
+# If we're unpacking a tarball, instead of building a package, the init.sh
+# from the tarball will replace the one we create here, but that should be
+# safe.
+mkdir -p "$INSTALLROOT/etc/profile.d"
+cat <<\EOF > "$INSTALLROOT/etc/profile.d/init.sh"
+# Source dependencies' init.sh.
+%(source_dependencies)s
+# Set up variables pointing to this package.
+%(package_vars)s
+# Environment variables set by this alidist recipe.
+%(environment)s
+EOF
+echo "$PKGHASH" > "$INSTALLROOT/.build-hash"
+cat <<\EOF > "$INSTALLROOT/.full-dependencies"
+%(dependencies_json)s
+EOF
 
 # Reference statements
 %(referenceStatement)s
@@ -155,25 +173,6 @@ else
 fi
 
 cd "$WORK_DIR/INSTALLROOT/$PKGHASH"
-echo "$PKGHASH" > "$INSTALLROOT/.build-hash"
-cat <<\EOF | tr \' \" >"$INSTALLROOT/.full-dependencies"
-%(dependenciesJSON)s
-EOF
-
-mkdir -p "$INSTALLROOT/etc/profile.d"
-BIGPKGNAME=`echo "$PKGNAME" | tr [:lower:] [:upper:] | tr - _`
-rm -f "$INSTALLROOT/etc/profile.d/init.sh"
-
-# Init our dependencies
-%(dependenciesInit)s
-
-cat << EOF >> $INSTALLROOT/etc/profile.d/init.sh
-export ${BIGPKGNAME}_ROOT=\${WORK_DIR}/\${ALIBUILD_ARCH_PREFIX}/$PKGNAME/$PKGVERSION-$PKGREVISION
-export ${BIGPKGNAME}_VERSION=$PKGVERSION
-export ${BIGPKGNAME}_REVISION=$PKGREVISION
-export ${BIGPKGNAME}_HASH=$PKGHASH
-export ${BIGPKGNAME}_COMMIT=${COMMIT_HASH}
-EOF
 
 # Add support for direnv https://github.com/direnv/direnv/
 #
@@ -191,9 +190,6 @@ source_up
 # dynamic loader
 unset DYLD_LIBRARY_PATH
 EOF
-
-# Environment
-%(environment)s
 
 cd "$WORK_DIR/INSTALLROOT/$PKGHASH/$PKGPATH"
 # Find which files need relocation.

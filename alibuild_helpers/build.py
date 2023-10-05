@@ -1,5 +1,6 @@
 from os.path import abspath, exists, basename, dirname, join, realpath
 from os import makedirs, unlink, readlink, rmdir
+from textwrap import dedent
 from alibuild_helpers import __version__
 from alibuild_helpers.analytics import report_event
 from alibuild_helpers.log import debug, error, info, banner, warning
@@ -32,6 +33,8 @@ except ImportError:
 
 import concurrent.futures
 import importlib
+import itertools
+import json
 import socket
 import os
 import re
@@ -894,76 +897,81 @@ def doBuild(args, parser):
     # Notice that we guarantee that a dependency is always sourced before the
     # parts depending on it, but we do not guaranteed anything for the order in
     # which unrelated components are activated.
-    dependencies = "ALIBUILD_ARCH_PREFIX=\"${ALIBUILD_ARCH_PREFIX:-%s}\"\n" % args.architecture
-    dependenciesInit = "echo ALIBUILD_ARCH_PREFIX=\"\${ALIBUILD_ARCH_PREFIX:-%s}\" >> $INSTALLROOT/etc/profile.d/init.sh\n" % args.architecture
-    for dep in spec.get("requires", []):
-      depSpec = specs[dep]
-      depInfo = {
+    source_dependencies = "".join(dedent("""\
+    [ -n "${bigpackage}_REVISION" ] ||
+      . "$WORK_DIR/${{ALIBUILD_ARCH_PREFIX:-{architecture}}}"/{package}/{version}-{revision}/etc/profile.d/init.sh
+    """).format(
+      architecture=quote(args.architecture),
+      package=quote(dep),
+      version=quote(specs[dep]["version"]),
+      revision=quote(specs[dep]["revision"]),
+      bigpackage=dep.upper().replace("-", "_"),
+    ) for dep in spec.get("requires", ()))
+
+    package_vars = dedent("""\
+    export {bigpackage}_ROOT="$WORK_DIR/$ALIBUILD_ARCH_PREFIX"/{package}/{version}-{revision}
+    export {bigpackage}_VERSION={version}
+    export {bigpackage}_REVISION={revision}
+    export {bigpackage}_HASH={pkghash}
+    export {bigpackage}_COMMIT={commit_hash}
+    """).format(
+      bigpackage=spec["package"].upper().replace("-", "_"),
+      package=quote(spec["package"]),
+      version=quote(spec["version"]),
+      revision=quote(spec["revision"]),
+      pkghash=quote(spec["hash"]),
+      commit_hash=quote(spec["commit_hash"]),
+    )
+
+    dependencies_json = json.dumps({
+      dep: {
         "architecture": args.architecture,
         "package": dep,
-        "version": depSpec["version"],
-        "revision": depSpec["revision"],
-        "bigpackage": dep.upper().replace("-", "_")
+        "version": specs[dep]["version"],
+        "revision": specs[dep]["revision"],
+        "hash": specs[dep]["hash"],
       }
-      dependencies += format("[ -z ${%(bigpackage)s_REVISION+x} ] && source \"$WORK_DIR/$ALIBUILD_ARCH_PREFIX/%(package)s/%(version)s-%(revision)s/etc/profile.d/init.sh\"\n",
-                             **depInfo)
-      dependenciesInit += format('echo [ -z \${%(bigpackage)s_REVISION+x} ] \&\& source \${WORK_DIR}/\${ALIBUILD_ARCH_PREFIX}/%(package)s/%(version)s-%(revision)s/etc/profile.d/init.sh >> \"$INSTALLROOT/etc/profile.d/init.sh\"\n',
-                             **depInfo)
-    dependenciesDict = {}
-    for dep in spec.get("full_requires", []):
-      depSpec = specs[dep]
-      depInfo = {
-        "architecture": args.architecture,
-        "package": dep,
-        "version": depSpec["version"],
-        "revision": depSpec["revision"],
-        "hash": depSpec["hash"]
-      }
-      dependenciesDict[dep] = depInfo
-    dependenciesJSON = str(dependenciesDict)
-      
-    # Generate the part which creates the environment for the package.
+      for dep in spec.get("full_requires", ())
+    })
+
+    # Generate the part of init.sh which creates the manually-specified build
+    # environment for subsequent packages.
     # This can be either variable set via the "env" keyword in the metadata
-    # or paths which get appended via the "append_path" one.
-    # By default we append LD_LIBRARY_PATH, PATH
-    environment = ""
-    dieOnError(not isinstance(spec.get("env", {}), dict),
-               "Tag `env' in %s should be a dict." % p)
-    for key,value in spec.get("env", {}).items():
-      if key == "DYLD_LIBRARY_PATH":
-        continue
-      environment += format("echo 'export %(key)s=\"%(value)s\"' >> $INSTALLROOT/etc/profile.d/init.sh\n",
-                            key=key,
-                            value=value)
-    basePath = "%s_ROOT" % p.upper().replace("-", "_")
-
-    pathDict = spec.get("append_path", {})
-    dieOnError(not isinstance(pathDict, dict),
-               "Tag `append_path' in %s should be a dict." % p)
-    for pathName,pathVal in pathDict.items():
-      pathVal = isinstance(pathVal, list) and pathVal or [ pathVal ]
-      if pathName == "DYLD_LIBRARY_PATH":
-        continue
-      environment += format("\ncat << \EOF >> \"$INSTALLROOT/etc/profile.d/init.sh\"\nexport %(key)s=$%(key)s:%(value)s\nEOF",
-                            key=pathName,
-                            value=":".join(pathVal))
-
-    # Same thing, but prepending the results so that they win against system ones.
-    defaultPrependPaths = { "LD_LIBRARY_PATH": "$%s/lib" % basePath,
-                            "PATH": "$%s/bin" % basePath }
-    pathDict = spec.get("prepend_path", {})
-    dieOnError(not isinstance(pathDict, dict),
-               "Tag `prepend_path' in %s should be a dict." % p)
-    for pathName,pathVal in pathDict.items():
-      pathDict[pathName] = isinstance(pathVal, list) and pathVal or [ pathVal ]
-    for pathName,pathVal in defaultPrependPaths.items():
-      pathDict[pathName] = [ pathVal ] + pathDict.get(pathName, [])
-    for pathName,pathVal in pathDict.items():
-      if pathName == "DYLD_LIBRARY_PATH":
-        continue
-      environment += format("\ncat << \EOF >> \"$INSTALLROOT/etc/profile.d/init.sh\"\nexport %(key)s=%(value)s${%(key)s+:$%(key)s}\nEOF",
-                            key=pathName,
-                            value=":".join(pathVal))
+    # or paths which get appended via the "{append,prepend}_path" keywords.
+    # By default we prepend to LD_LIBRARY_PATH, PATH.
+    for key in ("env", "append_path", "prepend_path"):
+      dieOnError(not isinstance(spec.get(key, {}), dict),
+                 "Value for key `%s' in %s should be a dict." % (key, p))
+    pkgroot = "$%s_ROOT" % p.upper().replace("-", "_")
+    default_prepend_paths = {
+      "LD_LIBRARY_PATH": "%s/lib" % pkgroot,
+      "PATH": "%s/bin" % pkgroot,
+    }
+    environment = "".join(itertools.chain((
+      # Explicitly-set variables using the env: key.
+      'export {var}="{value}"\n'.format(var=var, value=value)
+      for var, value in spec.get("env", {}).items()
+      if var != "DYLD_LIBRARY_PATH"
+    ), (
+      # Append to path variables using append_path: key.
+      'export {var}="${{{var}:+${var}:}}{value}"\n'.format(
+        var=var,
+        value=":".join(value) if isinstance(value, list) else value,
+      )
+      for var, value in spec.get("append_path", {}).items()
+      if var != "DYLD_LIBRARY_PATH"
+    ), (
+      # Prepend to path variables using prepend_path: key. Handle default
+      # prepend_path entries first so that any recipe-specified entries for
+      # the same path come before them in the final path value.
+      'export {var}="{value}${{{var}+:${var}}}"\n'.format(
+        var=var,
+        value=":".join(value) if isinstance(value, list) else value,
+      )
+      for prepend_path in (default_prepend_paths, spec.get("prepend_path", {}))
+      for var, value in prepend_path.items()
+      if var != "DYLD_LIBRARY_PATH"
+    )))
 
     # The actual build script.
     referenceStatement = ""
@@ -999,9 +1007,9 @@ def doBuild(args, parser):
 
 
     cmd = format(cmd_raw,
-                 dependencies=dependencies,
-                 dependenciesInit=dependenciesInit,
-                 dependenciesJSON=dependenciesJSON,
+                 source_dependencies=source_dependencies,
+                 package_vars=package_vars,
+                 dependencies_json=dependencies_json,
                  develPrefix=develPrefix,
                  environment=environment,
                  workDir=workDir,
