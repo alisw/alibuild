@@ -78,6 +78,48 @@ if [[ "$INCREMENTAL_BUILD_HASH" == 0 ]] && ! rm -rf "$BUILDROOT"; then
   rm -rf "$BUILDROOT"
 fi
 mkdir -p "$INSTALLROOT" "$BUILDROOT" "$BUILDDIR" "$WORK_DIR/INSTALLROOT/$PKGHASH/$PKGPATH"
+
+cd "$WORK_DIR/INSTALLROOT/$PKGHASH"
+echo "$PKGHASH" > "$INSTALLROOT/.build-hash"
+cat <<\EOF | tr \' \" >"$INSTALLROOT/.full-dependencies"
+%(dependenciesJSON)s
+EOF
+
+mkdir -p "$INSTALLROOT/etc/profile.d"
+BIGPKGNAME=`echo "$PKGNAME" | tr [:lower:] [:upper:] | tr - _`
+rm -f "$INSTALLROOT/etc/profile.d/init.sh"
+
+# Init our dependencies
+%(dependenciesInit)s
+
+cat << EOF >> $INSTALLROOT/etc/profile.d/init.sh
+export ${BIGPKGNAME}_ROOT=\${WORK_DIR}/\${ALIBUILD_ARCH_PREFIX}/$PKGNAME/$PKGVERSION-$PKGREVISION
+export ${BIGPKGNAME}_VERSION=$PKGVERSION
+export ${BIGPKGNAME}_REVISION=$PKGREVISION
+export ${BIGPKGNAME}_HASH=$PKGHASH
+export ${BIGPKGNAME}_COMMIT=${COMMIT_HASH}
+EOF
+
+# Add support for direnv https://github.com/direnv/direnv/
+#
+# This is beneficial for all the cases where the build step requires some
+# environment to be properly setup in order to work. e.g. to support ninja or
+# protoc.
+cat << EOF > $BUILDDIR/.envrc
+# Source the build environment which was used for this package
+WORK_DIR=$WORK_DIR source ../../../$PKGPATH/etc/profile.d/init.sh
+source_up
+
+# On mac we build with the proper installation relative RPATH,
+# so this is not actually used and it's actually harmful since
+# startup time is reduced a lot by the extra overhead from the
+# dynamic loader
+unset DYLD_LIBRARY_PATH
+EOF
+
+# Environment
+%(environment)s
+
 cd "$BUILDROOT"
 ln -snf $PKGHASH $WORK_DIR/BUILD/$PKGNAME-latest
 if [[ $DEVEL_PREFIX ]]; then
@@ -153,47 +195,6 @@ else
   find $INSTALLROOT -name "*.unrelocated" -delete
   rm -rf $WORK_DIR/TMP/$PKGHASH
 fi
-
-cd "$WORK_DIR/INSTALLROOT/$PKGHASH"
-echo "$PKGHASH" > "$INSTALLROOT/.build-hash"
-cat <<\EOF | tr \' \" >"$INSTALLROOT/.full-dependencies"
-%(dependenciesJSON)s
-EOF
-
-mkdir -p "$INSTALLROOT/etc/profile.d"
-BIGPKGNAME=`echo "$PKGNAME" | tr [:lower:] [:upper:] | tr - _`
-rm -f "$INSTALLROOT/etc/profile.d/init.sh"
-
-# Init our dependencies
-%(dependenciesInit)s
-
-cat << EOF >> $INSTALLROOT/etc/profile.d/init.sh
-export ${BIGPKGNAME}_ROOT=\${WORK_DIR}/\${ALIBUILD_ARCH_PREFIX}/$PKGNAME/$PKGVERSION-$PKGREVISION
-export ${BIGPKGNAME}_VERSION=$PKGVERSION
-export ${BIGPKGNAME}_REVISION=$PKGREVISION
-export ${BIGPKGNAME}_HASH=$PKGHASH
-export ${BIGPKGNAME}_COMMIT=${COMMIT_HASH}
-EOF
-
-# Add support for direnv https://github.com/direnv/direnv/
-#
-# This is beneficial for all the cases where the build step requires some
-# environment to be properly setup in order to work. e.g. to support ninja or
-# protoc.
-cat << EOF > $BUILDDIR/.envrc
-# Source the build environment which was used for this package
-WORK_DIR=$WORK_DIR source ../../../$PKGPATH/etc/profile.d/init.sh
-source_up
-
-# On mac we build with the proper installation relative RPATH,
-# so this is not actually used and it's actually harmful since
-# startup time is reduced a lot by the extra overhead from the
-# dynamic loader
-unset DYLD_LIBRARY_PATH
-EOF
-
-# Environment
-%(environment)s
 
 cd "$WORK_DIR/INSTALLROOT/$PKGHASH/$PKGPATH"
 # Find which files need relocation.
