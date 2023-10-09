@@ -457,6 +457,13 @@ def doBuild(args, parser):
             ", ".join({x.strip() for x, _ in develPkgsUpper} - set(develPkgs)))
       return 1
 
+  # We must not apply variants to non-development packages (so that the full
+  # package can be downloaded from the remote, for example). Delete the
+  # relevant packages' variants, now that we know the dev packages.
+  for spec in specs.values():
+    if spec["package"] not in develPkgs:
+      spec.pop("variants", None)
+
   if buildOrder:
     banner("Packages will be built in the following order:\n - %s",
            "\n - ".join(x+" (development package)" if x in develPkgs else "%s@%s" % (x, specs[x]["tag"])
@@ -510,6 +517,9 @@ def doBuild(args, parser):
         out = git(("rev-parse", "HEAD"), directory=spec["source"])
         spec["commit_hash"] = out.strip()
         spec["devel_hash"] = spec["commit_hash"] + hash_local_changes(spec["source"])
+        if spec.get("variants", ()):
+          # spec["variants"] is a set, so its order is undefined. Sort it.
+          spec["devel_hash"] += "/" + ",".join(sorted(spec["variants"]))
         out = git(("rev-parse", "--abbrev-ref", "HEAD"), directory=spec["source"])
         if out == "HEAD":
           out = git(("rev-parse", "HEAD"), directory=spec["source"])[:10]
@@ -1058,6 +1068,8 @@ def doBuild(args, parser):
       ("FULL_BUILD_REQUIRES", " ".join(spec["full_build_requires"])),
       ("FULL_REQUIRES", " ".join(spec["full_requires"])),
       ("WRITE_REPO", spec.get("write_repo", source)),
+      # spec["variants"] is a set, so its order is undefined. Sort it.
+      ("ALIBUILD_BUILD_VARIANT", ",".join(sorted(spec.get("variants", ())))),
     ]
     # Add the extra environment as passed from the command line.
     buildEnvironment += [e.partition('=')[::2] for e in args.environment]

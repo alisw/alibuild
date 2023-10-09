@@ -358,12 +358,30 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
   packages = packages[:]
   validDefaults = []  # empty list: all OK; None: no valid default; non-empty list: list of valid ones
   while packages:
-    p = packages.pop(0)
+    # Find requested variants of packages.
+    # We only apply variants to development packages (we always store
+    # requested variants here, but delete them from non-dev packages later).
+    # Variants allow building only a subset of a package (e.g. a specific
+    # CMake target), saving build time.
+    p, has_variants, variants = packages.pop(0).partition("#")
+    variants = {var.strip() for var in variants.split(",") if var}
+
     if p in specs:
+      if not has_variants:
+        # If we now want to build without variants (i.e. the whole package),
+        # wipe out any previously-configured variants for this package.
+        specs[p].pop("variants", None)
+      elif specs[p].get("variants"):
+        # The existing package has variants, and this repetition of it does
+        # too. Merge the variants lists.
+        specs[p]["variants"] |= variants
       continue
+
     lowerPkg = p.lower()
     filename = taps.get(lowerPkg, "%s/%s.sh" % (configDir, lowerPkg))
     err, spec, recipe = parseRecipe(getRecipeReader(filename, configDir))
+    if has_variants and variants:
+      spec["variants"] = variants
     dieOnError(err, err)
     dieOnError(spec["package"].lower() != lowerPkg,
                "%s.sh has different package field: %s" % (p, spec["package"]))
