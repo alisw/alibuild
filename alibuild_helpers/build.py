@@ -275,6 +275,7 @@ def hash_local_changes(directory):
   If there are untracked files, this function returns a unique hash to force a
   rebuild, and logs a warning, as we cannot detect changes to those files.
   """
+  untrackedFilesDirectories = []
   class UntrackedChangesError(Exception):
     """Signal that we cannot detect code changes due to untracked files."""
   h = Hasher()
@@ -291,6 +292,7 @@ def hash_local_changes(directory):
     debug("Command %s returned %d", cmd, err)
     dieOnError(err, "Unable to detect source code changes.")
   except UntrackedChangesError:
+    untrackedFilesDirectories = [directory]
     warning("You have untracked changes in %s, so aliBuild cannot detect "
             "whether it needs to rebuild the package. Therefore, the package "
             "is being rebuilt unconditionally. Please use 'git add' and/or "
@@ -299,7 +301,7 @@ def hash_local_changes(directory):
     # and let CMake figure out what needs to be rebuilt. Force a rebuild by
     # changing the hash to something basically random.
     h(str(time.time()))
-  return h.hexdigest()
+  return (h.hexdigest(), untrackedFilesDirectories)
 
 
 def better_tarball(spec, old, new):
@@ -473,6 +475,10 @@ def doBuild(args, parser):
 
   # Clone/update repos
   update_git_repos(args, specs, buildOrder, develPkgs)
+  # This is the list of packages which have untracked files in their
+  # source directory, and which are rebuilt every time. We will warn
+  # about them at the end of the build.
+  untrackedFilesDirectories = []
 
   # Resolve the tag to the actual commit ref
   for p in buildOrder:
@@ -509,7 +515,9 @@ def doBuild(args, parser):
         # Devel package: we get the commit hash from the checked source, not from remote.
         out = git(("rev-parse", "HEAD"), directory=spec["source"])
         spec["commit_hash"] = out.strip()
-        spec["devel_hash"] = spec["commit_hash"] + hash_local_changes(spec["source"])
+        local_hash, untracked = hash_local_changes(spec["source"])
+        untrackedFilesDirectories.extend(untracked)
+        spec["devel_hash"] = spec["commit_hash"] + local_hash
         out = git(("rev-parse", "--abbrev-ref", "HEAD"), directory=spec["source"])
         if out == "HEAD":
           out = git(("rev-parse", "HEAD"), directory=spec["source"])[:10]
@@ -1153,5 +1161,8 @@ def doBuild(args, parser):
   for x in develPkgs:
     banner("Build directory for devel package %s:\n%s/BUILD/%s-latest%s/%s",
            x, abspath(args.workDir), x, "-"+args.develPrefix if "develPrefix" in args else "", x)
+  for x in untrackedFilesDirectories:
+    banner("Untracked files in the following directories resulted in a rebuild of "
+           "the associated package and its dependencies:\n%s\n\nPlease commit or remove them to avoid useless rebuilds.", "\n".join(untrackedFilesDirectories))
   debug("Everything done")
   return 0
