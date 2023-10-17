@@ -4,6 +4,7 @@ except ImportError:
   from pipes import quote  # Python 2.7
 from alibuild_helpers.cmd import getstatusoutput
 from alibuild_helpers.log import debug
+from alibuild_helpers.scm import SCM
 
 GIT_COMMAND_TIMEOUT_SEC = 120
 """How many seconds to let any git command execute before being terminated."""
@@ -16,6 +17,35 @@ def clone_speedup_options():
     return ["--filter=blob:none"]
   return []
 
+class Git(SCM):
+  name = "Git"
+  def checkedOutCommitName(self, directory):
+    return git(("rev-parse", "HEAD"), directory)
+  def branchOrRef(self, directory):
+    out = git(("rev-parse", "--abbrev-ref", "HEAD"), directory=directory)
+    if out == "HEAD":
+      out = git(("rev-parse", "HEAD"), directory)[:10]
+    return out
+  def exec(self, *args, **kwargs):
+    return git(*args, **kwargs)
+  def parseRefs(self, output):
+    return {
+      git_ref: git_hash for git_hash, sep, git_ref
+      in (line.partition("\t") for line in output.splitlines()) if sep
+    }
+  def listRefsCmd(self):
+    return ["ls-remote", "--heads", "--tags"]
+  def cloneCmd(self, source, referenceRepo, usePartialClone):
+    cmd = ["clone", "--bare", source, referenceRepo]
+    if usePartialClone:
+      cmd.extend(clone_speedup_options())
+    return cmd
+  def fetchCmd(self, source):
+    return ["fetch", "-f", "--tags", source, "+refs/heads/*:refs/heads/*"]
+  def diffCmd(self, directory):
+    return "cd %s && git diff -r HEAD && git status --porcelain" % directory
+  def checkUntracked(self, line):
+    return line.startswith("?? ")
 
 def git(args, directory=".", check=True, prompt=True):
   debug("Executing git %s (in directory %s)", " ".join(args), directory)

@@ -1,4 +1,4 @@
-from alibuild_helpers.git import git
+from alibuild_helpers.git import git, Git
 from alibuild_helpers.utilities import getPackageList, parseDefaults, readDefaults, validateDefaults
 from alibuild_helpers.log import debug, error, warning, banner, info
 from alibuild_helpers.log import dieOnError
@@ -66,6 +66,7 @@ def doInit(args):
 
   for p in pkgs:
     spec = specs.get(p["name"])
+    spec["scm"] = Git()
     dieOnError(spec is None, "cannot find recipe for package %s" % p["name"])
     dest = join(args.develPrefix, spec["package"])
     writeRepo = spec.get("write_repo", spec.get("source"))
