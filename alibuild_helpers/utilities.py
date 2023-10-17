@@ -7,6 +7,8 @@ from os.path import basename, join
 import sys
 import os
 import re
+import platform
+
 from datetime import datetime
 try:
   from collections import OrderedDict
@@ -135,7 +137,6 @@ def doDetectArch(hasOsRelease, osReleaseLines, platformTuple, platformSystem, pl
   if platformSystem == "Darwin":
     processor = platformProcessor
     if not processor:
-      import platform
       if platform.machine() == "x86_64":
         processor = "x86-64"
       else:
@@ -194,7 +195,6 @@ def detectArch():
     osReleaseLines = []
     hasOsRelease = False
   try:
-    import platform
     if platform.system() == "Darwin":
       if platform.machine() == "x86_64":
         return "osx_x86-64"
@@ -203,7 +203,7 @@ def detectArch():
   except:
     pass
   try:
-    import platform, distro
+    import distro
     platformTuple = distro.linux_distribution()
     platformSystem = platform.system()
     platformProcessor = platform.processor()
