@@ -133,11 +133,14 @@ def format(s, **kwds):
 
 def doDetectArch(hasOsRelease, osReleaseLines, platformTuple, platformSystem, platformProcessor):
   if platformSystem == "Darwin":
-    import platform
-    if platform.machine() == "x86_64":
-      return "osx_x86-64"
-    else:
-      return "osx_arm64"
+    processor = platformProcessor
+    if not processor:
+      import platform
+      if platform.machine() == "x86_64":
+        processor = "x86-64"
+      else:
+        processor = "arm64"
+    return "osx_%s" % processor.replace("_", "-")
   distribution, version, flavour = platformTuple
   distribution = distribution.lower()
   # If platform.dist does not return something sensible,
