@@ -63,6 +63,47 @@ jobs:
         with:
           files: coverage.json
 
+  mac-unittest:
+    name: python${{ matrix.python-version }}
+    runs-on: macos-latest
+
+    strategy:
+      matrix:
+        python-version:
+          - '3.11'
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install test dependencies
+        run: |
+          brew install modules alisw/system-deps/o2-full-deps
+          python3 -m pip install --upgrade tox tox-gh-actions coverage
+
+      - name: Run tests
+        run: tox -e darwin
+
+      - name: Convert coverage information
+        if: ${{ always() && github.event.repository.owner.login == 'alisw' }}
+        run: |
+          coverage combine .tox/coverage.*
+          # Codecov only understands XML, JSON and LCOV files.
+          # Apparently, patching os.readlink in unit tests interferes with
+          # finding some source files, but our source shouldn't be affected, so
+          # ignore these errors.
+          coverage json --ignore-errors -o coverage.json
+
+      - name: Upload coverage information
+        if: ${{ always() && github.event.repository.owner.login == 'alisw' }}
+        uses: codecov/codecov-action@v3
+        with:
+          files: coverage.json
+
   lint:
     name: lint
     runs-on: ubuntu-latest
