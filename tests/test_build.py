@@ -180,6 +180,7 @@ def dummy_exists(x):
         return False
     return {
         "/alidist": True,
+        "/alidist/.git": True,
         "/sw": True,
         "/sw/SPECS": False,
         "/sw/MIRROR/root": True,
@@ -196,10 +197,8 @@ def dummy_exists(x):
 class BuildTestCase(unittest.TestCase):
     @patch("alibuild_helpers.analytics", new=MagicMock())
     @patch("requests.Session.get", new=MagicMock())
-    @patch("alibuild_helpers.build.git", new=dummy_git)
-    @patch("alibuild_helpers.workarea.git")
-    @patch("alibuild_helpers.build.execute", new=dummy_execute)
     @patch("alibuild_helpers.sync.execute", new=dummy_execute)
+    @patch("alibuild_helpers.git.git")
     @patch("alibuild_helpers.build.getstatusoutput", new=dummy_getstatusoutput)
     @patch("alibuild_helpers.build.exists", new=MagicMock(side_effect=dummy_exists))
     @patch("os.path.exists", new=MagicMock(side_effect=dummy_exists))
@@ -225,8 +224,8 @@ class BuildTestCase(unittest.TestCase):
     @patch("alibuild_helpers.workarea.is_writeable", new=MagicMock(return_value=True))
     @patch("alibuild_helpers.build.basename", new=MagicMock(return_value="aliBuild"))
     @patch("alibuild_helpers.build.install_wrapper_script", new=MagicMock())
-    def test_coverDoBuild(self, mock_debug, mock_glob, mock_sys, mock_workarea_git):
-        mock_workarea_git.side_effect = dummy_git
+    def test_coverDoBuild(self, mock_debug, mock_glob, mock_sys, mock_git_git):
+        mock_git_git.side_effect = dummy_git
         mock_debug.side_effect = lambda *args: None
         mock_glob.side_effect = lambda x: {
             "*": ["zlib"],
@@ -277,20 +276,21 @@ class BuildTestCase(unittest.TestCase):
             call(list(clone_args), directory=clone_dir, check=clone_check, prompt=False),
             call(["ls-remote", "--heads", "--tags", args.referenceSources + "/zlib"],
                  directory=".", check=False, prompt=False),
+            call(["clone", "--bare", "https://github.com/star-externals/zlib", "/sw/MIRROR/zlib", "--filter=blob:none"]),
             call(["ls-remote", "--heads", "--tags", args.referenceSources + "/root"],
                  directory=".", check=False, prompt=False),
         ]
 
-        mock_workarea_git.reset_mock()
+        mock_git_git.reset_mock()
         mock_debug.reset_mock()
         exit_code = doBuild(args, mock_parser)
         self.assertEqual(exit_code, 0)
         mock_debug.assert_called_with("Everything done")
-        self.assertEqual(mock_workarea_git.call_count, len(common_calls))
-        mock_workarea_git.has_calls(common_calls)
+        self.assertEqual(mock_git_git.call_count, len(common_calls))
+        mock_git_git.has_calls(common_calls)
 
         # Force fetching repos
-        mock_workarea_git.reset_mock()
+        mock_git_git.reset_mock()
         mock_debug.reset_mock()
         args.fetchRepos = True
         exit_code = doBuild(args, mock_parser)
@@ -299,8 +299,8 @@ class BuildTestCase(unittest.TestCase):
         mock_glob.assert_called_with("/sw/TARS/osx_x86-64/ROOT/ROOT-v6-08-30-*.osx_x86-64.tar.gz")
         # We can't compare directly against the list of calls here as they
         # might happen in any order.
-        self.assertEqual(mock_workarea_git.call_count, len(common_calls) + 1)
-        mock_workarea_git.has_calls(common_calls + [
+        self.assertEqual(mock_git_git.call_count, len(common_calls) + 1)
+        mock_git_git.has_calls(common_calls + [
             call(fetch_args, directory=fetch_dir, check=fetch_check),
         ])
 
@@ -323,13 +323,13 @@ class BuildTestCase(unittest.TestCase):
                            (root, TEST_ROOT_GIT_REFS),
                            (extra, TEST_EXTRA_GIT_REFS)):
             spec.setdefault("requires", []).append(default["package"])
-            spec["git_refs"] = {ref: hash for hash, _, ref in (
+            spec["scm_refs"] = {ref: hash for hash, _, ref in (
                 line.partition("\t") for line in refs.splitlines()
             )}
             try:
-                spec["commit_hash"] = spec["git_refs"]["refs/tags/" + spec["tag"]]
+                spec["commit_hash"] = spec["scm_refs"]["refs/tags/" + spec["tag"]]
             except KeyError:
-                spec["commit_hash"] = spec["git_refs"]["refs/heads/" + spec["tag"]]
+                spec["commit_hash"] = spec["scm_refs"]["refs/heads/" + spec["tag"]]
         specs = {pkg["package"]: pkg for pkg in (default, zlib, root, extra)}
 
         storeHashes("defaults-release", specs, isDevelPkg=False, considerRelocation=False)

@@ -13,11 +13,11 @@ from alibuild_helpers.utilities import validateDefaults
 from alibuild_helpers.utilities import Hasher
 from alibuild_helpers.utilities import yamlDump
 from alibuild_helpers.utilities import resolve_tag, resolve_version
-from alibuild_helpers.git import git, clone_speedup_options
+from alibuild_helpers.git import git, clone_speedup_options, Git
 from alibuild_helpers.sync import (NoRemoteSync, HttpRemoteSync, S3RemoteSync,
                                    Boto3RemoteSync, RsyncRemoteSync)
 import yaml
-from alibuild_helpers.workarea import cleanup_git_log, logged_git, updateReferenceRepoSpec
+from alibuild_helpers.workarea import cleanup_git_log, logged_scm, updateReferenceRepoSpec
 from alibuild_helpers.log import logger_handler, LogFormatter, ProgressPrint
 from datetime import datetime
 from glob import glob
@@ -61,13 +61,15 @@ def update_git_repos(args, specs, buildOrder, develPkgs):
     """
 
     def update_repo(package, git_prompt):
+        specs[package]["scm"] = Git()
         updateReferenceRepoSpec(args.referenceSources, package, specs[package],
                                 fetch=args.fetchRepos,
                                 usePartialClone=not args.docker,
                                 allowGitPrompt=git_prompt)
 
         # Retrieve git heads
-        cmd = ["ls-remote", "--heads", "--tags"]
+        scm = specs[package]["scm"]
+        cmd = scm.listRefsCmd()
         if package in develPkgs:
             specs[package]["source"] = \
                 os.path.join(os.getcwd(), specs[package]["package"])
@@ -75,12 +77,9 @@ def update_git_repos(args, specs, buildOrder, develPkgs):
         else:
             cmd.append(specs[package].get("reference", specs[package]["source"]))
 
-        output = logged_git(package, args.referenceSources,
+        output = logged_scm(scm, package, args.referenceSources,
                             cmd, ".", prompt=git_prompt, logOutput=False)
-        specs[package]["git_refs"] = {
-            git_ref: git_hash for git_hash, sep, git_ref
-            in (line.partition("\t") for line in output.splitlines()) if sep
-        }
+        specs[package]["scm_refs"] = scm.parseRefs(output)
 
     requires_auth = set()
     with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
@@ -102,7 +101,7 @@ def update_git_repos(args, specs, buildOrder, develPkgs):
                                    (futurePackage, exc))
             else:
                 debug("%r package updated: %d refs found", futurePackage,
-                      len(specs[futurePackage]["git_refs"]))
+                      len(specs[futurePackage]["scm_refs"]))
 
     # Now execute git commands for private packages one-by-one, so the user can
     # type their username and password without multiple prompts interfering.
@@ -114,7 +113,7 @@ def update_git_repos(args, specs, buildOrder, develPkgs):
                specs[package]["source"])
         update_repo(package, git_prompt=True)
         debug("%r package updated: %d refs found", package,
-              len(specs[package]["git_refs"]))
+              len(specs[package]["scm_refs"]))
 
 
 # Creates a directory in the store which contains symlinks to the package
@@ -191,7 +190,7 @@ def storeHashes(package, specs, isDevelPkg, considerRelocation):
   h_default(spec["commit_hash"])
   try:
     # If spec["commit_hash"] is a tag, get the actual git commit hash.
-    real_commit_hash = spec["git_refs"]["refs/tags/" + spec["commit_hash"]]
+    real_commit_hash = spec["scm_refs"]["refs/tags/" + spec["commit_hash"]]
   except KeyError:
     # If it's not a tag, assume it's an actual commit hash.
     real_commit_hash = spec["commit_hash"]
@@ -202,7 +201,7 @@ def storeHashes(package, specs, isDevelPkg, considerRelocation):
   h_real_commit(real_commit_hash)
   h_alternatives = [(spec.get("tag", "0"), spec["commit_hash"], h_default),
                     (spec.get("tag", "0"), real_commit_hash, h_real_commit)]
-  for ref, git_hash in spec.get("git_refs", {}).items():
+  for ref, git_hash in spec.get("scm_refs", {}).items():
     if ref.startswith("refs/tags/") and git_hash == real_commit_hash:
       tag_name = ref[len("refs/tags/"):]
       debug("Tag %s also points to %s, storing alternative",
@@ -269,12 +268,14 @@ def storeHashes(package, specs, isDevelPkg, considerRelocation):
     list({h.hexdigest() for _, _, h, in h_alternatives} - {spec["local_revision_hash"]})
 
 
-def hash_local_changes(directory):
+def hash_local_changes(spec):
   """Produce a hash of all local changes in the given git repo.
 
   If there are untracked files, this function returns a unique hash to force a
   rebuild, and logs a warning, as we cannot detect changes to those files.
   """
+  directory = spec["source"]
+  scm = spec["scm"]
   untrackedFilesDirectories = []
   class UntrackedChangesError(Exception):
     """Signal that we cannot detect code changes due to untracked files."""
@@ -283,10 +284,10 @@ def hash_local_changes(directory):
     lines = msg % args
     # `git status --porcelain` indicates untracked files using "??".
     # Lines from `git diff` never start with "??".
-    if any(line.startswith("?? ") for line in lines.split("\n")):
+    if any(scm.checkUntracked(line) for line in lines.split("\n")):
       raise UntrackedChangesError()
     h(lines)
-  cmd = "cd %s && git diff -r HEAD && git status --porcelain" % directory
+  cmd = scm.diffCmd(directory)
   try:
     err = execute(cmd, hash_output)
     debug("Command %s returned %d", cmd, err)
@@ -363,7 +364,10 @@ def doBuild(args, parser):
   if not exists(specDir):
     makedirs(specDir)
 
-  os.environ["ALIBUILD_ALIDIST_HASH"] = git(("rev-parse", "HEAD"), directory=args.configDir)
+  # By default Git is our SCM, so we find the commit hash of alidist
+  # using it.
+  scm = Git()
+  os.environ["ALIBUILD_ALIDIST_HASH"] = scm.checkedOutCommitName(directory=args.configDir)
 
   debug("Building for architecture %s", args.architecture)
   debug("Number of parallel builds: %d", args.jobs)
@@ -504,23 +508,21 @@ def doBuild(args, parser):
       # the commit_hash. If it's not a branch, it must be a tag or a raw commit
       # hash, so we use it directly. Finally if the package is a development
       # one, we use the name of the branch as commit_hash.
-      assert "git_refs" in spec
+      assert "scm_refs" in spec
       try:
-        spec["commit_hash"] = spec["git_refs"]["refs/heads/" + spec["tag"]]
+        spec["commit_hash"] = spec["scm_refs"]["refs/heads/" + spec["tag"]]
       except KeyError:
         spec["commit_hash"] = spec["tag"]
       # We are in development mode, we need to rebuild if the commit hash is
       # different or if there are extra changes on top.
       if spec["package"] in develPkgs:
         # Devel package: we get the commit hash from the checked source, not from remote.
-        out = git(("rev-parse", "HEAD"), directory=spec["source"])
+        out = spec["scm"].checkedOutCommitName(directory=spec["source"])
         spec["commit_hash"] = out.strip()
-        local_hash, untracked = hash_local_changes(spec["source"])
+        local_hash, untracked = hash_local_changes(spec)
         untrackedFilesDirectories.extend(untracked)
         spec["devel_hash"] = spec["commit_hash"] + local_hash
-        out = git(("rev-parse", "--abbrev-ref", "HEAD"), directory=spec["source"])
-        if out == "HEAD":
-          out = git(("rev-parse", "HEAD"), directory=spec["source"])[:10]
+        out = spec["scm"].branchOrRef(directory=spec["source"])
         develPackageBranch = out.replace("/", "-")
         spec["tag"] = args.develPrefix if "develPrefix" in args else develPackageBranch
         spec["commit_hash"] = "0"

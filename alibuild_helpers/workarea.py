@@ -9,7 +9,7 @@ except ImportError:
   from ordereddict import OrderedDict
 
 from alibuild_helpers.log import dieOnError, debug, info, error
-from alibuild_helpers.git import git, clone_speedup_options
+from alibuild_helpers.git import clone_speedup_options
 
 FETCH_LOG_NAME = "fetch-log.txt"
 
@@ -29,32 +29,32 @@ def cleanup_git_log(referenceSources):
                "Could not delete stale git log: %s" % exc)
 
 
-def logged_git(package, referenceSources,
+def logged_scm(scm, package, referenceSources,
                command, directory, prompt, logOutput=True):
-  """Run a git command, but produce an output file if it fails.
+  """Run an SCM command, but produce an output file if it fails.
 
-  This is useful in CI, so that we can pick up git failures and show them in
+  This is useful in CI, so that we can pick up SCM failures and show them in
   the final produced log. For this reason, the file we write in this function
-  must not contain any secrets. We only output the git command we ran, its exit
+  must not contain any secrets. We only output the SCM command we ran, its exit
   code, and the package name, so this should be safe.
   """
   # This might take a long time, so show the user what's going on.
-  info("Git %s for repository for %s...", command[0], package)
-  err, output = git(command, directory=directory, check=False, prompt=prompt)
+  info("%s %s for repository for %s...", scm.name, command[0], package)
+  err, output = scm.exec(command, directory=directory, check=False, prompt=prompt)
   if logOutput:
     debug(output)
   if err:
     try:
       with codecs.open(os.path.join(referenceSources, FETCH_LOG_NAME),
                        "a", encoding="utf-8", errors="replace") as logf:
-        logf.write("Git command for package %r failed.\n"
-                   "Command: git %s\nIn directory: %s\nExit code: %d\n" %
-                   (package, " ".join(command), directory, err))
+        logf.write("%s command for package %r failed.\n"
+                   "Command: %s %s\nIn directory: %s\nExit code: %d\n" %
+                   (scm.name, package, scm.name.lower(), " ".join(command), directory, err))
     except OSError as exc:
-      error("Could not write error log from git command:", exc_info=exc)
-  dieOnError(err, "Error during git %s for reference repo for %s." %
-             (command[0], package))
-  info("Done git %s for repository for %s", command[0], package)
+      error("Could not write error log from SCM command:", exc_info=exc)
+  dieOnError(err, "Error during %s %s for reference repo for %s." %
+             (scm.name.lower(), command[0], package))
+  info("Done %s %s for repository for %s", scm.name.lower(), command[0], package)
   return output
 
 
@@ -97,6 +97,8 @@ def updateReferenceRepo(referenceSources, p, spec,
   if "source" not in spec:
     return
 
+  scm = spec["scm"]
+
   debug("Updating references.")
   referenceRepo = os.path.join(os.path.abspath(referenceSources), p.lower())
 
@@ -114,14 +116,11 @@ def updateReferenceRepo(referenceSources, p, spec,
       return None  # no reference can be found and created (not fatal)
 
   if not os.path.exists(referenceRepo):
-    cmd = ["clone", "--bare", spec["source"], referenceRepo]
-    if usePartialClone:
-      cmd.extend(clone_speedup_options())
-    logged_git(p, referenceSources, cmd, ".", allowGitPrompt)
+    cmd = scm.cloneCmd(spec["source"], referenceRepo, usePartialClone)
+    logged_scm(scm, p, referenceSources, cmd, ".", allowGitPrompt)
   elif fetch:
-    logged_git(p, referenceSources, (
-      "fetch", "-f", "--tags", spec["source"], "+refs/heads/*:refs/heads/*",
-    ), referenceRepo, allowGitPrompt)
+    cmd = scm.fetchCmd(spec["source"])
+    logged_scm(scm, p, referenceSources, cmd, referenceRepo, allowGitPrompt)
 
   return referenceRepo  # reference is read-write
 

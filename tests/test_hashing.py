@@ -58,7 +58,7 @@ class KnownGoodHashesTestCase(unittest.TestCase):
                 self.assertEqual(spec["remote_revision_hash"], remote)
                 self.assertEqual(spec["local_revision_hash"], local)
                 # For logs produced by old hash implementations (which didn't
-                # consider spec["git_refs"]), alt_{remote,local} will only
+                # consider spec["scm_refs"]), alt_{remote,local} will only
                 # contain the primary hash anyway, so this works nicely.
                 self.assertEqual(spec["remote_hashes"], alt_remote.split(", "))
                 self.assertEqual(spec["local_hashes"], alt_local.split(", "))
