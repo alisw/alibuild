@@ -331,7 +331,7 @@ def doParseArgs():
   args = finaliseArgs(parser.parse_args(), parser)
   return (args, parser)
 
-VALID_ARCHS_RE = "^slc[5-9]_(x86-64|ppc64|aarch64)$|^(rhel|ubuntu|ubt|osx|fedora)[0-9]*_(x86-64|arm64)$"
+VALID_ARCHS_RE = "^slc[5-9]_(x86-64|ppc64|aarch64)$|^(ubuntu|ubt|osx|fedora)[0-9]*_(x86-64|arm64)$"
 
 def matchValidArch(architecture):
   return bool(re.match(VALID_ARCHS_RE, architecture))
