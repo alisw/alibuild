@@ -170,7 +170,7 @@ def doDetectArch(hasOsRelease, osReleaseLines, platformTuple, platformSystem, pl
     if version in debian_ubuntu:
       distribution = "ubuntu"
       version = debian_ubuntu[version]
-  elif distribution in ["redhat", "centos", "almalinux", "rockylinux"]:
+  elif distribution in ["redhat", "red hat enterprise linux", "centos", "almalinux", "rockylinux"]:
     distribution = "slc"
 
   processor = platformProcessor
