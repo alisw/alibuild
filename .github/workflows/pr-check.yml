@@ -82,7 +82,7 @@ jobs:
 
       - name: Install test dependencies
         run: |
-          brew install modules alisw/system-deps/o2-full-deps
+          brew install modules alisw/system-deps/o2-full-deps sapling
           python3 -m pip install --upgrade tox tox-gh-actions coverage
 
       - name: Run tests
