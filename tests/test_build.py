@@ -181,6 +181,7 @@ def dummy_exists(x):
     return {
         "/alidist": True,
         "/alidist/.git": True,
+        "/alidist/.sl": False,
         "/sw": True,
         "/sw/SPECS": False,
         "/sw/MIRROR/root": True,
