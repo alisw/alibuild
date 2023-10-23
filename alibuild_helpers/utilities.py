@@ -7,6 +7,8 @@ from os.path import basename, join
 import sys
 import os
 import re
+import platform
+
 from datetime import datetime
 try:
   from collections import OrderedDict
@@ -27,6 +29,10 @@ class SpecError(Exception):
 
 asList = lambda x : x if type(x) == list else [x]
 
+# This function is only needed to check the coverage of the testsuite
+# is really happening and we did not made a mistake in tox.ini
+def check_coverage():
+  return True
 
 def resolve_store_path(architecture, spec_hash):
   """Return the path where a tarball with the given hash is to be stored.
@@ -133,11 +139,13 @@ def format(s, **kwds):
 
 def doDetectArch(hasOsRelease, osReleaseLines, platformTuple, platformSystem, platformProcessor):
   if platformSystem == "Darwin":
-    import platform
-    if platform.machine() == "x86_64":
-      return "osx_x86-64"
-    else:
-      return "osx_arm64"
+    processor = platformProcessor
+    if not processor:
+      if platform.machine() == "x86_64":
+        processor = "x86-64"
+      else:
+        processor = "arm64"
+    return "osx_%s" % processor.replace("_", "-")
   distribution, version, flavour = platformTuple
   distribution = distribution.lower()
   # If platform.dist does not return something sensible,
@@ -162,7 +170,7 @@ def doDetectArch(hasOsRelease, osReleaseLines, platformTuple, platformSystem, pl
     if version in debian_ubuntu:
       distribution = "ubuntu"
       version = debian_ubuntu[version]
-  elif distribution in ["redhat", "centos", "almalinux", "rockylinux"]:
+  elif distribution in ["redhat", "red hat enterprise linux", "centos", "almalinux", "rockylinux"]:
     distribution = "slc"
 
   processor = platformProcessor
@@ -191,7 +199,6 @@ def detectArch():
     osReleaseLines = []
     hasOsRelease = False
   try:
-    import platform
     if platform.system() == "Darwin":
       if platform.machine() == "x86_64":
         return "osx_x86-64"
@@ -200,7 +207,7 @@ def detectArch():
   except:
     pass
   try:
-    import platform, distro
+    import distro
     platformTuple = distro.linux_distribution()
     platformSystem = platform.system()
     platformProcessor = platform.processor()

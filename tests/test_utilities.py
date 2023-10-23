@@ -115,6 +115,7 @@ BUG_REPORT_URL="https://bugs.sabayon.org/"
 
 architecturePayloads = [
   ['osx_x86-64', False, [], ('','',''), 'Darwin', 'x86-64'],
+  ['osx_arm64', False, [], ('','',''), 'Darwin', 'arm64'],
   ['slc5_x86-64', False, [], ('redhat', '5.XX', 'Boron'), 'Linux', 'x86-64'],
   ['slc6_x86-64', False, [], ('centos', '6.X', 'Carbon'), 'Linux', 'x86-64'],
   ['slc7_x86-64', False, [], ('centos', '7.X', 'Ptor'), 'Linux', 'x86-64'],
@@ -131,11 +132,23 @@ architecturePayloads = [
   ['sabayon2_x86-64', True, SABAYON2_OS_RELEASE.split("\n"), ('gentoo', '2.2', ''), 'Linux', 'x86_64']
 ]
 
+macOSArchitecturePayloads = [
+  ['osx_x86-64', False, [], ('','',''), 'Darwin', 'x86_64'],
+  ['osx_arm64', False, [], ('','',''), 'Darwin', 'arm64'],
+]
+
 class TestUtilities(unittest.TestCase):
   def test_osx(self):
     for payload in architecturePayloads:
       result, hasOsRelease, osReleaseLines, platformTuple, platformSystem, platformProcessor = payload
       self.assertEqual(result, doDetectArch(hasOsRelease, osReleaseLines, platformTuple, platformSystem, platformProcessor))
+  # Test by mocking platform.processor
+  def test_osx_mock(self):
+    for payload in macOSArchitecturePayloads:
+      result, hasOsRelease, osReleaseLines, platformTuple, platformSystem, platformProcessor = payload
+      with patch('platform.machine', return_value=platformProcessor):
+        platformProcessor = None
+        self.assertEqual(result, doDetectArch(hasOsRelease, osReleaseLines, platformTuple, platformSystem, None))
   def test_Hasher(self):
     h = Hasher()
     h("foo")

@@ -43,5 +43,5 @@ class GitWrapperTestCase(unittest.TestCase):
     def test_git_private_repo(self):
         """Check we get the right exception when credentials are required."""
         self.assertRaises(RuntimeError, git, (
-            "ls-remote", "-ht", PRIVATE_REPO,
+            "-c", "credential.helper=", "ls-remote", "-ht", PRIVATE_REPO,
         ), prompt=False)
