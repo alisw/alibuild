@@ -335,7 +335,6 @@ def doBuild(args, parser):
     syncHelper = NoRemoteSync()
 
   packages = args.pkgname
-  dockerImage = args.dockerImage if "dockerImage" in args else None
   specs = {}
   buildOrder = []
   workDir = abspath(args.workDir)
@@ -376,7 +375,7 @@ def doBuild(args, parser):
 
   install_wrapper_script("git", workDir)
 
-  with DockerRunner(dockerImage, ["--network=host"]) as getstatusoutput_docker:
+  with DockerRunner(args.dockerImage, args.docker_extra_args) as getstatusoutput_docker:
     my_gzip = "pigz" if getstatusoutput_docker("which pigz")[0] == 0 else "gzip"
     my_tar = ("tar --ignore-failed-read"
               if getstatusoutput_docker("tar --ignore-failed-read -cvvf "
@@ -1082,10 +1081,10 @@ def doBuild(args, parser):
         "{mirrorVolume} {develVolumes} {additionalEnv} {additionalVolumes} "
         "{overrideSource} {extraArgs} {image} bash -ex /build.sh"
       ).format(
-        image=quote(dockerImage),
+        image=quote(args.dockerImage),
         workdir=quote(abspath(args.workDir)),
         scriptDir=quote(scriptDir),
-        extraArgs=args.docker_extra_args if "docker_extra_args" in args else "",
+        extraArgs=" ".join(map(quote, args.docker_extra_args)),
         overrideSource="-e SOURCE0_DIR_OVERRIDE=/" if source.startswith("/") else "",
         additionalEnv=" ".join(
           "-e {}={}".format(var, quote(value)) for var, value in buildEnvironment),

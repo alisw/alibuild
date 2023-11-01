@@ -61,6 +61,8 @@ class DepsTestCase(unittest.TestCase):
                          configDir="/dist",
                          debug=False,
                          docker=False,
+                         dockerImage=None,
+                         docker_extra_args=["--network=host"],
                          preferSystem=[],
                          noSystem=True,
                          architecture="slc7_x86-64",

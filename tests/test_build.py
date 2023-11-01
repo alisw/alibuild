@@ -248,6 +248,8 @@ class BuildTestCase(unittest.TestCase):
             writeStore="",
             referenceSources="/sw/MIRROR",
             docker=False,
+            dockerImage=None,
+            docker_extra_args=["--network=host"],
             architecture="osx_x86-64",
             workDir="/sw",
             pkgname=["root"],
