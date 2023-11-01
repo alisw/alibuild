@@ -107,11 +107,6 @@ def doDoctor(args, parser):
   if err:
     homebrew_replacement = "brew() { true; }; "
 
-
-  dockerImage = args.dockerImage if "dockerImage" in args else ""
-  if args.docker and not dockerImage:
-    dockerImage = "registry.cern.ch/alisw/%s-builder" % args.architecture.split("_")[0]
-
   logger.setLevel(logging.BANNER)
   if args.debug:
     logger.setLevel(logging.DEBUG)
@@ -141,7 +136,7 @@ def doDoctor(args, parser):
       error("%s", msg)
     return (ok,msg,valid)
 
-  with DockerRunner(dockerImage, ["--network=host"]) as getstatusoutput_docker:
+  with DockerRunner(args.dockerImage, args.docker_extra_args) as getstatusoutput_docker:
     fromSystem, own, failed, validDefaults = \
       getPackageList(packages                = packages,
                      specs                   = specs,

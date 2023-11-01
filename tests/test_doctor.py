@@ -83,6 +83,8 @@ class DoctorTestCase(unittest.TestCase):
     args = Namespace(workDir="/work",
                      configDir="/dist",
                      docker=False,
+                     dockerImage=None,
+                     docker_extra_args=["--network=host"],
                      debug=False,
                      preferSystem=[],
                      noSystem=False,

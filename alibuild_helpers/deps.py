@@ -13,16 +13,11 @@ def doDeps(args, parser):
   if not args.outgraph:
     parser.error("Specify a PDF output file with --outgraph")
 
-  # In case we are using Docker
-  dockerImage = args.dockerImage if "dockerImage" in args else ""
-  if args.docker and not dockerImage:
-    dockerImage = "registry.cern.ch/alisw/%s-builder" % args.architecture.split("_")[0]
-
   # Resolve all the package parsing boilerplate
   specs = {}
   defaultsReader = lambda: readDefaults(args.configDir, args.defaults, parser.error, args.architecture)
   (err, overrides, taps) = parseDefaults(args.disable, defaultsReader, debug)
-  with DockerRunner(dockerImage, ["--network=host"]) as getstatusoutput_docker:
+  with DockerRunner(args.dockerImage, args.docker_extra_args) as getstatusoutput_docker:
     systemPackages, ownPackages, failed, validDefaults = \
       getPackageList(packages                = [args.package],
                      specs                   = specs,

@@ -6,6 +6,7 @@ import multiprocessing
 
 import re
 import os
+import shlex
 
 try:
   import commands
@@ -113,7 +114,7 @@ def doParseArgs():
   """)
   build_docker.add_argument("--docker", dest="docker", action="store_true",
                             help="Build inside a Docker container.")
-  build_docker.add_argument("--docker-image", dest="dockerImage", metavar="IMAGE", default=argparse.SUPPRESS,
+  build_docker.add_argument("--docker-image", dest="dockerImage", metavar="IMAGE", default=None,
                             help=("The Docker image to build inside of. Implies --docker. "
                                   "By default, an image is chosen based on the architecture."))
   build_docker.add_argument("--docker-extra-args", metavar="ARGLIST", default="",
@@ -217,7 +218,7 @@ def doParseArgs():
   """)
   deps_docker.add_argument("--docker", dest="docker", action="store_true",
                            help="Check for available system packages inside a Docker container.")
-  deps_docker.add_argument("--docker-image", dest="dockerImage", metavar="IMAGE",
+  deps_docker.add_argument("--docker-image", dest="dockerImage", metavar="IMAGE", default=None,
                            help=("The Docker image to use. Implies --docker. By default, an image "
                                  "is chosen based on the current or selected architecture."))
   deps_docker.add_argument("--docker-extra-args", default="", metavar="ARGLIST",
@@ -263,9 +264,13 @@ def doParseArgs():
   """)
   doctor_docker.add_argument("--docker", dest="docker", action="store_true",
                              help="Check for available system packages inside a Docker container.")
-  doctor_docker.add_argument("--docker-image", dest="dockerImage", metavar="IMAGE",
+  doctor_docker.add_argument("--docker-image", dest="dockerImage", metavar="IMAGE", default=None,
                              help=("The Docker image to use. Implies --docker. By default, an image "
                                    "is chosen based on the current or selected architecture."))
+  doctor_docker.add_argument("--docker-extra-args", metavar="ARGLIST", default="",
+                             help=("Command-line arguments to pass to 'docker run'. "
+                                   "Passed through verbatim -- separate multiple arguments "
+                                   "with spaces, and make sure quoting is correct! Implies --docker."))
 
   doctor_dirs = doctor_parser.add_argument_group(title="Customise aliBuild directories")
   doctor_dirs.add_argument("-C", "--chdir", metavar="DIR", dest="chdir", default=DEFAULT_CHDIR,
@@ -386,6 +391,25 @@ def finaliseArgs(args, parser):
     # stale git logs from previous invocations.
     cleanup_git_log(args.referenceSources)
 
+  if args.action in ("build", "doctor", "deps"):
+    if args.dockerImage or args.docker_extra_args:
+      args.docker = True
+
+    args.docker_extra_args = shlex.split(args.docker_extra_args)
+    args.docker_extra_args.append("--network=host")
+
+    if args.docker and args.architecture.startswith("osx"):
+      parser.error("cannot use `-a %s` and --docker" % args.architecture)
+
+    if args.docker and commands.getstatusoutput("which docker")[0]:
+      parser.error("cannot use --docker as docker executable is not found")
+
+    # If specified, used the docker image requested, otherwise, if running
+    # in docker the docker image is given by the first part of the
+    # architecture we want to build for.
+    if args.docker and not args.dockerImage:
+      args.dockerImage = "registry.cern.ch/alisw/%s-builder" % args.architecture.split("_")[0]
+
   if args.action == "build":
     args.configDir = args.configDir
 
@@ -400,21 +424,6 @@ def finaliseArgs(args, parser):
     if args.remoteStore or args.writeStore:
       args.noSystem = True
 
-    if "dockerImage" in args or args.docker_extra_args:
-      args.docker = True
-
-    if args.docker and args.architecture.startswith("osx"):
-      parser.error("cannot use `-a %s` and --docker" % args.architecture)
-
-    if args.docker and commands.getstatusoutput("which docker")[0]:
-      parser.error("cannot use --docker as docker executable is not found")
-
-    # If specified, used the docker image requested, otherwise, if running
-    # in docker the docker image is given by the first part of the
-    # architecture we want to build for.
-    if args.docker and not "dockerImage" in args:
-      args.dockerImage = "registry.cern.ch/alisw/%s-builder" % args.architecture.split("_")[0]
-
     if args.remoteStore.endswith("::rw") and args.writeStore:
       parser.error("cannot specify ::rw and --write-store at the same time")
 
@@ -428,7 +437,7 @@ def finaliseArgs(args, parser):
         args.develPrefix = basename(abspath(args.chdir))
       else:
         args.develPrefix = basename(dirname(abspath(args.configDir)))
-    if "dockerImage" in args:
+    if getattr(args, "docker", False):
       args.develPrefix = "%s-%s" % (args.develPrefix, args.architecture) if "develPrefix" in args else args.architecture
 
   if args.action == "init":
