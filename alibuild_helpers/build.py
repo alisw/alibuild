@@ -174,15 +174,8 @@ def storeHashes(package, specs, isDevelPkg, considerRelocation):
   if spec.get("force_rebuild", False):
     h_all(str(time.time()))
 
-  def hash_data_for_key(key):
-    if sys.version_info[0] < 3 and key in spec and isinstance(spec[key], OrderedDict):
-      # Python 2: use YAML dict order to prevent changing hashes
-      return str(yaml.safe_load(yamlDump(spec[key])))
-    else:
-      return str(spec.get(key, "none"))
-
-  for x in ("recipe", "version", "package"):
-    h_all(hash_data_for_key(x))
+  for key in ("recipe", "version", "package"):
+    h_all(spec.get(key, "none"))
 
   # commit_hash could be a commit hash (if we're not building a tag, but
   # instead e.g. a branch or particular commit specified by its hash), or it
@@ -221,8 +214,29 @@ def storeHashes(package, specs, isDevelPkg, considerRelocation):
     for _, _, hasher in h_alternatives:
       hasher(data)
 
-  for x in ("env", "append_path", "prepend_path"):
-    h_all(hash_data_for_key(x))
+  for key in ("env", "append_path", "prepend_path"):
+    if sys.version_info[0] < 3 and key in spec and isinstance(spec[key], OrderedDict):
+      # Python 2: use YAML dict order to prevent changing hashes
+      h_all(str(yaml.safe_load(yamlDump(spec[key]))))
+    elif key not in spec:
+      h_all("none")
+    else:
+      # spec["env"] is of type OrderedDict[str, str].
+      # spec["*_path"] are of type OrderedDict[str, list[str]].
+      assert isinstance(spec[key], OrderedDict), \
+        "spec[%r] was of type %r" % (key, type(spec[key]))
+
+      # Python 3.12 changed the string representation of OrderedDicts from
+      # OrderedDict([(key, value)]) to OrderedDict({key: value}), so to remain
+      # compatible, we need to emulate the previous string representation.
+      h_all("OrderedDict([")
+      h_all(", ".join(
+        # XXX: We still rely on repr("str") being "'str'",
+        # and on repr(["a", "b"]) being "['a', 'b']".
+        "(%r, %r)" % (key, value)
+        for key, value in spec[key].items()
+      ))
+      h_all("])")
 
   for tag, commit_hash, hasher in h_alternatives:
     # If the commit hash is a real hash, and not a tag, we can safely assume
