@@ -276,10 +276,10 @@ class BuildTestCase(unittest.TestCase):
         clone_args, clone_dir, clone_check = GIT_CLONE_ZLIB_ARGS
         fetch_args, fetch_dir, fetch_check = GIT_FETCH_ROOT_ARGS
         common_calls = [
+            call(("rev-parse", "HEAD"), args.configDir),
             call(list(clone_args), directory=clone_dir, check=clone_check, prompt=False),
             call(["ls-remote", "--heads", "--tags", args.referenceSources + "/zlib"],
                  directory=".", check=False, prompt=False),
-            call(["clone", "--bare", "https://github.com/star-externals/zlib", "/sw/MIRROR/zlib", "--filter=blob:none"]),
             call(["ls-remote", "--heads", "--tags", args.referenceSources + "/root"],
                  directory=".", check=False, prompt=False),
         ]
@@ -290,7 +290,7 @@ class BuildTestCase(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         mock_debug.assert_called_with("Everything done")
         self.assertEqual(mock_git_git.call_count, len(common_calls))
-        mock_git_git.has_calls(common_calls)
+        mock_git_git.assert_has_calls(common_calls, any_order=True)
 
         # Force fetching repos
         mock_git_git.reset_mock()
@@ -303,9 +303,9 @@ class BuildTestCase(unittest.TestCase):
         # We can't compare directly against the list of calls here as they
         # might happen in any order.
         self.assertEqual(mock_git_git.call_count, len(common_calls) + 1)
-        mock_git_git.has_calls(common_calls + [
-            call(fetch_args, directory=fetch_dir, check=fetch_check),
-        ])
+        mock_git_git.assert_has_calls(common_calls + [
+            call(list(fetch_args), directory=fetch_dir, check=fetch_check, prompt=False),
+        ], any_order=True)
 
     def test_hashing(self):
         """Check that the hashes assigned to packages remain constant."""
