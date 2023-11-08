@@ -60,7 +60,7 @@ class WorkareaTestCase(unittest.TestCase):
         updateReferenceRepoSpec(referenceSources="sw/MIRROR", p="AliRoot",
                                 spec=spec, fetch=True)
         mock_exists.assert_called_with("%s/sw/MIRROR/aliroot" % getcwd())
-        mock_exists.has_calls([])
+        mock_exists.assert_has_calls([])
         mock_makedirs.assert_called_with("%s/sw/MIRROR" % getcwd())
         mock_git.assert_called_once_with([
             "fetch", "-f", "--tags", spec["source"], "+refs/heads/*:refs/heads/*",

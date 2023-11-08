@@ -20,15 +20,16 @@ classifiers = [
     'License :: OSI Approved :: GNU General Public License v3 (GPLv3)',
     'Programming Language :: Python :: 2.7',   # slc6
     'Programming Language :: Python :: 3.6',   # slc7, slc8, cs8
-    'Programming Language :: Python :: 3.8',   # MacOS
-    'Programming Language :: Python :: 3.9',   # alma9
-    'Programming Language :: Python :: 3.10',
-    'Programming Language :: Python :: 3.11',
+    'Programming Language :: Python :: 3.8',   # ubuntu2004
+    'Programming Language :: Python :: 3.9',   # slc9
+    'Programming Language :: Python :: 3.10',  # ubuntu2204
+    'Programming Language :: Python :: 3.11',  # MacOS
+    'Programming Language :: Python :: 3.12',  # MacOS
 ]
 
 dependencies = [
   'pyyaml',
-  'requests', 
+  'requests',
   'distro',
   'jinja2',
   'boto3',

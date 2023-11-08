@@ -54,10 +54,11 @@ setup(
         # that you indicate whether you support Python 2, Python 3 or both.
         'Programming Language :: Python :: 2.7',   # slc6
         'Programming Language :: Python :: 3.6',   # slc7, slc8, cs8
-        'Programming Language :: Python :: 3.8',   # MacOS
-        'Programming Language :: Python :: 3.9',   # alma9
-        'Programming Language :: Python :: 3.10',
-        'Programming Language :: Python :: 3.11',
+        'Programming Language :: Python :: 3.8',   # ubuntu2004
+        'Programming Language :: Python :: 3.9',   # slc9
+        'Programming Language :: Python :: 3.10',  # ubuntu2204
+        'Programming Language :: Python :: 3.11',  # MacOS
+        'Programming Language :: Python :: 3.12',  # MacOS
     ],
 
     # What does your project relate to?
