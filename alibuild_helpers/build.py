@@ -932,7 +932,7 @@ def doBuild(args, parser):
     # parts depending on it, but we do not guaranteed anything for the order in
     # which unrelated components are activated.
     dependencies = "ALIBUILD_ARCH_PREFIX=\"${ALIBUILD_ARCH_PREFIX:-%s}\"\n" % args.architecture
-    dependenciesInit = "echo ALIBUILD_ARCH_PREFIX=\"\${ALIBUILD_ARCH_PREFIX:-%s}\" >> $INSTALLROOT/etc/profile.d/init.sh\n" % args.architecture
+    dependenciesInit = "echo ALIBUILD_ARCH_PREFIX=\"\\${ALIBUILD_ARCH_PREFIX:-%s}\" >> $INSTALLROOT/etc/profile.d/init.sh\n" % args.architecture
     for dep in spec.get("requires", []):
       depSpec = specs[dep]
       depInfo = {
@@ -944,7 +944,7 @@ def doBuild(args, parser):
       }
       dependencies += format("[ -z ${%(bigpackage)s_REVISION+x} ] && source \"$WORK_DIR/$ALIBUILD_ARCH_PREFIX/%(package)s/%(version)s-%(revision)s/etc/profile.d/init.sh\"\n",
                              **depInfo)
-      dependenciesInit += format('echo [ -z \${%(bigpackage)s_REVISION+x} ] \&\& source \${WORK_DIR}/\${ALIBUILD_ARCH_PREFIX}/%(package)s/%(version)s-%(revision)s/etc/profile.d/init.sh >> \"$INSTALLROOT/etc/profile.d/init.sh\"\n',
+      dependenciesInit += format('echo [ -z \\${%(bigpackage)s_REVISION+x} ] \\&\\& source \\${WORK_DIR}/\\${ALIBUILD_ARCH_PREFIX}/%(package)s/%(version)s-%(revision)s/etc/profile.d/init.sh >> \"$INSTALLROOT/etc/profile.d/init.sh\"\n',
                              **depInfo)
     dependenciesDict = {}
     for dep in spec.get("full_requires", []):
@@ -981,7 +981,7 @@ def doBuild(args, parser):
       pathVal = isinstance(pathVal, list) and pathVal or [ pathVal ]
       if pathName == "DYLD_LIBRARY_PATH":
         continue
-      environment += format("\ncat << \EOF >> \"$INSTALLROOT/etc/profile.d/init.sh\"\nexport %(key)s=$%(key)s:%(value)s\nEOF",
+      environment += format("\ncat << \\EOF >> \"$INSTALLROOT/etc/profile.d/init.sh\"\nexport %(key)s=$%(key)s:%(value)s\nEOF",
                             key=pathName,
                             value=":".join(pathVal))
 
@@ -998,7 +998,7 @@ def doBuild(args, parser):
     for pathName,pathVal in pathDict.items():
       if pathName == "DYLD_LIBRARY_PATH":
         continue
-      environment += format("\ncat << \EOF >> \"$INSTALLROOT/etc/profile.d/init.sh\"\nexport %(key)s=%(value)s${%(key)s+:$%(key)s}\nEOF",
+      environment += format("\ncat << \\EOF >> \"$INSTALLROOT/etc/profile.d/init.sh\"\nexport %(key)s=%(value)s${%(key)s+:$%(key)s}\nEOF",
                             key=pathName,
                             value=":".join(pathVal))
 
