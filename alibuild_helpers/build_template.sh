@@ -80,7 +80,6 @@ fi
 mkdir -p "$INSTALLROOT" "$BUILDROOT" "$BUILDDIR" "$WORK_DIR/INSTALLROOT/$PKGHASH/$PKGPATH"
 
 cd "$WORK_DIR/INSTALLROOT/$PKGHASH"
-echo "$PKGHASH" > "$INSTALLROOT/.build-hash"
 cat <<\EOF | tr \' \" >"$INSTALLROOT/.full-dependencies"
 %(dependenciesJSON)s
 EOF
@@ -195,6 +194,9 @@ else
   find $INSTALLROOT -name "*.unrelocated" -delete
   rm -rf $WORK_DIR/TMP/$PKGHASH
 fi
+
+cd "$WORK_DIR/INSTALLROOT/$PKGHASH"
+echo "$PKGHASH" > "$INSTALLROOT/.build-hash"
 
 cd "$WORK_DIR/INSTALLROOT/$PKGHASH/$PKGPATH"
 # Find which files need relocation.
