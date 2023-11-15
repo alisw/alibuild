@@ -104,11 +104,10 @@ EOF
 # This is beneficial for all the cases where the build step requires some
 # environment to be properly setup in order to work. e.g. to support ninja or
 # protoc.
-cat << EOF > $BUILDDIR/.envrc
+cat << EOF > "$BUILDDIR/.envrc"
 # Source the build environment which was used for this package
-WORK_DIR=$WORK_DIR source ../../../$PKGPATH/etc/profile.d/init.sh
+WORK_DIR=$WORK_DIR source $INSTALLROOT/etc/profile.d/init.sh
 source_up
-
 # On mac we build with the proper installation relative RPATH,
 # so this is not actually used and it's actually harmful since
 # startup time is reduced a lot by the extra overhead from the
@@ -197,6 +196,17 @@ fi
 
 cd "$WORK_DIR/INSTALLROOT/$PKGHASH"
 echo "$PKGHASH" > "$INSTALLROOT/.build-hash"
+# Replace the .envrc to point to the final installation directory.
+cat << EOF > "$BUILDDIR/.envrc"
+# Source the build environment which was used for this package
+WORK_DIR=$WORK_DIR source ../../../$PKGPATH/etc/profile.d/init.sh
+source_up
+# On mac we build with the proper installation relative RPATH,
+# so this is not actually used and it's actually harmful since
+# startup time is reduced a lot by the extra overhead from the
+# dynamic loader
+unset DYLD_LIBRARY_PATH
+EOF
 
 cd "$WORK_DIR/INSTALLROOT/$PKGHASH/$PKGPATH"
 # Find which files need relocation.
