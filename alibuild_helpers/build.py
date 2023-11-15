@@ -1103,7 +1103,7 @@ def doBuild(args, parser):
     # will perform the actual build. Otherwise build as usual using bash.
     if args.docker:
       build_command = (
-        "docker run --rm --network=host --entrypoint= --user $(id -u):$(id -g) "
+        "docker run --rm --entrypoint= --user $(id -u):$(id -g) "
         "-v {workdir}:/sw -v {scriptDir}/build.sh:/build.sh:ro "
         "-e GIT_REFERENCE_OVERRIDE=/mirror -e WORK_DIR_OVERRIDE=/sw "
         "{mirrorVolume} {develVolumes} {additionalEnv} {additionalVolumes} "
