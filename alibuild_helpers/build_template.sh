@@ -106,7 +106,7 @@ EOF
 # protoc.
 cat << EOF > "$BUILDDIR/.envrc"
 # Source the build environment which was used for this package
-WORK_DIR=$WORK_DIR source $INSTALLROOT/etc/profile.d/init.sh
+WORK_DIR=\${WORK_DIR:-$WORK_DIR} source "\${WORK_DIR:-$WORK_DIR}/${INSTALLROOT#$WORK_DIR/}/etc/profile.d/init.sh"
 source_up
 # On mac we build with the proper installation relative RPATH,
 # so this is not actually used and it's actually harmful since
@@ -199,7 +199,7 @@ echo "$PKGHASH" > "$INSTALLROOT/.build-hash"
 # Replace the .envrc to point to the final installation directory.
 cat << EOF > "$BUILDDIR/.envrc"
 # Source the build environment which was used for this package
-WORK_DIR=$WORK_DIR source ../../../$PKGPATH/etc/profile.d/init.sh
+WORK_DIR=\${WORK_DIR:-$WORK_DIR} source ../../../$PKGPATH/etc/profile.d/init.sh
 source_up
 # On mac we build with the proper installation relative RPATH,
 # so this is not actually used and it's actually harmful since
