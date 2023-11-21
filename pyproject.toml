@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = 'alibuild'
-dynamic = ['readme', 'version']
+dynamic = ['readme', 'version', 'optional-dependencies']
 description = 'ALICE Build Tool'
 keywords = ['HEP', 'ALICE']
 license = {text = 'GPL'}
