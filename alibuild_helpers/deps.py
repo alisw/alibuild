@@ -54,6 +54,11 @@ def doDeps(args, parser):
   all_both = all_build.intersection(all_runtime)
 
   dot = "digraph {\n"
+  dot += "ratio=\"0.52\"\n"
+  dot += 'graph [nodesep=0.25, ranksep=0.2];\n'
+  dot += 'node [width=1.5, height=1, fonsize=46, margin=0.1];\n'
+  dot += 'edge [penwidth=2];\n'
+
   for k,spec in specs.items():
     if k == "defaults-release":
       continue
