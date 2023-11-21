@@ -52,7 +52,6 @@ setup(
 
         # Specify the Python versions you support here. In particular, ensure
         # that you indicate whether you support Python 2, Python 3 or both.
-        'Programming Language :: Python :: 2.7',   # slc6
         'Programming Language :: Python :: 3.6',   # slc7, slc8, cs8
         'Programming Language :: Python :: 3.8',   # ubuntu2004
         'Programming Language :: Python :: 3.9',   # slc9
@@ -90,14 +89,6 @@ setup(
     # https://packaging.python.org/en/latest/requirements.html
     install_requires=install_requires,
 
-    # List additional groups of dependencies here (e.g. development
-    # dependencies). You can install these using the following syntax,
-    # for example:
-    # $ pip install -e .[dev,test]
-    extras_require={
-        ':python_version == "2.7"': ['futures'],
-        ':python_version == "2.6"': ['futures', 'argparse', 'ordereddict'],
-    },
     # If there are data files included in your packages that need to be
     # installed, specify them here.  If using Python 2.6 or less, then these
     # have to be included in MANIFEST.in as well.
