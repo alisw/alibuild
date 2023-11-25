@@ -80,8 +80,8 @@ class CleanTestCase(unittest.TestCase):
     @patch('alibuild_helpers.clean.os')
     @patch('alibuild_helpers.clean.path')
     @patch('alibuild_helpers.clean.shutil')
-    @patch('alibuild_helpers.clean.print_results')
-    def test_doClean(self, mock_print_results,  mock_shutil, mock_path, mock_os, mock_glob):
+    @patch('alibuild_helpers.clean.log')
+    def test_doClean(self, mock_log, mock_shutil, mock_path, mock_os, mock_glob):
         mock_path.realpath.side_effect = lambda x : REALPATH_WITH_OBSOLETE_FILES[x]
         mock_path.islink.side_effect = lambda x : "latest" in x
         mock_glob.glob.side_effect = lambda x : GLOB_WITH_OBSOLETE_FILES[x]
@@ -90,18 +90,18 @@ class CleanTestCase(unittest.TestCase):
           doClean(workDir="sw", architecture="osx_x86-64", aggressiveCleanup=True, dryRun=True)
         self.assertEqual(cm.exception.code, 0)
         mock_shutil.rmtree.assert_not_called()
-        mock_print_results.assert_called_with(dedent("""\
-        This will delete the following directories:
-
+        mock_log.banner.assert_called_with("This %s delete the following directories:\n%s", "would", dedent("""\
         sw/TMP
         sw/INSTALLROOT
         sw/TARS/osx_x86-64/store
         sw/SOURCES
         sw/BUILD/somethingtodelete
         sw/osx_x86-64/b/v1
-        sw/osx_x86-64/b/v3
+        sw/osx_x86-64/b/v3"""))
+        mock_log.info.assert_called_with("--dry-run / -n specified. Doing nothing.")
 
-        --dry-run / -n specified. Doing nothing."""))
+        mock_log.banner.reset_mock()
+        mock_log.info.reset_mock()
 
         with self.assertRaises(SystemExit) as cm:
           doClean(workDir="sw", architecture="osx_x86-64", aggressiveCleanup=True, dryRun=False)
@@ -114,9 +114,7 @@ class CleanTestCase(unittest.TestCase):
                               call('sw/osx_x86-64/b/v1'),
                               call('sw/osx_x86-64/b/v3')]
         self.assertEqual(mock_shutil.rmtree.mock_calls, remove_files_calls)
-        mock_print_results.assert_called_with(dedent("""\
-        This will delete the following directories:
-
+        mock_log.banner.assert_called_with("This %s delete the following directories:\n%s", "will", dedent("""\
         sw/TMP
         sw/INSTALLROOT
         sw/TARS/osx_x86-64/store
@@ -124,6 +122,7 @@ class CleanTestCase(unittest.TestCase):
         sw/BUILD/somethingtodelete
         sw/osx_x86-64/b/v1
         sw/osx_x86-64/b/v3"""))
+        mock_log.info.assert_not_called()
 
 
 if __name__ == '__main__':
