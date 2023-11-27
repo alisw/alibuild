@@ -142,6 +142,31 @@ class CleanTestCase(unittest.TestCase):
         sw/osx_x86-64/b/v3"""))
         mock_log.info.assert_not_called()
 
+        mock_log.banner.reset_mock()
+        mock_log.info.reset_mock()
+        mock_shutil.rmtree.reset_mock()
+
+        def failing_rmtree(directory):
+            raise OSError("sentinel exception")
+
+        mock_shutil.rmtree.side_effect = failing_rmtree
+
+        with self.assertRaises(SystemExit) as cm:
+          doClean(workDir="sw", architecture="osx_x86-64", aggressiveCleanup=True, dryRun=False)
+        self.assertEqual(cm.exception.code, 1)
+        # Make sure the function still attempts to delete all of the
+        # directories, even if some fail.
+        self.assertEqual(mock_shutil.rmtree.mock_calls, remove_files_calls)
+        mock_log.banner.assert_called_with("This %s delete the following directories:\n%s", "will", dedent("""\
+        sw/TMP
+        sw/INSTALLROOT
+        sw/TARS/osx_x86-64/store
+        sw/SOURCES
+        sw/BUILD/somethingtodelete
+        sw/osx_x86-64/b/v1
+        sw/osx_x86-64/b/v3"""))
+        mock_log.info.assert_not_called()
+
 
 if __name__ == '__main__':
   unittest.main()
