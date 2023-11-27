@@ -53,6 +53,7 @@ READLINK_MOCKUP_DB = {
   "sw/BUILD/b-latest": "fcdfc2e1c9f0433c60b3b000e0e2737d297a9b1c"
 }
 
+
 class CleanTestCase(unittest.TestCase):
     @patch('alibuild_helpers.clean.glob')
     @patch('alibuild_helpers.clean.os')
@@ -82,10 +83,27 @@ class CleanTestCase(unittest.TestCase):
     @patch('alibuild_helpers.clean.shutil')
     @patch('alibuild_helpers.clean.log')
     def test_doClean(self, mock_log, mock_shutil, mock_path, mock_os, mock_glob):
-        mock_path.realpath.side_effect = lambda x : REALPATH_WITH_OBSOLETE_FILES[x]
-        mock_path.islink.side_effect = lambda x : "latest" in x
-        mock_glob.glob.side_effect = lambda x : GLOB_WITH_OBSOLETE_FILES[x]
-        mock_os.readlink.side_effect = lambda x : READLINK_MOCKUP_DB[x]
+        mock_path.realpath.side_effect = lambda x: REALPATH_WITH_OBSOLETE_FILES[x]
+        mock_path.islink.side_effect = lambda x: "latest" in x
+        mock_os.readlink.side_effect = lambda x: READLINK_MOCKUP_DB[x]
+
+        mock_glob.glob.side_effect = lambda x: []
+        # To get rid of default entries like sw/TMP, sw/INSTALLROOT.
+        mock_path.exists.return_value = False
+
+        with self.assertRaises(SystemExit) as cm:
+          doClean(workDir="sw", architecture="osx_x86-64", aggressiveCleanup=True, dryRun=True)
+        self.assertEqual(cm.exception.code, 0)
+        mock_shutil.rmtree.assert_not_called()
+        mock_log.info.assert_called_with("Nothing to delete.")
+        mock_log.banner.assert_not_called()
+
+        mock_log.banner.reset_mock()
+        mock_log.info.reset_mock()
+
+        mock_glob.glob.side_effect = lambda x: GLOB_WITH_OBSOLETE_FILES[x]
+        mock_path.exists.return_value = True
+
         with self.assertRaises(SystemExit) as cm:
           doClean(workDir="sw", architecture="osx_x86-64", aggressiveCleanup=True, dryRun=True)
         self.assertEqual(cm.exception.code, 0)
