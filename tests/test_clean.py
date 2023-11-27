@@ -87,6 +87,18 @@ class CleanTestCase(unittest.TestCase):
         mock_path.islink.side_effect = lambda x: "latest" in x
         mock_os.readlink.side_effect = lambda x: READLINK_MOCKUP_DB[x]
 
+        files_to_delete = [
+            "sw/TMP",
+            "sw/INSTALLROOT",
+            "sw/TARS/osx_x86-64/store",
+            "sw/SOURCES",
+            "sw/BUILD/somethingtodelete",
+            "sw/osx_x86-64/b/v1",
+            "sw/osx_x86-64/b/v3",
+        ]
+        remove_files_calls = list(map(call, files_to_delete))
+        files_delete_formatarg = "\n".join(files_to_delete)
+
         mock_glob.glob.side_effect = lambda x: []
         # To get rid of default entries like sw/TMP, sw/INSTALLROOT.
         mock_path.exists.return_value = False
@@ -108,14 +120,8 @@ class CleanTestCase(unittest.TestCase):
           doClean(workDir="sw", architecture="osx_x86-64", aggressiveCleanup=True, dryRun=True)
         self.assertEqual(cm.exception.code, 0)
         mock_shutil.rmtree.assert_not_called()
-        mock_log.banner.assert_called_with("This %s delete the following directories:\n%s", "would", dedent("""\
-        sw/TMP
-        sw/INSTALLROOT
-        sw/TARS/osx_x86-64/store
-        sw/SOURCES
-        sw/BUILD/somethingtodelete
-        sw/osx_x86-64/b/v1
-        sw/osx_x86-64/b/v3"""))
+        mock_log.banner.assert_called_with("This %s delete the following directories:\n%s",
+                                           "would", files_delete_formatarg)
         mock_log.info.assert_called_with("--dry-run / -n specified. Doing nothing.")
 
         mock_log.banner.reset_mock()
@@ -124,22 +130,9 @@ class CleanTestCase(unittest.TestCase):
         with self.assertRaises(SystemExit) as cm:
           doClean(workDir="sw", architecture="osx_x86-64", aggressiveCleanup=True, dryRun=False)
         self.assertEqual(cm.exception.code, 0)
-        remove_files_calls = [call('sw/TMP'),
-                              call('sw/INSTALLROOT'),
-                              call('sw/TARS/osx_x86-64/store'),
-                              call('sw/SOURCES'),
-                              call('sw/BUILD/somethingtodelete'),
-                              call('sw/osx_x86-64/b/v1'),
-                              call('sw/osx_x86-64/b/v3')]
         self.assertEqual(mock_shutil.rmtree.mock_calls, remove_files_calls)
-        mock_log.banner.assert_called_with("This %s delete the following directories:\n%s", "will", dedent("""\
-        sw/TMP
-        sw/INSTALLROOT
-        sw/TARS/osx_x86-64/store
-        sw/SOURCES
-        sw/BUILD/somethingtodelete
-        sw/osx_x86-64/b/v1
-        sw/osx_x86-64/b/v3"""))
+        mock_log.banner.assert_called_with("This %s delete the following directories:\n%s",
+                                           "will", files_delete_formatarg)
         mock_log.info.assert_not_called()
 
         mock_log.banner.reset_mock()
@@ -157,14 +150,8 @@ class CleanTestCase(unittest.TestCase):
         # Make sure the function still attempts to delete all of the
         # directories, even if some fail.
         self.assertEqual(mock_shutil.rmtree.mock_calls, remove_files_calls)
-        mock_log.banner.assert_called_with("This %s delete the following directories:\n%s", "will", dedent("""\
-        sw/TMP
-        sw/INSTALLROOT
-        sw/TARS/osx_x86-64/store
-        sw/SOURCES
-        sw/BUILD/somethingtodelete
-        sw/osx_x86-64/b/v1
-        sw/osx_x86-64/b/v3"""))
+        mock_log.banner.assert_called_with("This %s delete the following directories:\n%s",
+                                           "will", files_delete_formatarg)
         mock_log.info.assert_not_called()
 
 
