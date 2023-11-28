@@ -9,13 +9,13 @@ except ImportError:
     try:
         from setuptools_scm import get_version
     except ImportError:
-        __version__ = '(could not detect version)'
+        __version__ = None
     else:
         import os.path
         source_root = os.path.join(os.path.dirname(__file__), os.path.pardir)
         try:
             __version__ = get_version(root=source_root)
         except LookupError:
-            __version__ = '(could not detect version)'
+            __version__ = None
         finally:
             del get_version, source_root

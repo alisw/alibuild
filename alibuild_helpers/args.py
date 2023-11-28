@@ -105,6 +105,12 @@ def doParseArgs():
                                   "same effect as adding 'force_rebuild: true' to its recipe "
                                   "in CONFIGDIR. You can specify this option multiple times or "
                                   "separate multiple arguments with commas."))
+  build_parser.add_argument("--annotate", default=[], action="append", metavar="PACKAGE=COMMENT",
+                            help=("Store COMMENT in the build metadata for PACKAGE. This option "
+                                  "can be given multiple times, if you want to store comments "
+                                  "in multiple packages. The comment will only be stored if "
+                                  "PACKAGE is compiled or downloaded during this run; if it "
+                                  "already exists, this does not happen."))
 
   build_docker = build_parser.add_argument_group(title="Build inside a container", description="""\
   Builds can be done inside a Docker container, to make it easier to get a
@@ -436,6 +442,15 @@ def finaliseArgs(args, parser):
 
   if args.action in ("build", "doctor"):
     args.configDir = args.configDir
+
+    for comment_assignment in args.annotate:
+      if "=" not in comment_assignment:
+        parser.error("--annotate takes arguments of the form PACKAGE=COMMENT")
+    args.annotate = {
+      package: comment
+      for package, _, comment
+      in (assignment.partition("=") for assignment in args.annotate)
+    }
 
     # On selected platforms, caching is active by default
     if args.architecture in S3_SUPPORTED_ARCHS and not args.preferSystem and not args.no_remote_store:

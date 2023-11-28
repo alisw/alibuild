@@ -431,6 +431,34 @@ def generate_initdotsh(package, specs, architecture, post_build=False):
   return "\n".join(lines)
 
 
+def create_provenance_info(package, specs, args):
+  """Return a metadata record for storage in the package's install directory."""
+
+  def spec_info(spec):
+    return {
+      "name": spec["package"],
+      "tag": spec.get("tag"),
+      "source": spec.get("source"),
+      "version": spec["version"],
+      "revision": spec["revision"],
+      "hash": spec["hash"],
+    }
+
+  return json.dumps({
+    "comment": args.annotate.get(package),
+    "alibuild_version": __version__,
+    "alidist": {
+      "commit": os.environ["ALIBUILD_ALIDIST_HASH"],
+    },
+    "architecture": args.architecture,
+    "defaults": args.defaults,
+    "package": spec_info(specs[package]),
+    "dependencies": [
+      spec_info(specs[dep]) for dep in specs[package].get("full_requires", ())
+    ],
+  })
+
+
 def doBuild(args, parser):
   if args.remoteStore.startswith("http"):
     syncHelper = HttpRemoteSync(args.remoteStore, args.architecture, args.workDir, args.insecure)
@@ -491,7 +519,7 @@ def doBuild(args, parser):
   debug("Building for architecture %s", args.architecture)
   debug("Number of parallel builds: %d", args.jobs)
   debug("Using aliBuild from alibuild@%s recipes in alidist@%s",
-        __version__, os.environ["ALIBUILD_ALIDIST_HASH"])
+        __version__ or "unknown", os.environ["ALIBUILD_ALIDIST_HASH"])
 
   install_wrapper_script("git", workDir)
 
@@ -1071,13 +1099,7 @@ def doBuild(args, parser):
     dieOnError(err, "Failed to create script dir %s: %s" % (scriptDir, out))
     writeAll("%s/%s.sh" % (scriptDir, spec["package"]), spec["recipe"])
     writeAll("%s/build.sh" % scriptDir, cmd_raw % {
-      "dependenciesJSON": json.dumps({dep: {
-        "architecture": args.architecture,
-        "package": dep,
-        "version": specs[dep]["version"],
-        "revision": specs[dep]["revision"],
-        "hash": specs[dep]["hash"],
-      } for dep in spec.get("full_requires", ())}),
+      "provenance": create_provenance_info(spec["package"], specs, args),
       "initdotsh_deps": generate_initdotsh(p, specs, args.architecture, post_build=False),
       "initdotsh_full": generate_initdotsh(p, specs, args.architecture, post_build=True),
       "develPrefix": develPrefix,

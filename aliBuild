@@ -60,7 +60,7 @@ def doMain(args, parser):
 
   if args.action == "version":
     print("aliBuild version: {version} ({arch})".format(
-      version=__version__, arch=args.architecture or "unknown"))
+      version=__version__ or "unknown", arch=args.architecture or "unknown"))
     sys.exit(0)
 
   if args.action == "doctor":
@@ -91,7 +91,7 @@ if __name__ == "__main__":
   logger.setLevel(logging.DEBUG if args.debug else logging.INFO)
 
   os.environ["ALIBUILD_ANALYTICS_ID"] = "UA-77346950-1"
-  os.environ["ALIBUILD_VERSION"] = __version__
+  os.environ["ALIBUILD_VERSION"] = __version__ or ""
   if args.action == "analytics":
     if args.state == "off":
       disable_analytics()

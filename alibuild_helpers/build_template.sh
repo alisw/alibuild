@@ -77,8 +77,8 @@ fi
 mkdir -p "$INSTALLROOT" "$BUILDROOT" "$BUILDDIR" "$WORK_DIR/INSTALLROOT/$PKGHASH/$PKGPATH"
 
 cd "$WORK_DIR/INSTALLROOT/$PKGHASH"
-cat <<\EOF > "$INSTALLROOT/.full-dependencies"
-%(dependenciesJSON)s
+cat > "$INSTALLROOT/.meta.json" <<\EOF
+%(provenance)s
 EOF
 
 # Add "source" command for dependencies to init.sh.
@@ -207,8 +207,8 @@ source_up
 unset DYLD_LIBRARY_PATH
 EOF
 
-cat <<\EOF > "$INSTALLROOT/.full-dependencies"
-%(dependenciesJSON)s
+cat > "$INSTALLROOT/.meta.json" <<\EOF
+%(provenance)s
 EOF
 
 cd "$WORK_DIR/INSTALLROOT/$PKGHASH/$PKGPATH"
