@@ -444,6 +444,9 @@ def create_provenance_info(package, specs, args):
       "hash": spec["hash"],
     }
 
+  def dependency_list(key):
+    return [spec_info(specs[dep]) for dep in specs[package].get(key, ())]
+
   return json.dumps({
     "comment": args.annotate.get(package),
     "alibuild_version": __version__,
@@ -453,9 +456,16 @@ def create_provenance_info(package, specs, args):
     "architecture": args.architecture,
     "defaults": args.defaults,
     "package": spec_info(specs[package]),
-    "dependencies": [
-      spec_info(specs[dep]) for dep in specs[package].get("full_requires", ())
-    ],
+    "dependencies": {
+      "direct": {
+        "build": dependency_list("build_requires"),
+        "runtime": dependency_list("runtime_requires"),
+      },
+      "recursive": {  # includes direct deps and deps' deps
+        "build": dependency_list("full_build_requires"),
+        "runtime": dependency_list("full_runtime_requires"),
+      },
+    },
   })
 
 
