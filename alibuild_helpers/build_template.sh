@@ -88,7 +88,8 @@ mkdir -p "$INSTALLROOT/etc/profile.d"
 BIGPKGNAME=`echo "$PKGNAME" | tr [:lower:] [:upper:] | tr - _`
 rm -f "$INSTALLROOT/etc/profile.d/init.sh"
 
-# Init our dependencies
+# Adds "source" command for dependencies to init.sh.
+# Install init.sh now, so that it is available for debugging in case the build fails.
 %(dependenciesInit)s
 
 cat << EOF >> $INSTALLROOT/etc/profile.d/init.sh
@@ -193,6 +194,19 @@ else
   find $INSTALLROOT -name "*.unrelocated" -delete
   rm -rf $WORK_DIR/TMP/$PKGHASH
 fi
+
+# Regenerate init.sh, in case the package build clobbered it. This
+# particularly happens in the AliEn-Runtime package, since it copies other
+# packages into its installroot wholesale.
+rm -f "$INSTALLROOT/etc/profile.d/init.sh"
+%(dependenciesInit)s
+cat << EOF >> "$INSTALLROOT/etc/profile.d/init.sh"
+export ${BIGPKGNAME}_ROOT=\${WORK_DIR}/\${ALIBUILD_ARCH_PREFIX}/$PKGNAME/$PKGVERSION-$PKGREVISION
+export ${BIGPKGNAME}_VERSION=$PKGVERSION
+export ${BIGPKGNAME}_REVISION=$PKGREVISION
+export ${BIGPKGNAME}_HASH=$PKGHASH
+export ${BIGPKGNAME}_COMMIT=${COMMIT_HASH}
+EOF
 
 cd "$WORK_DIR/INSTALLROOT/$PKGHASH"
 echo "$PKGHASH" > "$INSTALLROOT/.build-hash"
