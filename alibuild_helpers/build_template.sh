@@ -116,7 +116,7 @@ source_up
 unset DYLD_LIBRARY_PATH
 EOF
 
-# Environment
+# Add environment variables to init.sh (e.g. PATH).
 %(environment)s
 
 cd "$BUILDROOT"
@@ -221,6 +221,8 @@ source_up
 # dynamic loader
 unset DYLD_LIBRARY_PATH
 EOF
+# Add environment variables to init.sh (e.g. PATH).
+%(environment)s
 
 cd "$WORK_DIR/INSTALLROOT/$PKGHASH/$PKGPATH"
 # Find which files need relocation.
