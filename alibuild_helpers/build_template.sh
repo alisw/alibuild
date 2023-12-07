@@ -12,9 +12,6 @@ set +h
 function hash() { true; }
 export WORK_DIR="${WORK_DIR_OVERRIDE:-%(workDir)s}"
 
-# From our dependencies
-%(dependencies)s
-
 # Insert our own wrapper scripts into $PATH, patched to use the system OpenSSL,
 # instead of the one we build ourselves.
 export PATH=$WORK_DIR/wrapper-scripts:$PATH
@@ -80,25 +77,20 @@ fi
 mkdir -p "$INSTALLROOT" "$BUILDROOT" "$BUILDDIR" "$WORK_DIR/INSTALLROOT/$PKGHASH/$PKGPATH"
 
 cd "$WORK_DIR/INSTALLROOT/$PKGHASH"
-cat <<\EOF | tr \' \" >"$INSTALLROOT/.full-dependencies"
+cat <<\EOF > "$INSTALLROOT/.full-dependencies"
 %(dependenciesJSON)s
 EOF
 
-mkdir -p "$INSTALLROOT/etc/profile.d"
-BIGPKGNAME=`echo "$PKGNAME" | tr [:lower:] [:upper:] | tr - _`
-rm -f "$INSTALLROOT/etc/profile.d/init.sh"
-
-# Adds "source" command for dependencies to init.sh.
+# Add "source" command for dependencies to init.sh.
 # Install init.sh now, so that it is available for debugging in case the build fails.
-%(dependenciesInit)s
-
-cat << EOF >> $INSTALLROOT/etc/profile.d/init.sh
-export ${BIGPKGNAME}_ROOT=\${WORK_DIR}/\${ALIBUILD_ARCH_PREFIX}/$PKGNAME/$PKGVERSION-$PKGREVISION
-export ${BIGPKGNAME}_VERSION=$PKGVERSION
-export ${BIGPKGNAME}_REVISION=$PKGREVISION
-export ${BIGPKGNAME}_HASH=$PKGHASH
-export ${BIGPKGNAME}_COMMIT=${COMMIT_HASH}
+mkdir -p "$INSTALLROOT/etc/profile.d"
+rm -f "$INSTALLROOT/etc/profile.d/init.sh"
+cat <<\EOF > "$INSTALLROOT/etc/profile.d/init.sh"
+%(initdotsh_deps)s
 EOF
+
+# Apply dependency initialisation now, but skip setting the variables below until after the build.
+. "$INSTALLROOT/etc/profile.d/init.sh"
 
 # Add support for direnv https://github.com/direnv/direnv/
 #
@@ -115,9 +107,6 @@ source_up
 # dynamic loader
 unset DYLD_LIBRARY_PATH
 EOF
-
-# Add environment variables to init.sh (e.g. PATH).
-%(environment)s
 
 cd "$BUILDROOT"
 ln -snf $PKGHASH $WORK_DIR/BUILD/$PKGNAME-latest
@@ -198,14 +187,10 @@ fi
 # Regenerate init.sh, in case the package build clobbered it. This
 # particularly happens in the AliEn-Runtime package, since it copies other
 # packages into its installroot wholesale.
+mkdir -p "$INSTALLROOT/etc/profile.d"
 rm -f "$INSTALLROOT/etc/profile.d/init.sh"
-%(dependenciesInit)s
-cat << EOF >> "$INSTALLROOT/etc/profile.d/init.sh"
-export ${BIGPKGNAME}_ROOT=\${WORK_DIR}/\${ALIBUILD_ARCH_PREFIX}/$PKGNAME/$PKGVERSION-$PKGREVISION
-export ${BIGPKGNAME}_VERSION=$PKGVERSION
-export ${BIGPKGNAME}_REVISION=$PKGREVISION
-export ${BIGPKGNAME}_HASH=$PKGHASH
-export ${BIGPKGNAME}_COMMIT=${COMMIT_HASH}
+cat <<\EOF > "$INSTALLROOT/etc/profile.d/init.sh"
+%(initdotsh_full)s
 EOF
 
 cd "$WORK_DIR/INSTALLROOT/$PKGHASH"
@@ -221,8 +206,10 @@ source_up
 # dynamic loader
 unset DYLD_LIBRARY_PATH
 EOF
-# Add environment variables to init.sh (e.g. PATH).
-%(environment)s
+
+cat <<\EOF > "$INSTALLROOT/.full-dependencies"
+%(dependenciesJSON)s
+EOF
 
 cd "$WORK_DIR/INSTALLROOT/$PKGHASH/$PKGPATH"
 # Find which files need relocation.

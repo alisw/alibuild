@@ -19,7 +19,7 @@ except ImportError:
 
 from alibuild_helpers.cmd import is_string
 from alibuild_helpers.utilities import parseRecipe, resolve_tag
-from alibuild_helpers.build import doBuild, storeHashes
+from alibuild_helpers.build import doBuild, storeHashes, generate_initdotsh
 
 
 TEST_DEFAULT_RELEASE = """\
@@ -307,20 +307,21 @@ class BuildTestCase(unittest.TestCase):
             call(list(fetch_args), directory=fetch_dir, check=fetch_check, prompt=False),
         ], any_order=True)
 
+    def setup_spec(self, script):
+        """Parse the alidist recipe in SCRIPT and return its spec."""
+        err, spec, recipe = parseRecipe(lambda: script)
+        self.assertIsNone(err)
+        spec["recipe"] = recipe.strip("\n")
+        spec.setdefault("tag", spec["version"])
+        spec["tag"] = resolve_tag(spec)
+        return spec
+
     def test_hashing(self):
         """Check that the hashes assigned to packages remain constant."""
-        def setup_spec(script):
-            err, spec, recipe = parseRecipe(lambda: script)
-            self.assertIsNone(err)
-            spec["recipe"] = recipe.strip("\n")
-            spec.setdefault("tag", spec["version"])
-            spec["tag"] = resolve_tag(spec)
-            return spec
-
-        default = setup_spec(TEST_DEFAULT_RELEASE)
-        zlib = setup_spec(TEST_ZLIB_RECIPE)
-        root = setup_spec(TEST_ROOT_RECIPE)
-        extra = setup_spec(TEST_EXTRA_RECIPE)
+        default = self.setup_spec(TEST_DEFAULT_RELEASE)
+        zlib = self.setup_spec(TEST_ZLIB_RECIPE)
+        root = self.setup_spec(TEST_ROOT_RECIPE)
+        extra = self.setup_spec(TEST_EXTRA_RECIPE)
         default["commit_hash"] = "0"
         for spec, refs in ((zlib, TEST_ZLIB_GIT_REFS),
                            (root, TEST_ROOT_GIT_REFS),
@@ -360,6 +361,43 @@ class BuildTestCase(unittest.TestCase):
         self.assertEqual(len(extra["local_hashes"]), 3)
         self.assertEqual(len(extra["remote_hashes"]), 3)
         self.assertEqual(extra["local_hashes"][0], TEST_EXTRA_BUILD_HASH)
+
+    def test_initdotsh(self):
+        """Sanity-check the generated init.sh for a few variables."""
+        specs = {
+            # Add some attributes that are normally set by doBuild(), but
+            # required by generate_initdotsh().
+            spec["package"]: dict(spec, revision="1", commit_hash="424242", hash="010101")
+            for spec in map(self.setup_spec, (
+                    TEST_DEFAULT_RELEASE,
+                    TEST_ZLIB_RECIPE,
+                    TEST_ROOT_RECIPE,
+                    TEST_EXTRA_RECIPE,
+            ))
+        }
+
+        setup_initdotsh = generate_initdotsh("ROOT", specs, "slc7_x86-64", post_build=False)
+        complete_initdotsh = generate_initdotsh("ROOT", specs, "slc7_x86-64", post_build=True)
+
+        # We only generate init.sh for ROOT, so Extra should not appear at all.
+        self.assertNotIn("Extra", setup_initdotsh)
+        self.assertNotIn("Extra", complete_initdotsh)
+
+        # Dependencies must be loaded both for this build and for subsequent ones.
+        self.assertIn('. "$WORK_DIR/$ALIBUILD_ARCH_PREFIX"/zlib/v1.2.3-1/etc/profile.d/init.sh', setup_initdotsh)
+        self.assertIn('. "$WORK_DIR/$ALIBUILD_ARCH_PREFIX"/zlib/v1.2.3-1/etc/profile.d/init.sh', complete_initdotsh)
+
+        # ROOT-specific variables must not be set during ROOT's build yet...
+        self.assertNotIn("export ROOT_VERSION=", setup_initdotsh)
+        self.assertNotIn("export ROOT_TEST_1=", setup_initdotsh)
+        self.assertNotIn("export APPEND_ROOT_1=", setup_initdotsh)
+        self.assertNotIn("export PREPEND_ROOT_1=", setup_initdotsh)
+
+        # ...but they must be set once ROOT's build has completed.
+        self.assertIn("export ROOT_VERSION=v6-08-30", complete_initdotsh)
+        self.assertIn('export ROOT_TEST_1="root test 1"', complete_initdotsh)
+        self.assertIn("export APPEND_ROOT_1=", complete_initdotsh)
+        self.assertIn("export PREPEND_ROOT_1=", complete_initdotsh)
 
 
 if __name__ == '__main__':
