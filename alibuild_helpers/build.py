@@ -8,7 +8,7 @@ from alibuild_helpers.cmd import execute, getstatusoutput, DockerRunner, BASH, i
 from alibuild_helpers.utilities import prunePaths
 from alibuild_helpers.utilities import resolve_store_path
 from alibuild_helpers.utilities import format, parseDefaults, readDefaults
-from alibuild_helpers.utilities import getPackageList
+from alibuild_helpers.utilities import getPackageList, asList
 from alibuild_helpers.utilities import validateDefaults
 from alibuild_helpers.utilities import Hasher
 from alibuild_helpers.utilities import yamlDump
@@ -33,6 +33,7 @@ except ImportError:
 
 import concurrent.futures
 import importlib
+import json
 import socket
 import os
 import re
@@ -337,6 +338,97 @@ def better_tarball(spec, old, new):
   # Finally, return the one that appears in the list of hashes earlier.
   hashes = spec["local_hashes" if old_is_local else "remote_hashes"]
   return old if hashes.index(old_hash) < hashes.index(new_hash) else new
+
+
+def generate_initdotsh(package, specs, architecture, post_build=False):
+  """Return the contents of the given package's etc/profile/init.sh as a string.
+
+  If post_build is true, also generate variables pointing to the package
+  itself; else, only generate variables pointing at it dependencies.
+  """
+  spec = specs[package]
+  # Allow users to override ALIBUILD_ARCH_PREFIX if they manually source
+  # init.sh. This is useful for development off CVMFS, since we have a
+  # slightly different directory hierarchy there.
+  lines = [': "${ALIBUILD_ARCH_PREFIX:=%s}"' % architecture]
+
+  # Generate the part which sources the environment for all the dependencies.
+  # We guarantee that a dependency is always sourced before the parts
+  # depending on it, but we do not guarantee anything for the order in which
+  # unrelated components are activated.
+  # These variables are also required during the build itself, so always
+  # generate them.
+  lines.extend((
+    '[ -z "${{{bigpackage}_REVISION}}" ] && '
+    '. "$WORK_DIR/$ALIBUILD_ARCH_PREFIX"/{package}/{version}-{revision}/etc/profile.d/init.sh'
+  ).format(
+    bigpackage=dep.upper().replace("-", "_"),
+    package=quote(specs[dep]["package"]),
+    version=quote(specs[dep]["version"]),
+    revision=quote(specs[dep]["revision"]),
+  ) for dep in spec.get("requires", ()))
+
+  if post_build:
+    bigpackage = package.upper().replace("-", "_")
+
+    # Set standard variables related to the package itself. These should only
+    # be set once the build has actually completed.
+    lines.extend(line.format(
+      bigpackage=bigpackage,
+      package=quote(spec["package"]),
+      version=quote(spec["version"]),
+      revision=quote(spec["revision"]),
+      hash=quote(spec["hash"]),
+      commit_hash=quote(spec["commit_hash"]),
+    ) for line in (
+      'export {bigpackage}_ROOT="$WORK_DIR/$ALIBUILD_ARCH_PREFIX"/{package}/{version}-{revision}',
+      "export {bigpackage}_VERSION={version}",
+      "export {bigpackage}_REVISION={revision}",
+      "export {bigpackage}_HASH={hash}",
+      "export {bigpackage}_COMMIT={commit_hash}",
+    ))
+
+    # Generate the part which sets the environment variables related to the
+    # package itself. This can be variables set via the "env" keyword in the
+    # metadata or paths which get concatenated via the "{append,prepend}_path"
+    # keys. These should only be set once the build has actually completed,
+    # since the paths referred to will only exist then.
+
+    # First, output a sensible error message if types are wrong.
+    for key in ("env", "append_path", "prepend_path"):
+      dieOnError(not isinstance(spec.get(key, {}), dict),
+                 "Tag `%s' in %s should be a dict." % (key, package))
+
+    # Set "env" variables.
+    # We only put the values in double-quotes, so that they can refer to other
+    # shell variables or do command substitution (e.g. $(brew --prefix ...)).
+    lines.extend('export {}="{}"'.format(key, value)
+                 for key, value in spec.get("env", {}).items()
+                 if key != "DYLD_LIBRARY_PATH")
+
+    # Append paths to variables, if requested using append_path.
+    # Again, only put values in double quotes so that they can refer to other variables.
+    lines.extend('export {key}="${key}:{value}"'
+                 .format(key=key, value=":".join(asList(value)))
+                 for key, value in spec.get("append_path", {}).items()
+                 if key != "DYLD_LIBRARY_PATH")
+
+    # First convert all values to list, so that we can use .setdefault().insert() below.
+    prepend_path = {key: asList(value)
+                    for key, value in spec.get("prepend_path", {}).items()}
+    # By default we add the .../bin directory to PATH and .../lib to LD_LIBRARY_PATH.
+    # Prepend to these paths, so that our packages win against system ones.
+    for key, value in (("PATH", "bin"), ("LD_LIBRARY_PATH", "lib")):
+      prepend_path.setdefault(key, []).insert(0, "${}_ROOT/{}".format(bigpackage, value))
+    lines.extend('export {key}="{value}${{{key}+:${key}}}"'
+                 .format(key=key, value=":".join(value))
+                 for key, value in prepend_path.items()
+                 if key != "DYLD_LIBRARY_PATH")
+
+  # Return string without a trailing newline, since we expect call sites to
+  # append that (and the obvious way to inesrt it into the build tempate is by
+  # putting the "%(initdotsh_*)s" on its own line, which has the same effect).
+  return "\n".join(lines)
 
 
 def doBuild(args, parser):
@@ -927,81 +1019,6 @@ def doBuild(args, parser):
       debug("Found tarball in %s" % spec["cachedTarball"]
             if spec["cachedTarball"] else "No cache tarballs found")
 
-    # Generate the part which sources the environment for all the dependencies.
-    # Notice that we guarantee that a dependency is always sourced before the
-    # parts depending on it, but we do not guaranteed anything for the order in
-    # which unrelated components are activated.
-    dependencies = "ALIBUILD_ARCH_PREFIX=\"${ALIBUILD_ARCH_PREFIX:-%s}\"\n" % args.architecture
-    dependenciesInit = "echo ALIBUILD_ARCH_PREFIX=\"\\${ALIBUILD_ARCH_PREFIX:-%s}\" >> $INSTALLROOT/etc/profile.d/init.sh\n" % args.architecture
-    for dep in spec.get("requires", []):
-      depSpec = specs[dep]
-      depInfo = {
-        "architecture": args.architecture,
-        "package": dep,
-        "version": depSpec["version"],
-        "revision": depSpec["revision"],
-        "bigpackage": dep.upper().replace("-", "_")
-      }
-      dependencies += format("[ -z ${%(bigpackage)s_REVISION+x} ] && source \"$WORK_DIR/$ALIBUILD_ARCH_PREFIX/%(package)s/%(version)s-%(revision)s/etc/profile.d/init.sh\"\n",
-                             **depInfo)
-      dependenciesInit += format('echo [ -z \\${%(bigpackage)s_REVISION+x} ] \\&\\& source \\${WORK_DIR}/\\${ALIBUILD_ARCH_PREFIX}/%(package)s/%(version)s-%(revision)s/etc/profile.d/init.sh >> \"$INSTALLROOT/etc/profile.d/init.sh\"\n',
-                             **depInfo)
-    dependenciesDict = {}
-    for dep in spec.get("full_requires", []):
-      depSpec = specs[dep]
-      depInfo = {
-        "architecture": args.architecture,
-        "package": dep,
-        "version": depSpec["version"],
-        "revision": depSpec["revision"],
-        "hash": depSpec["hash"]
-      }
-      dependenciesDict[dep] = depInfo
-    dependenciesJSON = str(dependenciesDict)
-      
-    # Generate the part which creates the environment for the package.
-    # This can be either variable set via the "env" keyword in the metadata
-    # or paths which get appended via the "append_path" one.
-    # By default we append LD_LIBRARY_PATH, PATH
-    environment = ""
-    dieOnError(not isinstance(spec.get("env", {}), dict),
-               "Tag `env' in %s should be a dict." % p)
-    for key,value in spec.get("env", {}).items():
-      if key == "DYLD_LIBRARY_PATH":
-        continue
-      environment += format("echo 'export %(key)s=\"%(value)s\"' >> $INSTALLROOT/etc/profile.d/init.sh\n",
-                            key=key,
-                            value=value)
-    basePath = "%s_ROOT" % p.upper().replace("-", "_")
-
-    pathDict = spec.get("append_path", {})
-    dieOnError(not isinstance(pathDict, dict),
-               "Tag `append_path' in %s should be a dict." % p)
-    for pathName,pathVal in pathDict.items():
-      pathVal = isinstance(pathVal, list) and pathVal or [ pathVal ]
-      if pathName == "DYLD_LIBRARY_PATH":
-        continue
-      environment += format("\ncat << \\EOF >> \"$INSTALLROOT/etc/profile.d/init.sh\"\nexport %(key)s=$%(key)s:%(value)s\nEOF",
-                            key=pathName,
-                            value=":".join(pathVal))
-
-    # Same thing, but prepending the results so that they win against system ones.
-    defaultPrependPaths = { "LD_LIBRARY_PATH": "$%s/lib" % basePath,
-                            "PATH": "$%s/bin" % basePath }
-    pathDict = spec.get("prepend_path", {})
-    dieOnError(not isinstance(pathDict, dict),
-               "Tag `prepend_path' in %s should be a dict." % p)
-    for pathName,pathVal in pathDict.items():
-      pathDict[pathName] = isinstance(pathVal, list) and pathVal or [ pathVal ]
-    for pathName,pathVal in defaultPrependPaths.items():
-      pathDict[pathName] = [ pathVal ] + pathDict.get(pathName, [])
-    for pathName,pathVal in pathDict.items():
-      if pathName == "DYLD_LIBRARY_PATH":
-        continue
-      environment += format("\ncat << \\EOF >> \"$INSTALLROOT/etc/profile.d/init.sh\"\nexport %(key)s=%(value)s${%(key)s+:$%(key)s}\nEOF",
-                            key=pathName,
-                            value=":".join(pathVal))
-
     # The actual build script.
     referenceStatement = ""
     if "reference" in spec:
@@ -1034,33 +1051,35 @@ def doBuild(args, parser):
     else:
       cachedTarball = spec["cachedTarball"]
 
-
-    cmd = format(cmd_raw,
-                 dependencies=dependencies,
-                 dependenciesInit=dependenciesInit,
-                 dependenciesJSON=dependenciesJSON,
-                 develPrefix=develPrefix,
-                 environment=environment,
-                 workDir=workDir,
-                 configDir=abspath(args.configDir),
-                 incremental_recipe=spec.get("incremental_recipe", ":"),
-                 sourceDir=source and (dirname(source) + "/") or "",
-                 sourceName=source and basename(source) or "",
-                 referenceStatement=referenceStatement,
-                 gitOptionsStatement="" if args.docker else
-                   "export GIT_CLONE_SPEEDUP=" + quote(" ".join(clone_speedup_options())),
-                 requires=" ".join(spec["requires"]),
-                 build_requires=" ".join(spec["build_requires"]),
-                 runtime_requires=" ".join(spec["runtime_requires"])
-                )
-
     scriptDir = join(workDir, "SPECS", args.architecture, spec["package"],
                      spec["version"] + "-" + spec["revision"])
 
     err, out = getstatusoutput("mkdir -p %s" % scriptDir)
     dieOnError(err, "Failed to create script dir %s: %s" % (scriptDir, out))
-    writeAll("%s/build.sh" % scriptDir, cmd)
     writeAll("%s/%s.sh" % (scriptDir, spec["package"]), spec["recipe"])
+    writeAll("%s/build.sh" % scriptDir, cmd_raw % {
+      "dependenciesJSON": json.dumps({dep: {
+        "architecture": args.architecture,
+        "package": dep,
+        "version": specs[dep]["version"],
+        "revision": specs[dep]["revision"],
+        "hash": specs[dep]["hash"],
+      } for dep in spec.get("full_requires", ())}),
+      "initdotsh_deps": generate_initdotsh(p, specs, args.architecture, post_build=False),
+      "initdotsh_full": generate_initdotsh(p, specs, args.architecture, post_build=True),
+      "develPrefix": develPrefix,
+      "workDir": workDir,
+      "configDir": abspath(args.configDir),
+      "incremental_recipe": spec.get("incremental_recipe", ":"),
+      "sourceDir": (dirname(source) + "/") if source else "",
+      "sourceName": basename(source) if source else "",
+      "referenceStatement": referenceStatement,
+      "gitOptionsStatement": "" if args.docker else
+      "export GIT_CLONE_SPEEDUP=" + quote(" ".join(clone_speedup_options())),
+      "requires": " ".join(spec["requires"]),
+      "build_requires": " ".join(spec["build_requires"]),
+      "runtime_requires": " ".join(spec["runtime_requires"]),
+    })
 
     banner("Building %s@%s", spec["package"],
            args.develPrefix if "develPrefix" in args and spec["package"] in develPkgs
