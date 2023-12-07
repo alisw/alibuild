@@ -366,21 +366,37 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
   validDefaults = []  # empty list: all OK; None: no valid default; non-empty list: list of valid ones
   while packages:
     p = packages.pop(0)
-    if p in specs:
+    if p in specs or (p == "defaults-release" and ("defaults-" + defaults) in specs):
       continue
-    lowerPkg = p.lower()
-    filename = taps.get(lowerPkg, "%s/%s.sh" % (configDir, lowerPkg))
+
+    # We rewrite all defaults to "defaults-release", so load the correct
+    # defaults package here.
+    # The reason for this rewriting is (I assume) so that packages that are
+    # not overridden by some defaults can be shared with other defaults, since
+    # they will end up with the same hash. The defaults must be called
+    # "defaults-release" for this to work, since the defaults are a dependency
+    # and all dependencies' names go into a package's hash.
+    pkg_filename = ("defaults-" + defaults) if p == "defaults-release" else p.lower()
+    filename = taps.get(pkg_filename, "%s/%s.sh" % (configDir, pkg_filename))
     err, spec, recipe = parseRecipe(getRecipeReader(filename, configDir))
     dieOnError(err, err)
-    dieOnError(spec["package"].lower() != lowerPkg,
+    dieOnError(spec["package"].lower() != pkg_filename,
                "%s.sh has different package field: %s" % (p, spec["package"]))
+
+    # Re-rewrite the defaults' name to "defaults-release". Everything auto-
+    # depends on "defaults-release", so we need something with that name.
+    if p == "defaults-release":
+      spec["package"] = "defaults-release"
     dieOnError(spec["package"] != p,
                "%s should be spelt %s." % (p, spec["package"]))
 
     # If an override fully matches a package, we apply it. This means
     # you can have multiple overrides being applied for a given package.
     for override in overrides:
-      if not re.match("^" + override.strip("^$") + "$", lowerPkg):
+      # We downcase the regex in parseDefaults(), so downcase the package name
+      # as well. FIXME: This is probably a bad idea; we should use
+      # re.IGNORECASE instead or just match case-sensitively.
+      if not re.fullmatch(override, p.lower()):
         continue
       log("Overrides for package %s: %s", spec["package"], overrides[override])
       spec.update(overrides.get(override, {}) or {})
