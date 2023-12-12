@@ -1,5 +1,3 @@
-from __future__ import print_function
-
 # Import as function if they do not have any side effects
 from os.path import dirname, basename
 
@@ -9,15 +7,33 @@ import os
 import glob
 import sys
 import shutil
+from alibuild_helpers import log
 
-def print_results(x):
-  print(x)
 
 def decideClean(workDir, architecture, aggressiveCleanup):
-  """ Decides what to delete, without actually doing it:
-      - Find all the symlinks in "BUILD"
-      - Find all the directories in "BUILD"
-      - Schedule a directory for deletion if it does not have a symlink
+  """Decide what to delete, without actually doing it.
+
+  To clean up obsolete build directories:
+  - Find all the symlinks in "BUILD"
+  - Find all the directories in "BUILD"
+  - Schedule a directory for deletion if it does not have a symlink
+
+  Installed packages are deleted from the final installation directory
+  according to the above scheme as well.
+
+  The temporary directory and temporary install roots are always cleaned up.
+
+  In aggressive mode, the following are also cleaned up:
+
+  - Tarballs (but not their symlinks), since these are expected to either be
+    unpacked in the installation directory, available from the remote store
+    for download, or not needed any more if their installation directory is
+    gone.
+  - Git checkouts for specific tags, since we expect to be able to rebuild
+    those easily from the mirror directory.
+
+  In the case of installed packages and tarballs, only those for the given
+  architecture are considered for deletion.
   """
   symlinksBuild = [os.readlink(x) for x in glob.glob("%s/BUILD/*-latest*" % workDir)]
   # $WORK_DIR/TMP should always be cleaned up. This does not happen only
@@ -42,24 +58,26 @@ def decideClean(workDir, architecture, aggressiveCleanup):
   toDelete = [x for x in toDelete if path.exists(x)]
   return toDelete
 
+
 def doClean(workDir, architecture, aggressiveCleanup, dryRun):
   """ CLI API to cleanup build area """
   toDelete = decideClean(workDir, architecture, aggressiveCleanup)
   if not toDelete:
-    print_results("Nothing to delete.")
+    log.info("Nothing to delete.")
     sys.exit(0)
-  finalMessage = "This will delete the following directories:\n\n" + "\n".join(toDelete)
 
+  log.banner("This %s delete the following directories:\n%s",
+             "would" if dryRun else "will", "\n".join(toDelete))
   if dryRun:
-    finalMessage += "\n\n--dry-run / -n specified. Doing nothing."
-    print_results(finalMessage)
+    log.info("--dry-run / -n specified. Doing nothing.")
     sys.exit(0)
 
-  print_results(finalMessage)
-  for x in toDelete:
+  have_error = False
+  for directory in toDelete:
     try:
-      shutil.rmtree(x)
-    except OSError:
-      print_results("Unable to delete %s." % x)
-      sys.exit(1)
-  sys.exit(0)
+      shutil.rmtree(directory)
+    except OSError as exc:
+      have_error = True
+      log.error("Unable to delete %s:", directory, exc_info=exc)
+
+  sys.exit(1 if have_error else 0)
