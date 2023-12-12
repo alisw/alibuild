@@ -21,7 +21,7 @@ except ImportError:
 
 from alibuild_helpers.cmd import decode_with_fallback, getoutput
 from alibuild_helpers.git import git
-from alibuild_helpers.log import dieOnError
+from alibuild_helpers.log import warning, dieOnError
 
 
 class SpecError(Exception):
@@ -383,10 +383,18 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
     dieOnError(spec["package"].lower() != pkg_filename,
                "%s.sh has different package field: %s" % (p, spec["package"]))
 
-    # Re-rewrite the defaults' name to "defaults-release". Everything auto-
-    # depends on "defaults-release", so we need something with that name.
     if p == "defaults-release":
+      # Re-rewrite the defaults' name to "defaults-release". Everything auto-
+      # depends on "defaults-release", so we need something with that name.
       spec["package"] = "defaults-release"
+
+      # Never run the defaults' recipe, to match previous behaviour.
+      # Warn if a non-trivial recipe is found (i.e., one with any non-comment lines).
+      for line in map(str.strip, recipe.splitlines()):
+        if line and not line.startswith("#"):
+          warning("%s.sh contains a recipe, which will be ignored", pkg_filename)
+      recipe = ""
+
     dieOnError(spec["package"] != p,
                "%s should be spelt %s." % (p, spec["package"]))
 
