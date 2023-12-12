@@ -359,7 +359,7 @@ def generate_initdotsh(package, specs, architecture, post_build=False):
   # These variables are also required during the build itself, so always
   # generate them.
   lines.extend((
-    '[ -z "${{{bigpackage}_REVISION}}" ] && '
+    '[ -n "${{{bigpackage}_REVISION}}" ] || '
     '. "$WORK_DIR/$ALIBUILD_ARCH_PREFIX"/{package}/{version}-{revision}/etc/profile.d/init.sh'
   ).format(
     bigpackage=dep.upper().replace("-", "_"),
