@@ -506,7 +506,8 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
     spec["tag"] = spec.get("tag", spec["version"])
     spec["version"] = spec["version"].replace("/", "_")
     spec["recipe"] = recipe.strip("\n")
-    spec["force_rebuild"] = spec["package"] in force_rebuild
+    if spec["package"] in force_rebuild:
+      spec["force_rebuild"] = True
     specs[spec["package"]] = spec
     packages += spec["requires"]
   return (systemPackages, ownPackages, failedRequirements, validDefaults)
