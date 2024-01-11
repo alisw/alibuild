@@ -1135,6 +1135,7 @@ def doBuild(args, parser):
         overrideSource="-e SOURCE0_DIR_OVERRIDE=/" if source.startswith("/") else "",
         additionalEnv=" ".join(
           "-e {}={}".format(var, quote(value)) for var, value in buildEnvironment),
+        # Used e.g. by O2DPG-sim-tests to find the O2DPG repository.
         develVolumes=" ".join(
           '-v "$PWD/$(readlink {pkg} || echo {pkg})":/{pkg}:rw'.format(pkg=quote(pkg))
           for pkg in develPkgs),
