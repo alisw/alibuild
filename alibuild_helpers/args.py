@@ -272,6 +272,29 @@ def doParseArgs():
                                    "Passed through verbatim -- separate multiple arguments "
                                    "with spaces, and make sure quoting is correct! Implies --docker."))
 
+  doctor_remote = doctor_parser.add_argument_group(title="Re-use prebuilt tarballs", description="""\
+  Reusing prebuilt tarballs saves compilation time, as common packages need not
+  be rebuilt from scratch. rsync://, https://, b3:// and s3:// remote stores
+  are recognised. Some of these require credentials: s3:// remotes require an
+  ~/.s3cfg; b3:// remotes require AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY
+  environment variables. A useful remote store is
+  'https://s3.cern.ch/swift/v1/alibuild-repo'. It requires no credentials and
+  provides tarballs for the most common supported architectures.
+  """)
+  doctor_remote.add_argument("--no-remote-store", action="store_true",
+                            help="Disable the use of the remote store, even if it is enabled by default.")
+  doctor_remote.add_argument("--remote-store", dest="remoteStore", metavar="STORE", default="", help="""\
+  Where to find prebuilt tarballs to reuse. See above for available remote stores.
+  End with ::rw if you want to upload (in that case, ::rw is stripped and --write-store
+  is set to the same value). Implies --no-system. May be set to a default store on some
+  architectures; use --no-remote-store to disable it in that case.
+  """)
+  doctor_remote.add_argument("--write-store", dest="writeStore", metavar="STORE", default="",
+                            help=("Where to upload newly built packages. Same syntax as --remote-store, "
+                                  "except ::rw is not recognised. Implies --no-system."))
+  doctor_remote.add_argument("--insecure", dest="insecure", action="store_true",
+                            help="Don't validate TLS certificates when connecting to an https:// remote store.")
+
   doctor_dirs = doctor_parser.add_argument_group(title="Customise aliBuild directories")
   doctor_dirs.add_argument("-C", "--chdir", metavar="DIR", dest="chdir", default=DEFAULT_CHDIR,
                            help=("Change to the specified directory before doing anything. "
@@ -410,7 +433,7 @@ def finaliseArgs(args, parser):
     if args.docker and not args.dockerImage:
       args.dockerImage = "registry.cern.ch/alisw/%s-builder" % args.architecture.split("_")[0]
 
-  if args.action == "build":
+  if args.action in ("build", "doctor"):
     args.configDir = args.configDir
 
     # On selected platforms, caching is active by default
