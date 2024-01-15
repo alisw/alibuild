@@ -32,7 +32,6 @@ except ImportError:
   from pipes import quote  # Python 2.7
 
 import concurrent.futures
-import errno
 import importlib
 import json
 import socket
@@ -802,9 +801,8 @@ def doBuild(args, parser):
                   for symlink in os.listdir(symlink_dir)
                   if links_regex.fullmatch(symlink)]
     except OSError as exc:
-      # If symlink_dir does not exist, return an empty list of packages.
-      if exc.errno != errno.ENOENT:
-        raise
+      # If symlink_dir does not exist or cannot be accessed, return an empty
+      # list of packages.
       packages = []
     del links_regex, symlink_dir
 
