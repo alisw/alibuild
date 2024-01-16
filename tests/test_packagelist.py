@@ -14,6 +14,7 @@ RECIPES = {
     "CONFIG_DIR/defaults-release.sh": dedent("""\
     package: defaults-release
     version: v1
+    force_rebuild: false
     ---
     """),
     "CONFIG_DIR/disable.sh": dedent("""\
@@ -63,6 +64,12 @@ RECIPES = {
         : magic sentinel command
     ---
     """),
+    "CONFIG_DIR/force-rebuild.sh": dedent("""\
+    package: force-rebuild
+    version: v1
+    force_rebuild: true
+    ---
+    """),
 }
 
 
@@ -75,7 +82,7 @@ class MockReader:
         return self._contents
 
 
-def getPackageListWithDefaults(packages):
+def getPackageListWithDefaults(packages, force_rebuild=()):
     specs = {}   # getPackageList will mutate this
     return_values = getPackageList(
         packages=packages,
@@ -89,12 +96,14 @@ def getPackageListWithDefaults(packages):
         architecture="ARCH",
         disable=[],
         defaults="release",
+        # Mock recipes just run "echo" or ":", so this is safe.
         performPreferCheck=lambda spec, cmd: getstatusoutput(cmd),
         performRequirementCheck=lambda spec, cmd: getstatusoutput(cmd),
         performValidateDefaults=lambda spec: (True, "", ["release"]),
         overrides={"defaults-release": {}},
         taps={},
         log=lambda *_: None,
+        force_rebuild=force_rebuild,
     )
     return (specs, *return_values)
 
@@ -155,6 +164,25 @@ class ReplacementTestCase(unittest.TestCase):
             getPackageListWithDefaults(["missing-spec"])
         mock_dieOnError.assert_any_call(True, "Could not find named replacement "
                                         "spec for missing-spec: missing_tag")
+
+
+@mock.patch("alibuild_helpers.utilities.getRecipeReader", new=MockReader)
+class ForceRebuildTestCase(unittest.TestCase):
+    """Test that force_rebuild keys are applied properly."""
+
+    def test_force_rebuild_recipe(self):
+        """If the recipe specifies force_rebuild, it must be applied."""
+        specs, _, _, _, _ = getPackageListWithDefaults(["force-rebuild"])
+        self.assertTrue(specs["force-rebuild"]["force_rebuild"])
+        self.assertFalse(specs["defaults-release"]["force_rebuild"])
+
+    def test_force_rebuild_command_line(self):
+        """The --force-rebuild option must take precedence, if given."""
+        specs, _, _, _, _ = getPackageListWithDefaults(
+            ["force-rebuild"], force_rebuild=["defaults-release", "force-rebuild"],
+        )
+        self.assertTrue(specs["force-rebuild"]["force_rebuild"])
+        self.assertTrue(specs["defaults-release"]["force_rebuild"])
 
 
 if __name__ == '__main__':
