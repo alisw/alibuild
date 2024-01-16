@@ -355,11 +355,12 @@ On Linux, x86-64:
 On Linux, POWER8 / PPC64 (little endian):
    RHEL7 / CC7 compatible: slc7_ppc64
 
-On Mac, x86-64:
-   Yosemite to Big Sur: osx_x86-64
-   Big Sur: osx_arm64
+On Mac, 1-2 latest supported OSX versions:
+   Intel: osx_x86-64
+   Apple Silicon: osx_arm64
 """
 
+# When updating this variable, also update docs/user.markdown!
 S3_SUPPORTED_ARCHS = "slc7_x86-64", "slc8_x86-64", "ubuntu2004_x86-64", "ubuntu2204_x86-64", "slc9_x86-64"
 
 def finaliseArgs(args, parser):
