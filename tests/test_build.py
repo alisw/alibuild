@@ -220,30 +220,32 @@ class BuildTestCase(unittest.TestCase):
     @patch("alibuild_helpers.build.open", new=MagicMock(side_effect=dummy_open))
     @patch("codecs.open", new=MagicMock(side_effect=dummy_open))
     @patch("alibuild_helpers.build.shutil", new=MagicMock())
-    @patch("alibuild_helpers.build.glob")
+    @patch("os.listdir")
+    @patch("alibuild_helpers.build.glob", new=lambda pattern: {
+        "*": ["zlib"],
+        "/sw/TARS/osx_x86-64/store/%s/%s/*gz" % (TEST_DEFAULT_RELEASE_BUILD_HASH[:2],
+                                                 TEST_DEFAULT_RELEASE_BUILD_HASH): [],
+        "/sw/TARS/osx_x86-64/store/%s/%s/*gz" % (TEST_ZLIB_BUILD_HASH[:2], TEST_ZLIB_BUILD_HASH): [],
+        "/sw/TARS/osx_x86-64/store/%s/%s/*gz" % (TEST_ROOT_BUILD_HASH[:2], TEST_ROOT_BUILD_HASH): [],
+        "/sw/TARS/osx_x86-64/defaults-release/defaults-release-v1-1.osx_x86-64.tar.gz":
+        ["../../osx_x86-64/store/%s/%s/defaults-release-v1-1.osx_x86-64.tar.gz" %
+         (TEST_DEFAULT_RELEASE_BUILD_HASH[:2], TEST_DEFAULT_RELEASE_BUILD_HASH)],
+    }[pattern])
     @patch("alibuild_helpers.build.readlink", new=dummy_readlink)
     @patch("alibuild_helpers.build.banner", new=MagicMock(return_value=None))
     @patch("alibuild_helpers.build.debug")
     @patch("alibuild_helpers.workarea.is_writeable", new=MagicMock(return_value=True))
     @patch("alibuild_helpers.build.basename", new=MagicMock(return_value="aliBuild"))
     @patch("alibuild_helpers.build.install_wrapper_script", new=MagicMock())
-    def test_coverDoBuild(self, mock_debug, mock_glob, mock_warning, mock_sys, mock_git_git):
+    def test_coverDoBuild(self, mock_debug, mock_listdir, mock_warning, mock_sys, mock_git_git):
         mock_git_git.side_effect = dummy_git
         mock_debug.side_effect = lambda *args: None
         mock_warning.side_effect = lambda *args: None
-        mock_glob.side_effect = lambda x: {
-            "*": ["zlib"],
-            "/sw/TARS/osx_x86-64/defaults-release/defaults-release-v1-*.osx_x86-64.tar.gz": ["/sw/TARS/osx_x86-64/defaults-release/defaults-release-v1-1.osx_x86-64.tar.gz"],
-            "/sw/TARS/osx_x86-64/zlib/zlib-v1.2.3-*.osx_x86-64.tar.gz": [],
-            "/sw/TARS/osx_x86-64/ROOT/ROOT-v6-08-30-*.osx_x86-64.tar.gz": [],
-            "/sw/TARS/osx_x86-64/store/%s/%s/*gz" % (TEST_DEFAULT_RELEASE_BUILD_HASH[:2],
-                                                     TEST_DEFAULT_RELEASE_BUILD_HASH): [],
-            "/sw/TARS/osx_x86-64/store/%s/%s/*gz" % (TEST_ZLIB_BUILD_HASH[:2], TEST_ZLIB_BUILD_HASH): [],
-            "/sw/TARS/osx_x86-64/store/%s/%s/*gz" % (TEST_ROOT_BUILD_HASH[:2], TEST_ROOT_BUILD_HASH): [],
-            "/sw/TARS/osx_x86-64/defaults-release/defaults-release-v1-1.osx_x86-64.tar.gz":
-            ["../../osx_x86-64/store/%s/%s/defaults-release-v1-1.osx_x86-64.tar.gz" %
-             (TEST_DEFAULT_RELEASE_BUILD_HASH[:2], TEST_DEFAULT_RELEASE_BUILD_HASH)],
-        }[x]
+        mock_listdir.side_effect = lambda directory: {
+            "/sw/TARS/osx_x86-64/defaults-release": ["defaults-release-v1-1.osx_x86-64.tar.gz"],
+            "/sw/TARS/osx_x86-64/zlib": [],
+            "/sw/TARS/osx_x86-64/ROOT": [],
+        }.get(directory, DEFAULT)
         os.environ["ALIBUILD_NO_ANALYTICS"] = "1"
 
         mock_parser = MagicMock()
@@ -306,7 +308,7 @@ class BuildTestCase(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         mock_warning.assert_called_with("%s.sh contains a recipe, which will be ignored", "defaults-release")
         mock_debug.assert_called_with("Everything done")
-        mock_glob.assert_called_with("/sw/TARS/osx_x86-64/ROOT/ROOT-v6-08-30-*.osx_x86-64.tar.gz")
+        mock_listdir.assert_called_with("/sw/TARS/osx_x86-64/ROOT")
         # We can't compare directly against the list of calls here as they
         # might happen in any order.
         self.assertEqual(mock_git_git.call_count, len(common_calls) + 1)

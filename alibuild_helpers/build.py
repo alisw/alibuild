@@ -786,13 +786,26 @@ def doBuild(args, parser):
     # Decide how it should be called, based on the hash and what is already
     # available.
     debug("Checking for packages already built.")
-    linksGlob = format("%(w)s/TARS/%(a)s/%(p)s/%(p)s-%(v)s-*.%(a)s.tar.gz",
-                       w=workDir,
-                       a=args.architecture,
-                       p=spec["package"],
-                       v=spec["version"])
-    debug("Glob pattern used: %s", linksGlob)
-    packages = glob(linksGlob)
+
+    # Make sure this regex broadly matches the regex below that parses the
+    # symlink's target. Overly-broadly matching the version, for example, can
+    # lead to false positives that trigger a warning below.
+    links_regex = re.compile(r"{package}-{version}-(?:local)?[0-9]+\.{arch}\.tar\.gz".format(
+      package=re.escape(spec["package"]),
+      version=re.escape(spec["version"]),
+      arch=re.escape(args.architecture),
+    ))
+    symlink_dir = join(workDir, "TARS", args.architecture, spec["package"])
+    try:
+      packages = [join(symlink_dir, symlink)
+                  for symlink in os.listdir(symlink_dir)
+                  if links_regex.fullmatch(symlink)]
+    except OSError as exc:
+      # If symlink_dir does not exist or cannot be accessed, return an empty
+      # list of packages.
+      packages = []
+    del links_regex, symlink_dir
+
     # In case there is no installed software, revision is 1
     # If there is already an installed package:
     # - Remove it if we do not know its hash
