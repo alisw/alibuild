@@ -440,9 +440,7 @@ def finaliseArgs(args, parser):
     if args.docker and not args.dockerImage:
       args.dockerImage = "registry.cern.ch/alisw/%s-builder" % args.architecture.split("_")[0]
 
-  if args.action in ("build", "doctor"):
-    args.configDir = args.configDir
-
+  if "annotate" in args:
     for comment_assignment in args.annotate:
       if "=" not in comment_assignment:
         parser.error("--annotate takes arguments of the form PACKAGE=COMMENT")
@@ -451,6 +449,9 @@ def finaliseArgs(args, parser):
       for package, _, comment
       in (assignment.partition("=") for assignment in args.annotate)
     }
+
+  if args.action in ("build", "doctor"):
+    args.configDir = args.configDir
 
     # On selected platforms, caching is active by default
     if args.architecture in S3_SUPPORTED_ARCHS and not args.preferSystem and not args.no_remote_store:
