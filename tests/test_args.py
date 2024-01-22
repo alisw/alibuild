@@ -34,6 +34,7 @@ PARSER_ERRORS = {
   "build zlib --architecture foo": ARCHITECTURE_ERROR,
   "build --force-unknown-architecture zlib --remote-store rsync://test1.local/::rw --write-store rsync://test2.local/::rw ": [call('cannot specify ::rw and --write-store at the same time')],
   "build zlib -a osx_x86-64 --docker-image foo": [call('cannot use `-a osx_x86-64` and --docker')],
+  "build zlib -a slc7_x86-64 --annotate foobar": [call("--annotate takes arguments of the form PACKAGE=COMMENT")],
   "analytics": [call(ANALYTICS_MISSING_STATE_ERROR)]
 }
 

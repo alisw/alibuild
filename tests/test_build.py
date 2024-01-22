@@ -264,6 +264,7 @@ class BuildTestCase(unittest.TestCase):
             force_rebuild=[],
             defaults="release",
             jobs=2,
+            annotate={},
             preferSystem=[],
             noSystem=False,
             debug=True,
