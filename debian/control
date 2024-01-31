@@ -9,5 +9,6 @@ X-Python3-Version: >= 3.6
 Package: python3-alibuild
 Architecture: all
 Description: ALICE build tool.
-	Please refer to https://alisw.github.io for full documentation
+	Please refer to https://alisw.github.io/alibuild for full documentation.
 Depends: ${python3:Depends},python3-requests,python3-yaml
+Recommends: pigz
