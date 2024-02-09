@@ -241,10 +241,11 @@ fi
 if [[ ${ARCHITECTURE:0:3} == "osx" ]]; then
   otool_arch=$(echo "${ARCHITECTURE#osx_}" | tr - _)  # otool knows x86_64, not x86-64
 
-  /usr/bin/find ${RELOCATE_PATHS:-bin lib lib64} -type f \
-                -not -name '*.py' -not -name '*.pyc' -not -name '*.h' -not -name '*.js' \
-                -not -name '*.txt' -not -name '*.dat' -not -name '*.sav' -not -name '*.wav' \
-                -not -name '*.png' -not -name '*.css' -not -name '*.cc' |
+  /usr/bin/find ${RELOCATE_PATHS:-bin lib lib64} -type d \( -name '*.dist-info' -o -path '*/pytz/zoneinfo' \) -prune -false -o -type f \
+                -not -name '*.py' -not -name '*.pyc' -not -name '*.pyi' -not -name '*.pxd' -not -name '*.inc' -not -name '*.js' -not -name '*.json' \
+                -not -name '*.xml' -not -name '*.xsl' -not -name '*.txt' -not -name '*.dat' -not -name '*.mat' -not -name '*.sav' -not -name '*.csv' \
+                -not -name '*.wav' -not -name '*.png' -not -name '*.svg' -not -name '*.css' -not -name '*.html' -not -name '*.woff' -not -name '*.woff2' -not -name '*.ttf' \
+                -not -name LICENSE -not -name COPYING -not -name '*.c' -not -name '*.cc' -not -name '*.cxx' -not -name '*.cpp' -not -name '*.h' -not -name '*.hpp' |
     while read -r BIN; do
       MACHOTYPE=$(set +o pipefail; otool -arch "$otool_arch" -h "$PWD/$BIN" 2> /dev/null | grep filetype -A1 | awk 'END{print $5}')
 
