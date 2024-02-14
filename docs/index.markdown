@@ -13,19 +13,19 @@ A simple build tool for ALICE experiment software and its externals. Recipes
 for the externals and ALICE software are stored in
 [alidist](https://github.com/alisw/alidist).
 
-Install with:
+You can install aliBuild on [Ubuntu][ubuntu], [MacOS][mac], [CentOS 7][centos7], [Alma 8][alma8], [Alma 9][alma9] and [Fedora][fedora].
 
-    pip install alibuild
+[centos7]: https://alice-doc.github.io/alice-analysis-tutorial/building/prereq-centos7.html
+[alma8]: https://alice-doc.github.io/alice-analysis-tutorial/building/prereq-centos8.html
+[alma9]: https://alice-doc.github.io/alice-analysis-tutorial/building/prereq-alma9.html
+[ubuntu]: https://alice-doc.github.io/alice-analysis-tutorial/building/prereq-ubuntu.html
+[mac]: https://alice-doc.github.io/alice-analysis-tutorial/building/prereq-macos.html
+[fedora]: https://alice-doc.github.io/alice-analysis-tutorial/building/prereq-fedora.html
 
-On macOS you can also install with:
-
-    brew tap alisw/system-deps
-    brew install alisw/system-deps/alibuild
-
-Instant gratification on your machine with:
+Then, build ALICE's software with:
 
     git clone https://github.com/alisw/alidist.git
-    aliBuild build AliRoot
+    aliBuild build O2Physics
 
 For a more verbose documentation of what is happening have a look at
 the [quickstart guide](quick.html). See the [user guide](user.html)
