@@ -1255,7 +1255,7 @@ def doBuild(args, parser):
   for x in develPkgs:
     banner("Build directory for devel package %s:\n%s/BUILD/%s-latest%s/%s",
            x, abspath(args.workDir), x, "-"+args.develPrefix if "develPrefix" in args else "", x)
-  for x in untrackedFilesDirectories:
+  if untrackedFilesDirectories:
     banner("Untracked files in the following directories resulted in a rebuild of "
            "the associated package and its dependencies:\n%s\n\nPlease commit or remove them to avoid useless rebuilds.", "\n".join(untrackedFilesDirectories))
   debug("Everything done")
