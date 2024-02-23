@@ -20,27 +20,26 @@ MOCK_SPEC = OrderedDict((
 ))
 
 
-@patch("alibuild_helpers.workarea.debug", new=MagicMock())
-@patch("alibuild_helpers.workarea.info", new=MagicMock())
-@patch("alibuild_helpers.workarea.clone_speedup_options",
+@patch("alibuild_helpers.git.clone_speedup_options",
        new=MagicMock(return_value=["--filter=blob:none"]))
+@patch("alibuild_helpers.workarea.debug", new=MagicMock())
 class WorkareaTestCase(unittest.TestCase):
 
-    @patch("os.path.exists")
+    @patch("os.path.isdir")
     @patch("os.makedirs")
     @patch("alibuild_helpers.git")
     @patch("alibuild_helpers.workarea.is_writeable", new=MagicMock(return_value=False))
-    def test_reference_sources_reused(self, mock_git, mock_makedirs, mock_exists):
+    def test_reference_sources_reused(self, mock_git, mock_makedirs, mock_isdir):
         """Check mirrors are reused when pre-existing, but not writable.
 
         In this case, make sure nothing is fetched, even when requested.
         """
-        mock_exists.return_value = True
+        mock_isdir.return_value = True
         spec = MOCK_SPEC.copy()
         updateReferenceRepoSpec(referenceSources="sw/MIRROR", p="AliRoot",
                                 spec=spec, fetch=True)
-        mock_exists.assert_called_with("%s/sw/MIRROR/aliroot" % getcwd())
-        mock_makedirs.assert_called_with("%s/sw/MIRROR" % getcwd())
+        mock_isdir.assert_called_with("%s/sw/MIRROR/aliroot" % getcwd())
+        mock_makedirs.assert_called_with("%s/sw/MIRROR" % getcwd(), exist_ok=True)
         mock_git.assert_not_called()
         self.assertEqual(spec.get("reference"), "%s/sw/MIRROR/aliroot" % getcwd())
 
@@ -60,25 +59,24 @@ class WorkareaTestCase(unittest.TestCase):
         updateReferenceRepoSpec(referenceSources="sw/MIRROR", p="AliRoot",
                                 spec=spec, fetch=True)
         mock_exists.assert_called_with("%s/sw/MIRROR/aliroot" % getcwd())
-        mock_exists.assert_has_calls([])
-        mock_makedirs.assert_called_with("%s/sw/MIRROR" % getcwd())
+        mock_makedirs.assert_called_with("%s/sw/MIRROR" % getcwd(), exist_ok=True)
         mock_git.assert_called_once_with([
             "fetch", "-f", "--tags", spec["source"], "+refs/heads/*:refs/heads/*",
         ], directory="%s/sw/MIRROR/aliroot" % getcwd(), check=False, prompt=True)
         self.assertEqual(spec.get("reference"), "%s/sw/MIRROR/aliroot" % getcwd())
 
-    @patch("os.path.exists")
+    @patch("os.path.isdir")
     @patch("os.makedirs")
     @patch("alibuild_helpers.git")
     @patch("alibuild_helpers.workarea.is_writeable", new=MagicMock(return_value=False))
-    def test_reference_sources_not_writable(self, mock_git, mock_makedirs, mock_exists):
+    def test_reference_sources_not_writable(self, mock_git, mock_makedirs, mock_isdir):
         """Check nothing is fetched when mirror directory isn't writable."""
-        mock_exists.side_effect = lambda path: not path.endswith("/aliroot")
+        mock_isdir.side_effect = lambda path: not path.endswith("/aliroot")
         spec = MOCK_SPEC.copy()
         updateReferenceRepoSpec(referenceSources="sw/MIRROR", p="AliRoot",
                                 spec=spec, fetch=True)
-        mock_exists.assert_called_with("%s/sw/MIRROR/aliroot" % getcwd())
-        mock_makedirs.assert_called_with("%s/sw/MIRROR" % getcwd())
+        mock_isdir.assert_called_with("%s/sw/MIRROR/aliroot" % getcwd())
+        mock_makedirs.assert_called_with("%s/sw/MIRROR" % getcwd(), exist_ok=True)
         mock_git.assert_not_called()
         self.assertNotIn("reference", spec,
                          "should delete spec['reference'], as no mirror exists")
@@ -95,7 +93,7 @@ class WorkareaTestCase(unittest.TestCase):
         updateReferenceRepoSpec(referenceSources="sw/MIRROR", p="AliRoot",
                                 spec=spec, fetch=True)
         mock_exists.assert_called_with("%s/sw/MIRROR/aliroot" % getcwd())
-        mock_makedirs.assert_called_with("%s/sw/MIRROR" % getcwd())
+        mock_makedirs.assert_called_with("%s/sw/MIRROR" % getcwd(), exist_ok=True)
         mock_git.assert_called_once_with([
             "clone", "--bare", spec["source"],
             "%s/sw/MIRROR/aliroot" % getcwd(), "--filter=blob:none",

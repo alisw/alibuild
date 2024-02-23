@@ -10,13 +10,28 @@ import requests
 from requests.exceptions import RequestException
 
 from alibuild_helpers.cmd import execute
-from alibuild_helpers.log import debug, error, dieOnError
+from alibuild_helpers.log import debug, info, error, dieOnError, ProgressPrint
 from alibuild_helpers.utilities import resolve_store_path, resolve_links_path
+
+
+def remote_from_url(read_url, write_url, architecture, work_dir, insecure=False):
+  """Parse remote store URLs and return the correct RemoteSync instance for them."""
+  if read_url.startswith("http"):
+    return HttpRemoteSync(read_url, architecture, work_dir, insecure)
+  if read_url.startswith("s3://"):
+    return S3RemoteSync(read_url, write_url, architecture, work_dir)
+  if read_url.startswith("b3://"):
+    return Boto3RemoteSync(read_url, write_url, architecture, work_dir)
+  if read_url:
+    return RsyncRemoteSync(read_url, write_url, architecture, work_dir)
+  return NoRemoteSync()
 
 
 class NoRemoteSync:
   """Helper class which does not do anything to sync"""
-  def syncToLocal(self, p, spec):
+  def fetch_symlinks(self, spec):
+    pass
+  def fetch_tarball(self, spec):
     pass
   def syncToRemote(self, p, spec):
     pass
@@ -40,7 +55,7 @@ class HttpRemoteSync:
     self.httpConnRetries = 4
     self.httpBackoff = 0.4
 
-  def getRetry(self, url, dest=None, returnResult=False, log=True, session=None):
+  def getRetry(self, url, dest=None, returnResult=False, log=True, session=None, progress=None):
     get = session.get if session is not None else requests.get
     for i in range(0, self.httpConnRetries):
       if i > 0:
@@ -78,7 +93,10 @@ class HttpRemoteSync:
                 if downloaded == size:
                   debug("Download complete")
                 elif now - reportTime > 3:
-                  debug("%.0f%% downloaded...", 100*downloaded/size)
+                  if progress:
+                    progress("[%d/%d] bytes fetched", downloaded, size)
+                  else:
+                    debug("%.0f%% downloaded...", 100*downloaded/size)
                   reportTime = now
           finally:
             if destFp:
@@ -120,7 +138,7 @@ class HttpRemoteSync:
             pass
     return None
 
-  def syncToLocal(self, p, spec):
+  def fetch_tarball(self, spec):
     # Check for any existing tarballs we can use instead of fetching new ones.
     for pkg_hash in spec["remote_hashes"]:
       try:
@@ -135,12 +153,12 @@ class HttpRemoteSync:
             arch=re.escape(self.architecture),
         ), os.path.basename(tarball)):
           debug("Previously downloaded tarball for %s with hash %s, reusing",
-                p, pkg_hash)
+                spec["package"], pkg_hash)
           return
 
     with requests.Session() as session:
       debug("Updating remote store for package %s; trying hashes %s",
-            p, ", ".join(spec["remote_hashes"]))
+            spec["package"], ", ".join(spec["remote_hashes"]))
       store_path = use_tarball = None
       # Find the first tarball that matches any possible hash and fetch it.
       for pkg_hash in spec["remote_hashes"]:
@@ -152,19 +170,25 @@ class HttpRemoteSync:
           break
 
       if store_path is None or use_tarball is None:
-        debug("Nothing fetched for %s (%s)", p, ", ".join(spec["remote_hashes"]))
+        debug("Nothing fetched for %s (%s)", spec["package"], ", ".join(spec["remote_hashes"]))
         return
 
-      links_path = resolve_links_path(self.architecture, spec["package"])
-      execute("mkdir -p {}/{} {}/{}".format(self.workdir, store_path,
-                                            self.workdir, links_path))
+      os.makedirs(os.path.join(self.workdir, store_path), exist_ok=True)
 
       destPath = os.path.join(self.workdir, store_path, use_tarball)
       if not os.path.isfile(destPath):
         # Do not download twice
+        progress = ProgressPrint("Downloading precompiled tarball for %s" % spec["package"])
+        progress("%s", "[0%]")   # initialise progress line
         self.getRetry("/".join((self.remoteStore, store_path, use_tarball)),
-                      destPath, session=session)
+                      destPath, session=session, progress=progress)
+        progress.end("done")
 
+  def fetch_symlinks(self, spec):
+    links_path = resolve_links_path(self.architecture, spec["package"])
+    os.makedirs(os.path.join(self.workdir, links_path), exist_ok=True)
+
+    with requests.Session() as session:
       # Fetch manifest file with initial symlinks. This file is updated
       # regularly; we use it to avoid many small network requests.
       manifest = self.getRetry("%s/%s.manifest" % (self.remoteStore, links_path),
@@ -175,10 +199,6 @@ class HttpRemoteSync:
                                       for line in manifest.splitlines())
         if sep and linkname and target
       }
-      # If we've just downloaded a tarball, add a symlink to it.
-      # We need to strip the leading TARS/ first, though.
-      assert store_path.startswith("TARS/"), store_path
-      symlinks[use_tarball] = os.path.join(store_path[len("TARS/"):], use_tarball)
       # Now add any remaining symlinks that aren't in the manifest yet. There
       # should always be relatively few of these, as the separate network
       # requests are a bit expensive.
@@ -217,12 +237,11 @@ class RsyncRemoteSync:
     self.architecture = architecture
     self.workdir = workdir
 
-  def syncToLocal(self, p, spec):
-    debug("Updating remote store for package %s with hashes %s", p,
+  def fetch_tarball(self, spec):
+    info("Downloading precompiled tarball for %s, if available", spec["package"])
+    debug("Updating remote store for package %s with hashes %s", spec["package"],
           ", ".join(spec["remote_hashes"]))
     err = execute("""\
-    mkdir -p {workDir}/{linksPath}
-    rsync -rlvW --delete {remoteStore}/{linksPath}/ {workDir}/{linksPath}/ || :
     for storePath in {storePaths}; do
       # Only get the first matching tarball. If there are multiple with the
       # same hash, we only need one and they should be interchangable.
@@ -239,13 +258,21 @@ class RsyncRemoteSync:
         break
       fi
     done
-    """.format(pkg=p, ver=spec["version"], arch=self.architecture,
+    """.format(pkg=spec["package"], ver=spec["version"], arch=self.architecture,
                remoteStore=self.remoteStore,
                workDir=self.workdir,
-               linksPath=resolve_links_path(self.architecture, p),
                storePaths=" ".join(resolve_store_path(self.architecture, pkg_hash)
                                    for pkg_hash in spec["remote_hashes"])))
     dieOnError(err, "Unable to update from specified store.")
+
+  def fetch_symlinks(self, spec):
+    links_path = resolve_links_path(self.architecture, spec["package"])
+    os.makedirs(os.path.join(self.workdir, links_path), exist_ok=True)
+    execute("rsync -rlvW --delete {remote_store}/{links_path}/ {workdir}/{links_path}/".format(
+      remote_store=self.remoteStore,
+      links_path=links_path,
+      workdir=self.workdir,
+    ))
 
   def syncToRemote(self, p, spec):
     if not self.writeStore:
@@ -283,8 +310,9 @@ class S3RemoteSync:
     self.architecture = architecture
     self.workdir = workdir
 
-  def syncToLocal(self, p, spec):
-    debug("Updating remote store for package %s with hashes %s", p,
+  def fetch_tarball(self, spec):
+    info("Downloading precompiled tarball for %s, if available", spec["package"])
+    debug("Updating remote store for package %s with hashes %s", spec["package"],
           ", ".join(spec["remote_hashes"]))
     err = execute("""\
     for storePath in {storePaths}; do
@@ -297,6 +325,16 @@ class S3RemoteSync:
         break
       fi
     done
+    """.format(
+      b=self.remoteStore,
+      storePaths=" ".join(resolve_store_path(self.architecture, pkg_hash)
+                          for pkg_hash in spec["remote_hashes"]),
+      workDir=self.workdir,
+    ))
+    dieOnError(err, "Unable to update from specified store.")
+
+  def fetch_symlinks(self, spec):
+    err = execute("""\
     mkdir -p "{workDir}/{linksPath}"
     find "{workDir}/{linksPath}" -type l -delete
     curl -sL "https://s3.cern.ch/swift/v1/{b}/{linksPath}.manifest" |
@@ -312,9 +350,7 @@ class S3RemoteSync:
     done
     """.format(
       b=self.remoteStore,
-      storePaths=" ".join(resolve_store_path(self.architecture, pkg_hash)
-                          for pkg_hash in spec["remote_hashes"]),
-      linksPath=resolve_links_path(self.architecture, p),
+      linksPath=resolve_links_path(self.architecture, spec["package"]),
       workDir=self.workdir,
     ))
     dieOnError(err, "Unable to update from specified store.")
@@ -417,17 +453,16 @@ class Boto3RemoteSync:
       raise
     return True
 
-  def syncToLocal(self, p, spec):
-    from botocore.exceptions import ClientError
-    debug("Updating remote store for package %s with hashes %s", p,
+  def fetch_tarball(self, spec):
+    debug("Updating remote store for package %s with hashes %s", spec["package"],
           ", ".join(spec["remote_hashes"]))
 
     # If we already have a tarball with any equivalent hash, don't check S3.
     have_tarball = False
     for pkg_hash in spec["remote_hashes"]:
       store_path = resolve_store_path(self.architecture, pkg_hash)
-      if glob.glob(os.path.join(self.workdir, store_path, "%s-*.tar.gz" % p)):
-        debug("Reusing existing tarball for %s@%s", p, pkg_hash)
+      if glob.glob(os.path.join(self.workdir, store_path, "%s-*.tar.gz" % spec["package"])):
+        debug("Reusing existing tarball for %s@%s", spec["package"], pkg_hash)
         have_tarball = True
         break
 
@@ -442,19 +477,26 @@ class Boto3RemoteSync:
       # ever use one anyway.)
       for tarball in self._s3_listdir(store_path):
         debug("Fetching tarball %s", tarball)
+        progress = ProgressPrint("Downloading precompiled tarball for %s" % spec["package"])
+        progress("%s", "[0%]")   # initialise progress line
         # Create containing directory locally. (exist_ok= is python3-specific.)
         os.makedirs(os.path.join(self.workdir, store_path), exist_ok=True)
+        meta = self.s3.head_object(Bucket=self.remoteStore, Key=tarball)
+        total_size = int(meta.get("ContentLength", 0))
         self.s3.download_file(Bucket=self.remoteStore, Key=tarball,
-                              Filename=os.path.join(self.workdir, store_path,
-                                                    os.path.basename(tarball)))
+                              Filename=os.path.join(self.workdir, store_path, os.path.basename(tarball)),
+                              Callback=lambda num_bytes: progress("[%d/%d] bytes transferred", num_bytes, total_size))
+        progress.end("done")
         have_tarball = True  # break out of outer loop
         break
 
     if not have_tarball:
-      debug("Remote has no tarballs for %s with hashes %s", p,
+      debug("Remote has no tarballs for %s with hashes %s", spec["package"],
             ", ".join(spec["remote_hashes"]))
 
-    links_path = resolve_links_path(self.architecture, p)
+  def fetch_symlinks(self, spec):
+    from botocore.exceptions import ClientError
+    links_path = resolve_links_path(self.architecture, spec["package"])
     os.makedirs(os.path.join(self.workdir, links_path), exist_ok=True)
 
     # Remove existing symlinks: we'll fetch the ones from the remote next.

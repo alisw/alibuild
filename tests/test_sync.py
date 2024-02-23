@@ -87,7 +87,9 @@ class SyncTestCase(unittest.TestCase):
 
     @patch("alibuild_helpers.sync.open", new=lambda fn, mode: BytesIO())
     @patch("os.path.isfile", new=MagicMock(return_value=False))
+    @patch("os.makedirs", new=MagicMock())
     @patch("os.rename", new=MagicMock(return_value=None))
+    @patch("alibuild_helpers.sync.ProgressPrint", new=MagicMock())
     @patch("alibuild_helpers.sync.execute", new=MagicMock(return_value=None))
     @patch("alibuild_helpers.sync.debug")
     @patch("alibuild_helpers.sync.error")
@@ -103,14 +105,16 @@ class SyncTestCase(unittest.TestCase):
         # Try good spec
         mock_error.reset_mock()
 
-        syncer.syncToLocal(PACKAGE, GOOD_SPEC)
+        syncer.fetch_symlinks(GOOD_SPEC)
+        syncer.fetch_tarball(GOOD_SPEC)
         mock_error.assert_not_called()
         syncer.syncToRemote(PACKAGE, GOOD_SPEC)
 
         # Try bad spec
         mock_error.reset_mock()
 
-        syncer.syncToLocal(PACKAGE, BAD_SPEC)
+        syncer.fetch_symlinks(BAD_SPEC)
+        syncer.fetch_tarball(BAD_SPEC)
 
         # We can't use mock_error.assert_called_once_with because two
         # PartialDownloadError instances don't compare equal.
@@ -129,10 +133,13 @@ class SyncTestCase(unittest.TestCase):
 
         # Try missing spec
         mock_debug.reset_mock()
-        syncer.syncToLocal(PACKAGE, MISSING_SPEC)
+        syncer.fetch_symlinks(MISSING_SPEC)
+        syncer.fetch_tarball(MISSING_SPEC)
         mock_debug.assert_called_with("Nothing fetched for %s (%s)",
                                       PACKAGE, NONEXISTENT_HASH)
 
+    @patch("os.makedirs", new=MagicMock())
+    @patch("alibuild_helpers.sync.ProgressPrint", new=MagicMock())
     @patch("alibuild_helpers.sync.execute", new=lambda cmd, printer=None: 0)
     @patch("alibuild_helpers.sync.os")
     def test_sync(self, mock_os):
@@ -156,11 +163,13 @@ class SyncTestCase(unittest.TestCase):
 
         for spec in (GOOD_SPEC, BAD_SPEC):
             for syncer in syncers:
-                syncer.syncToLocal(PACKAGE, spec)
+                syncer.fetch_symlinks(spec)
+                syncer.fetch_tarball(spec)
                 syncer.syncToRemote(PACKAGE, spec)
 
         for syncer in syncers:
-            syncer.syncToLocal(PACKAGE, MISSING_SPEC)
+            syncer.fetch_symlinks(MISSING_SPEC)
+            syncer.fetch_tarball(MISSING_SPEC)
 
 
 @unittest.skipIf(sys.version_info < (3, 6), "python >= 3.6 is required for boto3")
@@ -222,8 +231,9 @@ class Boto3TestCase(unittest.TestCase):
             if NONEXISTENT_HASH in Key or BAD_HASH in Key or \
                os.path.basename(Key) == tarball_name(MISSING_SPEC):
                 raise ClientError({"Error": {"Code": "404"}}, "head_object")
+            return {}
 
-        def download_file(Bucket, Key, Filename):
+        def download_file(Bucket, Key, Filename, Callback=None):
             self.assertNotIn(NONEXISTENT_HASH, Key, "tried to fetch missing tarball")
             self.assertNotIn(BAD_HASH, Key, "tried to follow bad symlink")
 
@@ -256,6 +266,7 @@ class Boto3TestCase(unittest.TestCase):
     @patch("os.path.isfile", new=MagicMock(return_value=False))
     @patch("os.path.islink", new=MagicMock(return_value=False))
     @patch("alibuild_helpers.sync.execute", new=MagicMock(return_value=0))
+    @patch("alibuild_helpers.sync.ProgressPrint", new=MagicMock())
     def test_tarball_download(self):
         """Test boto3 behaviour when downloading tarballs from the remote."""
         b3sync = sync.Boto3RemoteSync(
@@ -264,15 +275,18 @@ class Boto3TestCase(unittest.TestCase):
         b3sync.s3 = self.mock_s3()
 
         b3sync.s3.download_file.reset_mock()
-        b3sync.syncToLocal(PACKAGE, GOOD_SPEC)
+        b3sync.fetch_symlinks(GOOD_SPEC)
+        b3sync.fetch_tarball(GOOD_SPEC)
         b3sync.s3.download_file.assert_called()
 
         b3sync.s3.download_file.reset_mock()
-        b3sync.syncToLocal(PACKAGE, BAD_SPEC)
+        b3sync.fetch_symlinks(BAD_SPEC)
+        b3sync.fetch_tarball(BAD_SPEC)
         b3sync.s3.download_file.assert_not_called()
 
         b3sync.s3.download_file.reset_mock()
-        b3sync.syncToLocal(PACKAGE, MISSING_SPEC)
+        b3sync.fetch_symlinks(MISSING_SPEC)
+        b3sync.fetch_tarball(BAD_SPEC)
         b3sync.s3.download_file.assert_not_called()
 
     @patch("os.listdir", new=lambda path: (

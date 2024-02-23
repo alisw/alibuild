@@ -308,10 +308,11 @@ if [ "$CAN_DELETE" = 1 ]; then
   # There might be an old existing tarball, and we should delete it.
   rm -f "$WORK_DIR/TARS/$HASH_PATH/$PACKAGE_WITH_REV"
 elif [ -z "$CACHED_TARBALL" ]; then
+  gzip=$(command -v pigz 2>/dev/null || echo gzip)
   # We don't have an existing tarball, and we want to keep the one we create now.
   tar -cC "$WORK_DIR/INSTALLROOT/$PKGHASH" . |
     # Avoid having broken left overs if the tar fails.
-    $MY_GZIP -c > "$WORK_DIR/TARS/$HASH_PATH/$PACKAGE_WITH_REV.processing"
+    $gzip -c > "$WORK_DIR/TARS/$HASH_PATH/$PACKAGE_WITH_REV.processing"
   mv "$WORK_DIR/TARS/$HASH_PATH/$PACKAGE_WITH_REV.processing" \
      "$WORK_DIR/TARS/$HASH_PATH/$PACKAGE_WITH_REV"
   ln -nfs "../../$HASH_PATH/$PACKAGE_WITH_REV" \

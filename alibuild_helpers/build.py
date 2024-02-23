@@ -1,160 +1,109 @@
-from os.path import abspath, exists, basename, dirname, join, realpath
-from os import makedirs, unlink, readlink, rmdir
-from alibuild_helpers import __version__
-from alibuild_helpers.analytics import report_event
-from alibuild_helpers.log import debug, error, info, banner, warning
-from alibuild_helpers.log import dieOnError
-from alibuild_helpers.cmd import execute, getstatusoutput, DockerRunner, BASH, install_wrapper_script
-from alibuild_helpers.utilities import prunePaths
-from alibuild_helpers.utilities import resolve_store_path
-from alibuild_helpers.utilities import format, parseDefaults, readDefaults
-from alibuild_helpers.utilities import getPackageList, asList
-from alibuild_helpers.utilities import validateDefaults
-from alibuild_helpers.utilities import Hasher
-from alibuild_helpers.utilities import yamlDump
-from alibuild_helpers.utilities import resolve_tag, resolve_version
-from alibuild_helpers.git import git, clone_speedup_options, Git
-from alibuild_helpers.sl import sapling, Sapling
-from alibuild_helpers.sync import (NoRemoteSync, HttpRemoteSync, S3RemoteSync,
-                                   Boto3RemoteSync, RsyncRemoteSync)
-import yaml
-from alibuild_helpers.workarea import cleanup_git_log, logged_scm, updateReferenceRepoSpec
-from alibuild_helpers.log import logger_handler, LogFormatter, ProgressPrint
-from datetime import datetime
-from glob import glob
-try:
-  from collections import OrderedDict
-except ImportError:
-  from ordereddict import OrderedDict
-try:
-  from shlex import quote  # Python 3.3+
-except ImportError:
-  from pipes import quote  # Python 2.7
-
+from collections import OrderedDict
 import concurrent.futures
+from glob import glob
 import importlib
 import json
-import socket
 import os
+from os import makedirs, unlink, readlink, rmdir
+from os.path import abspath, exists, basename, dirname, join, realpath
 import re
+from shlex import quote
 import shutil
+import socket
 import sys
+from textwrap import dedent
 import time
+import yaml
+
+from alibuild_helpers import __version__
+from alibuild_helpers.analytics import report_event
+from alibuild_helpers.cmd import execute, DockerRunner, BASH, install_wrapper_script
+from alibuild_helpers.git import git, clone_speedup_options, Git
+from alibuild_helpers.log import debug, info, banner, warning, dieOnError
+from alibuild_helpers.log import log_current_package, ProgressPrint
+from alibuild_helpers.scm import SCMError
+from alibuild_helpers.sl import Sapling
+from alibuild_helpers.sync import remote_from_url
+from alibuild_helpers.utilities import Hasher, getPackageList, asList, yamlDump, prunePaths
+from alibuild_helpers.utilities import call_ignoring_oserrors, symlink
+from alibuild_helpers.utilities import parseDefaults, readDefaults, validateDefaults
+from alibuild_helpers.utilities import resolve_store_path, resolve_tag, resolve_version
+from alibuild_helpers.workarea import update_refs, updateReferenceRepoSpec
 
 
-def writeAll(fn, txt):
-  f = open(fn, "w")
-  f.write(txt)
-  f.close()
+def devel_package_branch(spec):
+    try:
+        package_source = spec["source"]
+    except KeyError:
+        return ""
+    if not exists(package_source):
+        return ""
+    return spec["scm"].branchOrRef(directory=package_source).replace("/", "-")
 
 
-def readHashFile(fn):
-  try:
-    return open(fn).read().strip("\n")
-  except IOError:
-    return "0"
+def parallel_scm_wrapper(specs, function, *extra_args):
+    """Run FUNCTION, which performs an SCM operation, in parallel.
 
+    If any operation fails with an SCMError, then it is retried, while
+    allowing the user to input their credentials if required.
 
-def update_git_repos(args, specs, buildOrder, develPkgs):
-    """Update and/or fetch required git repositories in parallel.
-
-    If any repository fails to be fetched, then it is retried, while allowing the
-    user to input their credentials if required.
+    FUNCTION must take a spec as a first argument, then any number of
+    EXTRA_ARGS, and finally a allow_prompt= kwarg which indicates whether user
+    interaction is allowed.
     """
-
-    def update_repo(package, git_prompt):
-        specs[package]["scm"] = Git()
-        if package in develPkgs:
-          localCheckout = os.path.join(os.getcwd(), specs[package]["package"])
-          if exists("%s/.sl" % localCheckout):
-            specs[package]["scm"] = Sapling()
-        updateReferenceRepoSpec(args.referenceSources, package, specs[package],
-                                fetch=args.fetchRepos,
-                                usePartialClone=not args.docker,
-                                allowGitPrompt=git_prompt)
-
-        # Retrieve git heads
-        scm = specs[package]["scm"]
-        cmd = scm.listRefsCmd()
-        if package in develPkgs:
-            specs[package]["source"] = \
-                os.path.join(os.getcwd(), specs[package]["package"])
-            cmd.append(specs[package]["source"])
-        else:
-            cmd.append(specs[package].get("reference", specs[package]["source"]))
-
-        output = logged_scm(scm, package, args.referenceSources,
-                            cmd, ".", prompt=git_prompt, logOutput=False)
-        specs[package]["scm_refs"] = scm.parseRefs(output)
-
+    progress = ProgressPrint("Updating repositories")
     requires_auth = set()
     with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
-        future_to_download = {
-          executor.submit(update_repo, package, git_prompt=False): package
-          for package in buildOrder if "source" in specs[package]
+        future_to_package = {
+          executor.submit(function, spec, *extra_args, allow_prompt=False):
+          spec["package"]
+          for spec in specs.values()
         }
-        for future in concurrent.futures.as_completed(future_to_download):
-            futurePackage = future_to_download[future]
+        for i, future in enumerate(concurrent.futures.as_completed(future_to_package)):
+            fetched_pkg = future_to_package[future]
+            progress("[%d/%d] Updating repo for %s", i,
+                     len(future_to_package) + len(requires_auth), fetched_pkg)
             try:
                 future.result()
-            except RuntimeError as exc:
-                # Git failed. Let's assume this is because the user needs to
-                # supply a password.
-                debug("%r requires auth; will prompt later", futurePackage)
-                requires_auth.add(futurePackage)
+            except SCMError:
+                # The SCM failed. Let's assume this is because the user needs
+                # to supply a password.
+                debug("%r requires auth; will prompt later", fetched_pkg)
+                requires_auth.add(fetched_pkg)
             except Exception as exc:
-                raise RuntimeError("Error on fetching %r: %s. Aborting." %
-                                   (futurePackage, exc))
-            else:
-                debug("%r package updated: %d refs found", futurePackage,
-                      len(specs[futurePackage]["scm_refs"]))
+                raise RuntimeError("Error on fetching %r. Aborting." %
+                                   fetched_pkg) from exc
 
     # Now execute git commands for private packages one-by-one, so the user can
     # type their username and password without multiple prompts interfering.
-    for package in requires_auth:
+    for i, package in enumerate(requires_auth):
+        progress("[%d/%d] Updating repo for %s", len(future_to_package) + i,
+                 len(future_to_package) + len(requires_auth), package)
         banner("If prompted now, enter your username and password for %s below\n"
                "If you are prompted too often, see: "
                "https://alisw.github.io/alibuild/troubleshooting.html"
                "#alibuild-keeps-asking-for-my-password",
                specs[package]["source"])
-        update_repo(package, git_prompt=True)
-        debug("%r package updated: %d refs found", package,
-              len(specs[package]["scm_refs"]))
+        function(specs[package], *extra_args, allow_prompt=True)
+
+    progress.end("done")
 
 
 # Creates a directory in the store which contains symlinks to the package
 # and its direct / indirect dependencies
-def createDistLinks(spec, specs, args, syncHelper, repoType, requiresType):
-  # At the point we call this function, spec has a single, definitive hash.
-  target = format("TARS/%(a)s/%(rp)s/%(p)s/%(p)s-%(v)s-%(r)s",
-                  a=args.architecture,
-                  rp=repoType,
-                  p=spec["package"],
-                  v=spec["version"],
-                  r=spec["revision"])
-  shutil.rmtree(target.encode("utf-8"), True)
-  cmd = format("cd %(w)s && mkdir -p %(t)s", w=args.workDir, t=target)
-  links = []
-  for x in [spec["package"]] + list(spec[requiresType]):
-    dep = specs[x]
-    source = format("../../../../../TARS/%(a)s/store/%(sh)s/%(h)s/%(p)s-%(v)s-%(r)s.%(a)s.tar.gz",
-                    a=args.architecture,
-                    sh=dep["hash"][0:2],
-                    h=dep["hash"],
-                    p=dep["package"],
-                    v=dep["version"],
-                    r=dep["revision"])
-    links.append(format("ln -sfn %(source)s %(target)s",
-                 target=target,
-                 source=source))
-  # We do it in chunks to avoid hitting shell limits but
-  # still do more than one symlink at the time, to save the
-  # forking cost.
-  for g in [ links[i:i+10] for i in range(0, len(links), 10) ]:
-    execute(" && ".join([cmd] + g))
+def create_dist_links(spec, specs, architecture, work_dir, repo_type, requires_type):
+    # At the point we call this function, spec has a single, definitive hash.
+    target_dir = "{work_dir}/TARS/{arch}/{repo}/{package}/{package}-{version}-{revision}" \
+        .format(work_dir=work_dir, arch=architecture, repo=repo_type, **spec)
+    shutil.rmtree(target_dir.encode("utf-8"), ignore_errors=True)
+    makedirs(target_dir, exist_ok=True)
+    for pkg in [spec["package"]] + list(spec[requires_type]):
+        dep_tarball = "../../../../../TARS/{arch}/store/{short_hash}/{hash}/{package}-{version}-{revision}.{arch}.tar.gz" \
+            .format(arch=architecture, short_hash=specs[pkg]["hash"][:2], **specs[pkg])
+        symlink(dep_tarball, target_dir)
 
 
-def storeHashes(package, specs, isDevelPkg, considerRelocation):
+def store_hashes(package, specs, consider_relocation):
   """Calculate various hashes for package, and store them in specs[package].
 
   Assumes that all dependencies of the package already have a definitive hash.
@@ -256,21 +205,21 @@ def storeHashes(package, specs, isDevelPkg, considerRelocation):
     # If this package is a dev package, and it depends on another dev pkg, then
     # this package's hash shouldn't change if the other dev package was
     # changed, so that we can just rebuild this one incrementally.
-    h_all(specs[dep]["hash"] if isDevelPkg else hash_and_devel_hash)
+    h_all(specs[dep]["hash"] if spec.get("is_devel_pkg", False) else hash_and_devel_hash)
     # The deps_hash should always change, however, so we actually rebuild the
     # dependent package (even if incrementally).
     dh(hash_and_devel_hash)
 
-  if isDevelPkg and "incremental_recipe" in spec:
+  if spec.get("is_devel_pkg", False) and "incremental_recipe" in spec:
     h_all(spec["incremental_recipe"])
     ih = Hasher()
     ih(spec["incremental_recipe"])
     spec["incremental_hash"] = ih.hexdigest()
-  elif isDevelPkg:
+  elif spec.get("is_devel_pkg", False):
     h_all(spec["devel_hash"])
 
-  if considerRelocation and "relocate_paths" in spec:
-    h_all("relocate:"+" ".join(sorted(spec["relocate_paths"])))
+  if consider_relocation and "relocate_paths" in spec:
+    h_all("relocate:" + " ".join(sorted(spec["relocate_paths"])))
 
   spec["deps_hash"] = dh.hexdigest()
   spec["remote_revision_hash"] = h_default.hexdigest()
@@ -297,9 +246,12 @@ def hash_local_changes(spec):
   directory = spec["source"]
   scm = spec["scm"]
   untrackedFilesDirectories = []
+
   class UntrackedChangesError(Exception):
     """Signal that we cannot detect code changes due to untracked files."""
+
   h = Hasher()
+
   def hash_output(msg, args):
     lines = msg % args
     # `git status --porcelain` indicates untracked files using "??".
@@ -307,6 +259,7 @@ def hash_local_changes(spec):
     if any(scm.checkUntracked(line) for line in lines.split("\n")):
       raise UntrackedChangesError()
     h(lines)
+
   cmd = scm.diffCmd(directory)
   try:
     err = execute(cmd, hash_output)
@@ -327,14 +280,18 @@ def hash_local_changes(spec):
 
 def better_tarball(spec, old, new):
   """Return which tarball we should prefer to reuse."""
-  if not old: return new
-  if not new: return old
+  if not old:
+      return new
+  if not new:
+      return old
   old_rev, old_hash, _ = old
   new_rev, new_hash, _ = new
   old_is_local, new_is_local = old_rev.startswith("local"), new_rev.startswith("local")
   # If one is local and one is remote, return the remote one.
-  if old_is_local and not new_is_local: return new
-  if new_is_local and not old_is_local: return old
+  if old_is_local and not new_is_local:
+      return new
+  if new_is_local and not old_is_local:
+      return old
   # Finally, return the one that appears in the list of hashes earlier.
   hashes = spec["local_hashes" if old_is_local else "remote_hashes"]
   return old if hashes.index(old_hash) < hashes.index(new_hash) else new
@@ -469,358 +426,266 @@ def create_provenance_info(package, specs, args):
   })
 
 
-def doBuild(args, parser):
-  if args.remoteStore.startswith("http"):
-    syncHelper = HttpRemoteSync(args.remoteStore, args.architecture, args.workDir, args.insecure)
-  elif args.remoteStore.startswith("s3://"):
-    syncHelper = S3RemoteSync(args.remoteStore, args.writeStore,
-                              args.architecture, args.workDir)
-  elif args.remoteStore.startswith("b3://"):
-    syncHelper = Boto3RemoteSync(args.remoteStore, args.writeStore,
-                                 args.architecture, args.workDir)
-  elif args.remoteStore:
-    syncHelper = RsyncRemoteSync(args.remoteStore, args.writeStore, args.architecture, args.workDir)
-  else:
-    syncHelper = NoRemoteSync()
+def topological_sort(nodes, edges):
+    """Sort NODES (a list of package names) topologically, according to dependencies in EDGES.
 
-  packages = args.pkgname
-  specs = {}
-  buildOrder = []
-  workDir = abspath(args.workDir)
-  prunePaths(workDir)
+    EDGES is a list of (package, dependency) pairs, one for each dependency.
+    """
+    # Algorithm adapted from:
+    # http://www.stoimen.com/blog/2012/10/01/computer-algorithms-topological-sort-of-a-graph/
+    leaves = [pkg for pkg in nodes if not any(other == pkg for other, _ in edges)]
+    sorted_nodes = []
+    while leaves:
+        current_pkg = leaves.pop(0)
+        sorted_nodes.append(current_pkg)
+        # Find every package that depended on the current one.
+        new_leaves = {pkg for pkg, dep in edges if dep == current_pkg}
+        # Stop blocking packages that depend on the current one...
+        edges = [(pkg, dep) for pkg, dep in edges if dep != current_pkg]
+        # ...but keep blocking those that still depend on other stuff!
+        has_predecessors = {m for pkg, _ in edges for m in new_leaves if pkg == m}
+        leaves.extend(new_leaves - has_predecessors)
+    return sorted_nodes
 
-  if not exists(args.configDir):
-    error('Cannot find alidist recipes under directory "%s".\n'
-          'Maybe you need to "cd" to the right directory or '
-          'you forgot to run "aliBuild init"?', args.configDir)
-    return 1
 
-  _, value = git(("symbolic-ref", "-q", "HEAD"), directory=args.configDir, check=False)
-  branch_basename = re.sub("refs/heads/", "", value)
-  branch_stream = re.sub("-patches$", "", branch_basename)
-  # In case the basename and the stream are the same,
-  # the stream becomes empty.
-  if branch_stream == branch_basename:
-    branch_stream = ""
+def prepare_builds(args, parser, remote):
+    workDir = abspath(args.workDir)
+    prunePaths(workDir)
 
-  defaultsReader = lambda : readDefaults(args.configDir, args.defaults, parser.error, args.architecture)
-  (err, overrides, taps) = parseDefaults(args.disable,
-                                         defaultsReader, debug)
-  dieOnError(err, err)
+    dieOnError(not exists(args.configDir),
+               'Cannot find alidist recipes under directory "%s".\n'
+               'Maybe you need to "cd" to the right directory or '
+               'you forgot to run "aliBuild init"?' % args.configDir)
 
-  specDir = "%s/SPECS" % workDir
-  if not exists(specDir):
-    makedirs(specDir)
+    _, value = git(("symbolic-ref", "-q", "HEAD"), directory=args.configDir, check=False)
+    branch_basename = re.sub("refs/heads/", "", value)
+    branch_stream = re.sub("-patches$", "", branch_basename)
+    # In case the basename and the stream are the same,
+    # the stream becomes empty.
+    if branch_stream == branch_basename:
+      branch_stream = ""
 
-  # If the alidist workdir contains a .sl directory, we use Saplign as SCM
-  # otherwise we default to git (without checking for the actual presence of 
-  # .git). 
-  # We do it this way, because we have one test which uses an embedded folder 
-  # in the alibuild source, which therefore does not contain a .git directory
-  # and falls back to the alibuild git commit.
-  scm = exists("%s/.sl" % args.configDir) and Sapling() or Git()
-  try:
-    checkedOutCommitName = scm.checkedOutCommitName(directory=args.configDir)
-  except:
-    error("Cannot find SCM directory in %s.", args.configDir)
-    return 1
-  os.environ["ALIBUILD_ALIDIST_HASH"] = checkedOutCommitName
+    err, overrides, taps = parseDefaults(
+      args.disable,
+      lambda: readDefaults(args.configDir, args.defaults, parser.error, args.architecture),
+      debug,
+    )
+    dieOnError(err, err)
 
-  debug("Building for architecture %s", args.architecture)
-  debug("Number of parallel builds: %d", args.jobs)
-  debug("Using aliBuild from alibuild@%s recipes in alidist@%s",
-        __version__ or "unknown", os.environ["ALIBUILD_ALIDIST_HASH"])
+    specDir = join(workDir, "SPECS")
+    makedirs(specDir, exist_ok=True)
 
-  install_wrapper_script("git", workDir)
+    # If the alidist workdir contains a .sl directory, we use Sapling as SCM;
+    # otherwise we default to git (without checking for the actual presence of
+    # .git).
+    # We do it this way, because one unit test uses an embedded folder in the
+    # alibuild source, which therefore does not contain a .git directory and
+    # falls back to the alibuild git commit.
+    scm = exists("%s/.sl" % args.configDir) and Sapling() or Git()
+    try:
+        checkedOutCommitName = scm.checkedOutCommitName(directory=args.configDir)
+    except SCMError:
+        dieOnError(True, "Cannot find SCM directory in %s." % args.configDir)
+    os.environ["ALIBUILD_ALIDIST_HASH"] = checkedOutCommitName
 
-  with DockerRunner(args.dockerImage, args.docker_extra_args) as getstatusoutput_docker:
-    my_gzip = "pigz" if getstatusoutput_docker("which pigz")[0] == 0 else "gzip"
-    my_tar = ("tar --ignore-failed-read"
-              if getstatusoutput_docker("tar --ignore-failed-read -cvvf "
-                                        "/dev/null /dev/zero")[0] == 0
-              else "tar")
-    systemPackages, ownPackages, failed, validDefaults = \
-      getPackageList(packages                = packages,
-                     specs                   = specs,
-                     configDir               = args.configDir,
-                     preferSystem            = args.preferSystem,
-                     noSystem                = args.noSystem,
-                     architecture            = args.architecture,
-                     disable                 = args.disable,
-                     force_rebuild           = args.force_rebuild,
-                     defaults                = args.defaults,
-                     performPreferCheck      = lambda pkg, cmd: getstatusoutput_docker(cmd),
-                     performRequirementCheck = lambda pkg, cmd: getstatusoutput_docker(cmd),
-                     performValidateDefaults = lambda spec: validateDefaults(spec, args.defaults),
-                     overrides               = overrides,
-                     taps                    = taps,
-                     log                     = debug)
+    debug("Building for architecture %s", args.architecture)
+    debug("Number of parallel builds: %d", args.jobs)
+    debug("Using aliBuild from alibuild@%s recipes in alidist@%s",
+          __version__ or "unknown", os.environ["ALIBUILD_ALIDIST_HASH"])
 
-  if validDefaults and args.defaults not in validDefaults:
-    error("Specified default `%s' is not compatible with the packages you want to build.\n"
-          "Valid defaults:\n\n- %s", args.defaults, "\n- ".join(sorted(validDefaults)))
-    return 1
+    install_wrapper_script("git", workDir)
 
-  if failed:
-    error("The following packages are system requirements and could not be found:\n\n- %s\n\n"
-          "Please run:\n\n\taliDoctor --defaults %s %s\n\nto get a full diagnosis.",
-          "\n- ".join(sorted(list(failed))), args.defaults, args.pkgname.pop())
-    return 1
+    specs = {}   # getPackageList mutates this variable
+    with DockerRunner(args.dockerImage, args.docker_extra_args) as getstatusoutput_docker:
+      systemPackages, ownPackages, failed, validDefaults = getPackageList(
+          packages=args.pkgname,
+          specs=specs,
+          configDir=args.configDir,
+          preferSystem=args.preferSystem,
+          noSystem=args.noSystem,
+          architecture=args.architecture,
+          disable=args.disable,
+          force_rebuild=args.force_rebuild,
+          defaults=args.defaults,
+          performPreferCheck=lambda pkg, cmd: getstatusoutput_docker(cmd),
+          performRequirementCheck=lambda pkg, cmd: getstatusoutput_docker(cmd),
+          performValidateDefaults=lambda spec: validateDefaults(spec, args.defaults),
+          overrides=overrides,
+          taps=taps,
+          log=debug,
+      )
 
-  for x in specs.values():
-    x["requires"] = [r for r in x["requires"] if not r in args.disable]
-    x["build_requires"] = [r for r in x["build_requires"] if not r in args.disable]
-    x["runtime_requires"] = [r for r in x["runtime_requires"] if not r in args.disable]
+    dieOnError(validDefaults and args.defaults not in validDefaults,
+               "Specified default `%s' is not compatible with the packages you want to build.\n"
+               "Valid defaults:\n\n- %s" % (args.defaults, "\n- ".join(sorted(validDefaults))))
+    dieOnError(failed,
+               "The following packages are system requirements and could not be found:\n\n- %s\n\n"
+               "Please run:\n\n\taliDoctor --defaults %s %s\n\nto get a full diagnosis." %
+               ("\n- ".join(sorted(list(failed))), args.defaults, " ".join(args.pkgname)))
 
-  if systemPackages:
-    banner("aliBuild can take the following packages from the system and will not build them:\n  %s",
-           ", ".join(systemPackages))
-  if ownPackages:
-    banner("The following packages cannot be taken from the system and will be built:\n  %s",
-           ", ".join(ownPackages))
+    for x in specs.values():
+      x["requires"] = [r for r in x["requires"] if r not in args.disable]
+      x["build_requires"] = [r for r in x["build_requires"] if r not in args.disable]
+      x["runtime_requires"] = [r for r in x["runtime_requires"] if r not in args.disable]
 
-  # Do topological sort to have the correct build order even in the
-  # case of non-tree like dependencies..
-  # The actual algorith used can be found at:
-  #
-  # http://www.stoimen.com/blog/2012/10/01/computer-algorithms-topological-sort-of-a-graph/
-  #
-  edges = [(p["package"], d) for p in specs.values() for d in p["requires"] ]
-  L = [l for l in specs.values() if not l["requires"]]
-  S = []
-  while L:
-    spec = L.pop(0)
-    S.append(spec)
-    nextVertex = [e[0] for e in edges if e[1] == spec["package"]]
-    edges = [e for e in edges if e[1] != spec["package"]]
-    hasPredecessors = set([m for e in edges for m in nextVertex if e[0] == m])
-    withPredecessor = set(nextVertex) - hasPredecessors
-    L += [specs[m] for m in withPredecessor]
-  buildOrder = [s["package"] for s in S]
+    if systemPackages:
+      banner("aliBuild can take the following packages from the system and will not build them:\n  %s",
+             ", ".join(systemPackages))
+    if ownPackages:
+      banner("The following packages cannot be taken from the system and will be built:\n  %s",
+             ", ".join(ownPackages))
 
-  # Date fields to substitute: they are zero-padded
-  now = datetime.now()
-  nowKwds = { "year": str(now.year),
-              "month": str(now.month).zfill(2),
-              "day": str(now.day).zfill(2),
-              "hour": str(now.hour).zfill(2) }
+    # Do topological sort to have the correct build order even in the
+    # case of non-tree like dependencies.
+    buildOrder = topological_sort(
+      [p["package"] for p in specs.values()],
+      [(p["package"], d) for p in specs.values() for d in p["requires"]],
+    )
 
-  # Check if any of the packages can be picked up from a local checkout
-  develPkgs = []
-  if not args.forceTracked:
-    develCandidates = [basename(d) for d in glob("*") if os.path.isdir(d)]
-    develCandidatesUpper = [basename(d).upper() for d in glob("*") if os.path.isdir(d)]
-    develPkgs = [p for p in buildOrder
-                 if p in develCandidates and p not in args.noDevel]
-    develPkgsUpper = [(p, p.upper()) for p in buildOrder
-                      if p.upper() in develCandidatesUpper and p not in args.noDevel]
-    if set(develPkgs) != {x for x, _ in develPkgsUpper}:
-      error("The following development packages have the wrong spelling: %s.\n"
-            "Please check your local checkout and adapt to the correct one indicated.",
-            ", ".join({x.strip() for x, _ in develPkgsUpper} - set(develPkgs)))
-      return 1
+    # Check if any of the packages can be picked up from a local checkout
+    develPkgs = []
+    if not args.forceTracked:
+      develCandidates = [basename(d) for d in glob("*") if os.path.isdir(d)]
+      develCandidatesUpper = [basename(d).upper() for d in glob("*") if os.path.isdir(d)]
+      develPkgs = [p for p in buildOrder
+                   if p in develCandidates and p not in args.noDevel]
+      develPkgsUpper = [(p, p.upper()) for p in buildOrder
+                        if p.upper() in develCandidatesUpper and p not in args.noDevel]
+      dieOnError(set(develPkgs) != {x for x, _ in develPkgsUpper},
+                 "The following development packages have the wrong spelling: " +
+                 ", ".join({x.strip() for x, _ in develPkgsUpper} - set(develPkgs)) +
+                 ".\nPlease check your local checkout and adapt to the correct one indicated.")
 
-  if buildOrder:
-    banner("Packages will be built in the following order:\n - %s",
-           "\n - ".join(x+" (development package)" if x in develPkgs else "%s@%s" % (x, specs[x]["tag"])
-                        for x in buildOrder if x != "defaults-release"))
+    for pkg, spec in specs.items():
+        spec["is_devel_pkg"] = pkg in develPkgs
+        spec["scm"] = Git()
+        if spec["is_devel_pkg"]:
+            spec["source"] = os.path.join(os.getcwd(), pkg)
+        if "source" in spec and exists(os.path.join(spec["source"], ".sl")):
+            spec["scm"] = Sapling()
+        reference_repo = join(os.path.abspath(args.referenceSources), pkg.lower())
+        if exists(reference_repo):
+            spec["reference"] = reference_repo
 
-  if develPkgs:
-    banner("You have packages in development mode.\n"
-           "This means their source code can be freely modified under:\n\n"
-           "  %s/<package_name>\n\n"
-           "aliBuild does not automatically update such packages to avoid work loss.\n"
-           "In most cases this is achieved by doing in the package source directory:\n\n"
-           "  git pull --rebase\n",
-           os.getcwd())
+    # Fetch remote scm_refs for all repos, so we know what needs updating.
+    parallel_scm_wrapper(specs, update_refs, args.referenceSources, args.fetchRepos)
 
-  # Clone/update repos
-  update_git_repos(args, specs, buildOrder, develPkgs)
-  # This is the list of packages which have untracked files in their
-  # source directory, and which are rebuilt every time. We will warn
-  # about them at the end of the build.
-  untrackedFilesDirectories = []
+    # This is the list of packages which have untracked files in their
+    # source directory, and which are rebuilt every time. We will warn
+    # about them at the end of the build.
+    untrackedFilesDirectories = []
 
-  # Resolve the tag to the actual commit ref
-  for p in buildOrder:
-    spec = specs[p]
-    spec["commit_hash"] = "0"
-    develPackageBranch = ""
-    # This is a development package (i.e. a local directory named like
-    # spec["package"]), but there is no "source" key in its alidist recipe,
-    # so there shouldn't be any code for it! Presumably, a user has
-    # mistakenly named a local directory after one of our packages.
-    dieOnError("source" not in spec and spec["package"] in develPkgs,
-               "Found a directory called {package} here, but we're not "
-               "expecting any code for the package {package}. If this is a "
-               "mistake, please rename the {package} directory or use the "
-               "'--no-local {package}' option. If aliBuild should pick up "
-               "source code from this directory, add a 'source:' key to "
-               "alidist/{recipe}.sh instead."
-               .format(package=p, recipe=p.lower()))
-    if "source" in spec:
-      # Tag may contain date params like %(year)s, %(month)s, %(day)s, %(hour).
-      spec["tag"] = resolve_tag(spec)
-      # First, we try to resolve the "tag" as a branch name, and use its tip as
-      # the commit_hash. If it's not a branch, it must be a tag or a raw commit
-      # hash, so we use it directly. Finally if the package is a development
-      # one, we use the name of the branch as commit_hash.
-      assert "scm_refs" in spec
-      try:
-        spec["commit_hash"] = spec["scm_refs"]["refs/heads/" + spec["tag"]]
-      except KeyError:
-        spec["commit_hash"] = spec["tag"]
-      # We are in development mode, we need to rebuild if the commit hash is
-      # different or if there are extra changes on top.
-      if spec["package"] in develPkgs:
-        # Devel package: we get the commit hash from the checked source, not from remote.
-        out = spec["scm"].checkedOutCommitName(directory=spec["source"])
-        spec["commit_hash"] = out.strip()
-        local_hash, untracked = hash_local_changes(spec)
-        untrackedFilesDirectories.extend(untracked)
-        spec["devel_hash"] = spec["commit_hash"] + local_hash
-        out = spec["scm"].branchOrRef(directory=spec["source"])
-        develPackageBranch = out.replace("/", "-")
-        spec["tag"] = args.develPrefix if "develPrefix" in args else develPackageBranch
-        spec["commit_hash"] = "0"
+    # Resolve the tag to the actual commit ref
+    for p in buildOrder:
+      spec = specs[p]
+      spec["commit_hash"] = "0"
+      # This is a development package (i.e. a local directory named like
+      # spec["package"]), but there is no "source" key in its alidist recipe,
+      # so there shouldn't be any code for it! Presumably, a user has
+      # mistakenly named a local directory after one of our packages.
+      dieOnError("source" not in spec and spec["package"] in develPkgs,
+                 "Found a directory called {package} here, but we're not "
+                 "expecting any code for the package {package}. If this is a "
+                 "mistake, please rename the {package} directory or use the "
+                 "'--no-local {package}' option. If aliBuild should pick up "
+                 "source code from this directory, add a 'source:' key to "
+                 "alidist/{recipe}.sh instead."
+                 .format(package=p, recipe=p.lower()))
+      if "source" in spec:
+        # Tag may contain date params like %(year)s, %(month)s, %(day)s, %(hour).
+        spec["tag"] = resolve_tag(spec)
+        # First, we try to resolve the "tag" as a branch name, and use its tip as
+        # the commit_hash. If it's not a branch, it must be a tag or a raw commit
+        # hash, so we use it directly. Finally if the package is a development
+        # one, we use the name of the branch as commit_hash.
+        assert "scm_refs" in spec
+        try:
+          spec["commit_hash"] = spec["scm_refs"]["refs/heads/" + spec["tag"]]
+        except KeyError:
+          spec["commit_hash"] = spec["tag"]
+        # We are in development mode, we need to rebuild if the commit hash is
+        # different or if there are extra changes on top.
+        if spec["package"] in develPkgs:
+          # Devel package: we get the commit hash from the checked source, not from remote.
+          spec["commit_hash"] = spec["scm"].checkedOutCommitName(directory=spec["source"]).strip()
+          local_hash, untracked = hash_local_changes(spec)
+          untrackedFilesDirectories.extend(untracked)
+          spec["devel_hash"] = spec["commit_hash"] + local_hash
+          spec["tag"] = args.develPrefix if "develPrefix" in args else devel_package_branch(spec)
+          spec["commit_hash"] = "0"
 
-    # Version may contain date params like tag, plus %(commit_hash)s,
-    # %(short_hash)s and %(tag)s.
-    spec["version"] = resolve_version(spec, args.defaults, branch_basename, branch_stream)
+      # Version may contain date params like tag, plus %(commit_hash)s,
+      # %(short_hash)s and %(tag)s.
+      spec["version"] = resolve_version(spec, args.defaults, branch_basename, branch_stream)
 
-    if spec["package"] in develPkgs and "develPrefix" in args and args.develPrefix != "ali-master":
-      spec["version"] = args.develPrefix
+      if spec["package"] in develPkgs and "develPrefix" in args and args.develPrefix != "ali-master":
+        spec["version"] = args.develPrefix
 
-  # Decide what is the main package we are building and at what commit.
-  #
-  # We emit an event for the main package, when encountered, so that we can use
-  # it to index builds of the same hash on different architectures. We also
-  # make sure add the main package and it's hash to the debug log, so that we
-  # can always extract it from it.
-  # If one of the special packages is in the list of packages to be built,
-  # we use it as main package, rather than the last one.
-  if not buildOrder:
-    banner("Nothing to be done.")
-    return 0
-  mainPackage = buildOrder[-1]
-  mainHash = specs[mainPackage]["commit_hash"]
-
-  debug("Main package is %s@%s", mainPackage, mainHash)
-  if args.debug:
-    logger_handler.setFormatter(
-        LogFormatter("%%(asctime)s:%%(levelname)s:%s:%s: %%(message)s" %
-                     (mainPackage, args.develPrefix if "develPrefix" in args else mainHash[0:8])))
-
-  # Now that we have the main package set, we can print out Useful information
-  # which we will be able to associate with this build. Also lets make sure each package
-  # we need to build can be built with the current default.
-  for p in buildOrder:
-    spec = specs[p]
-    if "source" in spec:
-      debug("Commit hash for %s@%s is %s", spec["source"], spec["tag"], spec["commit_hash"])
-
-  # We recursively calculate the full set of requires "full_requires"
-  # including build_requires and the subset of them which are needed at
-  # runtime "full_runtime_requires".
-  for p in buildOrder:
-    spec = specs[p]
-    todo = [p]
-    spec["full_requires"] = []
-    spec["full_runtime_requires"] = []
-    spec["full_build_requires"] = []
-    while todo:
-      i = todo.pop(0)
-      requires = specs[i].get("requires", [])
-      runTimeRequires = specs[i].get("runtime_requires", [])
-      buildRequires = specs[i].get("build_requires", [])
-      spec["full_requires"] += requires
-      spec["full_runtime_requires"] += runTimeRequires
-      spec["full_build_requires"] += buildRequires
-      todo += requires
-    spec["full_requires"] = set(spec["full_requires"])
-    spec["full_runtime_requires"] = set(spec["full_runtime_requires"])
-    # If something requires or runtime_requires a package, then it's not 
-    # a build_requires only anymore, so we drop it from the list.
-    spec["full_build_requires"] = set(spec["full_build_requires"]) - spec["full_runtime_requires"]
-
-  # Use the selected plugin to build, instead of the default behaviour, if a
-  # plugin was selected.
-  if args.plugin != "legacy":
-    return importlib.import_module("alibuild_helpers.%s_plugin" % args.plugin) \
-                    .build_plugin(specs, args, buildOrder)
-
-  debug("We will build packages in the following order: %s", " ".join(buildOrder))
-  if args.dryRun:
-    info("--dry-run / -n specified. Not building.")
-    return 0
-
-  # We now iterate on all the packages, making sure we build correctly every
-  # single one of them. This is done this way so that the second time we run we
-  # can check if the build was consistent and if it is, we bail out.
-  packageIterations = 0
-  report_event("install",
-               format("%(p)s disabled=%(dis)s devel=%(dev)s system=%(sys)s own=%(own)s deps=%(deps)s",
-                      p=args.pkgname,
-                      dis=",".join(sorted(args.disable)),
-                      dev=",".join(sorted(develPkgs)),
-                      sys=",".join(sorted(systemPackages)),
-                      own=",".join(sorted(ownPackages)),
-                      deps=",".join(buildOrder[:-1])
-                     ),
-               args.architecture)
-
-  while buildOrder:
-    packageIterations += 1
-    if packageIterations > 20:
-      error("Too many attempts at building %s. Something wrong with the repository?",
-            spec["package"])
-      return 1
-    p = buildOrder[0]
-    spec = specs[p]
-    if args.debug:
-      printedVersion = mainHash == spec["tag"] and mainHash or mainHash[0:8]
-      logger_handler.setFormatter(
-          LogFormatter("%%(asctime)s:%%(levelname)s:%s:%s:%s: %%(message)s" %
-                       (mainPackage, p, args.develPrefix if "develPrefix" in args else printedVersion)))
-
-    # Calculate the hashes. We do this in build order so that we can guarantee
-    # that the hashes of the dependencies are calculated first. Do this inside
-    # the main build loop to make sure that our dependencies have been assigned
-    # a single, definitive hash.
-    debug("Calculating hash.")
-    debug("spec = %r", spec)
-    debug("develPkgs = %r", develPkgs)
-    storeHashes(p, specs, isDevelPkg=p in develPkgs,
-                considerRelocation=args.architecture.startswith("osx"))
-    debug("Hashes for recipe %s are %s (remote); %s (local)", p,
-          ", ".join(spec["remote_hashes"]), ", ".join(spec["local_hashes"]))
-
-    if spec["package"] in develPkgs and getattr(syncHelper, "writeStore", None):
-      warning("Disabling remote write store from now since %s is a development package.", spec["package"])
-      syncHelper.writeStore = ""
-
-    # Since we can execute this multiple times for a given package, in order to
-    # ensure consistency, we need to reset things and make them pristine.
-    spec.pop("revision", None)
-
-    debug("Updating from tarballs")
-    # If we arrived here it really means we have a tarball which was created
-    # using the same recipe. We will use it as a cache for the build. This means
-    # that while we will still perform the build process, rather than
-    # executing the build itself we will:
+    # Decide what is the main package we are building and at what commit.
     #
-    # - Unpack it in a temporary place.
-    # - Invoke the relocation specifying the correct work_dir and the
-    #   correct path which should have been used.
-    # - Move the version directory to its final destination, including the
-    #   correct revision.
-    # - Repack it and put it in the store with the
-    #
-    # this will result in a new package which has the same binary contents of
-    # the old one but where the relocation will work for the new dictory. Here
-    # we simply store the fact that we can reuse the contents of cachedTarball.
-    syncHelper.syncToLocal(p, spec)
+    # We emit an event for the main package, when encountered, so that we can use
+    # it to index builds of the same hash on different architectures. We also
+    # make sure add the main package and it's hash to the debug log, so that we
+    # can always extract it from it.
+    # If one of the special packages is in the list of packages to be built,
+    # we use it as main package, rather than the last one.
+    if not buildOrder:
+      return {}, [], []    # do nothing
 
+    log_current_package(None, buildOrder[-1], specs, getattr(args, "develPrefix", None))
+    debug("Main package is %s@%s", buildOrder[-1], specs[buildOrder[-1]]["commit_hash"])
+
+    # Now that we have the main package set, we can print out Useful information
+    # which we will be able to associate with this build. Also lets make sure each package
+    # we need to build can be built with the current default.
+    for spec in (specs[pkg] for pkg in buildOrder):
+        if "source" in spec:
+            debug("Commit hash for %s@%s is %s", spec["source"], spec["tag"], spec["commit_hash"])
+
+    # We recursively calculate the full set of requires "full_requires"
+    # including build_requires and the subset of them which are needed at
+    # runtime "full_runtime_requires".
+    for p in buildOrder:
+      spec = specs[p]
+      todo = [p]
+      spec["full_requires"] = []
+      spec["full_runtime_requires"] = []
+      spec["full_build_requires"] = []
+      while todo:
+        i = todo.pop(0)
+        requires = specs[i].get("requires", [])
+        runTimeRequires = specs[i].get("runtime_requires", [])
+        buildRequires = specs[i].get("build_requires", [])
+        spec["full_requires"] += requires
+        spec["full_runtime_requires"] += runTimeRequires
+        spec["full_build_requires"] += buildRequires
+        todo += requires
+      spec["full_requires"] = set(spec["full_requires"])
+      spec["full_runtime_requires"] = set(spec["full_runtime_requires"])
+      # If something requires or runtime_requires a package, then it's not
+      # a build_requires only anymore, so we drop it from the list.
+      spec["full_build_requires"] = set(spec["full_build_requires"]) - spec["full_runtime_requires"]
+
+    debug("We will build packages in the following order: %s", " ".join(buildOrder))
+    if args.dryRun:
+      info("--dry-run / -n specified. Not building.")
+      return {}, [], []   # do nothing
+
+    report_event("install", "{p} disabled={dis} devel={dev} system={sys} own={own} deps={deps}".format(
+      p=args.pkgname,
+      dis=",".join(sorted(args.disable)),
+      dev=",".join(sorted(develPkgs)),
+      sys=",".join(sorted(systemPackages)),
+      own=",".join(sorted(ownPackages)),
+      deps=",".join(buildOrder[:-1])
+    ), args.architecture)
+
+    return specs, buildOrder, untrackedFilesDirectories
+
+
+def find_revision_number(spec, architecture, defaults, work_dir, devel_prefix, for_upload,
+                         assign_new_as_fallback=False):
+    """"""
     # Decide how it should be called, based on the hash and what is already
     # available.
     debug("Checking for packages already built.")
@@ -831,14 +696,14 @@ def doBuild(args, parser):
     links_regex = re.compile(r"{package}-{version}-(?:local)?[0-9]+\.{arch}\.tar\.gz".format(
       package=re.escape(spec["package"]),
       version=re.escape(spec["version"]),
-      arch=re.escape(args.architecture),
+      arch=re.escape(architecture),
     ))
-    symlink_dir = join(workDir, "TARS", args.architecture, spec["package"])
+    symlink_dir = join(work_dir, "TARS", architecture, spec["package"])
     try:
-      packages = [join(symlink_dir, symlink)
-                  for symlink in os.listdir(symlink_dir)
-                  if links_regex.fullmatch(symlink)]
-    except OSError as exc:
+      packages = [join(symlink_dir, link)
+                  for link in os.listdir(symlink_dir)
+                  if links_regex.fullmatch(link)]
+    except OSError:
       # If symlink_dir does not exist or cannot be accessed, return an empty
       # list of packages.
       packages = []
@@ -848,7 +713,8 @@ def doBuild(args, parser):
     # If there is already an installed package:
     # - Remove it if we do not know its hash
     # - Use the latest number in the version, to decide its revision
-    debug("Packages already built using this version\n%s", "\n".join(packages))
+    debug("%d packages already built using this version:\n%s",
+          len(packages), "\n".join(packages))
 
     # Calculate the build_family for the package
     #
@@ -860,32 +726,30 @@ def doBuild(args, parser):
     # to tag all the packages incurred in the build, this way we can have
     # a latest-<buildFamily> link for all of them an we will not incur in the
     # flip - flopping described in https://github.com/alisw/alibuild/issues/325.
-    develPrefix = ""
-    possibleDevelPrefix = getattr(args, "develPrefix", develPackageBranch)
-    if spec["package"] in develPkgs:
-      develPrefix = possibleDevelPrefix
+    possibleDevelPrefix = devel_prefix if devel_prefix is not None else \
+        devel_package_branch(spec)
+    if spec["is_devel_pkg"]:
+        spec["devel_prefix"] = possibleDevelPrefix
+    else:
+        spec["devel_prefix"] = ""
 
     if possibleDevelPrefix:
-      spec["build_family"] = "%s-%s" % (possibleDevelPrefix, args.defaults)
+      spec["build_family"] = "%s-%s" % (possibleDevelPrefix, defaults)
     else:
-      spec["build_family"] = args.defaults
-    if spec["package"] == mainPackage:
-      mainBuildFamily = spec["build_family"]
+      spec["build_family"] = defaults
 
     candidate = None
     busyRevisions = set()
-    # We can tell that the remote store is read-only if it has an empty or
-    # no writeStore property. See below for explanation of why we need this.
-    revisionPrefix = "" if getattr(syncHelper, "writeStore", "") else "local"
-    for symlink in packages:
-      realPath = readlink(symlink)
-      matcher = format("../../%(a)s/store/[0-9a-f]{2}/([0-9a-f]*)/%(p)s-%(v)s-((?:local)?[0-9]*).%(a)s.tar.gz$",
-                       a=args.architecture,
-                       p=spec["package"],
-                       v=spec["version"])
-      match = re.match(matcher, realPath)
+    revisionPrefix = "" if for_upload else "local"
+    matcher = re.compile(r"\.\./\.\./{a}/store/[0-9a-f]{{2}}/([0-9a-f]*)/{p}-{v}-((?:local)?[0-9]*).{a}.tar.gz$".format(
+        a=architecture,
+        p=spec["package"],
+        v=spec["version"],
+    ))
+    for link in packages:
+      match = matcher.match(readlink(link))
       if not match:
-        warning("Symlink %s -> %s couldn't be parsed", symlink, realPath)
+        warning("Symlink %s -> %s couldn't be parsed", link, readlink(link))
         continue
       rev_hash, revision = match.groups()
 
@@ -901,7 +765,7 @@ def doBuild(args, parser):
 
       # Don't re-use local revisions when we have a read-write store, so that
       # packages we'll upload later don't depend on local revisions.
-      if getattr(syncHelper, "writeStore", False) and "local" in revision:
+      if for_upload and "local" in revision:
         debug("Skipping revision %s because we want to upload later", revision)
         continue
 
@@ -909,11 +773,19 @@ def doBuild(args, parser):
       # and we do not need to build it. Because we prefer reusing remote
       # revisions, only store a local revision if there is no other candidate
       # for reuse yet.
-      candidate = better_tarball(spec, candidate, (revision, rev_hash, symlink))
+      candidate = better_tarball(spec, candidate, (revision, rev_hash, link))
 
-    try:
-      revision, rev_hash, symlink = candidate
-    except TypeError:  # raised if candidate is still None
+    if candidate:
+      spec["revision"], rev_hash, link = candidate
+      # Remember what hash we're actually using.
+      spec["local_revision_hash" if spec["revision"].startswith("local")
+           else "remote_revision_hash"] = rev_hash
+      if spec["is_devel_pkg"] and "incremental_recipe" in spec:
+        spec["obsolete_tarball"] = link
+      else:
+        debug("Package %s with hash %s is already found in %s. Not building.",
+              spec["package"], rev_hash, link)
+    elif assign_new_as_fallback:
       # If we can't reuse an existing revision, assign the next free revision
       # to this package. If we're not uploading it, name it localN to avoid
       # interference with the remote store -- in case this package is built
@@ -924,167 +796,144 @@ def doBuild(args, parser):
       spec["revision"] = revisionPrefix + str(
         min(set(range(1, max(busyRevisions) + 2)) - busyRevisions)
         if busyRevisions else 1)
-    else:
-      spec["revision"] = revision
-      # Remember what hash we're actually using.
-      spec["local_revision_hash" if revision.startswith("local")
-           else "remote_revision_hash"] = rev_hash
-      if spec["package"] in develPkgs and "incremental_recipe" in spec:
-        spec["obsolete_tarball"] = symlink
-      else:
-        debug("Package %s with hash %s is already found in %s. Not building.",
-              p, rev_hash, symlink)
-        getstatusoutput(
-          "ln -snf {v}-{r} {w}/{a}/{p}/latest-{bf};"
-          "ln -snf {v}-{r} {w}/{a}/{p}/latest".format(
-            v=spec["version"], r=spec["revision"], w=workDir,
-            a=args.architecture, p=spec["package"], bf=spec["build_family"]))
-        info("Using cached build for %s", p)
+
+
+def assign_revision_number(p, specs, syncHelper, work_dir, architecture, defaults, devel_prefix):
+    spec = specs[p]
+
+    # Calculate the hashes. We must do this in build order so that we can
+    # guarantee that the hashes of the dependencies are calculated first.
+    debug("Calculating hash.")
+    debug("spec = %r", spec)
+    store_hashes(p, specs, consider_relocation=architecture.startswith("osx"))
+    debug("Hashes for recipe %s are %s (remote); %s (local)", p,
+          ", ".join(spec["remote_hashes"]), ", ".join(spec["local_hashes"]))
+
+    if spec["is_devel_pkg"] and getattr(syncHelper, "writeStore", None):
+        warning("Disabling remote write store from now since %s is a development package.", spec["package"])
+        syncHelper.writeStore = ""
+
+    # To speed things up, first see if we can get a matching revision number
+    # from any of the symlinks we already have locally.
+    find_revision_number(spec, architecture, defaults, work_dir, devel_prefix,
+                         # We can tell that the remote store is read-only if
+                         # it has an empty or no writeStore property.
+                         for_upload=getattr(syncHelper, "writeStore", ""),
+                         assign_new_as_fallback=False)
+
+    # If we didn't find any matching revision number from the symlinks we
+    # already have locally, then fetch symlinks from the remote and try again.
+    if "revision" not in spec:
+        debug("Fetching symlinks from remote store")
+        syncHelper.fetch_symlinks(spec)
+        find_revision_number(spec, architecture, defaults, work_dir, devel_prefix,
+                             for_upload=getattr(syncHelper, "writeStore", ""),
+                             assign_new_as_fallback=True)
 
     # Now we know whether we're using a local or remote package, so we can set
     # the proper hash and tarball directory.
     if spec["revision"].startswith("local"):
-      spec["hash"] = spec["local_revision_hash"]
+        spec["hash"] = spec["local_revision_hash"]
     else:
-      spec["hash"] = spec["remote_revision_hash"]
-    spec["old_devel_hash"] = readHashFile(join(
-      workDir, "BUILD", spec["hash"], spec["package"], ".build_succeeded"))
+        spec["hash"] = spec["remote_revision_hash"]
 
-    # Recreate symlinks to this development package builds.
-    if spec["package"] in develPkgs:
+
+def symlink_build(spec, specs, architecture, work_dir):
+    # Recreate symlinks to this package build.
+    if spec["is_devel_pkg"]:
       debug("Creating symlinks to builds of devel package %s", spec["package"])
-      cmd = format("ln -snf %(pkgHash)s %(wd)s/BUILD/%(pkgName)s-latest",
-                   wd=workDir,
-                   pkgName=spec["package"],
-                   pkgHash=spec["hash"])
-      if develPrefix:
-        cmd += format(" && ln -snf %(pkgHash)s %(wd)s/BUILD/%(pkgName)s-latest-%(devPrefix)s",
-                      wd=workDir,
-                      pkgName=spec["package"],
-                      pkgHash=spec["hash"],
-                      devPrefix=develPrefix)
-      err = execute(cmd)
-      debug("Command %s returned %d", cmd, err)
-      # Last package built gets a "latest" mark.
-      cmd = format("ln -snf %(pkgVersion)s-%(pkgRevision)s %(wd)s/%(arch)s/%(pkgName)s/latest",
-                   wd=workDir,
-                   arch=args.architecture,
-                   pkgName=spec["package"],
-                   pkgVersion=spec["version"],
-                   pkgRevision=spec["revision"])
-      # Latest package built for a given devel prefix gets a "latest-%(family)s" mark.
-      if spec["build_family"]:
-        cmd += format(" && ln -snf %(pkgVersion)s-%(pkgRevision)s %(wd)s/%(arch)s/%(pkgName)s/latest-%(family)s",
-                      wd=workDir,
-                      arch=args.architecture,
-                      pkgName=spec["package"],
-                      pkgVersion=spec["version"],
-                      pkgRevision=spec["revision"],
-                      family=spec["build_family"])
-      err = execute(cmd)
-      debug("Command %s returned %d", cmd, err)
+      symlink(spec["hash"], f"{work_dir}/BUILD/{spec['package']}-latest")
+      if spec["devel_prefix"]:
+          symlink(spec["hash"], f"{work_dir}/BUILD/{spec['package']}-latest-{spec['devel_prefix']}")
+    # Last package built gets a "latest" mark.
+    symlink(f"{spec['version']}-{spec['revision']}",
+            join(work_dir, architecture, spec["package"], "latest"))
+    # Latest package built for a given devel prefix gets a "latest-%(family)s" mark.
+    if spec["build_family"]:
+        symlink(f"{spec['version']}-{spec['revision']}",
+                join(work_dir, architecture, spec["package"], "latest-" + spec["build_family"]))
+    # We need to create 2 sets of links, once with the full requires,
+    # once with only direct dependencies, since that's required to
+    # register packages in Alien.
+    create_dist_links(spec, specs, architecture, work_dir, "dist", "full_requires")
+    create_dist_links(spec, specs, architecture, work_dir, "dist-direct", "requires")
+    create_dist_links(spec, specs, architecture, work_dir, "dist-runtime", "full_runtime_requires")
 
-    # Check if this development package needs to be rebuilt.
-    if spec["package"] in develPkgs:
-      debug("Checking if devel package %s needs rebuild", spec["package"])
-      if spec["devel_hash"]+spec["deps_hash"] == spec["old_devel_hash"]:
-        info("Development package %s does not need rebuild", spec["package"])
-        buildOrder.pop(0)
-        continue
 
-    # Now that we have all the information about the package we want to build, let's
-    # check if it wasn't built / unpacked already.
-    hashFile = "%s/%s/%s/%s-%s/.build-hash" % (workDir,
-                                               args.architecture,
-                                               spec["package"],
-                                               spec["version"],
-                                               spec["revision"])
-    fileHash = readHashFile(hashFile)
-    # Development packages have their own rebuild-detection logic above.
-    # spec["hash"] is only useful here for regular packages.
-    if fileHash == spec["hash"] and spec["package"] not in develPkgs:
-      # If we get here, we know we are in sync with whatever remote store.  We
-      # can therefore create a directory which contains all the packages which
-      # were used to compile this one.
-      debug("Package %s was correctly compiled. Moving to next one.", spec["package"])
-      # If using incremental builds, next time we execute the script we need to remove
-      # the placeholders which avoid rebuilds.
-      if spec["package"] in develPkgs and "incremental_recipe" in spec:
-        unlink(hashFile)
-      if "obsolete_tarball" in spec:
+def cleanup_after_build(spec, work_dir, devel_prefix=None, aggressive=False):
+    if "obsolete_tarball" in spec:
         unlink(realpath(spec["obsolete_tarball"]))
         unlink(spec["obsolete_tarball"])
-      buildOrder.pop(0)
-      packageIterations = 0
-      # We can now delete the INSTALLROOT and BUILD directories,
-      # assuming the package is not a development one. We also can
-      # delete the SOURCES in case we have aggressive-cleanup enabled.
-      if not spec["package"] in develPkgs and args.autoCleanup:
-        cleanupDirs = [format("%(w)s/BUILD/%(h)s",
-                              w=workDir,
-                              h=spec["hash"]),
-                       format("%(w)s/INSTALLROOT/%(h)s",
-                              w=workDir,
-                              h=spec["hash"])]
-        if args.aggressiveCleanup:
-          cleanupDirs.append(format("%(w)s/SOURCES/%(p)s",
-                                    w=workDir,
-                                    p=spec["package"]))
-        debug("Cleaning up:\n%s", "\n".join(cleanupDirs))
+    cleanupDirs = [join(work_dir, "BUILD", spec["hash"]),
+                   join(work_dir, "INSTALLROOT", spec["hash"])]
+    if aggressive:
+        cleanupDirs.append(join(work_dir, "SOURCES", spec["package"]))
+    debug("Cleaning up:\n%s", "\n".join(cleanupDirs))
 
-        for d in cleanupDirs:
-          shutil.rmtree(d.encode("utf8"), True)
-        try:
-          unlink(format("%(w)s/BUILD/%(p)s-latest",
-                 w=workDir, p=spec["package"]))
-          if "develPrefix" in args:
-            unlink(format("%(w)s/BUILD/%(p)s-latest-%(dp)s",
-                   w=workDir, p=spec["package"], dp=args.develPrefix))
-        except:
-          pass
-        try:
-          rmdir(format("%(w)s/BUILD",
-                w=workDir, p=spec["package"]))
-          rmdir(format("%(w)s/INSTALLROOT",
-                w=workDir, p=spec["package"]))
-        except:
-          pass
-      continue
+    for d in cleanupDirs:
+        shutil.rmtree(d.encode("utf8"), True)
+    call_ignoring_oserrors(unlink, "{w}/BUILD/{p}-latest".format(w=work_dir, p=spec["package"]))
+    if devel_prefix:
+        call_ignoring_oserrors(unlink, "{w}/BUILD/{p}-latest-{dp}".format(w=work_dir, p=spec["package"], dp=devel_prefix))
+    call_ignoring_oserrors(rmdir, join(work_dir, "BUILD"))
+    call_ignoring_oserrors(rmdir, join(work_dir, "INSTALLROOT"))
 
-    if fileHash != "0":
-      debug("Mismatch between local area (%s) and the one which I should build (%s). Redoing.",
-            fileHash, spec["hash"])
+
+def final_installation_dir(spec, architecture, work_dir):
+    return "%s/%s/%s/%s-%s" % (
+        work_dir,
+        architecture,
+        spec["package"],
+        spec["version"],
+        spec["revision"],
+    )
+
+
+def is_already_built(spec, is_devel_pkg, architecture, work_dir):
+    """Return whether the given package has been built and installed before with the same hash."""
+    def read_hash_file(*file_name_parts):
+        try:
+            with open(join(*file_name_parts)) as fp:
+                return fp.read().strip("\n")
+        except IOError:
+            return "0"
+
+    if is_devel_pkg:
+        return spec["devel_hash"] + spec["deps_hash"] == read_hash_file(
+            work_dir, "BUILD", spec["hash"], spec["package"], ".build_succeeded",
+        )
+
+    prev_build_hash = read_hash_file(
+        final_installation_dir(spec, architecture, work_dir), ".build-hash",
+    )
+    if prev_build_hash == spec["hash"]:
+        return True
+    if prev_build_hash != "0":
+        debug("Mismatch between local area (%s) and the one which I should build (%s). Redoing.",
+              prev_build_hash, spec["hash"])
+    return False
+
+
+def build_or_unpack_package(package, specs, args):
+    spec = specs[package]
+
     # shutil.rmtree under Python 2 fails when hashFile is unicode and the
     # directory contains files with non-ASCII names, e.g. Golang/Boost.
-    shutil.rmtree(dirname(hashFile).encode("utf-8"), True)
-
-    tar_hash_dir = os.path.join(workDir, resolve_store_path(args.architecture, spec["hash"]))
-    debug("Looking for cached tarball in %s", tar_hash_dir)
-    # FIXME: I should get the tar_hash_dir updated with server at this point.
-    #        It does not really matter that the symlinks are ok at this point
-    #        as I only used the tarballs as reusable binary blobs.
-    spec["cachedTarball"] = ""
-    if not spec["package"] in develPkgs:
-      tarballs = glob(os.path.join(tar_hash_dir, "*gz"))
-      spec["cachedTarball"] = tarballs[0] if len(tarballs) else ""
-      debug("Found tarball in %s" % spec["cachedTarball"]
-            if spec["cachedTarball"] else "No cache tarballs found")
+    shutil.rmtree(final_installation_dir(spec, args.architecture, args.workDir).encode("utf-8"), True)
 
     # The actual build script.
-    referenceStatement = ""
+    reference_statement = ""
     if "reference" in spec:
-      referenceStatement = "export GIT_REFERENCE=${GIT_REFERENCE_OVERRIDE:-%s}/%s" % (dirname(spec["reference"]), basename(spec["reference"]))
+      reference_statement = "export GIT_REFERENCE=${GIT_REFERENCE_OVERRIDE:-%s}/%s" % (dirname(spec["reference"]), basename(spec["reference"]))
 
     debug("spec = %r", spec)
 
-    cmd_raw = ""
     try:
-      fp = open(dirname(realpath(__file__))+'/build_template.sh', 'r')
-      cmd_raw = fp.read()
-      fp.close()
-    except:
+      with open(join(dirname(realpath(__file__)), "build_template.sh"), "r") as fp:
+        cmd_raw = fp.read()
+    except OSError:
       from pkg_resources import resource_string
-      cmd_raw = resource_string("alibuild_helpers", 'build_template.sh')
+      cmd_raw = resource_string("alibuild_helpers", "build_template.sh")
 
     source = spec.get("source", "")
     # Shortend the commit hash in case it's a real commit hash and not simply
@@ -1098,67 +947,61 @@ def doBuild(args, parser):
     # container path, if required.  No changes for what concerns the standard
     # bash builds, though.
     if args.docker:
-      cachedTarball = re.sub("^" + workDir, "/sw", spec["cachedTarball"])
+        cachedTarball = re.sub("^" + re.escape(args.workDir), "/sw", spec["cachedTarball"])
     else:
-      cachedTarball = spec["cachedTarball"]
+        cachedTarball = spec["cachedTarball"]
 
-    scriptDir = join(workDir, "SPECS", args.architecture, spec["package"],
+    scriptDir = join(args.workDir, "SPECS", args.architecture, spec["package"],
                      spec["version"] + "-" + spec["revision"])
+    makedirs(scriptDir, exist_ok=True)
+    with open("%s/%s.sh" % (scriptDir, spec["package"]), "w") as recipe_f:
+        recipe_f.write(spec["recipe"])
+    with open("%s/build.sh" % scriptDir, "w") as build_script_f:
+        build_script_f.write(cmd_raw % {
+            "provenance": create_provenance_info(spec["package"], specs, args),
+            "initdotsh_deps": generate_initdotsh(package, specs, args.architecture, post_build=False),
+            "initdotsh_full": generate_initdotsh(package, specs, args.architecture, post_build=True),
+            "workDir": args.workDir,
+            "configDir": abspath(args.configDir),
+            "incremental_recipe": spec.get("incremental_recipe", ":"),
+            "sourceDir": (dirname(source) + "/") if source else "",
+            "sourceName": basename(source) if source else "",
+            "referenceStatement": reference_statement,
+            "gitOptionsStatement": "" if args.docker else
+            "export GIT_CLONE_SPEEDUP=" + quote(" ".join(clone_speedup_options())),
+            "requires": " ".join(spec["requires"]),
+            "build_requires": " ".join(spec["build_requires"]),
+            "runtime_requires": " ".join(spec["runtime_requires"]),
+        })
 
-    err, out = getstatusoutput("mkdir -p %s" % scriptDir)
-    dieOnError(err, "Failed to create script dir %s: %s" % (scriptDir, out))
-    writeAll("%s/%s.sh" % (scriptDir, spec["package"]), spec["recipe"])
-    writeAll("%s/build.sh" % scriptDir, cmd_raw % {
-      "provenance": create_provenance_info(spec["package"], specs, args),
-      "initdotsh_deps": generate_initdotsh(p, specs, args.architecture, post_build=False),
-      "initdotsh_full": generate_initdotsh(p, specs, args.architecture, post_build=True),
-      "develPrefix": develPrefix,
-      "workDir": workDir,
-      "configDir": abspath(args.configDir),
-      "incremental_recipe": spec.get("incremental_recipe", ":"),
-      "sourceDir": (dirname(source) + "/") if source else "",
-      "sourceName": basename(source) if source else "",
-      "referenceStatement": referenceStatement,
-      "gitOptionsStatement": "" if args.docker else
-      "export GIT_CLONE_SPEEDUP=" + quote(" ".join(clone_speedup_options())),
-      "requires": " ".join(spec["requires"]),
-      "build_requires": " ".join(spec["build_requires"]),
-      "runtime_requires": " ".join(spec["runtime_requires"]),
-    })
-
-    banner("Building %s@%s", spec["package"],
-           args.develPrefix if "develPrefix" in args and spec["package"] in develPkgs
-           else spec["version"])
     # Define the environment so that it can be passed up to the
     # actual build script
     buildEnvironment = [
-      ("ARCHITECTURE", args.architecture),
-      ("BUILD_REQUIRES", " ".join(spec["build_requires"])),
-      ("CACHED_TARBALL", cachedTarball),
-      ("CAN_DELETE", args.aggressiveCleanup and "1" or ""),
-      ("COMMIT_HASH", commit_hash),
-      ("DEPS_HASH", spec.get("deps_hash", "")),
-      ("DEVEL_HASH", spec.get("devel_hash", "")),
-      ("DEVEL_PREFIX", develPrefix),
-      ("BUILD_FAMILY", spec["build_family"]),
-      ("GIT_COMMITTER_NAME", "unknown"),
-      ("GIT_COMMITTER_EMAIL", "unknown"),
-      ("GIT_TAG", spec["tag"]),
-      ("MY_GZIP", my_gzip),
-      ("MY_TAR", my_tar),
-      ("INCREMENTAL_BUILD_HASH", spec.get("incremental_hash", "0")),
-      ("JOBS", str(args.jobs)),
-      ("PKGHASH", spec["hash"]),
-      ("PKGNAME", spec["package"]),
-      ("PKGREVISION", spec["revision"]),
-      ("PKGVERSION", spec["version"]),
-      ("RELOCATE_PATHS", " ".join(spec.get("relocate_paths", []))),
-      ("REQUIRES", " ".join(spec["requires"])),
-      ("RUNTIME_REQUIRES", " ".join(spec["runtime_requires"])),
-      ("FULL_RUNTIME_REQUIRES", " ".join(spec["full_runtime_requires"])),
-      ("FULL_BUILD_REQUIRES", " ".join(spec["full_build_requires"])),
-      ("FULL_REQUIRES", " ".join(spec["full_requires"])),
-      ("WRITE_REPO", spec.get("write_repo", source)),
+        ("ARCHITECTURE", args.architecture),
+        ("BUILD_REQUIRES", " ".join(spec["build_requires"])),
+        ("CACHED_TARBALL", cachedTarball),
+        ("CAN_DELETE", args.aggressiveCleanup and "1" or ""),
+        ("COMMIT_HASH", commit_hash),
+        ("DEPS_HASH", spec.get("deps_hash", "")),
+        ("DEVEL_HASH", spec.get("devel_hash", "")),
+        ("DEVEL_PREFIX", getattr(args, "develPrefix", "")),
+        ("BUILD_FAMILY", spec["build_family"]),
+        ("GIT_COMMITTER_NAME", "unknown"),
+        ("GIT_COMMITTER_EMAIL", "unknown"),
+        ("GIT_TAG", spec["tag"]),
+        ("INCREMENTAL_BUILD_HASH", spec.get("incremental_hash", "0")),
+        ("JOBS", str(args.jobs)),
+        ("PKGHASH", spec["hash"]),
+        ("PKGNAME", spec["package"]),
+        ("PKGREVISION", spec["revision"]),
+        ("PKGVERSION", spec["version"]),
+        ("RELOCATE_PATHS", " ".join(spec.get("relocate_paths", []))),
+        ("REQUIRES", " ".join(spec["requires"])),
+        ("RUNTIME_REQUIRES", " ".join(spec["runtime_requires"])),
+        ("FULL_RUNTIME_REQUIRES", " ".join(spec["full_runtime_requires"])),
+        ("FULL_BUILD_REQUIRES", " ".join(spec["full_build_requires"])),
+        ("FULL_REQUIRES", " ".join(spec["full_requires"])),
+        ("WRITE_REPO", spec.get("write_repo", source)),
     ]
     # Add the extra environment as passed from the command line.
     buildEnvironment += [e.partition('=')[::2] for e in args.environment]
@@ -1166,97 +1009,212 @@ def doBuild(args, parser):
     # In case the --docker options is passed, we setup a docker container which
     # will perform the actual build. Otherwise build as usual using bash.
     if args.docker:
-      build_command = (
-        "docker run --rm --entrypoint= --user $(id -u):$(id -g) "
-        "-v {workdir}:/sw -v {scriptDir}/build.sh:/build.sh:ro "
-        "-e GIT_REFERENCE_OVERRIDE=/mirror -e WORK_DIR_OVERRIDE=/sw "
-        "{mirrorVolume} {develVolumes} {additionalEnv} {additionalVolumes} "
-        "{overrideSource} {extraArgs} {image} bash -ex /build.sh"
-      ).format(
-        image=quote(args.dockerImage),
-        workdir=quote(abspath(args.workDir)),
-        scriptDir=quote(scriptDir),
-        extraArgs=" ".join(map(quote, args.docker_extra_args)),
-        overrideSource="-e SOURCE0_DIR_OVERRIDE=/" if source.startswith("/") else "",
-        additionalEnv=" ".join(
-          "-e {}={}".format(var, quote(value)) for var, value in buildEnvironment),
-        # Used e.g. by O2DPG-sim-tests to find the O2DPG repository.
-        develVolumes=" ".join(
-          '-v "$PWD/$(readlink {pkg} || echo {pkg})":/{pkg}:rw'.format(pkg=quote(pkg))
-          for pkg in develPkgs),
-        additionalVolumes=" ".join(
-          "-v %s" % quote(volume) for volume in args.volumes),
-        mirrorVolume=("-v %s:/mirror" % quote(dirname(spec["reference"]))
-                      if "reference" in spec else ""),
-      )
+        build_command = (
+            "docker run --rm --entrypoint= --user $(id -u):$(id -g) "
+            "-v {workdir}:/sw -v {scriptDir}/build.sh:/build.sh:ro "
+            "-e GIT_REFERENCE_OVERRIDE=/mirror -e WORK_DIR_OVERRIDE=/sw "
+            "{mirrorVolume} {develVolumes} {additionalEnv} {additionalVolumes} "
+            "{overrideSource} {extraArgs} {image} bash -ex /build.sh"
+        ).format(
+            image=quote(args.dockerImage),
+            workdir=quote(abspath(args.workDir)),
+            scriptDir=quote(abspath(scriptDir)),
+            extraArgs=" ".join(map(quote, args.docker_extra_args)),
+            overrideSource="-e SOURCE0_DIR_OVERRIDE=/" if source.startswith("/") else "",
+            additionalEnv=" ".join(
+                "-e {}={}".format(var, quote(value)) for var, value in buildEnvironment),
+            # Used e.g. by O2DPG-sim-tests to find the O2DPG repository.
+            develVolumes=" ".join(
+                '-v "$PWD/$(readlink {pkg} || echo {pkg})":/{pkg}:rw'.format(pkg=quote(pkg))
+                for pkg, spec in specs.items() if spec["is_devel_pkg"]
+            ),
+            additionalVolumes=" ".join("-v %s" % quote(volume) for volume in args.volumes),
+            mirrorVolume=("-v %s:/mirror" % quote(dirname(spec["reference"]))
+                          if "reference" in spec else ""),
+        )
     else:
-      os.environ.update(buildEnvironment)
-      build_command = "%s -e -x %s/build.sh 2>&1" % (BASH, quote(scriptDir))
+        os.environ.update(buildEnvironment)
+        build_command = "%s -e -x %s/build.sh 2>&1" % (BASH, quote(scriptDir))
 
     debug("Build command: %s", build_command)
-    progress = ProgressPrint("%s is being built (use --debug for full output)" % spec["package"])
-    err = execute(build_command, printer=debug if args.debug or not sys.stdout.isatty() else progress)
-    progress.end("failed" if err else "ok", err)
-    report_event("BuildError" if err else "BuildSuccess",
-                 spec["package"],
-                 format("%(a)s %(v)s %(c)s %(h)s",
-                        a = args.architecture,
-                        v = spec["version"],
-                        c = spec["commit_hash"],
-                        h = os.environ["ALIBUILD_ALIDIST_HASH"][0:10]))
+    progress = ProgressPrint("%s %s@%s (use --debug for full output)" % (
+        "Unpacking tarball for" if cachedTarball else "Compiling", spec["package"],
+        args.develPrefix if "develPrefix" in args and spec["is_devel_pkg"] else spec["version"],
+    ))
+    err = execute(build_command, printer=progress)
+    progress.end("failed" if err else "done", err)
+    report_event("BuildError" if err else "BuildSuccess", spec["package"], " ".join((
+        args.architecture,
+        spec["version"],
+        spec["commit_hash"],
+        os.environ["ALIBUILD_ALIDIST_HASH"][0:10],
+    )))
 
-    updatablePkgs = [ x for x in spec["requires"] if x in develPkgs ]
-    if spec["package"] in develPkgs:
-      updatablePkgs.append(spec["package"])
+    updatable_pkgs = [pkg for pkg in spec["requires"] if specs[pkg]["is_devel_pkg"]]
+    if spec["is_devel_pkg"]:
+        updatable_pkgs.append(spec["package"])
 
-    buildErrMsg = format("Error while executing %(sd)s/build.sh on `%(h)s'.\n"
-                         "Log can be found in %(w)s/BUILD/%(p)s-latest%(devSuffix)s/log\n"
-                         "Please upload it to CERNBox/Dropbox if you intend to request support.\n"
-                         "Build directory is %(w)s/BUILD/%(p)s-latest%(devSuffix)s/%(p)s.",
-                         h=socket.gethostname(),
-                         sd=scriptDir,
-                         w=abspath(args.workDir),
-                         p=spec["package"],
-                         devSuffix="-" + args.develPrefix
-                                   if "develPrefix" in args and spec["package"] in develPkgs
-                                   else "")
-    if updatablePkgs:
-      buildErrMsg += format("\n\n"
-                            "Note that you have packages in development mode.\n"
-                            "Devel sources are not updated automatically, you must do it by hand.\n"
-                            "This problem might be due to one or more outdated devel sources.\n"
-                            "To update all development packages required for this build "
-                            "it is usually sufficient to do:\n%(updatablePkgs)s",
-                            updatablePkgs="".join(["\n  ( cd %s && git pull --rebase )" % dp
-                                                   for dp in updatablePkgs]))
+    build_error_msg = dedent("""\
+    Error while executing {script_dir}/build.sh on `{hostname}'.
+    Log can be found in {work_dir}/BUILD/{package}-latest{dev_suffix}/log
+    Please upload it to CERNBox/Dropbox if you intend to request support.
+    Build directory is {work_dir}/BUILD/{package}-latest{dev_suffix}/{package}.
+    """).format(
+        hostname=socket.gethostname(),
+        script_dir=scriptDir,
+        work_dir=abspath(args.workDir),
+        package=spec["package"],
+        dev_suffix=("-" + args.develPrefix) if "develPrefix" in args and spec["is_devel_pkg"] else "",
+    )
+    if updatable_pkgs:
+        build_error_msg += dedent("""
 
-    dieOnError(err, buildErrMsg)
+        Note that you have packages in development mode.
+        Devel sources are not updated automatically, you must do it by hand.
+        This problem might be due to one or more outdated devel sources.
+        To update all development packages required for this build,
+        it is usually sufficient to do:
+        """)
+        build_error_msg += "".join("\n  ( cd %s && git pull --rebase )" % dp
+                                   for dp in updatable_pkgs)
 
-    # We need to create 2 sets of links, once with the full requires,
-    # once with only direct dependencies, since that's required to
-    # register packages in Alien.
-    createDistLinks(spec, specs, args, syncHelper, "dist", "full_requires")
-    createDistLinks(spec, specs, args, syncHelper, "dist-direct", "requires")
-    createDistLinks(spec, specs, args, syncHelper, "dist-runtime", "full_runtime_requires")
+    dieOnError(err, build_error_msg)
+    debug("Package %s was correctly compiled. Moving to next one.", package)
 
-    # Make sure not to upload local-only packages! These might have been
-    # produced in a previous run with a read-only remote store.
-    if not spec["revision"].startswith("local"):
-      syncHelper.syncToRemote(p, spec)
 
-  banner("Build of %s successfully completed on `%s'.\n"
-         "Your software installation is at:"
-         "\n\n  %s\n\n"
-         "You can use this package by loading the environment:"
-         "\n\n  alienv enter %s/latest-%s",
-         mainPackage, socket.gethostname(),
-         abspath(join(args.workDir, args.architecture)),
-         mainPackage, mainBuildFamily)
-  for x in develPkgs:
-    banner("Build directory for devel package %s:\n%s/BUILD/%s-latest%s/%s",
-           x, abspath(args.workDir), x, "-"+args.develPrefix if "develPrefix" in args else "", x)
-  if untrackedFilesDirectories:
-    banner("Untracked files in the following directories resulted in a rebuild of "
-           "the associated package and its dependencies:\n%s\n\nPlease commit or remove them to avoid useless rebuilds.", "\n".join(untrackedFilesDirectories))
-  debug("Everything done")
-  return 0
+def doBuild(args, parser):
+    devel_prefix = getattr(args, "develPrefix", None)
+    remote = remote_from_url(args.remoteStore, args.writeStore, args.architecture,
+                             args.workDir, getattr(args, "insecure", False))
+
+    specs, build_order, repos_with_untracked_files = prepare_builds(args, parser, remote)
+
+    # Use the selected plugin to build, instead of the default behaviour, if a
+    # plugin was selected.
+    if args.plugin != "legacy":
+        return importlib.import_module("alibuild_helpers.%s_plugin" % args.plugin) \
+                        .build_plugin(specs, args, build_order)
+
+    if not build_order:
+        banner("Nothing to be done.")
+        return 0
+    main_package = build_order[-1]
+    log_current_package(None, main_package, specs, devel_prefix)
+
+    # Each package needs its dependencies' hashes to be set, so iterate in build order.
+    for package in build_order:
+        assign_revision_number(package, specs, remote, args.workDir, args.architecture,
+                               args.defaults, devel_prefix)
+
+    # Now that we have all the information about each package we need, detect
+    # any of them that have already been built and/or unpacked and skip them.
+    for spec in specs.values():
+        log_current_package(spec["package"], main_package, specs, devel_prefix)
+        if is_already_built(spec, spec["is_devel_pkg"], args.architecture, args.workDir):
+            if spec["is_devel_pkg"]:
+                info("Development package %s does not need rebuild", spec["package"])
+            build_order.remove(spec["package"])
+
+    if not build_order:
+        banner("Nothing to be done.")
+        return 0
+
+    # Now that we know which packages we still need to build or unpack,
+    # download tarballs for as many of them as possible. Doing this after the
+    # above block means we skip the download for anything we already have
+    # installed.
+    for package in build_order:
+        specs[package]["cachedTarball"] = ""
+        if specs[package]["is_devel_pkg"]:
+            continue
+        log_current_package(package, main_package, specs, devel_prefix)
+        remote.fetch_tarball(specs[package])
+        tar_hash_dir = os.path.join(args.workDir, resolve_store_path(args.architecture, specs[package]["hash"]))
+        debug("Looking for cached tarball in %s", tar_hash_dir)
+        tarballs = glob(os.path.join(tar_hash_dir, "*gz"))
+        if tarballs:
+            specs[package]["cachedTarball"] = tarballs[0]
+            debug("Found tarball in %s", specs[package]["cachedTarball"])
+        else:
+            debug("No cached tarball found")
+
+    def describe_package(package):
+        spec = specs[package]
+        action = "Compile"
+        ver_suffix = ""
+        if "tag" in spec:
+            ver_suffix = "@ " + spec["tag"]
+        if spec["cachedTarball"]:
+            action = "Unpack"
+        if spec["is_devel_pkg"]:
+            ver_suffix = "(development package)"
+        return "- %s %s %s" % (action, package, ver_suffix)
+
+    banner("The following will be done, in order:\n%s\n",
+           "\n".join(describe_package(pkg) for pkg in build_order if pkg != "defaults-release"))
+
+    debug("Development packages are: %r",
+          [spec["package"] for spec in specs.values() if spec["is_devel_pkg"]])
+    if any(spec["is_devel_pkg"] for spec in specs.values()):
+        banner("You have packages in development mode.\n"
+               "This means their source code can be freely modified under:\n\n"
+               "  %s/<package_name>\n\n"
+               "aliBuild does not automatically update such packages to avoid work loss.\n"
+               "In most cases this is achieved by doing in the package source directory:\n\n"
+               "  git pull --rebase\n",
+               os.getcwd())
+
+    log_current_package(None, main_package, specs, devel_prefix)
+    # Clone git repo if it doesn't exist, or update it if requested.
+    # Only clone repos for the packages that we're actually going to compile.
+    # If we'll just unpack a tarball, we don't need the git repo.
+    parallel_scm_wrapper({
+        pkg: spec for pkg, spec in specs.items()
+        if pkg in build_order and not spec["cachedTarball"]
+    }, lambda spec, allow_prompt: updateReferenceRepoSpec(
+        args.referenceSources, spec["package"], spec, fetch=args.fetchRepos,
+        usePartialClone=not args.docker, allowGitPrompt=allow_prompt,
+    ))
+
+    for package in build_order:
+        log_current_package(package, main_package, specs, devel_prefix)
+        build_or_unpack_package(package, specs, args)
+
+        if args.autoCleanup:
+            cleanup_after_build(specs[package], args.workDir, devel_prefix,
+                                args.aggressiveCleanup)
+
+        # Make sure not to upload local-only packages! These might have been
+        # produced in a previous run with a read-only remote store.
+        if not specs[package]["revision"].startswith("local"):
+            remote.syncToRemote(package, specs[package])
+
+    # Create "latest" symlinks to every package we built or used.
+    for package in specs:
+        log_current_package(package, main_package, specs, devel_prefix)
+        symlink_build(specs[package], specs, args.architecture, args.workDir)
+
+    log_current_package(None, main_package, specs, devel_prefix)
+    banner("Build of %s successfully completed on `%s'.\n"
+           "Your software installation is at:"
+           "\n\n  %s\n\n"
+           "You can use this package by loading the environment:"
+           "\n\n  alienv enter %s/latest-%s",
+           main_package, socket.gethostname(),
+           abspath(join(args.workDir, args.architecture)),
+           main_package, specs[main_package]["build_family"])
+
+    for spec in specs.values():
+        if spec["is_devel_pkg"]:
+            banner("Build directory for devel package %s:\n%s/BUILD/%s-latest%s/%s",
+                   spec["package"], abspath(args.workDir), spec["package"],
+                   ("-" + devel_prefix) if devel_prefix is not None else "",
+                   spec["package"])
+
+    if repos_with_untracked_files:
+        banner("Untracked files in the following directories resulted in a rebuild of "
+               "the associated package and its dependencies:\n%s\n\n"
+               "Please commit or remove them to avoid useless rebuilds.",
+               "\n".join(repos_with_untracked_files))
+    debug("Everything done")
+    return 0

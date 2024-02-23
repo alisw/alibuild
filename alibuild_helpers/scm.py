@@ -1,3 +1,7 @@
+class SCMError(Exception):
+  """Signal that a source-control-related operation failed."""
+
+
 class SCM(object):
   def checkedOutCommitName(self, directory):
     raise NotImplementedError

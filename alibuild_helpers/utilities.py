@@ -1,23 +1,15 @@
 #!/usr/bin/env python
-import yaml
-from os.path import exists
-import hashlib
-from glob import glob
-from os.path import basename, join
-import sys
-import os
-import re
-import platform
-
+from collections import OrderedDict
 from datetime import datetime
-try:
-  from collections import OrderedDict
-except ImportError:
-  from ordereddict import OrderedDict
-try:
-  from shlex import quote  # Python 3.3+
-except ImportError:
-  from pipes import quote  # Python 2.7
+from glob import glob
+import hashlib
+import os
+from os.path import basename, join, exists, isdir, islink
+import platform
+import re
+from shlex import quote
+import sys
+import yaml
 
 from alibuild_helpers.cmd import decode_with_fallback, getoutput
 from alibuild_helpers.git import git
@@ -25,14 +17,34 @@ from alibuild_helpers.log import warning, dieOnError
 
 
 class SpecError(Exception):
-  pass
+    """Signal that a package spec file could not be parsed."""
 
-asList = lambda x : x if type(x) == list else [x]
 
-# This function is only needed to check the coverage of the testsuite
-# is really happening and we did not made a mistake in tox.ini
-def check_coverage():
-  return True
+def asList(list_or_item):
+    if isinstance(list_or_item, list):
+        return list_or_item
+    return [list_or_item]
+
+
+def call_ignoring_oserrors(function, *args, **kwargs):
+    try:
+        return function(*args, **kwargs)
+    except OSError:
+        return None
+
+
+def symlink(link_target, link_name):
+    """Match the behaviour of `ln -nsf LINK_TARGET LINK_NAME`, without having to fork.
+
+    Create a new symlink named LINK_NAME pointing to LINK_TARGET. If LINK_NAME
+    is a directory, create a symlink named basename(LINK_TARGET) inside it.
+    """
+    # If link_name is a symlink pointing to a directory, isdir() will return True.
+    if isdir(link_name) and not islink(link_name):
+        link_name = join(link_name, basename(link_target))
+    call_ignoring_oserrors(os.unlink, link_name)
+    os.symlink(link_target, link_name)
+
 
 def resolve_store_path(architecture, spec_hash):
   """Return the path where a tarball with the given hash is to be stored.

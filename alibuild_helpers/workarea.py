@@ -8,8 +8,9 @@ try:
 except ImportError:
   from ordereddict import OrderedDict
 
-from alibuild_helpers.log import dieOnError, debug, info, error
-from alibuild_helpers.git import clone_speedup_options
+from alibuild_helpers.git import Git
+from alibuild_helpers.sl import Sapling
+from alibuild_helpers.log import dieOnError, debug, error
 
 FETCH_LOG_NAME = "fetch-log.txt"
 
@@ -38,8 +39,6 @@ def logged_scm(scm, package, referenceSources,
   must not contain any secrets. We only output the SCM command we ran, its exit
   code, and the package name, so this should be safe.
   """
-  # This might take a long time, so show the user what's going on.
-  info("%s %s for repository for %s...", scm.name, command[0], package)
   err, output = scm.exec(command, directory=directory, check=False, prompt=prompt)
   if logOutput:
     debug(output)
@@ -54,7 +53,6 @@ def logged_scm(scm, package, referenceSources,
       error("Could not write error log from SCM command:", exc_info=exc)
   dieOnError(err, "Error during %s %s for reference repo for %s." %
              (scm.name.lower(), command[0], package))
-  info("Done %s %s for repository for %s", scm.name.lower(), command[0], package)
   return output
 
 
@@ -103,17 +101,24 @@ def updateReferenceRepo(referenceSources, p, spec,
   referenceRepo = os.path.join(os.path.abspath(referenceSources), p.lower())
 
   try:
-    os.makedirs(os.path.abspath(referenceSources))
-  except:
+    os.makedirs(os.path.abspath(referenceSources), exist_ok=True)
+  except OSError:
     pass
 
   if not is_writeable(referenceSources):
-    if os.path.exists(referenceRepo):
+    if os.path.isdir(referenceRepo):
       debug("Using %s as reference for %s", referenceRepo, p)
       return referenceRepo  # reference is read-only
     else:
       debug("Cannot create reference for %s in %s", p, referenceSources)
       return None  # no reference can be found and created (not fatal)
+
+  # In preparation for cloning the repo, wipe out any ref cache file with the
+  # same name produced by update_refs.
+  try:
+    os.unlink(referenceRepo)
+  except OSError:
+    pass
 
   if not os.path.exists(referenceRepo):
     cmd = scm.cloneCmd(spec["source"], referenceRepo, usePartialClone)
@@ -123,6 +128,41 @@ def updateReferenceRepo(referenceSources, p, spec,
     logged_scm(scm, p, referenceSources, cmd, referenceRepo, allowGitPrompt)
 
   return referenceRepo  # reference is read-write
+
+
+def update_refs(spec, reference_sources, always_fetch=True, allow_prompt=False):
+    """Update SCM refs for the given package and cache them."""
+    if "source" not in spec:
+        # There is no repository to update. Skip this package.
+        return
+    reference_repo = os.path.join(reference_sources, spec["package"].lower())
+    # If the reference repo exists and is a sapling checkout, then use
+    # Sapling, else use Git.
+    scm = Sapling() if os.path.exists(os.path.join(reference_repo, ".sl")) else Git()
+    # If we previously cached a list of refs, and always_fetch isn't set, then
+    # read that cache.
+    if not always_fetch and os.path.isfile(reference_repo):
+        with open(reference_repo) as refs_cache:
+            raw_refs = refs_cache.read()
+    else:
+        # If reference_repo is a "real" checkout, not a cache file, use it;
+        # otherwise fetch from the internet.
+        list_refs_url = reference_repo if os.path.isdir(reference_repo) else spec["source"]
+        raw_refs = logged_scm(
+            scm, spec["package"], reference_sources, scm.listRefsCmd() + [list_refs_url],
+            ".", prompt=allow_prompt, logOutput=False,
+        )
+    spec["scm_refs"] = scm.parseRefs(raw_refs)
+    try:
+        os.makedirs(reference_sources, exist_ok=True)
+        with open(reference_repo, "w") as refs_cache:
+            refs_cache.write(raw_refs)
+    except OSError:
+        # If we can't save refs (e.g. if a repo checkout exists here, or if
+        # the path is not writable), then skip writing the cache.
+        pass
+    debug("%r package updated: %d refs found", spec["package"],
+          len(spec["scm_refs"]))
 
 
 def is_writeable(dirpath):

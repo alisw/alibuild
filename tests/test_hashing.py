@@ -8,7 +8,7 @@ try:
 except ImportError:
     from ordereddict import OrderedDict
 
-from alibuild_helpers.build import storeHashes
+from alibuild_helpers.build import store_hashes
 
 LOGFILE = "build.log"
 SPEC_RE = re.compile(r"spec = (OrderedDict\(\[\('package', '([^']+)'.*\)\]\))")
@@ -18,7 +18,7 @@ HASH_RE = re.compile(r"Hashes for recipe (.*) are "
 
 
 class KnownGoodHashesTestCase(unittest.TestCase):
-    """Make sure storeHashes produces the same hashes as in a build log.
+    """Make sure store_hashes produces the same hashes as in a build log.
 
     It is assumed that the hashes in the build log are correct, i.e. the ones
     we want to get for the matching spec in the log.
@@ -49,11 +49,10 @@ class KnownGoodHashesTestCase(unittest.TestCase):
                     # Once a package is built, it will have a second "spec ="
                     # and "Hashes for recipe" line in the log. In that case, we
                     # don't want to check the hashes are correct, as
-                    # storeHashes doesn't do anything in that case (the spec
+                    # store_hashes doesn't do anything in that case (the spec
                     # from the log will already have hashes stored).
                     continue
-                storeHashes(package, specs,
-                            isDevelPkg=False, considerRelocation=False)
+                store_hashes(package, specs, consider_relocation=False)
                 spec = specs[package]
                 self.assertEqual(spec["remote_revision_hash"], remote)
                 self.assertEqual(spec["local_revision_hash"], local)

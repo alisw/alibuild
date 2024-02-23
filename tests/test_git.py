@@ -2,6 +2,7 @@ import os
 import unittest
 
 from alibuild_helpers.git import git
+from alibuild_helpers.scm import SCMError
 
 EXISTING_REPO = "https://github.com/alisw/alibuild"
 MISSING_REPO = "https://github.com/alisw/nonexistent"
@@ -36,12 +37,12 @@ class GitWrapperTestCase(unittest.TestCase):
 
     def test_git_missing_repo(self):
         """Check we get the right exception when a repo doesn't exist."""
-        self.assertRaises(RuntimeError, git, (
+        self.assertRaises(SCMError, git, (
             "ls-remote", "-ht", MISSING_REPO,
         ), prompt=False)
 
     def test_git_private_repo(self):
         """Check we get the right exception when credentials are required."""
-        self.assertRaises(RuntimeError, git, (
+        self.assertRaises(SCMError, git, (
             "-c", "credential.helper=", "ls-remote", "-ht", PRIVATE_REPO,
         ), prompt=False)

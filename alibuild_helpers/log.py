@@ -35,16 +35,38 @@ class LogFormatter(logging.Formatter):
     } for x in record.msg.split("\n"))
 
 
+def log_current_package(package, main_package, specs, devel_prefix):
+  """Show PACKAGE as the one currently being processed in future log messages."""
+  if logger_handler.level > logging.DEBUG:
+    return
+  if devel_prefix is not None:
+    short_version = devel_prefix
+  else:
+    short_version = specs[main_package]["commit_hash"]
+    if short_version != specs[main_package]["tag"]:
+      short_version = short_version[:8]
+  logger_handler.setFormatter(LogFormatter(
+    "%(asctime)s:%(levelname)s:{}:{}: %(message)s"
+    .format(main_package, short_version)
+    if package is None else
+    "%(asctime)s:%(levelname)s:{}:{}:{}: %(message)s"
+    .format(main_package, package, short_version)
+  ))
+
+
 class ProgressPrint:
   def __init__(self, begin_msg=""):
     self.count = -1
     self.lasttime = 0
-    self.STAGES = [ ".", "..", "...", "....", ".....", "....", "...", ".." ]
+    self.STAGES = ".", "..", "...", "....", ".....", "....", "...", ".."
     self.begin_msg = begin_msg
     self.percent = -1
 
   def __call__(self, txt, *args):
-    if time.time()-self.lasttime < 0.5:
+    if logger.level <= logging.DEBUG or not sys.stdout.isatty():
+      debug(txt, *args)
+      return
+    if time.time() - self.lasttime < 0.5:
       return
     if self.count == -1 and self.begin_msg:
       sys.stderr.write("\033[1;35m==>\033[m "+self.begin_msg)
@@ -102,7 +124,7 @@ logging.Logger.success = log_success
 logger = logging.getLogger('alibuild')
 logger_handler = logging.StreamHandler()
 logger.addHandler(logger_handler)
-logger_handler.setFormatter(LogFormatter("%(levelname)s: %(message)s"))
+logger_handler.setFormatter(LogFormatter("%(asctime)s:%(levelname)s: %(message)s"))
 
 debug = logger.debug
 error = logger.error
