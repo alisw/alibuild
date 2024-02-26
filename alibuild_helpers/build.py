@@ -961,7 +961,7 @@ def build_or_unpack_package(package, specs, args):
             "provenance": create_provenance_info(spec["package"], specs, args),
             "initdotsh_deps": generate_initdotsh(package, specs, args.architecture, post_build=False),
             "initdotsh_full": generate_initdotsh(package, specs, args.architecture, post_build=True),
-            "workDir": args.workDir,
+            "workDir": os.path.abspath(args.workDir),
             "configDir": abspath(args.configDir),
             "incremental_recipe": spec.get("incremental_recipe", ":"),
             "sourceDir": (dirname(source) + "/") if source else "",
