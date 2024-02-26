@@ -1102,9 +1102,12 @@ def doBuild(args, parser):
     log_current_package(None, main_package, specs, devel_prefix)
 
     # Each package needs its dependencies' hashes to be set, so iterate in build order.
-    for package in build_order:
+    progress = ProgressPrint("Looking for packages to reuse")
+    for i, package in enumerate(build_order):
+        progress("[%d/%d] Resolving hash and symlinks", i, len(build_order))
         assign_revision_number(package, specs, remote, args.workDir, args.architecture,
                                args.defaults, devel_prefix)
+    progress.end("done")
 
     # Now that we have all the information about each package we need, detect
     # any of them that have already been built and/or unpacked and skip them.
