@@ -21,7 +21,8 @@ class LogTestCase(unittest.TestCase):
         mock_error.assert_not_called()
         mock_sys.exit.assert_not_called()
 
-    @patch("alibuild_helpers.log.sys.stderr", new=MagicMock(return_value=True))
+    @patch("sys.stdout.isatty", new=MagicMock(return_value=True))
+    @patch("sys.stderr", new=MagicMock(return_value=True))
     def test_ProgressPrint(self):
         """Make sure ProgressPrint updates correctly."""
         # ProgressPrint only parses messages every 0.5s. Trick it into thinking
