@@ -659,27 +659,21 @@ def doBuild(args, parser):
 
   # We recursively calculate the full set of requires "full_requires"
   # including build_requires and the subset of them which are needed at
-  # runtime "full_runtime_requires".
+  # runtime "full_runtime_requires". Do this in build order, so that we can
+  # rely on each spec's dependencies already having their full_*_requires
+  # properties populated.
   for p in buildOrder:
     spec = specs[p]
-    todo = [p]
-    spec["full_requires"] = []
-    spec["full_runtime_requires"] = []
-    spec["full_build_requires"] = []
-    while todo:
-      i = todo.pop(0)
-      requires = specs[i].get("requires", [])
-      runTimeRequires = specs[i].get("runtime_requires", [])
-      buildRequires = specs[i].get("build_requires", [])
-      spec["full_requires"] += requires
-      spec["full_runtime_requires"] += runTimeRequires
-      spec["full_build_requires"] += buildRequires
-      todo += requires
-    spec["full_requires"] = set(spec["full_requires"])
-    spec["full_runtime_requires"] = set(spec["full_runtime_requires"])
-    # If something requires or runtime_requires a package, then it's not 
-    # a build_requires only anymore, so we drop it from the list.
-    spec["full_build_requires"] = set(spec["full_build_requires"]) - spec["full_runtime_requires"]
+    for key in ("requires", "runtime_requires", "build_requires"):
+      full_key = "full_" + key
+      spec[full_key] = set()
+      for dep in spec.get(key, ()):
+        spec[full_key].add(dep)
+        # Runtime deps of build deps should count as build deps.
+        spec[full_key] |= specs[dep]["full_requires" if key == "build_requires" else full_key]
+    # If something requires or runtime_requires a package, then it's not a
+    # pure build_requires only anymore, so we drop it from the list.
+    spec["full_build_requires"] -= spec["full_runtime_requires"]
 
   # Use the selected plugin to build, instead of the default behaviour, if a
   # plugin was selected.
