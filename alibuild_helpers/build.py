@@ -14,13 +14,12 @@ from alibuild_helpers.utilities import Hasher
 from alibuild_helpers.utilities import yamlDump
 from alibuild_helpers.utilities import resolve_tag, resolve_version
 from alibuild_helpers.git import git, clone_speedup_options, Git
-from alibuild_helpers.sl import sapling, Sapling
+from alibuild_helpers.sl import Sapling
 from alibuild_helpers.sync import (NoRemoteSync, HttpRemoteSync, S3RemoteSync,
                                    Boto3RemoteSync, RsyncRemoteSync)
 import yaml
-from alibuild_helpers.workarea import cleanup_git_log, logged_scm, updateReferenceRepoSpec
+from alibuild_helpers.workarea import logged_scm, updateReferenceRepoSpec
 from alibuild_helpers.log import logger_handler, LogFormatter, ProgressPrint
-from datetime import datetime
 from glob import glob
 try:
   from collections import OrderedDict
@@ -598,13 +597,6 @@ def doBuild(args, parser):
     L += [specs[m] for m in withPredecessor]
   buildOrder = [s["package"] for s in S]
 
-  # Date fields to substitute: they are zero-padded
-  now = datetime.now()
-  nowKwds = { "year": str(now.year),
-              "month": str(now.month).zfill(2),
-              "day": str(now.day).zfill(2),
-              "hour": str(now.hour).zfill(2) }
-
   # Check if any of the packages can be picked up from a local checkout
   develPkgs = []
   if not args.forceTracked:
@@ -838,7 +830,7 @@ def doBuild(args, parser):
       packages = [join(symlink_dir, symlink)
                   for symlink in os.listdir(symlink_dir)
                   if links_regex.fullmatch(symlink)]
-    except OSError as exc:
+    except OSError:
       # If symlink_dir does not exist or cannot be accessed, return an empty
       # list of packages.
       packages = []
