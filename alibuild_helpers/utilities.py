@@ -19,7 +19,7 @@ try:
 except ImportError:
   from pipes import quote  # Python 2.7
 
-from alibuild_helpers.cmd import decode_with_fallback, getoutput
+from alibuild_helpers.cmd import getoutput
 from alibuild_helpers.git import git
 from alibuild_helpers.log import warning, dieOnError
 
@@ -74,27 +74,31 @@ def resolve_version(spec, defaults, branch_basename, branch_stream):
   - %(day)s
   - %(hour)s
 
-  with the calculated content"""
+  with the calculated content.
+  """
   defaults_upper = defaults != "release" and "_" + defaults.upper().replace("-", "_") or ""
   commit_hash = spec.get("commit_hash", "hash_unknown")
   tag = str(spec.get("tag", "tag_unknown"))
-  return format(spec["version"],
-                commit_hash=commit_hash,
-                short_hash=commit_hash[0:10],
-                tag=tag,
-                branch_basename = branch_basename,
-                branch_stream = branch_stream or tag,
-                tag_basename=basename(tag),
-                defaults_upper=defaults_upper,
-                **nowKwds)
+  return spec["version"] % {
+    "commit_hash": commit_hash,
+    "short_hash": commit_hash[0:10],
+    "tag": tag,
+    "branch_basename": branch_basename,
+    "branch_stream": branch_stream or tag,
+    "tag_basename": basename(tag),
+    "defaults_upper": defaults_upper,
+    **nowKwds,
+  }
 
 def resolve_tag(spec):
-  """Expand the version replacing the following keywords:
+  """Expand the tag, replacing the following keywords:
   - %(year)s
   - %(month)s
   - %(day)s
-  - %(hour)s"""
-  return format(spec["tag"], **nowKwds)
+  - %(hour)s
+  """
+  return spec["tag"] % nowKwds
+
 
 def normalise_multiple_options(option, sep=","):
   return [x for x in ",".join(option).split(sep) if x]
@@ -131,10 +135,6 @@ def validateDefaults(finalPkgSpec, defaults):
                   (finalPkgSpec["package"],
                    defaults,
                    "\n".join([" - " + x for x in validDefaults])), validDefaults)
-
-
-def format(s, **kwds):
-  return decode_with_fallback(s) % kwds
 
 
 def doDetectArch(hasOsRelease, osReleaseLines, platformTuple, platformSystem, platformProcessor):
@@ -278,10 +278,10 @@ class GitReader(object):
     err, d = git(("show", "{gh}:{fn}.sh".format(gh=gh, fn=fn.lower())),
                  directory=self.configDir)
     if err:
-      raise RuntimeError(format("Cannot read recipe %(fn)s from reference %(gh)s.\n" +
-                                "Make sure you run first (this will not alter your recipes):\n" +
-                                "  cd %(dist)s && git remote update -p && git fetch --tags",
-                                dist=self.configDir, gh=gh, fn=fn))
+      raise RuntimeError("Cannot read recipe {fn} from reference {gh}.\n"
+                         "Make sure you run first (this will not alter your recipes):\n"
+                         "  cd {dist} && git remote update -p && git fetch --tags"
+                         .format(dist=self.configDir, gh=gh, fn=fn))
     return d
 
 def yamlLoad(s):

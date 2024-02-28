@@ -7,7 +7,7 @@ from alibuild_helpers.log import dieOnError
 from alibuild_helpers.cmd import execute, getstatusoutput, DockerRunner, BASH, install_wrapper_script
 from alibuild_helpers.utilities import prunePaths
 from alibuild_helpers.utilities import resolve_store_path
-from alibuild_helpers.utilities import format, parseDefaults, readDefaults
+from alibuild_helpers.utilities import parseDefaults, readDefaults
 from alibuild_helpers.utilities import getPackageList, asList
 from alibuild_helpers.utilities import validateDefaults
 from alibuild_helpers.utilities import Hasher
@@ -21,6 +21,7 @@ import yaml
 from alibuild_helpers.workarea import logged_scm, updateReferenceRepoSpec
 from alibuild_helpers.log import logger_handler, LogFormatter, ProgressPrint
 from glob import glob
+from textwrap import dedent
 try:
   from collections import OrderedDict
 except ImportError:
@@ -125,27 +126,16 @@ def update_git_repos(args, specs, buildOrder, develPkgs):
 # and its direct / indirect dependencies
 def createDistLinks(spec, specs, args, syncHelper, repoType, requiresType):
   # At the point we call this function, spec has a single, definitive hash.
-  target = format("TARS/%(a)s/%(rp)s/%(p)s/%(p)s-%(v)s-%(r)s",
-                  a=args.architecture,
-                  rp=repoType,
-                  p=spec["package"],
-                  v=spec["version"],
-                  r=spec["revision"])
+  target = "TARS/{arch}/{repo}/{package}/{package}-{version}-{revision}" \
+    .format(arch=args.architecture, repo=repoType, **spec)
   shutil.rmtree(target.encode("utf-8"), True)
-  cmd = format("cd %(w)s && mkdir -p %(t)s", w=args.workDir, t=target)
+  cmd = "cd {} && mkdir -p {}".format(args.workDir, target)
   links = []
   for x in [spec["package"]] + list(spec[requiresType]):
     dep = specs[x]
-    source = format("../../../../../TARS/%(a)s/store/%(sh)s/%(h)s/%(p)s-%(v)s-%(r)s.%(a)s.tar.gz",
-                    a=args.architecture,
-                    sh=dep["hash"][0:2],
-                    h=dep["hash"],
-                    p=dep["package"],
-                    v=dep["version"],
-                    r=dep["revision"])
-    links.append(format("ln -sfn %(source)s %(target)s",
-                 target=target,
-                 source=source))
+    source = "../../../../../TARS/{arch}/store/{sh}/{hash}/{package}-{version}-{revision}.{arch}.tar.gz" \
+      .format(arch=args.architecture, sh=dep["hash"][:2], **dep)
+    links.append("ln -sfn {} {}".format(source, target))
   # We do it in chunks to avoid hitting shell limits but
   # still do more than one symlink at the time, to save the
   # forking cost.
@@ -735,16 +725,14 @@ def doBuild(args, parser):
   # single one of them. This is done this way so that the second time we run we
   # can check if the build was consistent and if it is, we bail out.
   packageIterations = 0
-  report_event("install",
-               format("%(p)s disabled=%(dis)s devel=%(dev)s system=%(sys)s own=%(own)s deps=%(deps)s",
-                      p=args.pkgname,
-                      dis=",".join(sorted(args.disable)),
-                      dev=",".join(sorted(develPkgs)),
-                      sys=",".join(sorted(systemPackages)),
-                      own=",".join(sorted(ownPackages)),
-                      deps=",".join(buildOrder[:-1])
-                     ),
-               args.architecture)
+  report_event("install", "{p} disabled={dis} devel={dev} system={sys} own={own} deps={deps}".format(
+    p=args.pkgname,
+    dis=",".join(sorted(args.disable)),
+    dev=",".join(sorted(develPkgs)),
+    sys=",".join(sorted(systemPackages)),
+    own=",".join(sorted(ownPackages)),
+    deps=",".join(buildOrder[:-1]),
+  ), args.architecture)
 
   while buildOrder:
     packageIterations += 1
@@ -856,10 +844,8 @@ def doBuild(args, parser):
     revisionPrefix = "" if getattr(syncHelper, "writeStore", "") else "local"
     for symlink in packages:
       realPath = readlink(symlink)
-      matcher = format("../../%(a)s/store/[0-9a-f]{2}/([0-9a-f]*)/%(p)s-%(v)s-((?:local)?[0-9]*).%(a)s.tar.gz$",
-                       a=args.architecture,
-                       p=spec["package"],
-                       v=spec["version"])
+      matcher = "../../{arch}/store/[0-9a-f]{{2}}/([0-9a-f]+)/{package}-{version}-((?:local)?[0-9]+).{arch}.tar.gz$" \
+        .format(arch=args.architecture, **spec)
       match = re.match(matcher, realPath)
       if not match:
         warning("Symlink %s -> %s couldn't be parsed", symlink, realPath)
@@ -930,35 +916,17 @@ def doBuild(args, parser):
     # Recreate symlinks to this development package builds.
     if spec["package"] in develPkgs:
       debug("Creating symlinks to builds of devel package %s", spec["package"])
-      cmd = format("ln -snf %(pkgHash)s %(wd)s/BUILD/%(pkgName)s-latest",
-                   wd=workDir,
-                   pkgName=spec["package"],
-                   pkgHash=spec["hash"])
+      cmd = "ln -snf {hash} {wd}/BUILD/{package}-latest"
       if develPrefix:
-        cmd += format(" && ln -snf %(pkgHash)s %(wd)s/BUILD/%(pkgName)s-latest-%(devPrefix)s",
-                      wd=workDir,
-                      pkgName=spec["package"],
-                      pkgHash=spec["hash"],
-                      devPrefix=develPrefix)
-      err = execute(cmd)
+        cmd += " && ln -snf {hash} {wd}/BUILD/{package}-latest-{dev_prefix}"
+      err = execute(cmd.format(wd=workDir, dev_prefix=develPrefix, **spec))
       debug("Command %s returned %d", cmd, err)
       # Last package built gets a "latest" mark.
-      cmd = format("ln -snf %(pkgVersion)s-%(pkgRevision)s %(wd)s/%(arch)s/%(pkgName)s/latest",
-                   wd=workDir,
-                   arch=args.architecture,
-                   pkgName=spec["package"],
-                   pkgVersion=spec["version"],
-                   pkgRevision=spec["revision"])
+      cmd = "ln -snf {version}-{revision} {wd}/{arch}/{package}/latest"
       # Latest package built for a given devel prefix gets a "latest-%(family)s" mark.
       if spec["build_family"]:
-        cmd += format(" && ln -snf %(pkgVersion)s-%(pkgRevision)s %(wd)s/%(arch)s/%(pkgName)s/latest-%(family)s",
-                      wd=workDir,
-                      arch=args.architecture,
-                      pkgName=spec["package"],
-                      pkgVersion=spec["version"],
-                      pkgRevision=spec["revision"],
-                      family=spec["build_family"])
-      err = execute(cmd)
+        cmd += " && ln -snf {version}-{revision} {wd}/{arch}/{package}/latest-{build_family}"
+      err = execute(cmd.format(wd=workDir, arch=args.architecture, **spec))
       debug("Command %s returned %d", cmd, err)
 
     # Check if this development package needs to be rebuilt.
@@ -997,33 +965,23 @@ def doBuild(args, parser):
       # assuming the package is not a development one. We also can
       # delete the SOURCES in case we have aggressive-cleanup enabled.
       if not spec["package"] in develPkgs and args.autoCleanup:
-        cleanupDirs = [format("%(w)s/BUILD/%(h)s",
-                              w=workDir,
-                              h=spec["hash"]),
-                       format("%(w)s/INSTALLROOT/%(h)s",
-                              w=workDir,
-                              h=spec["hash"])]
+        cleanupDirs = [join(workDir, "BUILD", spec["hash"]),
+                       join(workDir, "INSTALLROOT", spec["hash"])]
         if args.aggressiveCleanup:
-          cleanupDirs.append(format("%(w)s/SOURCES/%(p)s",
-                                    w=workDir,
-                                    p=spec["package"]))
+          cleanupDirs.append(join(workDir, "SOURCES", spec["package"]))
         debug("Cleaning up:\n%s", "\n".join(cleanupDirs))
 
         for d in cleanupDirs:
           shutil.rmtree(d.encode("utf8"), True)
         try:
-          unlink(format("%(w)s/BUILD/%(p)s-latest",
-                 w=workDir, p=spec["package"]))
+          unlink(join(workDir, "BUILD", spec["package"] + "-latest"))
           if "develPrefix" in args:
-            unlink(format("%(w)s/BUILD/%(p)s-latest-%(dp)s",
-                   w=workDir, p=spec["package"], dp=args.develPrefix))
+            unlink(join(workDir, "BUILD", spec["package"] + "-latest-" + args.develPrefix))
         except:
           pass
         try:
-          rmdir(format("%(w)s/BUILD",
-                w=workDir, p=spec["package"]))
-          rmdir(format("%(w)s/INSTALLROOT",
-                w=workDir, p=spec["package"]))
+          rmdir(join(workDir, "BUILD"))
+          rmdir(join(workDir, "INSTALLROOT"))
         except:
           pass
       continue
@@ -1172,40 +1130,41 @@ def doBuild(args, parser):
     progress = ProgressPrint("%s is being built (use --debug for full output)" % spec["package"])
     err = execute(build_command, printer=debug if args.debug or not sys.stdout.isatty() else progress)
     progress.end("failed" if err else "ok", err)
-    report_event("BuildError" if err else "BuildSuccess",
-                 spec["package"],
-                 format("%(a)s %(v)s %(c)s %(h)s",
-                        a = args.architecture,
-                        v = spec["version"],
-                        c = spec["commit_hash"],
-                        h = os.environ["ALIBUILD_ALIDIST_HASH"][0:10]))
+    report_event("BuildError" if err else "BuildSuccess", spec["package"], " ".join((
+      args.architecture,
+      spec["version"],
+      spec["commit_hash"],
+      os.environ["ALIBUILD_ALIDIST_HASH"][:10],
+    )))
 
     updatablePkgs = [ x for x in spec["requires"] if x in develPkgs ]
     if spec["package"] in develPkgs:
       updatablePkgs.append(spec["package"])
 
-    buildErrMsg = format("Error while executing %(sd)s/build.sh on `%(h)s'.\n"
-                         "Log can be found in %(w)s/BUILD/%(p)s-latest%(devSuffix)s/log\n"
-                         "Please upload it to CERNBox/Dropbox if you intend to request support.\n"
-                         "Build directory is %(w)s/BUILD/%(p)s-latest%(devSuffix)s/%(p)s.",
-                         h=socket.gethostname(),
-                         sd=scriptDir,
-                         w=abspath(args.workDir),
-                         p=spec["package"],
-                         devSuffix="-" + args.develPrefix
-                                   if "develPrefix" in args and spec["package"] in develPkgs
-                                   else "")
+    buildErrMsg = dedent("""\
+    Error while executing {sd}/build.sh on `{h}'.
+    Log can be found in {w}/BUILD/{p}-latest{devSuffix}/log
+    Please upload it to CERNBox/Dropbox if you intend to request support.
+    Build directory is {w}/BUILD/{p}-latest{devSuffix}/{p}.
+    """).format(
+      h=socket.gethostname(),
+      sd=scriptDir,
+      w=abspath(args.workDir),
+      p=spec["package"],
+      devSuffix="-" + args.develPrefix
+      if "develPrefix" in args and spec["package"] in develPkgs
+      else "",
+    )
     if updatablePkgs:
-      buildErrMsg += format("\n\n"
-                            "Note that you have packages in development mode.\n"
-                            "Devel sources are not updated automatically, you must do it by hand.\n"
-                            "This problem might be due to one or more outdated devel sources.\n"
-                            "To update all development packages required for this build "
-                            "it is usually sufficient to do:\n%(updatablePkgs)s",
-                            updatablePkgs="".join(["\n  ( cd %s && git pull --rebase )" % dp
-                                                   for dp in updatablePkgs]))
+      buildErrMsg += dedent("""
+      Note that you have packages in development mode.
+      Devel sources are not updated automatically, you must do it by hand.\n
+      This problem might be due to one or more outdated devel sources.
+      To update all development packages required for this build it is usually sufficient to do:
+      """)
+      buildErrMsg += "".join("\n  ( cd %s && git pull --rebase )" % dp for dp in updatablePkgs)
 
-    dieOnError(err, buildErrMsg)
+    dieOnError(err, buildErrMsg.strip())
 
     # We need to create 2 sets of links, once with the full requires,
     # once with only direct dependencies, since that's required to

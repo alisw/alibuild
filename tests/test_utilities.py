@@ -10,7 +10,6 @@ except ImportError:
 
 from alibuild_helpers.utilities import doDetectArch, filterByArchitecture
 from alibuild_helpers.utilities import Hasher
-from alibuild_helpers.utilities import format
 from alibuild_helpers.utilities import asList
 from alibuild_helpers.utilities import prunePaths
 from alibuild_helpers.utilities import resolve_version
@@ -170,19 +169,6 @@ class TestUtilities(unittest.TestCase):
     self.assertEqual(h2.hexdigest(), "1619bcdbeff6828138ad9b6e43cc17e856457603")
     self.assertEqual(h3.hexdigest(), "0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33")
     self.assertNotEqual(h1.hexdigest(), h2.hexdigest())
-
-  def test_format(self):
-    self.assertEqual(format("%(foo)s", foo="foo"), "foo")
-    self.assertEqual(format(b"%(foo)s", foo="foo"), "foo")
-    self.assertRaises(KeyError, format, "%(foo)s", bar="foo")
-
-    t1 = "ताड़िद्दा"
-    t2 = u"\u0924\u093e\u0921\u093c\u093f\u0926\u094d\u0926\u093e"
-    self.assertTrue(format(t1) == t2)
-    self.assertTrue(format(t1) == format(t2))
-    self.assertTrue(format([1,2,3]) == u"[1, 2, 3]")
-    self.assertTrue(format({"a":-1}) == u"{'a': -1}")
-    self.assertTrue(format(123456) == u"123456")
 
   def test_asList(self):
     self.assertEqual(asList("a"), ["a"])
