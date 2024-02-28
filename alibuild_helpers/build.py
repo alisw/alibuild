@@ -15,8 +15,7 @@ from alibuild_helpers.utilities import yamlDump
 from alibuild_helpers.utilities import resolve_tag, resolve_version
 from alibuild_helpers.git import git, clone_speedup_options, Git
 from alibuild_helpers.sl import Sapling
-from alibuild_helpers.sync import (NoRemoteSync, HttpRemoteSync, S3RemoteSync,
-                                   Boto3RemoteSync, RsyncRemoteSync)
+from alibuild_helpers.sync import remote_from_url
 import yaml
 from alibuild_helpers.workarea import logged_scm, updateReferenceRepoSpec
 from alibuild_helpers.log import logger_handler, LogFormatter, ProgressPrint
@@ -469,18 +468,8 @@ def create_provenance_info(package, specs, args):
 
 
 def doBuild(args, parser):
-  if args.remoteStore.startswith("http"):
-    syncHelper = HttpRemoteSync(args.remoteStore, args.architecture, args.workDir, args.insecure)
-  elif args.remoteStore.startswith("s3://"):
-    syncHelper = S3RemoteSync(args.remoteStore, args.writeStore,
-                              args.architecture, args.workDir)
-  elif args.remoteStore.startswith("b3://"):
-    syncHelper = Boto3RemoteSync(args.remoteStore, args.writeStore,
-                                 args.architecture, args.workDir)
-  elif args.remoteStore:
-    syncHelper = RsyncRemoteSync(args.remoteStore, args.writeStore, args.architecture, args.workDir)
-  else:
-    syncHelper = NoRemoteSync()
+  syncHelper = remote_from_url(args.remoteStore, args.writeStore, args.architecture,
+                               args.workDir, getattr(args, "insecure", False))
 
   packages = args.pkgname
   specs = {}
