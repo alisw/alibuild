@@ -523,11 +523,6 @@ def doBuild(args, parser):
   install_wrapper_script("git", workDir)
 
   with DockerRunner(args.dockerImage, args.docker_extra_args) as getstatusoutput_docker:
-    my_gzip = "pigz" if getstatusoutput_docker("which pigz")[0] == 0 else "gzip"
-    my_tar = ("tar --ignore-failed-read"
-              if getstatusoutput_docker("tar --ignore-failed-read -cvvf "
-                                        "/dev/null /dev/zero")[0] == 0
-              else "tar")
     systemPackages, ownPackages, failed, validDefaults = \
       getPackageList(packages                = packages,
                      specs                   = specs,
@@ -1126,8 +1121,6 @@ def doBuild(args, parser):
       ("GIT_COMMITTER_NAME", "unknown"),
       ("GIT_COMMITTER_EMAIL", "unknown"),
       ("GIT_TAG", spec["tag"]),
-      ("MY_GZIP", my_gzip),
-      ("MY_TAR", my_tar),
       ("INCREMENTAL_BUILD_HASH", spec.get("incremental_hash", "0")),
       ("JOBS", str(args.jobs)),
       ("PKGHASH", spec["hash"]),
