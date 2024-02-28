@@ -119,15 +119,6 @@ def dummy_git(args, directory=".", check=True, prompt=True):
     }[(tuple(args), directory, check)]
 
 
-def dummy_getstatusoutput(x):
-    if is_string(x) and re.match("(mkdir -p|ln -snf) [^;]+(;ln -snf [^;]+)*$", x):
-        return (0, "")
-    return {
-        'which pigz': (1, ""),
-        'tar --ignore-failed-read -cvvf /dev/null /dev/zero': (0, ""),
-    }[x]
-
-
 TIMES_ASKED = {}
 
 
@@ -201,7 +192,6 @@ class BuildTestCase(unittest.TestCase):
     @patch("requests.Session.get", new=MagicMock())
     @patch("alibuild_helpers.sync.execute", new=dummy_execute)
     @patch("alibuild_helpers.git.git")
-    @patch("alibuild_helpers.build.getstatusoutput", new=dummy_getstatusoutput)
     @patch("alibuild_helpers.build.exists", new=MagicMock(side_effect=dummy_exists))
     @patch("os.path.exists", new=MagicMock(side_effect=dummy_exists))
     @patch("alibuild_helpers.build.sys")
@@ -211,6 +201,7 @@ class BuildTestCase(unittest.TestCase):
     @patch("alibuild_helpers.build.readDefaults",
            new=MagicMock(return_value=(OrderedDict({"package": "defaults-release", "disable": []}), "")))
     @patch("alibuild_helpers.build.makedirs", new=MagicMock(return_value=None))
+    @patch("alibuild_helpers.build.symlink", new=MagicMock(return_value=None))
     @patch("alibuild_helpers.utilities.open", new=lambda x: {
         "/alidist/root.sh": StringIO(TEST_ROOT_RECIPE),
         "/alidist/zlib.sh": StringIO(TEST_ZLIB_RECIPE),

@@ -88,6 +88,8 @@ class SyncTestCase(unittest.TestCase):
     @patch("alibuild_helpers.sync.open", new=lambda fn, mode: BytesIO())
     @patch("os.path.isfile", new=MagicMock(return_value=False))
     @patch("os.rename", new=MagicMock(return_value=None))
+    @patch("os.makedirs", new=MagicMock(return_value=None))
+    @patch("alibuild_helpers.sync.symlink", new=MagicMock(return_value=None))
     @patch("alibuild_helpers.sync.execute", new=MagicMock(return_value=None))
     @patch("alibuild_helpers.sync.debug")
     @patch("alibuild_helpers.sync.error")
@@ -164,6 +166,8 @@ class SyncTestCase(unittest.TestCase):
 
 
 @unittest.skipIf(sys.version_info < (3, 6), "python >= 3.6 is required for boto3")
+@patch("os.makedirs", new=MagicMock(return_value=None))
+@patch("alibuild_helpers.sync.symlink", new=MagicMock(return_value=None))
 @patch("alibuild_helpers.log.error", new=MagicMock())
 @patch("alibuild_helpers.sync.Boto3RemoteSync._s3_init", new=MagicMock())
 class Boto3TestCase(unittest.TestCase):

@@ -8,7 +8,7 @@ from alibuild_helpers.log import debug, banner
 
 
 def generate_analytics_id():
-  getstatusoutput("mkdir -p  ~/.config/alibuild")
+  os.makedirs(os.path.expanduser("~/.config/alibuild"), exist_ok=True)
   err, output = getstatusoutput("uuidgen >  ~/.config/alibuild/analytics-uuid")
   # If an error is found while generating the unique user ID, we disable
   # the analytics on the machine.

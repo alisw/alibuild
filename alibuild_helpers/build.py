@@ -4,8 +4,8 @@ from alibuild_helpers import __version__
 from alibuild_helpers.analytics import report_event
 from alibuild_helpers.log import debug, error, info, banner, warning
 from alibuild_helpers.log import dieOnError
-from alibuild_helpers.cmd import execute, getstatusoutput, DockerRunner, BASH, install_wrapper_script
-from alibuild_helpers.utilities import prunePaths
+from alibuild_helpers.cmd import execute, DockerRunner, BASH, install_wrapper_script
+from alibuild_helpers.utilities import prunePaths, symlink, call_ignoring_oserrors
 from alibuild_helpers.utilities import resolve_store_path
 from alibuild_helpers.utilities import parseDefaults, readDefaults
 from alibuild_helpers.utilities import getPackageList, asList
@@ -126,21 +126,14 @@ def update_git_repos(args, specs, buildOrder, develPkgs):
 # and its direct / indirect dependencies
 def createDistLinks(spec, specs, args, syncHelper, repoType, requiresType):
   # At the point we call this function, spec has a single, definitive hash.
-  target = "TARS/{arch}/{repo}/{package}/{package}-{version}-{revision}" \
-    .format(arch=args.architecture, repo=repoType, **spec)
-  shutil.rmtree(target.encode("utf-8"), True)
-  cmd = "cd {} && mkdir -p {}".format(args.workDir, target)
-  links = []
-  for x in [spec["package"]] + list(spec[requiresType]):
-    dep = specs[x]
-    source = "../../../../../TARS/{arch}/store/{sh}/{hash}/{package}-{version}-{revision}.{arch}.tar.gz" \
-      .format(arch=args.architecture, sh=dep["hash"][:2], **dep)
-    links.append("ln -sfn {} {}".format(source, target))
-  # We do it in chunks to avoid hitting shell limits but
-  # still do more than one symlink at the time, to save the
-  # forking cost.
-  for g in [ links[i:i+10] for i in range(0, len(links), 10) ]:
-    execute(" && ".join([cmd] + g))
+  target_dir = "{work_dir}/TARS/{arch}/{repo}/{package}/{package}-{version}-{revision}" \
+    .format(work_dir=args.workDir, arch=args.architecture, repo=repoType, **spec)
+  shutil.rmtree(target_dir.encode("utf-8"), ignore_errors=True)
+  makedirs(target_dir, exist_ok=True)
+  for pkg in [spec["package"]] + list(spec[requiresType]):
+    dep_tarball = "../../../../../TARS/{arch}/store/{short_hash}/{hash}/{package}-{version}-{revision}.{arch}.tar.gz" \
+      .format(arch=args.architecture, short_hash=specs[pkg]["hash"][:2], **specs[pkg])
+    symlink(dep_tarball, target_dir)
 
 
 def storeHashes(package, specs, isDevelPkg, considerRelocation):
@@ -487,9 +480,7 @@ def doBuild(args, parser):
                                          defaultsReader, debug)
   dieOnError(err, err)
 
-  specDir = "%s/SPECS" % workDir
-  if not exists(specDir):
-    makedirs(specDir)
+  makedirs(join(workDir, "SPECS"), exist_ok=True)
 
   # If the alidist workdir contains a .sl directory, we use Saplign as SCM
   # otherwise we default to git (without checking for the actual presence of 
@@ -800,9 +791,9 @@ def doBuild(args, parser):
     ))
     symlink_dir = join(workDir, "TARS", args.architecture, spec["package"])
     try:
-      packages = [join(symlink_dir, symlink)
-                  for symlink in os.listdir(symlink_dir)
-                  if links_regex.fullmatch(symlink)]
+      packages = [join(symlink_dir, symlink_path)
+                  for symlink_path in os.listdir(symlink_dir)
+                  if links_regex.fullmatch(symlink_path)]
     except OSError:
       # If symlink_dir does not exist or cannot be accessed, return an empty
       # list of packages.
@@ -842,13 +833,13 @@ def doBuild(args, parser):
     # We can tell that the remote store is read-only if it has an empty or
     # no writeStore property. See below for explanation of why we need this.
     revisionPrefix = "" if getattr(syncHelper, "writeStore", "") else "local"
-    for symlink in packages:
-      realPath = readlink(symlink)
+    for symlink_path in packages:
+      realPath = readlink(symlink_path)
       matcher = "../../{arch}/store/[0-9a-f]{{2}}/([0-9a-f]+)/{package}-{version}-((?:local)?[0-9]+).{arch}.tar.gz$" \
         .format(arch=args.architecture, **spec)
       match = re.match(matcher, realPath)
       if not match:
-        warning("Symlink %s -> %s couldn't be parsed", symlink, realPath)
+        warning("Symlink %s -> %s couldn't be parsed", symlink_path, realPath)
         continue
       rev_hash, revision = match.groups()
 
@@ -872,10 +863,10 @@ def doBuild(args, parser):
       # and we do not need to build it. Because we prefer reusing remote
       # revisions, only store a local revision if there is no other candidate
       # for reuse yet.
-      candidate = better_tarball(spec, candidate, (revision, rev_hash, symlink))
+      candidate = better_tarball(spec, candidate, (revision, rev_hash, symlink_path))
 
     try:
-      revision, rev_hash, symlink = candidate
+      revision, rev_hash, symlink_path = candidate
     except TypeError:  # raised if candidate is still None
       # If we can't reuse an existing revision, assign the next free revision
       # to this package. If we're not uploading it, name it localN to avoid
@@ -893,15 +884,14 @@ def doBuild(args, parser):
       spec["local_revision_hash" if revision.startswith("local")
            else "remote_revision_hash"] = rev_hash
       if spec["package"] in develPkgs and "incremental_recipe" in spec:
-        spec["obsolete_tarball"] = symlink
+        spec["obsolete_tarball"] = symlink_path
       else:
         debug("Package %s with hash %s is already found in %s. Not building.",
-              p, rev_hash, symlink)
-        getstatusoutput(
-          "ln -snf {v}-{r} {w}/{a}/{p}/latest-{bf};"
-          "ln -snf {v}-{r} {w}/{a}/{p}/latest".format(
-            v=spec["version"], r=spec["revision"], w=workDir,
-            a=args.architecture, p=spec["package"], bf=spec["build_family"]))
+              p, rev_hash, symlink_path)
+        symlink("{version}-{revision}".format(**spec),
+                "{wd}/{arch}/{package}/latest-{build_family}".format(wd=workDir, arch=args.architecture, **spec))
+        symlink("{version}-{revision}".format(**spec),
+                "{wd}/{arch}/{package}/latest".format(wd=workDir, arch=args.architecture, **spec))
         info("Using cached build for %s", p)
 
     # Now we know whether we're using a local or remote package, so we can set
@@ -916,18 +906,16 @@ def doBuild(args, parser):
     # Recreate symlinks to this development package builds.
     if spec["package"] in develPkgs:
       debug("Creating symlinks to builds of devel package %s", spec["package"])
-      cmd = "ln -snf {hash} {wd}/BUILD/{package}-latest"
+      call_ignoring_oserrors(symlink, spec["hash"], join(workDir, "BUILD", spec["package"] + "-latest"))
       if develPrefix:
-        cmd += " && ln -snf {hash} {wd}/BUILD/{package}-latest-{dev_prefix}"
-      err = execute(cmd.format(wd=workDir, dev_prefix=develPrefix, **spec))
-      debug("Command %s returned %d", cmd, err)
+        call_ignoring_oserrors(symlink, spec["hash"], join(workDir, "BUILD", spec["package"] + "-latest-" + develPrefix))
       # Last package built gets a "latest" mark.
-      cmd = "ln -snf {version}-{revision} {wd}/{arch}/{package}/latest"
-      # Latest package built for a given devel prefix gets a "latest-%(family)s" mark.
+      call_ignoring_oserrors(symlink, "{version}-{revision}".format(**spec),
+                             join(workDir, args.architecture, spec["package"], "latest"))
+      # Latest package built for a given devel prefix gets a "latest-<family>" mark.
       if spec["build_family"]:
-        cmd += " && ln -snf {version}-{revision} {wd}/{arch}/{package}/latest-{build_family}"
-      err = execute(cmd.format(wd=workDir, arch=args.architecture, **spec))
-      debug("Command %s returned %d", cmd, err)
+        call_ignoring_oserrors(symlink, "{version}-{revision}".format(**spec),
+                               join(workDir, args.architecture, spec["package"], "latest-" + spec["build_family"]))
 
     # Check if this development package needs to be rebuilt.
     if spec["package"] in develPkgs:
@@ -1040,8 +1028,7 @@ def doBuild(args, parser):
     scriptDir = join(workDir, "SPECS", args.architecture, spec["package"],
                      spec["version"] + "-" + spec["revision"])
 
-    err, out = getstatusoutput("mkdir -p %s" % scriptDir)
-    dieOnError(err, "Failed to create script dir %s: %s" % (scriptDir, out))
+    makedirs(scriptDir, exist_ok=True)
     writeAll("%s/%s.sh" % (scriptDir, spec["package"]), spec["recipe"])
     writeAll("%s/build.sh" % scriptDir, cmd_raw % {
       "provenance": create_provenance_info(spec["package"], specs, args),
