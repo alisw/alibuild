@@ -2,7 +2,7 @@
 
 from __future__ import print_function
 from alibuild_helpers.log import debug, error, info, dieOnError
-from alibuild_helpers.utilities import parseDefaults, readDefaults, getPackageList, validateDefaults, format
+from alibuild_helpers.utilities import parseDefaults, readDefaults, getPackageList, validateDefaults
 from alibuild_helpers.cmd import DockerRunner, execute
 from tempfile import NamedTemporaryFile
 from os import remove
@@ -101,8 +101,7 @@ def doDeps(args, parser):
     dieOnError(True, "Could not find dot in PATH. Please install graphviz and add it to PATH.")
   try:
     if args.neat:
-      execute(format("tred %(dotFile)s > %(dotFile)s.0 && mv %(dotFile)s.0 %(dotFile)s",
-              dotFile=fp.name))
+      execute("tred {dotFile} > {dotFile}.0 && mv {dotFile}.0 {dotFile}".format(dotFile=fp.name))
     execute(["dot", fp.name, "-Tpdf", "-o", args.outgraph])
   except Exception as e:
     error("Error generating dependencies with dot: %s: %s", type(e).__name__, e)
