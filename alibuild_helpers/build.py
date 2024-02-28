@@ -1010,9 +1010,6 @@ def doBuild(args, parser):
       "runtime_requires": " ".join(spec["runtime_requires"]),
     })
 
-    banner("Building %s@%s", spec["package"],
-           args.develPrefix if "develPrefix" in args and spec["package"] in develPkgs
-           else spec["version"])
     # Define the environment so that it can be passed up to the
     # actual build script
     buildEnvironment = [
@@ -1076,9 +1073,12 @@ def doBuild(args, parser):
       build_command = "%s -e -x %s/build.sh 2>&1" % (BASH, quote(scriptDir))
 
     debug("Build command: %s", build_command)
-    progress = ProgressPrint("%s is being built (use --debug for full output)" % spec["package"])
-    err = execute(build_command, printer=debug if args.debug or not sys.stdout.isatty() else progress)
-    progress.end("failed" if err else "ok", err)
+    progress = ProgressPrint("%s %s@%s (use --debug for full output)" % (
+        "Unpacking tarball for" if cachedTarball else "Compiling", spec["package"],
+        args.develPrefix if "develPrefix" in args and spec["is_devel_pkg"] else spec["version"],
+    ))
+    err = execute(build_command, printer=progress)
+    progress.end("failed" if err else "done", err)
     report_event("BuildError" if err else "BuildSuccess", spec["package"], " ".join((
       args.architecture,
       spec["version"],
