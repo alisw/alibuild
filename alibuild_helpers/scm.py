@@ -1,3 +1,7 @@
+class SCMError(Exception):
+  """Signal that an SCM-related error occurred."""
+
+
 class SCM(object):
   def checkedOutCommitName(self, directory):
     raise NotImplementedError
