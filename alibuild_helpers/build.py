@@ -692,7 +692,6 @@ def doBuild(args, parser):
   # We now iterate on all the packages, making sure we build correctly every
   # single one of them. This is done this way so that the second time we run we
   # can check if the build was consistent and if it is, we bail out.
-  packageIterations = 0
   report_event("install", "{p} disabled={dis} devel={dev} system={sys} own={own} deps={deps}".format(
     p=args.pkgname,
     dis=",".join(sorted(args.disable)),
@@ -703,10 +702,6 @@ def doBuild(args, parser):
   ), args.architecture)
 
   while buildOrder:
-    packageIterations += 1
-    dieOnError(packageIterations > 20,
-               "Too many attempts at building %s. Something wrong with the repository?" %
-               spec["package"])
     p = buildOrder[0]
     spec = specs[p]
     if args.debug:
@@ -924,7 +919,6 @@ def doBuild(args, parser):
         unlink(realpath(spec["obsolete_tarball"]))
         unlink(spec["obsolete_tarball"])
       buildOrder.pop(0)
-      packageIterations = 0
       # We can now delete the INSTALLROOT and BUILD directories,
       # assuming the package is not a development one. We also can
       # delete the SOURCES in case we have aggressive-cleanup enabled.
