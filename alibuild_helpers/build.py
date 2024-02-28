@@ -481,12 +481,11 @@ def doBuild(args, parser):
 
   makedirs(join(workDir, "SPECS"), exist_ok=True)
 
-  # If the alidist workdir contains a .sl directory, we use Saplign as SCM
-  # otherwise we default to git (without checking for the actual presence of 
-  # .git). 
-  # We do it this way, because we have one test which uses an embedded folder 
-  # in the alibuild source, which therefore does not contain a .git directory
-  # and falls back to the alibuild git commit.
+  # If the alidist workdir contains a .sl directory, we use Sapling as SCM.
+  # Otherwise, we default to git (without checking for the actual presence of
+  # .git). We mustn't check for a .git directory, because some tests use a
+  # subdirectory of the alibuild source tree as the "alidist" checkout, and
+  # that won't have a .git directory.
   scm = exists("%s/.sl" % args.configDir) and Sapling() or Git()
   try:
     checkedOutCommitName = scm.checkedOutCommitName(directory=args.configDir)
