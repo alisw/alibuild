@@ -4,7 +4,7 @@ except ImportError:
   from pipes import quote  # Python 2.7
 from alibuild_helpers.cmd import getstatusoutput
 from alibuild_helpers.log import debug
-from alibuild_helpers.scm import SCM
+from alibuild_helpers.scm import SCM, SCMError
 
 GIT_COMMAND_TIMEOUT_SEC = 120
 """How many seconds to let any git command execute before being terminated."""
@@ -65,5 +65,5 @@ def git(args, directory=".", check=True, prompt=True):
     prompt_var="GIT_TERMINAL_PROMPT=0" if not prompt else "",
   ), timeout=GIT_COMMAND_TIMEOUT_SEC)
   if check and err != 0:
-    raise RuntimeError("Error {} from git {}: {}".format(err, " ".join(args), output))
+    raise SCMError("Error {} from git {}: {}".format(err, " ".join(args), output))
   return output if check else (err, output)

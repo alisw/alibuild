@@ -15,6 +15,7 @@ from alibuild_helpers.utilities import yamlDump
 from alibuild_helpers.utilities import resolve_tag, resolve_version
 from alibuild_helpers.git import git, clone_speedup_options, Git
 from alibuild_helpers.sl import Sapling
+from alibuild_helpers.scm import SCMError
 from alibuild_helpers.sync import remote_from_url
 import yaml
 from alibuild_helpers.workarea import logged_scm, updateReferenceRepoSpec
@@ -95,14 +96,14 @@ def update_git_repos(args, specs, buildOrder, develPkgs):
             futurePackage = future_to_download[future]
             try:
                 future.result()
-            except RuntimeError as exc:
-                # Git failed. Let's assume this is because the user needs to
-                # supply a password.
+            except SCMError:
+                # The SCM failed. Let's assume this is because the user needs
+                # to supply a password.
                 debug("%r requires auth; will prompt later", futurePackage)
                 requires_auth.add(futurePackage)
             except Exception as exc:
-                raise RuntimeError("Error on fetching %r: %s. Aborting." %
-                                   (futurePackage, exc))
+                dieOnError(True, "Error on fetching %r: %s. Aborting." %
+                           (futurePackage, exc))
             else:
                 debug("%r package updated: %d refs found", futurePackage,
                       len(specs[futurePackage]["scm_refs"]))
