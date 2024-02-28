@@ -14,6 +14,19 @@ from alibuild_helpers.log import debug, error, dieOnError
 from alibuild_helpers.utilities import resolve_store_path, resolve_links_path
 
 
+def remote_from_url(read_url, write_url, architecture, work_dir, insecure=False):
+  """Parse remote store URLs and return the correct RemoteSync instance for them."""
+  if read_url.startswith("http"):
+    return HttpRemoteSync(read_url, architecture, work_dir, insecure)
+  if read_url.startswith("s3://"):
+    return S3RemoteSync(read_url, write_url, architecture, work_dir)
+  if read_url.startswith("b3://"):
+    return Boto3RemoteSync(read_url, write_url, architecture, work_dir)
+  if read_url:
+    return RsyncRemoteSync(read_url, write_url, architecture, work_dir)
+  return NoRemoteSync()
+
+
 class NoRemoteSync:
   """Helper class which does not do anything to sync"""
   def syncToLocal(self, p, spec):
