@@ -50,10 +50,6 @@ def symlink(link_target, link_name):
 
 asList = lambda x : x if type(x) == list else [x]
 
-# This function is only needed to check the coverage of the testsuite
-# is really happening and we did not made a mistake in tox.ini
-def check_coverage():
-  return True
 
 def resolve_store_path(architecture, spec_hash):
   """Return the path where a tarball with the given hash is to be stored.
