@@ -35,6 +35,25 @@ class LogFormatter(logging.Formatter):
     } for x in record.msg.split("\n"))
 
 
+def log_current_package(package, main_package, specs, devel_prefix):
+  """Show PACKAGE as the one currently being processed in future log messages."""
+  if logger_handler.level > logging.DEBUG:
+    return
+  if devel_prefix is not None:
+    short_version = devel_prefix
+  else:
+    short_version = specs[main_package]["commit_hash"]
+    if short_version != specs[main_package]["tag"]:
+      short_version = short_version[:8]
+  logger_handler.setFormatter(LogFormatter(
+    "%(asctime)s:%(levelname)s:{}:{}: %(message)s"
+    .format(main_package, short_version)
+    if package is None else
+    "%(asctime)s:%(levelname)s:{}:{}:{}: %(message)s"
+    .format(main_package, package, short_version)
+  ))
+
+
 class ProgressPrint:
   def __init__(self, begin_msg=""):
     self.count = -1
