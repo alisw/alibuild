@@ -13,7 +13,9 @@ from alibuild_helpers.utilities import Hasher
 from alibuild_helpers.utilities import asList
 from alibuild_helpers.utilities import prunePaths
 from alibuild_helpers.utilities import resolve_version
+from alibuild_helpers.utilities import topological_sort
 import os
+import string
 
 UBUNTU_1510_OS_RELEASE = """
 NAME="Ubuntu"
@@ -227,6 +229,39 @@ class TestUtilities(unittest.TestCase):
     self.assertTrue(resolve_version(spec, "o2", "stream/v1", "v1"), "O2")
     spec["version"] = "NO%(defaults_upper)s"
     self.assertTrue(resolve_version(spec, "release", "stream/v1", "v1"), "NO")
+
+
+class TestTopologicalSort(unittest.TestCase):
+    """Check that various properties of topological sorting hold."""
+
+    def test_resolve_dependency_chain(self):
+        """Test that topological sorting correctly sorts packages in a dependency chain."""
+        # Topological sorting only takes "requires" into account, since the
+        # build/runtime distinction does not matter for resolving build order.
+        self.assertEqual(["c", "b", "a"], list(topological_sort({
+            "a": {"package": "a", "requires": ["b"]},
+            "b": {"package": "b", "requires": ["c"]},
+            "c": {"package": "c", "requires": []},
+        })))
+
+    def test_diamond_dependency(self):
+        """Test that a diamond dependency relationship is handled correctly."""
+        self.assertEqual(["base", "mid2", "mid1", "top"], list(topological_sort({
+            "top": {"package": "top", "requires": ["mid1", "mid2"]},
+            # Add a mid1 -> mid2 cross-dependency to make the order deterministic.
+            "mid1": {"package": "mid1", "requires": ["base", "mid2"]},
+            "mid2": {"package": "mid2", "requires": ["base"]},
+            "base": {"package": "base", "requires": []},
+        })))
+
+    def test_dont_drop_packages(self):
+        """Check that topological sorting doesn't drop any packages."""
+        # For half the packages, depend on the first package, to make this a
+        # little more than trivial.
+        specs = {pkg: {"package": pkg, "requires": [] if pkg < "m" else ["a"]}
+                 for pkg in string.ascii_lowercase}
+        self.assertEqual(frozenset(specs.keys()),
+                         frozenset(topological_sort(specs)))
 
 
 if __name__ == '__main__':
