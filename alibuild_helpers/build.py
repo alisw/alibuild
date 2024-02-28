@@ -5,7 +5,7 @@ from alibuild_helpers.analytics import report_event
 from alibuild_helpers.log import debug, error, info, banner, warning
 from alibuild_helpers.log import dieOnError
 from alibuild_helpers.cmd import execute, DockerRunner, BASH, install_wrapper_script
-from alibuild_helpers.utilities import prunePaths, symlink, call_ignoring_oserrors
+from alibuild_helpers.utilities import prunePaths, symlink, call_ignoring_oserrors, topological_sort
 from alibuild_helpers.utilities import resolve_store_path
 from alibuild_helpers.utilities import parseDefaults, readDefaults
 from alibuild_helpers.utilities import getPackageList, asList
@@ -544,24 +544,7 @@ def doBuild(args, parser):
     banner("The following packages cannot be taken from the system and will be built:\n  %s",
            ", ".join(ownPackages))
 
-  # Do topological sort to have the correct build order even in the
-  # case of non-tree like dependencies..
-  # The actual algorith used can be found at:
-  #
-  # http://www.stoimen.com/blog/2012/10/01/computer-algorithms-topological-sort-of-a-graph/
-  #
-  edges = [(p["package"], d) for p in specs.values() for d in p["requires"] ]
-  L = [l for l in specs.values() if not l["requires"]]
-  S = []
-  while L:
-    spec = L.pop(0)
-    S.append(spec)
-    nextVertex = [e[0] for e in edges if e[1] == spec["package"]]
-    edges = [e for e in edges if e[1] != spec["package"]]
-    hasPredecessors = set([m for e in edges for m in nextVertex if e[0] == m])
-    withPredecessor = set(nextVertex) - hasPredecessors
-    L += [specs[m] for m in withPredecessor]
-  buildOrder = [s["package"] for s in S]
+  buildOrder = list(topological_sort(specs))
 
   # Check if any of the packages can be picked up from a local checkout
   develPkgs = []

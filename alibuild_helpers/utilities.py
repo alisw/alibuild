@@ -51,6 +51,27 @@ def symlink(link_target, link_name):
 asList = lambda x : x if type(x) == list else [x]
 
 
+def topological_sort(specs):
+  """Topologically sort specs so that dependencies come before the packages that depend on them.
+
+  This function returns a generator, yielding package names in order.
+
+  The algorithm used here was adapted from:
+  http://www.stoimen.com/blog/2012/10/01/computer-algorithms-topological-sort-of-a-graph/
+  """
+  edges = [(spec["package"], dep) for spec in specs.values() for dep in spec["requires"]]
+  leaves = [spec["package"] for spec in specs.values() if not spec["requires"]]
+  while leaves:
+    current_package = leaves.pop(0)
+    yield current_package
+    # Find every package that depends on the current one.
+    new_leaves = {pkg for pkg, dep in edges if dep == current_package}
+    # Stop blocking packages that depend on the current one...
+    edges = [(pkg, dep) for pkg, dep in edges if dep != current_package]
+    # ...but keep blocking those that still depend on other stuff!
+    leaves.extend(new_leaves - {pkg for pkg, _ in edges})
+
+
 def resolve_store_path(architecture, spec_hash):
   """Return the path where a tarball with the given hash is to be stored.
 
