@@ -2,7 +2,7 @@ from os.path import abspath, exists, basename, dirname, join, realpath
 from os import makedirs, unlink, readlink, rmdir
 from alibuild_helpers import __version__
 from alibuild_helpers.analytics import report_event
-from alibuild_helpers.log import debug, error, info, banner, warning
+from alibuild_helpers.log import debug, info, banner, warning
 from alibuild_helpers.log import dieOnError
 from alibuild_helpers.cmd import execute, DockerRunner, BASH, install_wrapper_script
 from alibuild_helpers.utilities import prunePaths, symlink, call_ignoring_oserrors, topological_sort
@@ -461,11 +461,10 @@ def doBuild(args, parser):
   workDir = abspath(args.workDir)
   prunePaths(workDir)
 
-  if not exists(args.configDir):
-    error('Cannot find alidist recipes under directory "%s".\n'
-          'Maybe you need to "cd" to the right directory or '
-          'you forgot to run "aliBuild init"?', args.configDir)
-    return 1
+  dieOnError(not exists(args.configDir),
+             'Cannot find alidist recipes under directory "%s".\n'
+             'Maybe you need to "cd" to the right directory or '
+             'you forgot to run "aliBuild init"?' % args.configDir)
 
   _, value = git(("symbolic-ref", "-q", "HEAD"), directory=args.configDir, check=False)
   branch_basename = re.sub("refs/heads/", "", value)
@@ -491,9 +490,8 @@ def doBuild(args, parser):
   scm = exists("%s/.sl" % args.configDir) and Sapling() or Git()
   try:
     checkedOutCommitName = scm.checkedOutCommitName(directory=args.configDir)
-  except:
-    error("Cannot find SCM directory in %s.", args.configDir)
-    return 1
+  except SCMError:
+    dieOnError(True, "Cannot find SCM directory in %s." % args.configDir)
   os.environ["ALIBUILD_ALIDIST_HASH"] = checkedOutCommitName
 
   debug("Building for architecture %s", args.architecture)
@@ -521,16 +519,13 @@ def doBuild(args, parser):
                      taps                    = taps,
                      log                     = debug)
 
-  if validDefaults and args.defaults not in validDefaults:
-    error("Specified default `%s' is not compatible with the packages you want to build.\n"
-          "Valid defaults:\n\n- %s", args.defaults, "\n- ".join(sorted(validDefaults)))
-    return 1
-
-  if failed:
-    error("The following packages are system requirements and could not be found:\n\n- %s\n\n"
-          "Please run:\n\n\taliDoctor --defaults %s %s\n\nto get a full diagnosis.",
-          "\n- ".join(sorted(list(failed))), args.defaults, args.pkgname.pop())
-    return 1
+  dieOnError(validDefaults and args.defaults not in validDefaults,
+             "Specified default `%s' is not compatible with the packages you want to build.\n"
+             "Valid defaults:\n\n- %s" % (args.defaults, "\n- ".join(sorted(validDefaults or []))))
+  dieOnError(failed,
+             "The following packages are system requirements and could not be found:\n\n- %s\n\n"
+             "Please run:\n\n\taliDoctor --defaults %s %s\n\nto get a full diagnosis." %
+             ("\n- ".join(sorted(failed)), args.defaults, " ".join(args.pkgname)))
 
   for x in specs.values():
     x["requires"] = [r for r in x["requires"] if not r in args.disable]
@@ -555,11 +550,10 @@ def doBuild(args, parser):
                  if p in develCandidates and p not in args.noDevel]
     develPkgsUpper = [(p, p.upper()) for p in buildOrder
                       if p.upper() in develCandidatesUpper and p not in args.noDevel]
-    if set(develPkgs) != {x for x, _ in develPkgsUpper}:
-      error("The following development packages have the wrong spelling: %s.\n"
-            "Please check your local checkout and adapt to the correct one indicated.",
-            ", ".join({x.strip() for x, _ in develPkgsUpper} - set(develPkgs)))
-      return 1
+    dieOnError(set(develPkgs) != {x for x, _ in develPkgsUpper},
+               "The following development packages have the wrong spelling: %s.\n"
+               "Please check your local checkout and adapt to the correct one indicated." %
+               (", ".join({x.strip() for x, _ in develPkgsUpper} - set(develPkgs))))
 
   if buildOrder:
     banner("Packages will be built in the following order:\n - %s",
@@ -642,7 +636,7 @@ def doBuild(args, parser):
   # we use it as main package, rather than the last one.
   if not buildOrder:
     banner("Nothing to be done.")
-    return 0
+    return
   mainPackage = buildOrder[-1]
   mainHash = specs[mainPackage]["commit_hash"]
 
@@ -693,7 +687,7 @@ def doBuild(args, parser):
   debug("We will build packages in the following order: %s", " ".join(buildOrder))
   if args.dryRun:
     info("--dry-run / -n specified. Not building.")
-    return 0
+    return
 
   # We now iterate on all the packages, making sure we build correctly every
   # single one of them. This is done this way so that the second time we run we
@@ -710,10 +704,9 @@ def doBuild(args, parser):
 
   while buildOrder:
     packageIterations += 1
-    if packageIterations > 20:
-      error("Too many attempts at building %s. Something wrong with the repository?",
-            spec["package"])
-      return 1
+    dieOnError(packageIterations > 20,
+               "Too many attempts at building %s. Something wrong with the repository?" %
+               spec["package"])
     p = buildOrder[0]
     spec = specs[p]
     if args.debug:
@@ -1163,4 +1156,3 @@ def doBuild(args, parser):
     banner("Untracked files in the following directories resulted in a rebuild of "
            "the associated package and its dependencies:\n%s\n\nPlease commit or remove them to avoid useless rebuilds.", "\n".join(untrackedFilesDirectories))
   debug("Everything done")
-  return 0

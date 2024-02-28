@@ -81,7 +81,8 @@ def doMain(args, parser):
     exit(0)
 
   if args.action == "build":
-    sys.exit(doBuild(args, parser))
+    doBuild(args, parser)
+    sys.exit(0)
 
 
 if __name__ == "__main__":
