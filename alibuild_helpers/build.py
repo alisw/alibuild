@@ -19,7 +19,7 @@ from alibuild_helpers.scm import SCMError
 from alibuild_helpers.sync import remote_from_url
 import yaml
 from alibuild_helpers.workarea import logged_scm, updateReferenceRepoSpec
-from alibuild_helpers.log import logger_handler, LogFormatter, ProgressPrint
+from alibuild_helpers.log import ProgressPrint, log_current_package
 from glob import glob
 from textwrap import dedent
 try:
@@ -641,10 +641,7 @@ def doBuild(args, parser):
   mainHash = specs[mainPackage]["commit_hash"]
 
   debug("Main package is %s@%s", mainPackage, mainHash)
-  if args.debug:
-    logger_handler.setFormatter(
-        LogFormatter("%%(asctime)s:%%(levelname)s:%s:%s: %%(message)s" %
-                     (mainPackage, args.develPrefix if "develPrefix" in args else mainHash[0:8])))
+  log_current_package(None, mainPackage, specs, getattr(args, "develPrefix", None))
 
   # Now that we have the main package set, we can print out Useful information
   # which we will be able to associate with this build. Also lets make sure each package
@@ -704,11 +701,7 @@ def doBuild(args, parser):
   while buildOrder:
     p = buildOrder[0]
     spec = specs[p]
-    if args.debug:
-      printedVersion = mainHash == spec["tag"] and mainHash or mainHash[0:8]
-      logger_handler.setFormatter(
-          LogFormatter("%%(asctime)s:%%(levelname)s:%s:%s:%s: %%(message)s" %
-                       (mainPackage, p, args.develPrefix if "develPrefix" in args else printedVersion)))
+    log_current_package(p, mainPackage, specs, getattr(args, "develPrefix", None))
 
     # Calculate the hashes. We do this in build order so that we can guarantee
     # that the hashes of the dependencies are calculated first. Do this inside
