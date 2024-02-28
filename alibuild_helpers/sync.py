@@ -11,7 +11,7 @@ from requests.exceptions import RequestException
 
 from alibuild_helpers.cmd import execute
 from alibuild_helpers.log import debug, error, dieOnError
-from alibuild_helpers.utilities import resolve_store_path, resolve_links_path
+from alibuild_helpers.utilities import resolve_store_path, resolve_links_path, symlink
 
 
 def remote_from_url(read_url, write_url, architecture, work_dir, insecure=False):
@@ -169,8 +169,8 @@ class HttpRemoteSync:
         return
 
       links_path = resolve_links_path(self.architecture, spec["package"])
-      execute("mkdir -p {}/{} {}/{}".format(self.workdir, store_path,
-                                            self.workdir, links_path))
+      os.makedirs(os.path.join(self.workdir, store_path), exist_ok=True)
+      os.makedirs(os.path.join(self.workdir, links_path), exist_ok=True)
 
       destPath = os.path.join(self.workdir, store_path, use_tarball)
       if not os.path.isfile(destPath):
@@ -213,9 +213,8 @@ class HttpRemoteSync:
                           returnResult=True, log=False, session=session) \
                 .decode("utf-8").rstrip("\r\n")
     for linkname, target in symlinks.items():
-      execute("ln -nsf ../../{target} {workdir}/{linkdir}/{name}".format(
-        workdir=self.workdir, linkdir=links_path, name=linkname,
-        target=target.lstrip("./")))
+      symlink("../../" + target.lstrip("./"),
+              os.path.join(self.workdir, links_path, linkname))
 
   def syncToRemote(self, p, spec):
     pass
@@ -494,8 +493,7 @@ class Boto3RemoteSync:
           target = b"../../" + target
         target = os.fsdecode(target)
         link_path = os.path.join(self.workdir, links_path, os.fsdecode(link_name))
-        dieOnError(execute("ln -sf {} {}".format(target, link_path)),
-                  "Unable to create symlink {} -> {}".format(link_name, target))
+        symlink(target, link_path)
         n_symlinks += 1
       debug("Got %d entries in manifest", n_symlinks)
 
@@ -510,8 +508,7 @@ class Boto3RemoteSync:
       target = os.fsdecode(resp["Body"].read()).rstrip("\n")
       if not target.startswith("../../"):
         target = "../../" + target
-      dieOnError(execute("ln -sf {} {}".format(target, link_path)),
-                 "Unable to create symlink {} -> {}".format(link_key, target))
+      symlink(target, link_path)
 
   def syncToRemote(self, p, spec):
     if not self.writeStore:
