@@ -9,7 +9,6 @@ except ImportError:
   from ordereddict import OrderedDict
 
 from alibuild_helpers.log import dieOnError, debug, info, error
-from alibuild_helpers.git import clone_speedup_options
 
 FETCH_LOG_NAME = "fetch-log.txt"
 
