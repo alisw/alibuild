@@ -184,7 +184,7 @@ def dummy_exists(x):
 # A few errors we should handle, together with the expected result
 @patch("alibuild_helpers.build.clone_speedup_options",
        new=MagicMock(return_value=["--filter=blob:none"]))
-@patch("alibuild_helpers.workarea.clone_speedup_options",
+@patch("alibuild_helpers.git.clone_speedup_options",
        new=MagicMock(return_value=["--filter=blob:none"]))
 @patch("alibuild_helpers.build.BASH", new="/bin/bash")
 class BuildTestCase(unittest.TestCase):

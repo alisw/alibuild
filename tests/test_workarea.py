@@ -22,7 +22,7 @@ MOCK_SPEC = OrderedDict((
 
 @patch("alibuild_helpers.workarea.debug", new=MagicMock())
 @patch("alibuild_helpers.workarea.info", new=MagicMock())
-@patch("alibuild_helpers.workarea.clone_speedup_options",
+@patch("alibuild_helpers.git.clone_speedup_options",
        new=MagicMock(return_value=["--filter=blob:none"]))
 class WorkareaTestCase(unittest.TestCase):
 

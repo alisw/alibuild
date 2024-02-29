@@ -1,7 +1,4 @@
-try:
-  from shlex import quote  # Python 3.3+
-except ImportError:
-  from pipes import quote  # Python 2.7
+from shlex import quote
 from alibuild_helpers.cmd import getstatusoutput
 from alibuild_helpers.log import debug
 from alibuild_helpers.scm import SCM, SCMError
@@ -12,10 +9,12 @@ GIT_COMMAND_TIMEOUT_SEC = 120
 
 def clone_speedup_options():
   """Return a list of options supported by the system git which speed up cloning."""
-  _, out = getstatusoutput("LANG=C git clone --filter=blob:none")
-  if "unknown option" not in out and "invalid filter-spec" not in out:
-    return ["--filter=blob:none"]
+  for filter_option in ("--filter=tree:0", "--filter=blob:none"):
+    _, out = getstatusoutput("LANG=C git clone " + filter_option)
+    if "unknown option" not in out and "invalid filter-spec" not in out:
+      return [filter_option]
   return []
+
 
 class Git(SCM):
   name = "Git"
