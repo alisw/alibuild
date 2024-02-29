@@ -40,6 +40,7 @@ class KnownGoodHashesTestCase(unittest.TestCase):
                 if match:
                     spec_expr, package = match.groups()
                     specs[package] = eval(spec_expr, {"OrderedDict": OrderedDict})
+                    specs[package]["is_devel_pkg"] = False
                     continue
                 match = re.search(HASH_RE, line)
                 if not match:
@@ -52,8 +53,7 @@ class KnownGoodHashesTestCase(unittest.TestCase):
                     # storeHashes doesn't do anything in that case (the spec
                     # from the log will already have hashes stored).
                     continue
-                storeHashes(package, specs,
-                            isDevelPkg=False, considerRelocation=False)
+                storeHashes(package, specs, considerRelocation=False)
                 spec = specs[package]
                 self.assertEqual(spec["remote_revision_hash"], remote)
                 self.assertEqual(spec["local_revision_hash"], local)

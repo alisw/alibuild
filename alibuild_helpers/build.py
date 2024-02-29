@@ -55,7 +55,7 @@ def readHashFile(fn):
     return "0"
 
 
-def update_git_repos(args, specs, buildOrder, develPkgs):
+def update_git_repos(args, specs, buildOrder):
     """Update and/or fetch required git repositories in parallel.
 
     If any repository fails to be fetched, then it is retried, while allowing the
@@ -64,7 +64,7 @@ def update_git_repos(args, specs, buildOrder, develPkgs):
 
     def update_repo(package, git_prompt):
         specs[package]["scm"] = Git()
-        if package in develPkgs:
+        if specs[package]["is_devel_pkg"]:
           localCheckout = os.path.join(os.getcwd(), specs[package]["package"])
           if exists("%s/.sl" % localCheckout):
             specs[package]["scm"] = Sapling()
@@ -76,7 +76,7 @@ def update_git_repos(args, specs, buildOrder, develPkgs):
         # Retrieve git heads
         scm = specs[package]["scm"]
         cmd = scm.listRefsCmd()
-        if package in develPkgs:
+        if specs[package]["is_devel_pkg"]:
             specs[package]["source"] = \
                 os.path.join(os.getcwd(), specs[package]["package"])
             cmd.append(specs[package]["source"])
@@ -136,7 +136,7 @@ def createDistLinks(spec, specs, args, syncHelper, repoType, requiresType):
     symlink(dep_tarball, target_dir)
 
 
-def storeHashes(package, specs, isDevelPkg, considerRelocation):
+def storeHashes(package, specs, considerRelocation):
   """Calculate various hashes for package, and store them in specs[package].
 
   Assumes that all dependencies of the package already have a definitive hash.
@@ -238,17 +238,17 @@ def storeHashes(package, specs, isDevelPkg, considerRelocation):
     # If this package is a dev package, and it depends on another dev pkg, then
     # this package's hash shouldn't change if the other dev package was
     # changed, so that we can just rebuild this one incrementally.
-    h_all(specs[dep]["hash"] if isDevelPkg else hash_and_devel_hash)
+    h_all(specs[dep]["hash"] if spec["is_devel_pkg"] else hash_and_devel_hash)
     # The deps_hash should always change, however, so we actually rebuild the
     # dependent package (even if incrementally).
     dh(hash_and_devel_hash)
 
-  if isDevelPkg and "incremental_recipe" in spec:
+  if spec["is_devel_pkg"] and "incremental_recipe" in spec:
     h_all(spec["incremental_recipe"])
     ih = Hasher()
     ih(spec["incremental_recipe"])
     spec["incremental_hash"] = ih.hexdigest()
-  elif isDevelPkg:
+  elif spec["is_devel_pkg"]:
     h_all(spec["devel_hash"])
 
   if considerRelocation and "relocate_paths" in spec:
@@ -541,18 +541,18 @@ def doBuild(args, parser):
   buildOrder = list(topological_sort(specs))
 
   # Check if any of the packages can be picked up from a local checkout
-  develPkgs = []
-  if not args.forceTracked:
-    develCandidates = [basename(d) for d in glob("*") if os.path.isdir(d)]
-    develCandidatesUpper = [basename(d).upper() for d in glob("*") if os.path.isdir(d)]
-    develPkgs = [p for p in buildOrder
-                 if p in develCandidates and p not in args.noDevel]
-    develPkgsUpper = [(p, p.upper()) for p in buildOrder
-                      if p.upper() in develCandidatesUpper and p not in args.noDevel]
-    dieOnError(set(develPkgs) != {x for x, _ in develPkgsUpper},
+  if args.forceTracked:
+    develPkgs = set()
+  else:
+    develCandidates = {basename(d) for d in glob("*") if os.path.isdir(d)} - frozenset(args.noDevel)
+    develCandidatesUpper = {d.upper() for d in develCandidates}
+    develPkgs = frozenset(buildOrder) & develCandidates
+    develPkgsUpper = {p for p in buildOrder if p.upper() in develCandidatesUpper}
+    dieOnError(develPkgs != develPkgsUpper,
                "The following development packages have the wrong spelling: %s.\n"
                "Please check your local checkout and adapt to the correct one indicated." %
-               (", ".join({x.strip() for x, _ in develPkgsUpper} - set(develPkgs))))
+               ", ".join(develPkgsUpper - develPkgs))
+    del develCandidates, develCandidatesUpper, develPkgsUpper
 
   if buildOrder:
     banner("Packages will be built in the following order:\n - %s",
@@ -568,8 +568,20 @@ def doBuild(args, parser):
            "  git pull --rebase\n",
            os.getcwd())
 
+  for pkg, spec in specs.items():
+    spec["is_devel_pkg"] = pkg in develPkgs
+    spec["scm"] = Git()
+    if spec["is_devel_pkg"]:
+      spec["source"] = os.path.join(os.getcwd(), pkg)
+    if "source" in spec and exists(os.path.join(spec["source"], ".sl")):
+      spec["scm"] = Sapling()
+    reference_repo = join(os.path.abspath(args.referenceSources), pkg.lower())
+    if exists(reference_repo):
+      spec["reference"] = reference_repo
+  del develPkgs
+
   # Clone/update repos
-  update_git_repos(args, specs, buildOrder, develPkgs)
+  update_git_repos(args, specs, buildOrder)
   # This is the list of packages which have untracked files in their
   # source directory, and which are rebuilt every time. We will warn
   # about them at the end of the build.
@@ -584,7 +596,7 @@ def doBuild(args, parser):
     # spec["package"]), but there is no "source" key in its alidist recipe,
     # so there shouldn't be any code for it! Presumably, a user has
     # mistakenly named a local directory after one of our packages.
-    dieOnError("source" not in spec and spec["package"] in develPkgs,
+    dieOnError("source" not in spec and spec["is_devel_pkg"],
                "Found a directory called {package} here, but we're not "
                "expecting any code for the package {package}. If this is a "
                "mistake, please rename the {package} directory or use the "
@@ -606,7 +618,7 @@ def doBuild(args, parser):
         spec["commit_hash"] = spec["tag"]
       # We are in development mode, we need to rebuild if the commit hash is
       # different or if there are extra changes on top.
-      if spec["package"] in develPkgs:
+      if spec["is_devel_pkg"]:
         # Devel package: we get the commit hash from the checked source, not from remote.
         out = spec["scm"].checkedOutCommitName(directory=spec["source"])
         spec["commit_hash"] = out.strip()
@@ -622,7 +634,7 @@ def doBuild(args, parser):
     # %(short_hash)s and %(tag)s.
     spec["version"] = resolve_version(spec, args.defaults, branch_basename, branch_stream)
 
-    if spec["package"] in develPkgs and "develPrefix" in args and args.develPrefix != "ali-master":
+    if spec["is_devel_pkg"] and "develPrefix" in args and args.develPrefix != "ali-master":
       spec["version"] = args.develPrefix
 
   # Decide what is the main package we are building and at what commit.
@@ -691,7 +703,7 @@ def doBuild(args, parser):
   report_event("install", "{p} disabled={dis} devel={dev} system={sys} own={own} deps={deps}".format(
     p=args.pkgname,
     dis=",".join(sorted(args.disable)),
-    dev=",".join(sorted(develPkgs)),
+    dev=",".join(sorted(spec["package"] for spec in specs.values() if spec["is_devel_pkg"])),
     sys=",".join(sorted(systemPackages)),
     own=",".join(sorted(ownPackages)),
     deps=",".join(buildOrder[:-1]),
@@ -708,13 +720,12 @@ def doBuild(args, parser):
     # a single, definitive hash.
     debug("Calculating hash.")
     debug("spec = %r", spec)
-    debug("develPkgs = %r", develPkgs)
-    storeHashes(p, specs, isDevelPkg=p in develPkgs,
-                considerRelocation=args.architecture.startswith("osx"))
+    debug("develPkgs = %r", sorted(spec["package"] for spec in specs.values() if spec["is_devel_pkg"]))
+    storeHashes(p, specs, considerRelocation=args.architecture.startswith("osx"))
     debug("Hashes for recipe %s are %s (remote); %s (local)", p,
           ", ".join(spec["remote_hashes"]), ", ".join(spec["local_hashes"]))
 
-    if spec["package"] in develPkgs and getattr(syncHelper, "writeStore", None):
+    if spec["is_devel_pkg"] and getattr(syncHelper, "writeStore", None):
       warning("Disabling remote write store from now since %s is a development package.", spec["package"])
       syncHelper.writeStore = ""
 
@@ -781,7 +792,7 @@ def doBuild(args, parser):
     # flip - flopping described in https://github.com/alisw/alibuild/issues/325.
     develPrefix = ""
     possibleDevelPrefix = getattr(args, "develPrefix", develPackageBranch)
-    if spec["package"] in develPkgs:
+    if spec["is_devel_pkg"]:
       develPrefix = possibleDevelPrefix
 
     if possibleDevelPrefix:
@@ -846,7 +857,7 @@ def doBuild(args, parser):
       # Remember what hash we're actually using.
       spec["local_revision_hash" if revision.startswith("local")
            else "remote_revision_hash"] = rev_hash
-      if spec["package"] in develPkgs and "incremental_recipe" in spec:
+      if spec["is_devel_pkg"] and "incremental_recipe" in spec:
         spec["obsolete_tarball"] = symlink_path
       else:
         debug("Package %s with hash %s is already found in %s. Not building.",
@@ -869,7 +880,7 @@ def doBuild(args, parser):
       workDir, "BUILD", spec["hash"], spec["package"], ".build_succeeded"))
 
     # Recreate symlinks to this development package builds.
-    if spec["package"] in develPkgs:
+    if spec["is_devel_pkg"]:
       debug("Creating symlinks to builds of devel package %s", spec["package"])
       # Ignore errors here, because the path we're linking to might not exist
       # (if this is the first run through the loop). On the second run
@@ -886,7 +897,7 @@ def doBuild(args, parser):
                                join(workDir, args.architecture, spec["package"], "latest-" + spec["build_family"]))
 
     # Check if this development package needs to be rebuilt.
-    if spec["package"] in develPkgs:
+    if spec["is_devel_pkg"]:
       debug("Checking if devel package %s needs rebuild", spec["package"])
       if spec["devel_hash"]+spec["deps_hash"] == spec["old_devel_hash"]:
         info("Development package %s does not need rebuild", spec["package"])
@@ -903,14 +914,14 @@ def doBuild(args, parser):
     fileHash = readHashFile(hashFile)
     # Development packages have their own rebuild-detection logic above.
     # spec["hash"] is only useful here for regular packages.
-    if fileHash == spec["hash"] and spec["package"] not in develPkgs:
+    if fileHash == spec["hash"] and not spec["is_devel_pkg"]:
       # If we get here, we know we are in sync with whatever remote store.  We
       # can therefore create a directory which contains all the packages which
       # were used to compile this one.
       debug("Package %s was correctly compiled. Moving to next one.", spec["package"])
       # If using incremental builds, next time we execute the script we need to remove
       # the placeholders which avoid rebuilds.
-      if spec["package"] in develPkgs and "incremental_recipe" in spec:
+      if spec["is_devel_pkg"] and "incremental_recipe" in spec:
         unlink(hashFile)
       if "obsolete_tarball" in spec:
         unlink(realpath(spec["obsolete_tarball"]))
@@ -919,7 +930,7 @@ def doBuild(args, parser):
       # We can now delete the INSTALLROOT and BUILD directories,
       # assuming the package is not a development one. We also can
       # delete the SOURCES in case we have aggressive-cleanup enabled.
-      if not spec["package"] in develPkgs and args.autoCleanup:
+      if not spec["is_devel_pkg"] and args.autoCleanup:
         cleanupDirs = [join(workDir, "BUILD", spec["hash"]),
                        join(workDir, "INSTALLROOT", spec["hash"])]
         if args.aggressiveCleanup:
@@ -954,7 +965,7 @@ def doBuild(args, parser):
     #        It does not really matter that the symlinks are ok at this point
     #        as I only used the tarballs as reusable binary blobs.
     spec["cachedTarball"] = ""
-    if not spec["package"] in develPkgs:
+    if not spec["is_devel_pkg"]:
       tarballs = glob(os.path.join(tar_hash_dir, "*gz"))
       spec["cachedTarball"] = tarballs[0] if len(tarballs) else ""
       debug("Found tarball in %s" % spec["cachedTarball"]
@@ -1066,8 +1077,8 @@ def doBuild(args, parser):
           "-e {}={}".format(var, quote(value)) for var, value in buildEnvironment),
         # Used e.g. by O2DPG-sim-tests to find the O2DPG repository.
         develVolumes=" ".join(
-          '-v "$PWD/$(readlink {pkg} || echo {pkg})":/{pkg}:rw'.format(pkg=quote(pkg))
-          for pkg in develPkgs),
+          '-v "$PWD/$(readlink {pkg} || echo {pkg})":/{pkg}:rw'.format(pkg=quote(spec["package"]))
+          for spec in specs.values() if spec["is_devel_pkg"]),
         additionalVolumes=" ".join(
           "-v %s" % quote(volume) for volume in args.volumes),
         mirrorVolume=("-v %s:/mirror" % quote(dirname(spec["reference"]))
@@ -1091,8 +1102,8 @@ def doBuild(args, parser):
       os.environ["ALIBUILD_ALIDIST_HASH"][:10],
     )))
 
-    updatablePkgs = [ x for x in spec["requires"] if x in develPkgs ]
-    if spec["package"] in develPkgs:
+    updatablePkgs = [dep for dep in spec["requires"] if specs[dep]["is_devel_pkg"]]
+    if spec["is_devel_pkg"]:
       updatablePkgs.append(spec["package"])
 
     buildErrMsg = dedent("""\
@@ -1106,7 +1117,7 @@ def doBuild(args, parser):
       w=abspath(args.workDir),
       p=spec["package"],
       devSuffix="-" + args.develPrefix
-      if "develPrefix" in args and spec["package"] in develPkgs
+      if "develPrefix" in args and spec["is_devel_pkg"]
       else "",
     )
     if updatablePkgs:
@@ -1140,9 +1151,12 @@ def doBuild(args, parser):
          mainPackage, socket.gethostname(),
          abspath(join(args.workDir, args.architecture)),
          mainPackage, mainBuildFamily)
-  for x in develPkgs:
-    banner("Build directory for devel package %s:\n%s/BUILD/%s-latest%s/%s",
-           x, abspath(args.workDir), x, "-"+args.develPrefix if "develPrefix" in args else "", x)
+  for spec in specs.values():
+    if spec["is_devel_pkg"]:
+      banner("Build directory for devel package %s:\n%s/BUILD/%s-latest%s/%s",
+             spec["package"], abspath(args.workDir), spec["package"],
+             ("-" + args.develPrefix) if "develPrefix" in args else "",
+             spec["package"])
   if untrackedFilesDirectories:
     banner("Untracked files in the following directories resulted in a rebuild of "
            "the associated package and its dependencies:\n%s\n\nPlease commit or remove them to avoid useless rebuilds.", "\n".join(untrackedFilesDirectories))

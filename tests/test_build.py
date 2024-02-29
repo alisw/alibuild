@@ -334,18 +334,20 @@ class BuildTestCase(unittest.TestCase):
             except KeyError:
                 spec["commit_hash"] = spec["scm_refs"]["refs/heads/" + spec["tag"]]
         specs = {pkg["package"]: pkg for pkg in (default, zlib, root, extra)}
+        for spec in specs.values():
+            spec["is_devel_pkg"] = False
 
-        storeHashes("defaults-release", specs, isDevelPkg=False, considerRelocation=False)
+        storeHashes("defaults-release", specs, considerRelocation=False)
         default["hash"] = default["remote_revision_hash"]
         self.assertEqual(default["hash"], TEST_DEFAULT_RELEASE_BUILD_HASH)
         self.assertEqual(default["remote_hashes"], [TEST_DEFAULT_RELEASE_BUILD_HASH])
 
-        storeHashes("zlib", specs, isDevelPkg=False, considerRelocation=False)
+        storeHashes("zlib", specs, considerRelocation=False)
         zlib["hash"] = zlib["local_revision_hash"]
         self.assertEqual(zlib["hash"], TEST_ZLIB_BUILD_HASH)
         self.assertEqual(zlib["local_hashes"], [TEST_ZLIB_BUILD_HASH])
 
-        storeHashes("ROOT", specs, isDevelPkg=False, considerRelocation=False)
+        storeHashes("ROOT", specs, considerRelocation=False)
         root["hash"] = root["local_revision_hash"]
         self.assertEqual(root["hash"], TEST_ROOT_BUILD_HASH)
         # Equivalent "commit hashes": "f7b336611753f1f4aaa94222b0d620748ae230c0"
@@ -353,7 +355,7 @@ class BuildTestCase(unittest.TestCase):
         self.assertEqual(len(root["local_hashes"]), 2)
         self.assertEqual(root["local_hashes"][0], TEST_ROOT_BUILD_HASH)
 
-        storeHashes("Extra", specs, isDevelPkg=False, considerRelocation=False)
+        storeHashes("Extra", specs, considerRelocation=False)
         extra["hash"] = extra["local_revision_hash"]
         self.assertEqual(extra["hash"], TEST_EXTRA_BUILD_HASH)
         # Equivalent "commit hashes": "v1", "v2", "ba22".
