@@ -89,6 +89,7 @@ class SyncTestCase(unittest.TestCase):
     @patch("os.path.isfile", new=MagicMock(return_value=False))
     @patch("os.rename", new=MagicMock(return_value=None))
     @patch("os.makedirs", new=MagicMock(return_value=None))
+    @patch("os.listdir", new=MagicMock(return_value=[]))
     @patch("alibuild_helpers.sync.symlink", new=MagicMock(return_value=None))
     @patch("alibuild_helpers.sync.execute", new=MagicMock(return_value=None))
     @patch("alibuild_helpers.sync.debug")
@@ -105,14 +106,16 @@ class SyncTestCase(unittest.TestCase):
         # Try good spec
         mock_error.reset_mock()
 
-        syncer.syncToLocal(PACKAGE, GOOD_SPEC)
+        syncer.fetch_symlinks(GOOD_SPEC)
+        syncer.fetch_tarball(GOOD_SPEC)
         mock_error.assert_not_called()
-        syncer.syncToRemote(PACKAGE, GOOD_SPEC)
+        syncer.upload_symlinks_and_tarball(GOOD_SPEC)
 
         # Try bad spec
         mock_error.reset_mock()
 
-        syncer.syncToLocal(PACKAGE, BAD_SPEC)
+        syncer.fetch_symlinks(BAD_SPEC)
+        syncer.fetch_tarball(BAD_SPEC)
 
         # We can't use mock_error.assert_called_once_with because two
         # PartialDownloadError instances don't compare equal.
@@ -127,13 +130,14 @@ class SyncTestCase(unittest.TestCase):
         self.assertIsInstance(mock_error.call_args_list[0][0][2],
                               sync.PartialDownloadError)
 
-        syncer.syncToRemote(PACKAGE, BAD_SPEC)
+        syncer.upload_symlinks_and_tarball(BAD_SPEC)
 
         # Try missing spec
         mock_debug.reset_mock()
-        syncer.syncToLocal(PACKAGE, MISSING_SPEC)
+        syncer.fetch_symlinks(MISSING_SPEC)
+        syncer.fetch_tarball(MISSING_SPEC)
         mock_debug.assert_called_with("Nothing fetched for %s (%s)",
-                                      PACKAGE, NONEXISTENT_HASH)
+                                      MISSING_SPEC["package"], NONEXISTENT_HASH)
 
     @patch("alibuild_helpers.sync.execute", new=lambda cmd, printer=None: 0)
     @patch("alibuild_helpers.sync.os")
@@ -158,11 +162,13 @@ class SyncTestCase(unittest.TestCase):
 
         for spec in (GOOD_SPEC, BAD_SPEC):
             for syncer in syncers:
-                syncer.syncToLocal(PACKAGE, spec)
-                syncer.syncToRemote(PACKAGE, spec)
+                syncer.fetch_symlinks(spec)
+                syncer.fetch_tarball(spec)
+                syncer.upload_symlinks_and_tarball(spec)
 
         for syncer in syncers:
-            syncer.syncToLocal(PACKAGE, MISSING_SPEC)
+            syncer.fetch_symlinks(MISSING_SPEC)
+            syncer.fetch_tarball(MISSING_SPEC)
 
 
 @unittest.skipIf(sys.version_info < (3, 6), "python >= 3.6 is required for boto3")
@@ -268,15 +274,18 @@ class Boto3TestCase(unittest.TestCase):
         b3sync.s3 = self.mock_s3()
 
         b3sync.s3.download_file.reset_mock()
-        b3sync.syncToLocal(PACKAGE, GOOD_SPEC)
+        b3sync.fetch_symlinks(GOOD_SPEC)
+        b3sync.fetch_tarball(GOOD_SPEC)
         b3sync.s3.download_file.assert_called()
 
         b3sync.s3.download_file.reset_mock()
-        b3sync.syncToLocal(PACKAGE, BAD_SPEC)
+        b3sync.fetch_symlinks(BAD_SPEC)
+        b3sync.fetch_tarball(BAD_SPEC)
         b3sync.s3.download_file.assert_not_called()
 
         b3sync.s3.download_file.reset_mock()
-        b3sync.syncToLocal(PACKAGE, MISSING_SPEC)
+        b3sync.fetch_symlinks(MISSING_SPEC)
+        b3sync.fetch_tarball(MISSING_SPEC)
         b3sync.s3.download_file.assert_not_called()
 
     @patch("os.listdir", new=lambda path: (
@@ -297,7 +306,7 @@ class Boto3TestCase(unittest.TestCase):
         # Make sure upload of a fresh, new tarball works fine.
         b3sync.s3.put_object.reset_mock()
         b3sync.s3.upload_file.reset_mock()
-        b3sync.syncToRemote(PACKAGE, MISSING_SPEC)
+        b3sync.upload_symlinks_and_tarball(MISSING_SPEC)
         # We simulated local builds, so we should upload the tarballs to
         # the remote.
         b3sync.s3.put_object.assert_called()
@@ -305,7 +314,7 @@ class Boto3TestCase(unittest.TestCase):
 
         b3sync.s3.put_object.reset_mock()
         b3sync.s3.upload_file.reset_mock()
-        b3sync.syncToRemote(PACKAGE, GOOD_SPEC)
+        b3sync.upload_symlinks_and_tarball(GOOD_SPEC)
         # We simulated downloading tarballs from the remote, so we mustn't
         # upload them again and overwrite the remote.
         b3sync.s3.put_object.assert_not_called()
@@ -314,7 +323,7 @@ class Boto3TestCase(unittest.TestCase):
         # Make sure conflict detection is working for tarball sync.
         b3sync.s3.put_object.reset_mock()
         b3sync.s3.upload_file.reset_mock()
-        self.assertRaises(SystemExit, b3sync.syncToRemote, PACKAGE, BAD_SPEC)
+        self.assertRaises(SystemExit, b3sync.upload_symlinks_and_tarball, BAD_SPEC)
         b3sync.s3.put_object.assert_not_called()
         b3sync.s3.upload_file.assert_not_called()
 
