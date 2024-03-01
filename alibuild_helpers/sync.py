@@ -29,9 +29,11 @@ def remote_from_url(read_url, write_url, architecture, work_dir, insecure=False)
 
 class NoRemoteSync:
   """Helper class which does not do anything to sync"""
-  def syncToLocal(self, p, spec):
+  def fetch_symlinks(self, spec):
     pass
-  def syncToRemote(self, p, spec):
+  def fetch_tarball(self, spec):
+    pass
+  def upload_symlinks_and_tarball(self, spec):
     pass
 
 class PartialDownloadError(Exception):
@@ -133,7 +135,7 @@ class HttpRemoteSync:
             pass
     return None
 
-  def syncToLocal(self, p, spec):
+  def fetch_tarball(self, spec):
     # Check for any existing tarballs we can use instead of fetching new ones.
     for pkg_hash in spec["remote_hashes"]:
       try:
@@ -148,12 +150,12 @@ class HttpRemoteSync:
             arch=re.escape(self.architecture),
         ), os.path.basename(tarball)):
           debug("Previously downloaded tarball for %s with hash %s, reusing",
-                p, pkg_hash)
+                spec["package"], pkg_hash)
           return
 
     with requests.Session() as session:
       debug("Updating remote store for package %s; trying hashes %s",
-            p, ", ".join(spec["remote_hashes"]))
+            spec["package"], ", ".join(spec["remote_hashes"]))
       store_path = use_tarball = None
       # Find the first tarball that matches any possible hash and fetch it.
       for pkg_hash in spec["remote_hashes"]:
@@ -165,12 +167,11 @@ class HttpRemoteSync:
           break
 
       if store_path is None or use_tarball is None:
-        debug("Nothing fetched for %s (%s)", p, ", ".join(spec["remote_hashes"]))
+        debug("Nothing fetched for %s (%s)", spec["package"],
+              ", ".join(spec["remote_hashes"]))
         return
 
-      links_path = resolve_links_path(self.architecture, spec["package"])
       os.makedirs(os.path.join(self.workdir, store_path), exist_ok=True)
-      os.makedirs(os.path.join(self.workdir, links_path), exist_ok=True)
 
       destPath = os.path.join(self.workdir, store_path, use_tarball)
       if not os.path.isfile(destPath):
@@ -178,6 +179,20 @@ class HttpRemoteSync:
         self.getRetry("/".join((self.remoteStore, store_path, use_tarball)),
                       destPath, session=session)
 
+  def fetch_symlinks(self, spec):
+    links_path = resolve_links_path(self.architecture, spec["package"])
+    os.makedirs(os.path.join(self.workdir, links_path), exist_ok=True)
+
+    # If we already have a symlink we can use, don't update the list. This
+    # speeds up rebuilds significantly.
+    if any(f"/{pkg_hash[:2]}/{pkg_hash}/" in target
+           for target in (os.readlink(os.path.join(self.workdir, links_path, link))
+                          for link in os.listdir(os.path.join(self.workdir, links_path)))
+           for pkg_hash in spec["remote_hashes"]):
+      debug("Found symlink for %s@%s, not updating", spec["package"], spec["version"])
+      return
+
+    with requests.Session() as session:
       # Fetch manifest file with initial symlinks. This file is updated
       # regularly; we use it to avoid many small network requests.
       manifest = self.getRetry("%s/%s.manifest" % (self.remoteStore, links_path),
@@ -188,10 +203,6 @@ class HttpRemoteSync:
                                       for line in manifest.splitlines())
         if sep and linkname and target
       }
-      # If we've just downloaded a tarball, add a symlink to it.
-      # We need to strip the leading TARS/ first, though.
-      assert store_path.startswith("TARS/"), store_path
-      symlinks[use_tarball] = os.path.join(store_path[len("TARS/"):], use_tarball)
       # Now add any remaining symlinks that aren't in the manifest yet. There
       # should always be relatively few of these, as the separate network
       # requests are a bit expensive.
@@ -216,7 +227,7 @@ class HttpRemoteSync:
       symlink("../../" + target.lstrip("./"),
               os.path.join(self.workdir, links_path, linkname))
 
-  def syncToRemote(self, p, spec):
+  def upload_symlinks_and_tarball(self, spec):
     pass
 
 
@@ -229,12 +240,10 @@ class RsyncRemoteSync:
     self.architecture = architecture
     self.workdir = workdir
 
-  def syncToLocal(self, p, spec):
-    debug("Updating remote store for package %s with hashes %s", p,
+  def fetch_tarball(self, spec):
+    debug("Updating remote store for package %s with hashes %s", spec["package"],
           ", ".join(spec["remote_hashes"]))
     err = execute("""\
-    mkdir -p {workDir}/{linksPath}
-    rsync -rlvW --delete {remoteStore}/{linksPath}/ {workDir}/{linksPath}/ || :
     for storePath in {storePaths}; do
       # Only get the first matching tarball. If there are multiple with the
       # same hash, we only need one and they should be interchangable.
@@ -251,15 +260,24 @@ class RsyncRemoteSync:
         break
       fi
     done
-    """.format(pkg=p, ver=spec["version"], arch=self.architecture,
+    """.format(pkg=spec["package"], ver=spec["version"], arch=self.architecture,
                remoteStore=self.remoteStore,
                workDir=self.workdir,
-               linksPath=resolve_links_path(self.architecture, p),
                storePaths=" ".join(resolve_store_path(self.architecture, pkg_hash)
                                    for pkg_hash in spec["remote_hashes"])))
-    dieOnError(err, "Unable to update from specified store.")
+    dieOnError(err, "Unable to fetch tarball from specified store.")
 
-  def syncToRemote(self, p, spec):
+  def fetch_symlinks(self, spec):
+    links_path = resolve_links_path(self.architecture, spec["package"])
+    os.makedirs(os.path.join(self.workdir, links_path), exist_ok=True)
+    err = execute("rsync -rlvW --delete {remote_store}/{links_path}/ {workdir}/{links_path}/".format(
+      remote_store=self.remoteStore,
+      links_path=links_path,
+      workdir=self.workdir,
+    ))
+    dieOnError(err, "Unable to fetch symlinks from specified store.")
+
+  def upload_symlinks_and_tarball(self, spec):
     if not self.writeStore:
       return
     dieOnError(execute("""\
@@ -275,9 +293,9 @@ class RsyncRemoteSync:
       workdir=self.workdir,
       remote=self.remoteStore,
       store_path=resolve_store_path(self.architecture, spec["hash"]),
-      links_path=resolve_links_path(self.architecture, p),
+      links_path=resolve_links_path(self.architecture, spec["package"]),
       arch=self.architecture,
-      package=p,
+      package=spec["package"],
       version=spec["version"],
       revision=spec["revision"],
     )), "Unable to upload tarball.")
@@ -295,9 +313,9 @@ class S3RemoteSync:
     self.architecture = architecture
     self.workdir = workdir
 
-  def syncToLocal(self, p, spec):
-    debug("Updating remote store for package %s with hashes %s", p,
-          ", ".join(spec["remote_hashes"]))
+  def fetch_tarball(self, spec):
+    debug("Updating remote store for package %s with hashes %s",
+          spec["package"], ", ".join(spec["remote_hashes"]))
     err = execute("""\
     for storePath in {storePaths}; do
       # For the first store path that contains tarballs, fetch them, and skip
@@ -309,6 +327,16 @@ class S3RemoteSync:
         break
       fi
     done
+    """.format(
+      workDir=self.workdir,
+      b=self.remoteStore,
+      storePaths=" ".join(resolve_store_path(self.architecture, pkg_hash)
+                          for pkg_hash in spec["remote_hashes"]),
+    ))
+    dieOnError(err, "Unable to fetch tarball from specified store.")
+
+  def fetch_symlinks(self, spec):
+    err = execute("""\
     mkdir -p "{workDir}/{linksPath}"
     find "{workDir}/{linksPath}" -type l -delete
     curl -sL "https://s3.cern.ch/swift/v1/{b}/{linksPath}.manifest" |
@@ -324,14 +352,12 @@ class S3RemoteSync:
     done
     """.format(
       b=self.remoteStore,
-      storePaths=" ".join(resolve_store_path(self.architecture, pkg_hash)
-                          for pkg_hash in spec["remote_hashes"]),
-      linksPath=resolve_links_path(self.architecture, p),
+      linksPath=resolve_links_path(self.architecture, spec["package"]),
       workDir=self.workdir,
     ))
-    dieOnError(err, "Unable to update from specified store.")
+    dieOnError(err, "Unable to fetch symlinks from specified store.")
 
-  def syncToRemote(self, p, spec):
+  def upload_symlinks_and_tarball(self, spec):
     if not self.writeStore:
       return
     dieOnError(execute("""\
@@ -365,9 +391,9 @@ https://s3.cern.ch/swift/v1/{bucket}/$hashedurl" \\
       workdir=self.workdir,
       bucket=self.remoteStore,
       store_path=resolve_store_path(self.architecture, spec["hash"]),
-      links_path=resolve_links_path(self.architecture, p),
+      links_path=resolve_links_path(self.architecture, spec["package"]),
       arch=self.architecture,
-      package=p,
+      package=spec["package"],
       version=spec["version"],
       revision=spec["revision"],
     )), "Unable to upload tarball.")
@@ -429,23 +455,18 @@ class Boto3RemoteSync:
       raise
     return True
 
-  def syncToLocal(self, p, spec):
-    from botocore.exceptions import ClientError
-    debug("Updating remote store for package %s with hashes %s", p,
+  def fetch_tarball(self, spec):
+    debug("Updating remote store for package %s with hashes %s", spec["package"],
           ", ".join(spec["remote_hashes"]))
 
     # If we already have a tarball with any equivalent hash, don't check S3.
-    have_tarball = False
     for pkg_hash in spec["remote_hashes"]:
       store_path = resolve_store_path(self.architecture, pkg_hash)
-      if glob.glob(os.path.join(self.workdir, store_path, "%s-*.tar.gz" % p)):
-        debug("Reusing existing tarball for %s@%s", p, pkg_hash)
-        have_tarball = True
-        break
+      if glob.glob(os.path.join(self.workdir, store_path, "%s-*.tar.gz" % spec["package"])):
+        debug("Reusing existing tarball for %s@%s", spec["package"], pkg_hash)
+        return
 
     for pkg_hash in spec["remote_hashes"]:
-      if have_tarball:
-        break
       store_path = resolve_store_path(self.architecture, pkg_hash)
 
       # We don't already have a tarball with the hash that we need, so download
@@ -459,14 +480,14 @@ class Boto3RemoteSync:
         self.s3.download_file(Bucket=self.remoteStore, Key=tarball,
                               Filename=os.path.join(self.workdir, store_path,
                                                     os.path.basename(tarball)))
-        have_tarball = True  # break out of outer loop
-        break
+        return
 
-    if not have_tarball:
-      debug("Remote has no tarballs for %s with hashes %s", p,
-            ", ".join(spec["remote_hashes"]))
+    debug("Remote has no tarballs for %s with hashes %s", spec["package"],
+          ", ".join(spec["remote_hashes"]))
 
-    links_path = resolve_links_path(self.architecture, p)
+  def fetch_symlinks(self, spec):
+    from botocore.exceptions import ClientError
+    links_path = resolve_links_path(self.architecture, spec["package"])
     os.makedirs(os.path.join(self.workdir, links_path), exist_ok=True)
 
     # Remove existing symlinks: we'll fetch the ones from the remote next.
@@ -510,7 +531,7 @@ class Boto3RemoteSync:
         target = "../../" + target
       symlink(target, link_path)
 
-  def syncToRemote(self, p, spec):
+  def upload_symlinks_and_tarball(self, spec):
     if not self.writeStore:
       return
 
@@ -552,7 +573,7 @@ class Boto3RemoteSync:
       .format(architecture=self.architecture, **spec)
     tar_path = os.path.join(resolve_store_path(self.architecture, spec["hash"]),
                             tarball)
-    link_path = os.path.join(resolve_links_path(self.architecture, p),
+    link_path = os.path.join(resolve_links_path(self.architecture, spec["package"]),
                              tarball)
     tar_exists = self._s3_key_exists(tar_path)
     link_exists = self._s3_key_exists(link_path)
@@ -565,7 +586,7 @@ class Boto3RemoteSync:
                 link_path if tar_exists else tar_path))
 
     debug("Uploading tarball and symlinks for %s %s-%s (%s) to S3",
-          p, spec["version"], spec["revision"], spec["hash"])
+          spec["package"], spec["version"], spec["revision"], spec["hash"])
 
     # Upload the smaller file first, so that any parallel uploads are more
     # likely to find it and fail.

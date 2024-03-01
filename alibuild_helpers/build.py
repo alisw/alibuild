@@ -749,7 +749,7 @@ def doBuild(args, parser):
     # this will result in a new package which has the same binary contents of
     # the old one but where the relocation will work for the new dictory. Here
     # we simply store the fact that we can reuse the contents of cachedTarball.
-    syncHelper.syncToLocal(p, spec)
+    syncHelper.fetch_symlinks(spec)
 
     # Decide how it should be called, based on the hash and what is already
     # available.
@@ -961,11 +961,9 @@ def doBuild(args, parser):
 
     tar_hash_dir = os.path.join(workDir, resolve_store_path(args.architecture, spec["hash"]))
     debug("Looking for cached tarball in %s", tar_hash_dir)
-    # FIXME: I should get the tar_hash_dir updated with server at this point.
-    #        It does not really matter that the symlinks are ok at this point
-    #        as I only used the tarballs as reusable binary blobs.
     spec["cachedTarball"] = ""
     if not spec["is_devel_pkg"]:
+      syncHelper.fetch_tarball(spec)
       tarballs = glob(os.path.join(tar_hash_dir, "*gz"))
       spec["cachedTarball"] = tarballs[0] if len(tarballs) else ""
       debug("Found tarball in %s" % spec["cachedTarball"]
@@ -1141,7 +1139,7 @@ def doBuild(args, parser):
     # Make sure not to upload local-only packages! These might have been
     # produced in a previous run with a read-only remote store.
     if not spec["revision"].startswith("local"):
-      syncHelper.syncToRemote(p, spec)
+      syncHelper.upload_symlinks_and_tarball(spec)
 
   banner("Build of %s successfully completed on `%s'.\n"
          "Your software installation is at:"
