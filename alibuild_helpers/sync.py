@@ -10,7 +10,7 @@ import requests
 from requests.exceptions import RequestException
 
 from alibuild_helpers.cmd import execute
-from alibuild_helpers.log import debug, error, dieOnError
+from alibuild_helpers.log import debug, info, error, dieOnError, ProgressPrint
 from alibuild_helpers.utilities import resolve_store_path, resolve_links_path, symlink
 
 
@@ -55,7 +55,7 @@ class HttpRemoteSync:
     self.httpConnRetries = 4
     self.httpBackoff = 0.4
 
-  def getRetry(self, url, dest=None, returnResult=False, log=True, session=None):
+  def getRetry(self, url, dest=None, returnResult=False, log=True, session=None, progress=debug):
     get = session.get if session is not None else requests.get
     for i in range(0, self.httpConnRetries):
       if i > 0:
@@ -91,9 +91,9 @@ class HttpRemoteSync:
               if log and size != -1:
                 now = time.time()
                 if downloaded == size:
-                  debug("Download complete")
-                elif now - reportTime > 3:
-                  debug("%.0f%% downloaded...", 100*downloaded/size)
+                  progress("[100%%] Download complete")
+                elif now - reportTime > 1:
+                  progress("[%.0f%%] downloaded...", 100 * downloaded / size)
                   reportTime = now
           finally:
             if destFp:
@@ -174,10 +174,13 @@ class HttpRemoteSync:
       os.makedirs(os.path.join(self.workdir, store_path), exist_ok=True)
 
       destPath = os.path.join(self.workdir, store_path, use_tarball)
-      if not os.path.isfile(destPath):
-        # Do not download twice
+      if not os.path.isfile(destPath):   # do not download twice
+        progress = ProgressPrint("Downloading tarball for %s@%s" %
+                                 (spec["package"], spec["version"]))
+        progress("[0%%] Starting download of %s", use_tarball)  # initialise progress bar
         self.getRetry("/".join((self.remoteStore, store_path, use_tarball)),
-                      destPath, session=session)
+                      destPath, session=session, progress=progress)
+        progress.end("done")
 
   def fetch_symlinks(self, spec):
     links_path = resolve_links_path(self.architecture, spec["package"])
@@ -241,6 +244,7 @@ class RsyncRemoteSync:
     self.workdir = workdir
 
   def fetch_tarball(self, spec):
+    info("Downloading tarball for %s@%s, if available", spec["package"], spec["version"])
     debug("Updating remote store for package %s with hashes %s", spec["package"],
           ", ".join(spec["remote_hashes"]))
     err = execute("""\
@@ -314,6 +318,7 @@ class S3RemoteSync:
     self.workdir = workdir
 
   def fetch_tarball(self, spec):
+    info("Downloading tarball for %s@%s, if available", spec["package"], spec["version"])
     debug("Updating remote store for package %s with hashes %s",
           spec["package"], ", ".join(spec["remote_hashes"]))
     err = execute("""\
@@ -475,11 +480,19 @@ class Boto3RemoteSync:
       # ever use one anyway.)
       for tarball in self._s3_listdir(store_path):
         debug("Fetching tarball %s", tarball)
+        progress = ProgressPrint("Downloading tarball for %s@%s" %
+                                 (spec["package"], spec["version"]))
+        progress("[0%%] Starting download of %s", tarball)   # initialise progress bar
         # Create containing directory locally. (exist_ok= is python3-specific.)
         os.makedirs(os.path.join(self.workdir, store_path), exist_ok=True)
-        self.s3.download_file(Bucket=self.remoteStore, Key=tarball,
-                              Filename=os.path.join(self.workdir, store_path,
-                                                    os.path.basename(tarball)))
+        meta = self.s3.head_object(Bucket=self.remoteStore, Key=tarball)
+        total_size = int(meta.get("ContentLength", 0))
+        self.s3.download_file(
+          Bucket=self.remoteStore, Key=tarball,
+          Filename=os.path.join(self.workdir, store_path, os.path.basename(tarball)),
+          Callback=lambda num_bytes: progress("[%d/%d] bytes transferred", num_bytes, total_size),
+        )
+        progress.end("done")
         return
 
     debug("Remote has no tarballs for %s with hashes %s", spec["package"],
