@@ -6,6 +6,7 @@ from alibuild_helpers.scm import SCM, SCMError
 SL_COMMAND_TIMEOUT_SEC = 120
 """How many seconds to let any sl command execute before being terminated."""
 
+
 # Sapling is a novel SCM by Meta (i.e. Facebook) that is fully compatible with
 # git, but has a different command line interface. Among the reasons why it's
 # worth suporting it is the ability to handle unnamed branches, the ability to
@@ -14,25 +15,33 @@ SL_COMMAND_TIMEOUT_SEC = 120
 # command line from each commit of a branch.
 class Sapling(SCM):
   name = "Sapling"
+
   def checkedOutCommitName(self, directory):
     return sapling(("whereami", ), directory)
+
   def branchOrRef(self, directory):
     # Format is <hash>[+] <branch>
     identity = sapling(("identify", ), directory)
     return identity.split(" ")[-1]
+
   def exec(self, *args, **kwargs):
     return sapling(*args, **kwargs)
+
   def parseRefs(self, output):
     return {
       sl_ref: sl_hash for sl_ref, sep, sl_hash
       in (line.partition("\t") for line in output.splitlines()) if sep
     }
+
   def listRefsCmd(self, repository):
     return ["bookmark", "--list", "--remote", "-R", repository]
+
   def diffCmd(self, directory):
     return "cd %s && sl diff && sl status" % directory
+
   def checkUntracked(self, line):
     return line.startswith("? ")
+
 
 def sapling(args, directory=".", check=True, prompt=True):
   debug("Executing sl %s (in directory %s)", " ".join(args), directory)

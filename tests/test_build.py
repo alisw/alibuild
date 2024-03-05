@@ -17,7 +17,6 @@ try:
 except ImportError:
     from ordereddict import OrderedDict
 
-from alibuild_helpers.cmd import is_string
 from alibuild_helpers.utilities import parseRecipe, resolve_tag
 from alibuild_helpers.build import doBuild, storeHashes, generate_initdotsh
 
@@ -102,10 +101,25 @@ TEST_EXTRA_BUILD_HASH = ("9f9eb8696b7722df52c4703f5fe7acc4b8000ba2" if sys.versi
                          "5afae57bfc6a374e74c1c4427698ab5edebce0bc")
 
 
-GIT_CLONE_ZLIB_ARGS = ("clone", "--bare", "https://github.com/star-externals/zlib",
-                       "/sw/MIRROR/zlib", "--filter=blob:none"), ".", False
-GIT_FETCH_ROOT_ARGS = ("fetch", "-f", "--tags", "https://github.com/root-mirror/root",
-                       "+refs/heads/*:refs/heads/*"), "/sw/MIRROR/root", False
+GIT_CLONE_REF_ZLIB_ARGS = ("clone", "--bare", "https://github.com/star-externals/zlib",
+                           "/sw/MIRROR/zlib", "--filter=blob:none"), ".", False
+GIT_CLONE_SRC_ZLIB_ARGS = ("clone", "-n", "https://github.com/star-externals/zlib",
+                           "/sw/SOURCES/zlib/v1.2.3/8822efa61f2a385e0bc83ca5819d608111b2168a",
+                           "--reference", "/sw/MIRROR/zlib", "--filter=blob:none"), ".", False
+GIT_SET_URL_ZLIB_ARGS = ("remote", "set-url", "--push", "origin", "https://github.com/star-externals/zlib"), \
+    "/sw/SOURCES/zlib/v1.2.3/8822efa61f2a385e0bc83ca5819d608111b2168a", False
+GIT_CHECKOUT_ZLIB_ARGS = ("checkout", "-f", "master"), \
+    "/sw/SOURCES/zlib/v1.2.3/8822efa61f2a385e0bc83ca5819d608111b2168a", False
+
+GIT_FETCH_REF_ROOT_ARGS = ("fetch", "-f", "https://github.com/root-mirror/root", "+refs/tags/*:refs/tags/*",
+                           "+refs/heads/*:refs/heads/*"), "/sw/MIRROR/root", False
+GIT_CLONE_SRC_ROOT_ARGS = ("clone", "-n", "https://github.com/root-mirror/root",
+                           "/sw/SOURCES/ROOT/v6-08-30/f7b336611753f1f4aaa94222b0d620748ae230c0",
+                           "--reference", "/sw/MIRROR/root", "--filter=blob:none"), ".", False
+GIT_SET_URL_ROOT_ARGS = ("remote", "set-url", "--push", "origin", "https://github.com/root-mirror/root"), \
+    "/sw/SOURCES/ROOT/v6-08-30/f7b336611753f1f4aaa94222b0d620748ae230c0", False
+GIT_CHECKOUT_ROOT_ARGS = ("checkout", "-f", "v6-08-00-patches"), \
+    "/sw/SOURCES/ROOT/v6-08-30/f7b336611753f1f4aaa94222b0d620748ae230c0", False
 
 
 def dummy_git(args, directory=".", check=True, prompt=True):
@@ -114,8 +128,14 @@ def dummy_git(args, directory=".", check=True, prompt=True):
         (("rev-parse", "HEAD"), "/alidist", True): "6cec7b7b3769826219dfa85e5daa6de6522229a0",
         (("ls-remote", "--heads", "--tags", "/sw/MIRROR/root"), ".", False): (0, TEST_ROOT_GIT_REFS),
         (("ls-remote", "--heads", "--tags", "/sw/MIRROR/zlib"), ".", False): (0, TEST_ZLIB_GIT_REFS),
-        GIT_CLONE_ZLIB_ARGS: (0, ""),
-        GIT_FETCH_ROOT_ARGS: (0, ""),
+        GIT_CLONE_REF_ZLIB_ARGS: (0, ""),
+        GIT_CLONE_SRC_ZLIB_ARGS: (0, ""),
+        GIT_SET_URL_ZLIB_ARGS: (0, ""),
+        GIT_CHECKOUT_ZLIB_ARGS: (0, ""),
+        GIT_FETCH_REF_ROOT_ARGS: (0, ""),
+        GIT_CLONE_SRC_ROOT_ARGS: (0, ""),
+        GIT_SET_URL_ROOT_ARGS: (0, ""),
+        GIT_CHECKOUT_ROOT_ARGS: (0, ""),
     }[(tuple(args), directory, check)]
 
 
@@ -182,8 +202,6 @@ def dummy_exists(x):
 
 
 # A few errors we should handle, together with the expected result
-@patch("alibuild_helpers.build.clone_speedup_options",
-       new=MagicMock(return_value=["--filter=blob:none"]))
 @patch("alibuild_helpers.git.clone_speedup_options",
        new=MagicMock(return_value=["--filter=blob:none"]))
 @patch("alibuild_helpers.build.BASH", new="/bin/bash")
@@ -200,8 +218,11 @@ class BuildTestCase(unittest.TestCase):
     @patch("alibuild_helpers.utilities.warning")
     @patch("alibuild_helpers.build.readDefaults",
            new=MagicMock(return_value=(OrderedDict({"package": "defaults-release", "disable": []}), "")))
+    @patch("shutil.rmtree", new=MagicMock(return_value=None))
+    @patch("os.makedirs", new=MagicMock(return_value=None))
     @patch("alibuild_helpers.build.makedirs", new=MagicMock(return_value=None))
     @patch("alibuild_helpers.build.symlink", new=MagicMock(return_value=None))
+    @patch("alibuild_helpers.workarea.symlink", new=MagicMock(return_value=None))
     @patch("alibuild_helpers.utilities.open", new=lambda x: {
         "/alidist/root.sh": StringIO(TEST_ROOT_RECIPE),
         "/alidist/zlib.sh": StringIO(TEST_ZLIB_RECIPE),
@@ -270,11 +291,13 @@ class BuildTestCase(unittest.TestCase):
         )
         mock_sys.version_info = sys.version_info
 
-        clone_args, clone_dir, clone_check = GIT_CLONE_ZLIB_ARGS
-        fetch_args, fetch_dir, fetch_check = GIT_FETCH_ROOT_ARGS
+        def mkcall(args):
+            cmd, directory, check = args
+            return call(list(cmd), directory=directory, check=check, prompt=False)
+
         common_calls = [
             call(("rev-parse", "HEAD"), args.configDir),
-            call(list(clone_args), directory=clone_dir, check=clone_check, prompt=False),
+            mkcall(GIT_CLONE_REF_ZLIB_ARGS),
             call(["ls-remote", "--heads", "--tags", args.referenceSources + "/zlib"],
                  directory=".", check=False, prompt=False),
             call(["ls-remote", "--heads", "--tags", args.referenceSources + "/root"],
@@ -287,8 +310,17 @@ class BuildTestCase(unittest.TestCase):
         doBuild(args, mock_parser)
         mock_warning.assert_called_with("%s.sh contains a recipe, which will be ignored", "defaults-release")
         mock_debug.assert_called_with("Everything done")
-        self.assertEqual(mock_git_git.call_count, len(common_calls))
-        mock_git_git.assert_has_calls(common_calls, any_order=True)
+        # After this run, .build-hash files will be simulated to exist
+        # already, so sw/SOURCES repos must only be checked out on this run.
+        mock_git_git.assert_has_calls(common_calls + [
+            mkcall(GIT_CLONE_SRC_ZLIB_ARGS),
+            mkcall(GIT_SET_URL_ZLIB_ARGS),
+            mkcall(GIT_CHECKOUT_ZLIB_ARGS),
+            mkcall(GIT_CLONE_SRC_ROOT_ARGS),
+            mkcall(GIT_SET_URL_ROOT_ARGS),
+            mkcall(GIT_CHECKOUT_ROOT_ARGS),
+        ], any_order=True)
+        self.assertEqual(mock_git_git.call_count, len(common_calls) + 6)
 
         # Force fetching repos
         mock_git_git.reset_mock()
@@ -301,10 +333,10 @@ class BuildTestCase(unittest.TestCase):
         mock_listdir.assert_called_with("/sw/TARS/osx_x86-64/ROOT")
         # We can't compare directly against the list of calls here as they
         # might happen in any order.
-        self.assertEqual(mock_git_git.call_count, len(common_calls) + 1)
         mock_git_git.assert_has_calls(common_calls + [
-            call(list(fetch_args), directory=fetch_dir, check=fetch_check, prompt=False),
+            mkcall(GIT_FETCH_REF_ROOT_ARGS),
         ], any_order=True)
+        self.assertEqual(mock_git_git.call_count, len(common_calls) + 1)
 
     def setup_spec(self, script):
         """Parse the alidist recipe in SCRIPT and return its spec."""

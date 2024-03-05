@@ -13,12 +13,12 @@ from alibuild_helpers.utilities import validateDefaults
 from alibuild_helpers.utilities import Hasher
 from alibuild_helpers.utilities import yamlDump
 from alibuild_helpers.utilities import resolve_tag, resolve_version
-from alibuild_helpers.git import git, clone_speedup_options, Git
+from alibuild_helpers.git import Git, git
 from alibuild_helpers.sl import Sapling
 from alibuild_helpers.scm import SCMError
 from alibuild_helpers.sync import remote_from_url
 import yaml
-from alibuild_helpers.workarea import logged_scm, updateReferenceRepoSpec
+from alibuild_helpers.workarea import logged_scm, updateReferenceRepoSpec, checkout_sources
 from alibuild_helpers.log import ProgressPrint, log_current_package
 from glob import glob
 from textwrap import dedent
@@ -69,9 +69,7 @@ def update_git_repos(args, specs, buildOrder):
             if exists(os.path.join(specs[package]["source"], ".sl")):
                 specs[package]["scm"] = Sapling()
         updateReferenceRepoSpec(args.referenceSources, package, specs[package],
-                                fetch=args.fetchRepos,
-                                usePartialClone=not args.docker,
-                                allowGitPrompt=git_prompt)
+                                fetch=args.fetchRepos, allowGitPrompt=git_prompt)
 
         # Retrieve git heads
         output = logged_scm(specs[package]["scm"], package, args.referenceSources,
@@ -967,10 +965,6 @@ def doBuild(args, parser):
             if spec["cachedTarball"] else "No cache tarballs found")
 
     # The actual build script.
-    referenceStatement = ""
-    if "reference" in spec:
-      referenceStatement = "export GIT_REFERENCE=${GIT_REFERENCE_OVERRIDE:-%s}/%s" % (dirname(spec["reference"]), basename(spec["reference"]))
-
     debug("spec = %r", spec)
 
     cmd_raw = ""
@@ -982,21 +976,13 @@ def doBuild(args, parser):
       from pkg_resources import resource_string
       cmd_raw = resource_string("alibuild_helpers", 'build_template.sh')
 
-    source = spec.get("source", "")
-    # Shortend the commit hash in case it's a real commit hash and not simply
-    # the tag.
-    commit_hash = spec["commit_hash"]
-    if spec["tag"] != spec["commit_hash"]:
-      commit_hash = spec["commit_hash"][0:10]
-
-    # Split the source in two parts, sourceDir and sourceName.  This is done so
-    # that when we use Docker we can replace sourceDir with the correct
-    # container path, if required.  No changes for what concerns the standard
-    # bash builds, though.
     if args.docker:
       cachedTarball = re.sub("^" + workDir, "/sw", spec["cachedTarball"])
     else:
       cachedTarball = spec["cachedTarball"]
+
+    if not cachedTarball:
+      checkout_sources(spec, workDir, args.referenceSources, args.docker)
 
     scriptDir = join(workDir, "SPECS", args.architecture, spec["package"],
                      spec["version"] + "-" + spec["revision"])
@@ -1011,11 +997,6 @@ def doBuild(args, parser):
       "workDir": workDir,
       "configDir": abspath(args.configDir),
       "incremental_recipe": spec.get("incremental_recipe", ":"),
-      "sourceDir": (dirname(source) + "/") if source else "",
-      "sourceName": basename(source) if source else "",
-      "referenceStatement": referenceStatement,
-      "gitOptionsStatement": "" if args.docker else
-      "export GIT_CLONE_SPEEDUP=" + quote(" ".join(clone_speedup_options())),
       "requires": " ".join(spec["requires"]),
       "build_requires": " ".join(spec["build_requires"]),
       "runtime_requires": " ".join(spec["runtime_requires"]),
@@ -1028,14 +1009,14 @@ def doBuild(args, parser):
       ("BUILD_REQUIRES", " ".join(spec["build_requires"])),
       ("CACHED_TARBALL", cachedTarball),
       ("CAN_DELETE", args.aggressiveCleanup and "1" or ""),
-      ("COMMIT_HASH", commit_hash),
+      # Shorten the commit hash if it's a real commit hash and not simply the tag.
+      ("COMMIT_HASH", spec["tag"] if spec["tag"] == spec["commit_hash"] else spec["commit_hash"][:10]),
       ("DEPS_HASH", spec.get("deps_hash", "")),
       ("DEVEL_HASH", spec.get("devel_hash", "")),
       ("DEVEL_PREFIX", develPrefix),
       ("BUILD_FAMILY", spec["build_family"]),
       ("GIT_COMMITTER_NAME", "unknown"),
       ("GIT_COMMITTER_EMAIL", "unknown"),
-      ("GIT_TAG", spec["tag"]),
       ("INCREMENTAL_BUILD_HASH", spec.get("incremental_hash", "0")),
       ("JOBS", str(args.jobs)),
       ("PKGHASH", spec["hash"]),
@@ -1048,7 +1029,6 @@ def doBuild(args, parser):
       ("FULL_RUNTIME_REQUIRES", " ".join(spec["full_runtime_requires"])),
       ("FULL_BUILD_REQUIRES", " ".join(spec["full_build_requires"])),
       ("FULL_REQUIRES", " ".join(spec["full_requires"])),
-      ("WRITE_REPO", spec.get("write_repo", source)),
     ]
     # Add the extra environment as passed from the command line.
     buildEnvironment += [e.partition('=')[::2] for e in args.environment]
@@ -1059,15 +1039,13 @@ def doBuild(args, parser):
       build_command = (
         "docker run --rm --entrypoint= --user $(id -u):$(id -g) "
         "-v {workdir}:/sw -v {scriptDir}/build.sh:/build.sh:ro "
-        "-e GIT_REFERENCE_OVERRIDE=/mirror -e WORK_DIR_OVERRIDE=/sw "
         "{mirrorVolume} {develVolumes} {additionalEnv} {additionalVolumes} "
-        "{overrideSource} {extraArgs} {image} bash -ex /build.sh"
+        "-e WORK_DIR_OVERRIDE=/sw {extraArgs} {image} bash -ex /build.sh"
       ).format(
         image=quote(args.dockerImage),
         workdir=quote(abspath(args.workDir)),
         scriptDir=quote(scriptDir),
         extraArgs=" ".join(map(quote, args.docker_extra_args)),
-        overrideSource="-e SOURCE0_DIR_OVERRIDE=/" if source.startswith("/") else "",
         additionalEnv=" ".join(
           "-e {}={}".format(var, quote(value)) for var, value in buildEnvironment),
         # Used e.g. by O2DPG-sim-tests to find the O2DPG repository.

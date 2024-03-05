@@ -15,7 +15,15 @@ class SCM(object):
     raise NotImplementedError
   def exec(self, *args, **kwargs):
     raise NotImplementedError
-  def cloneCmd(self, spec, referenceRepo, usePartialClone):
+  def checkoutCmd(self, tag):
+    raise NotImplementedError
+  def fetchCmd(self, remote, *refs):
+    raise NotImplementedError
+  def cloneReferenceCmd(self, spec, referenceRepo, usePartialClone):
+    raise NotImplementedError
+  def cloneSourceCmd(self, spec, referenceRepo, usePartialClone):
+    raise NotImplementedError
+  def setWriteUrlCmd(self, url):
     raise NotImplementedError
   def diffCmd(self, directory):
     raise NotImplementedError
