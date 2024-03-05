@@ -851,11 +851,13 @@ def doBuild(args, parser):
       else:
         debug("Package %s with hash %s is already found in %s. Not building.",
               p, rev_hash, symlink_path)
-        symlink("{version}-{revision}".format(**spec),
-                "{wd}/{arch}/{package}/latest-{build_family}".format(wd=workDir, arch=args.architecture, **spec))
-        symlink("{version}-{revision}".format(**spec),
-                "{wd}/{arch}/{package}/latest".format(wd=workDir, arch=args.architecture, **spec))
-        info("Using cached build for %s", p)
+        # Ignore errors here, because the path we're linking to might not
+        # exist (if this is the first run through the loop). On the second run
+        # through, the path should have been created by the build process.
+        call_ignoring_oserrors(symlink, "{version}-{revision}".format(**spec),
+                               "{wd}/{arch}/{package}/latest-{build_family}".format(wd=workDir, arch=args.architecture, **spec))
+        call_ignoring_oserrors(symlink, "{version}-{revision}".format(**spec),
+                               "{wd}/{arch}/{package}/latest".format(wd=workDir, arch=args.architecture, **spec))
 
     # Now we know whether we're using a local or remote package, so we can set
     # the proper hash and tarball directory.
@@ -869,6 +871,9 @@ def doBuild(args, parser):
     # Recreate symlinks to this development package builds.
     if spec["package"] in develPkgs:
       debug("Creating symlinks to builds of devel package %s", spec["package"])
+      # Ignore errors here, because the path we're linking to might not exist
+      # (if this is the first run through the loop). On the second run
+      # through, the path should have been created by the build process.
       call_ignoring_oserrors(symlink, spec["hash"], join(workDir, "BUILD", spec["package"] + "-latest"))
       if develPrefix:
         call_ignoring_oserrors(symlink, spec["hash"], join(workDir, "BUILD", spec["package"] + "-latest-" + develPrefix))
