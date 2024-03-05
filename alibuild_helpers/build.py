@@ -1087,10 +1087,12 @@ def doBuild(args, parser):
       build_command = "%s -e -x %s/build.sh 2>&1" % (BASH, quote(scriptDir))
 
     debug("Build command: %s", build_command)
-    progress = ProgressPrint("%s %s@%s (use --debug for full output)" % (
-        "Unpacking tarball for" if cachedTarball else "Compiling", spec["package"],
-        args.develPrefix if "develPrefix" in args and spec["is_devel_pkg"] else spec["version"],
-    ))
+    progress = ProgressPrint(
+      ("Unpacking %s@%s" if cachedTarball else
+       "Compiling %s@%s (use --debug for full output)") %
+      (spec["package"],
+       args.develPrefix if "develPrefix" in args and spec["is_devel_pkg"] else spec["version"])
+    )
     err = execute(build_command, printer=progress)
     progress.end("failed" if err else "done", err)
     report_event("BuildError" if err else "BuildSuccess", spec["package"], " ".join((

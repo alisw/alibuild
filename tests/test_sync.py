@@ -68,6 +68,7 @@ class MockRequest:
                 self._bytes_left -= toread
 
 
+@patch("alibuild_helpers.sync.ProgressPrint", new=MagicMock())
 class SyncTestCase(unittest.TestCase):
     def mock_get(self, url, *args, **kw):
         if NONEXISTENT_HASH in url:
@@ -174,6 +175,7 @@ class SyncTestCase(unittest.TestCase):
 @unittest.skipIf(sys.version_info < (3, 6), "python >= 3.6 is required for boto3")
 @patch("os.makedirs", new=MagicMock(return_value=None))
 @patch("alibuild_helpers.sync.symlink", new=MagicMock(return_value=None))
+@patch("alibuild_helpers.sync.ProgressPrint", new=MagicMock())
 @patch("alibuild_helpers.log.error", new=MagicMock())
 @patch("alibuild_helpers.sync.Boto3RemoteSync._s3_init", new=MagicMock())
 class Boto3TestCase(unittest.TestCase):
@@ -232,8 +234,9 @@ class Boto3TestCase(unittest.TestCase):
             if NONEXISTENT_HASH in Key or BAD_HASH in Key or \
                os.path.basename(Key) == tarball_name(MISSING_SPEC):
                 raise ClientError({"Error": {"Code": "404"}}, "head_object")
+            return {}
 
-        def download_file(Bucket, Key, Filename):
+        def download_file(Bucket, Key, Filename, Callback=None):
             self.assertNotIn(NONEXISTENT_HASH, Key, "tried to fetch missing tarball")
             self.assertNotIn(BAD_HASH, Key, "tried to follow bad symlink")
 
