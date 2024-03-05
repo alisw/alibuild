@@ -8,7 +8,7 @@ try:
 except ImportError:
   from ordereddict import OrderedDict
 
-from alibuild_helpers.log import dieOnError, debug, info, error
+from alibuild_helpers.log import dieOnError, debug, error
 
 FETCH_LOG_NAME = "fetch-log.txt"
 
@@ -37,8 +37,7 @@ def logged_scm(scm, package, referenceSources,
   must not contain any secrets. We only output the SCM command we ran, its exit
   code, and the package name, so this should be safe.
   """
-  # This might take a long time, so show the user what's going on.
-  info("%s %s for repository for %s...", scm.name, command[0], package)
+  debug("%s %s for repository for %s...", scm.name, command[0], package)
   err, output = scm.exec(command, directory=directory, check=False, prompt=prompt)
   if logOutput:
     debug(output)
@@ -53,7 +52,7 @@ def logged_scm(scm, package, referenceSources,
       error("Could not write error log from SCM command:", exc_info=exc)
   dieOnError(err, "Error during %s %s for reference repo for %s." %
              (scm.name.lower(), command[0], package))
-  info("Done %s %s for repository for %s", scm.name.lower(), command[0], package)
+  debug("Done %s %s for repository for %s", scm.name.lower(), command[0], package)
   return output
 
 
