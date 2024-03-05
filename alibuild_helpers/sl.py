@@ -27,8 +27,8 @@ class Sapling(SCM):
       sl_ref: sl_hash for sl_ref, sep, sl_hash
       in (line.partition("\t") for line in output.splitlines()) if sep
     }
-  def listRefsCmd(self):
-    return ["bookmark", "--list", "--remote", "-R"]
+  def listRefsCmd(self, repository):
+    return ["bookmark", "--list", "--remote", "-R", repository]
   def diffCmd(self, directory):
     return "cd %s && sl diff && sl status" % directory
   def checkUntracked(self, line):

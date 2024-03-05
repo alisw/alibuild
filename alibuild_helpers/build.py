@@ -65,27 +65,19 @@ def update_git_repos(args, specs, buildOrder):
     def update_repo(package, git_prompt):
         specs[package]["scm"] = Git()
         if specs[package]["is_devel_pkg"]:
-          localCheckout = os.path.join(os.getcwd(), specs[package]["package"])
-          if exists("%s/.sl" % localCheckout):
-            specs[package]["scm"] = Sapling()
+            specs[package]["source"] = os.path.join(os.getcwd(), specs[package]["package"])
+            if exists(os.path.join(specs[package]["source"], ".sl")):
+                specs[package]["scm"] = Sapling()
         updateReferenceRepoSpec(args.referenceSources, package, specs[package],
                                 fetch=args.fetchRepos,
                                 usePartialClone=not args.docker,
                                 allowGitPrompt=git_prompt)
 
         # Retrieve git heads
-        scm = specs[package]["scm"]
-        cmd = scm.listRefsCmd()
-        if specs[package]["is_devel_pkg"]:
-            specs[package]["source"] = \
-                os.path.join(os.getcwd(), specs[package]["package"])
-            cmd.append(specs[package]["source"])
-        else:
-            cmd.append(specs[package].get("reference", specs[package]["source"]))
-
-        output = logged_scm(scm, package, args.referenceSources,
-                            cmd, ".", prompt=git_prompt, logOutput=False)
-        specs[package]["scm_refs"] = scm.parseRefs(output)
+        output = logged_scm(specs[package]["scm"], package, args.referenceSources,
+                            specs[package]["scm"].listRefsCmd(specs[package].get("reference", specs[package]["source"])),
+                            ".", prompt=git_prompt, logOutput=False)
+        specs[package]["scm_refs"] = specs[package]["scm"].parseRefs(output)
 
     progress = ProgressPrint("Updating repositories")
     requires_auth = set()

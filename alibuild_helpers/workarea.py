@@ -9,6 +9,7 @@ except ImportError:
   from ordereddict import OrderedDict
 
 from alibuild_helpers.log import dieOnError, debug, error
+from alibuild_helpers.utilities import call_ignoring_oserrors
 
 FETCH_LOG_NAME = "fetch-log.txt"
 
@@ -92,18 +93,15 @@ def updateReferenceRepo(referenceSources, p, spec,
   @fetch            : whether to fetch updates: if False, only clone if not found
   """
   assert isinstance(spec, OrderedDict)
-  if "source" not in spec:
-    return
+  if spec["is_devel_pkg"] or "source" not in spec:
+    return None
 
   scm = spec["scm"]
 
   debug("Updating references.")
   referenceRepo = os.path.join(os.path.abspath(referenceSources), p.lower())
 
-  try:
-    os.makedirs(os.path.abspath(referenceSources))
-  except:
-    pass
+  call_ignoring_oserrors(os.makedirs, os.path.abspath(referenceSources), exist_ok=True)
 
   if not is_writeable(referenceSources):
     if os.path.exists(referenceRepo):
