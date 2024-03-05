@@ -9,7 +9,7 @@ class SCM(object):
     raise NotImplementedError
   def lsRemote(self, remote):
     raise NotImplementedError
-  def listRefsCmd(self):
+  def listRefsCmd(self, repository):
     raise NotImplementedError
   def parseRefs(self, output):
     raise NotImplementedError

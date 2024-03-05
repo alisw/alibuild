@@ -32,8 +32,8 @@ class Git(SCM):
       git_ref: git_hash for git_hash, sep, git_ref
       in (line.partition("\t") for line in output.splitlines()) if sep
     }
-  def listRefsCmd(self):
-    return ["ls-remote", "--heads", "--tags"]
+  def listRefsCmd(self, repository):
+    return ["ls-remote", "--heads", "--tags", repository]
   def cloneCmd(self, source, referenceRepo, usePartialClone):
     cmd = ["clone", "--bare", source, referenceRepo]
     if usePartialClone:
