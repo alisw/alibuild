@@ -87,14 +87,17 @@ def update_git_repos(args, specs, buildOrder):
                             cmd, ".", prompt=git_prompt, logOutput=False)
         specs[package]["scm_refs"] = scm.parseRefs(output)
 
+    progress = ProgressPrint("Updating repositories")
     requires_auth = set()
     with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
         future_to_download = {
           executor.submit(update_repo, package, git_prompt=False): package
           for package in buildOrder if "source" in specs[package]
         }
-        for future in concurrent.futures.as_completed(future_to_download):
+        for i, future in enumerate(concurrent.futures.as_completed(future_to_download)):
             futurePackage = future_to_download[future]
+            progress("[%d/%d] Updating repository for %s",
+                     i, len(future_to_download), futurePackage)
             try:
                 future.result()
             except SCMError:
@@ -103,11 +106,13 @@ def update_git_repos(args, specs, buildOrder):
                 debug("%r requires auth; will prompt later", futurePackage)
                 requires_auth.add(futurePackage)
             except Exception as exc:
+                progress.end("error", error=True)
                 dieOnError(True, "Error on fetching %r: %s. Aborting." %
                            (futurePackage, exc))
             else:
                 debug("%r package updated: %d refs found", futurePackage,
                       len(specs[futurePackage]["scm_refs"]))
+    progress.end("done")
 
     # Now execute git commands for private packages one-by-one, so the user can
     # type their username and password without multiple prompts interfering.
