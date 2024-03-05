@@ -18,33 +18,57 @@ def clone_speedup_options():
 
 class Git(SCM):
   name = "Git"
+
   def checkedOutCommitName(self, directory):
     return git(("rev-parse", "HEAD"), directory)
+
   def branchOrRef(self, directory):
     out = git(("rev-parse", "--abbrev-ref", "HEAD"), directory=directory)
     if out == "HEAD":
       out = git(("rev-parse", "HEAD"), directory)[:10]
     return out
+
   def exec(self, *args, **kwargs):
     return git(*args, **kwargs)
+
   def parseRefs(self, output):
     return {
       git_ref: git_hash for git_hash, sep, git_ref
       in (line.partition("\t") for line in output.splitlines()) if sep
     }
+
   def listRefsCmd(self, repository):
     return ["ls-remote", "--heads", "--tags", repository]
-  def cloneCmd(self, source, referenceRepo, usePartialClone):
+
+  def cloneReferenceCmd(self, source, referenceRepo, usePartialClone):
     cmd = ["clone", "--bare", source, referenceRepo]
     if usePartialClone:
       cmd.extend(clone_speedup_options())
     return cmd
-  def fetchCmd(self, source):
-    return ["fetch", "-f", "--tags", source, "+refs/heads/*:refs/heads/*"]
+
+  def cloneSourceCmd(self, source, destination, referenceRepo, usePartialClone):
+    cmd = ["clone", "-n", source, destination]
+    if referenceRepo:
+      cmd.extend(["--reference", referenceRepo])
+    if usePartialClone:
+      cmd.extend(clone_speedup_options())
+    return cmd
+
+  def checkoutCmd(self, ref):
+    return ["checkout", "-f", ref]
+
+  def fetchCmd(self, source, *refs):
+    return ["fetch", "-f", source, *refs]
+
+  def setWriteUrlCmd(self, url):
+    return ["remote", "set-url", "--push", "origin", url]
+
   def diffCmd(self, directory):
     return "cd %s && git diff -r HEAD && git status --porcelain" % directory
+
   def checkUntracked(self, line):
     return line.startswith("?? ")
+
 
 def git(args, directory=".", check=True, prompt=True):
   debug("Executing git %s (in directory %s)", " ".join(args), directory)

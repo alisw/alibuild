@@ -27,7 +27,6 @@ export PATH=$WORK_DIR/wrapper-scripts:$PATH
 # - DEPS_HASH
 # - DEVEL_HASH
 # - DEVEL_PREFIX
-# - GIT_TAG
 # - INCREMENTAL_BUILD_HASH
 # - JOBS
 # - PKGHASH
@@ -36,22 +35,20 @@ export PATH=$WORK_DIR/wrapper-scripts:$PATH
 # - PKGVERSION
 # - REQUIRES
 # - RUNTIME_REQUIRES
-# - WRITE_REPO
 
 export PKG_NAME="$PKGNAME"
 export PKG_VERSION="$PKGVERSION"
 export PKG_BUILDNUM="$PKGREVISION"
 
-export SOURCE0="${SOURCE0_DIR_OVERRIDE:-%(sourceDir)s}%(sourceName)s"
 export PKGPATH=${ARCHITECTURE}/${PKGNAME}/${PKGVERSION}-${PKGREVISION}
 mkdir -p "$WORK_DIR/BUILD" "$WORK_DIR/SOURCES" "$WORK_DIR/TARS" \
          "$WORK_DIR/SPECS" "$WORK_DIR/INSTALLROOT"
 export BUILDROOT="$WORK_DIR/BUILD/$PKGHASH"
 
-# In case the repository is local, it means we are in development mode, so we
-# install directly in $WORK_DIR/$PKGPATH so that we can do make install
-# directly into BUILD/$PKGPATH and have changes being propagated.
-if [ "${SOURCE0:0:1}" == "/" ]; then
+# If we are in development mode, then install directly in $WORK_DIR/$PKGPATH,
+# so that we can do "make install" directly into BUILD/$PKGPATH and have
+# changes being propagated.
+if [ -n "$DEVEL_HASH" ]; then
   export INSTALLROOT="$WORK_DIR/$PKGPATH"
 else
   export INSTALLROOT="$WORK_DIR/INSTALLROOT/$PKGHASH/$PKGPATH"
@@ -59,13 +56,6 @@ fi
 export SOURCEDIR="$WORK_DIR/SOURCES/$PKGNAME/$PKGVERSION/$COMMIT_HASH"
 export BUILDDIR="$BUILDROOT/$PKGNAME"
 
-SHORT_TAG=${GIT_TAG:0:10}
-mkdir -p $(dirname $SOURCEDIR)
-if [[ ${COMMIT_HASH} != ${GIT_TAG} && "${SHORT_TAG:-0}" != ${COMMIT_HASH} ]]; then
-  GIT_TAG_DIR=${GIT_TAG:-0}
-  GIT_TAG_DIR=${GIT_TAG_DIR//\//_}
-  ln -snf ${COMMIT_HASH} "$WORK_DIR/SOURCES/$PKGNAME/$PKGVERSION/${GIT_TAG_DIR}"
-fi
 rm -fr "$WORK_DIR/INSTALLROOT/$PKGHASH"
 # We remove the build directory only if we are not in incremental mode.
 if [[ "$INCREMENTAL_BUILD_HASH" == 0 ]] && ! rm -rf "$BUILDROOT"; then
@@ -112,35 +102,6 @@ cd "$BUILDROOT"
 ln -snf $PKGHASH $WORK_DIR/BUILD/$PKGNAME-latest
 if [[ $DEVEL_PREFIX ]]; then
   ln -snf $PKGHASH $WORK_DIR/BUILD/$PKGNAME-latest-$DEVEL_PREFIX
-fi
-
-# Reference statements
-%(referenceStatement)s
-%(gitOptionsStatement)s
-
-if [ -z "$CACHED_TARBALL" ]; then
-  case "$SOURCE0" in
-    '')  # SOURCE0 is empty, so just create an empty SOURCEDIR.
-      mkdir -p "$SOURCEDIR" ;;
-    /*)  # SOURCE0 is an absolute path, so just make a symlink there.
-      ln -snf "$SOURCE0" "$SOURCEDIR" ;;
-    *)   # SOURCE0 is a relative path or URL, so clone/checkout the git repo from there.
-      if cd "$SOURCEDIR" 2>/dev/null; then
-        # Folder is already present, but check that it is the right tag
-        if ! git checkout -f "$GIT_TAG"; then
-          # If we can't find the tag, it might be new. Fetch tags and try again.
-          git fetch -f "$SOURCE0" "refs/tags/$GIT_TAG:refs/tags/$GIT_TAG"
-          git checkout -f "$GIT_TAG"
-        fi
-      else
-        # In case there is a stale link / file, for whatever reason.
-        rm -rf "$SOURCEDIR"
-        git clone -n $GIT_CLONE_SPEEDUP ${GIT_REFERENCE:+--reference "$GIT_REFERENCE"} "$SOURCE0" "$SOURCEDIR"
-        cd "$SOURCEDIR"
-        git remote set-url --push origin "$WRITE_REPO"
-        git checkout -f "$GIT_TAG"
-      fi ;;
-  esac
 fi
 
 cd "$BUILDDIR"

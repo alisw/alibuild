@@ -66,6 +66,7 @@ def doInit(args):
 
   for p in pkgs:
     spec = specs.get(p["name"])
+    spec["is_devel_pkg"] = False
     spec["scm"] = Git()
     dieOnError(spec is None, "cannot find recipe for package %s" % p["name"])
     dest = join(args.develPrefix, spec["package"])
