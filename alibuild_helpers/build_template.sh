@@ -155,7 +155,6 @@ cat <<\EOF > "$INSTALLROOT/etc/profile.d/init.sh"
 EOF
 
 cd "$WORK_DIR/INSTALLROOT/$PKGHASH"
-echo "$PKGHASH" > "$INSTALLROOT/.build-hash"
 # Replace the .envrc to point to the final installation directory.
 cat << EOF > "$BUILDDIR/.envrc"
 # Source the build environment which was used for this package
@@ -293,6 +292,9 @@ if [[ $BUILD_FAMILY ]]; then
   ln -snf $PKGVERSION-$PKGREVISION $ARCHITECTURE/$PKGNAME/latest-$BUILD_FAMILY
 fi
 
+# When the package is definitely fully installed, install the file that marks
+# the package as successful.
+echo "$PKGHASH" > "$WORK_DIR/$PKGPATH/.build-hash"
 # Mark the build as successful with a placeholder. Allows running incremental
 # recipe in case the package is in development mode.
 echo "${DEVEL_HASH}${DEPS_HASH}" > "$BUILDDIR/.build_succeeded"
