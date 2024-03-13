@@ -10,7 +10,7 @@ except ImportError:
   from ordereddict import OrderedDict
 
 from alibuild_helpers.log import dieOnError, debug, error
-from alibuild_helpers.utilities import call_ignoring_oserrors, symlink
+from alibuild_helpers.utilities import call_ignoring_oserrors, symlink, short_commit_hash
 
 FETCH_LOG_NAME = "fetch-log.txt"
 
@@ -145,7 +145,9 @@ def checkout_sources(spec, work_dir, reference_sources, containerised_build):
     return 0
 
   source_parent_dir = os.path.join(work_dir, "SOURCES", spec["package"], spec["version"])
-  source_dir = os.path.join(source_parent_dir, spec["commit_hash"])
+  # The build script expects SOURCEDIR to be named after the shortened commit
+  # hash, not the full one.
+  source_dir = os.path.join(source_parent_dir, short_commit_hash(spec))
   os.makedirs(source_parent_dir, exist_ok=True)
 
   if spec["commit_hash"] != spec["tag"]:

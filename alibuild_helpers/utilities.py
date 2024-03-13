@@ -90,6 +90,18 @@ def resolve_links_path(architecture, package):
   return "/".join(("TARS", architecture, package))
 
 
+def short_commit_hash(spec):
+  """Shorten the spec's commit hash to make it more human-readable.
+
+  This is complicated by the fact that the commit_hash property is not
+  necessarily a commit hash, but might be a tag name. If it is a tag name,
+  return it as-is, else assume it is actually a commit hash and shorten it.
+  """
+  if spec["tag"] == spec["commit_hash"]:
+    return spec["commit_hash"]
+  return spec["commit_hash"][:10]
+
+
 # Date fields to substitute: they are zero-padded
 now = datetime.now()
 nowKwds = { "year": str(now.year),

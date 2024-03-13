@@ -12,7 +12,7 @@ from alibuild_helpers.utilities import getPackageList, asList
 from alibuild_helpers.utilities import validateDefaults
 from alibuild_helpers.utilities import Hasher
 from alibuild_helpers.utilities import yamlDump
-from alibuild_helpers.utilities import resolve_tag, resolve_version
+from alibuild_helpers.utilities import resolve_tag, resolve_version, short_commit_hash
 from alibuild_helpers.git import Git, git
 from alibuild_helpers.sl import Sapling
 from alibuild_helpers.scm import SCMError
@@ -1009,8 +1009,7 @@ def doBuild(args, parser):
       ("BUILD_REQUIRES", " ".join(spec["build_requires"])),
       ("CACHED_TARBALL", cachedTarball),
       ("CAN_DELETE", args.aggressiveCleanup and "1" or ""),
-      # Shorten the commit hash if it's a real commit hash and not simply the tag.
-      ("COMMIT_HASH", spec["tag"] if spec["tag"] == spec["commit_hash"] else spec["commit_hash"][:10]),
+      ("COMMIT_HASH", short_commit_hash(spec)),
       ("DEPS_HASH", spec.get("deps_hash", "")),
       ("DEVEL_HASH", spec.get("devel_hash", "")),
       ("DEVEL_PREFIX", develPrefix),
