@@ -49,7 +49,11 @@ class Git(SCM):
   def cloneSourceCmd(self, source, destination, referenceRepo, usePartialClone):
     cmd = ["clone", "-n", source, destination]
     if referenceRepo:
-      cmd.extend(["--reference", referenceRepo])
+      # If we're building inside a Docker container, we can't refer to the
+      # mirror repo directly, since Git uses an absolute path. With
+      # "--dissociate", we still copy the objects locally, but we don't refer
+      # to them by path.
+      cmd.extend(["--dissociate", "--reference", referenceRepo])
     if usePartialClone:
       cmd.extend(clone_speedup_options())
     return cmd

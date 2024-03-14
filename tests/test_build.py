@@ -105,7 +105,7 @@ GIT_CLONE_REF_ZLIB_ARGS = ("clone", "--bare", "https://github.com/star-externals
                            "/sw/MIRROR/zlib", "--filter=blob:none"), ".", False
 GIT_CLONE_SRC_ZLIB_ARGS = ("clone", "-n", "https://github.com/star-externals/zlib",
                            "/sw/SOURCES/zlib/v1.2.3/8822efa61f",
-                           "--reference", "/sw/MIRROR/zlib", "--filter=blob:none"), ".", False
+                           "--dissociate", "--reference", "/sw/MIRROR/zlib", "--filter=blob:none"), ".", False
 GIT_SET_URL_ZLIB_ARGS = ("remote", "set-url", "--push", "origin", "https://github.com/star-externals/zlib"), \
     "/sw/SOURCES/zlib/v1.2.3/8822efa61f", False
 GIT_CHECKOUT_ZLIB_ARGS = ("checkout", "-f", "master"), \
@@ -115,7 +115,7 @@ GIT_FETCH_REF_ROOT_ARGS = ("fetch", "-f", "https://github.com/root-mirror/root",
                            "+refs/heads/*:refs/heads/*"), "/sw/MIRROR/root", False
 GIT_CLONE_SRC_ROOT_ARGS = ("clone", "-n", "https://github.com/root-mirror/root",
                            "/sw/SOURCES/ROOT/v6-08-30/f7b3366117",
-                           "--reference", "/sw/MIRROR/root", "--filter=blob:none"), ".", False
+                           "--dissociate", "--reference", "/sw/MIRROR/root", "--filter=blob:none"), ".", False
 GIT_SET_URL_ROOT_ARGS = ("remote", "set-url", "--push", "origin", "https://github.com/root-mirror/root"), \
     "/sw/SOURCES/ROOT/v6-08-30/f7b3366117", False
 GIT_CHECKOUT_ROOT_ARGS = ("checkout", "-f", "v6-08-00-patches"), \
