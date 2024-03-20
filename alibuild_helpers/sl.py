@@ -41,6 +41,9 @@ class Sapling(SCM):
 
   def checkUntracked(self, line):
     return line.startswith("? ")
+  def cloneCmd(self, source, referenceRepo, usePartialClone):
+    cmd = ["clone", source, referenceRepo]
+    return cmd
 
 
 def sapling(args, directory=".", check=True, prompt=True):
