@@ -86,7 +86,7 @@ def doDoctor(args, parser):
     warning("Unable to find system compiler.\n"
             "%s\n"
             "Please follow prerequisites:\n"
-            "* On Centos compatible systems: https://alice-doc.github.io/alice-analysis-tutorial/building/prereq-centos7.html\n"
+            "* On RHEL9 compatible systems (e.g. Alma9): https://alice-doc.github.io/alice-analysis-tutorial/building/prereq-alma9.html\n"
             "* On Fedora compatible systems: https://alice-doc.github.io/alice-analysis-tutorial/building/prereq-fedora.html\n"
             "* On Ubuntu compatible systems: https://alice-doc.github.io/alice-analysis-tutorial/building/prereq-ubuntu.html\n"
             "* On macOS: https://alice-doc.github.io/alice-analysis-tutorial/building/prereq-macos.html\n",
@@ -96,7 +96,7 @@ def doDoctor(args, parser):
     error("Unable to find git.\n"
           "%s\n"
           "Please follow prerequisites:\n"
-          "* On Centos compatible systems: https://alice-doc.github.io/alice-analysis-tutorial/building/prereq-centos7.html\n"
+          "* On RHEL9 compatible systems (e.g. Alma9): https://alice-doc.github.io/alice-analysis-tutorial/building/prereq-alma9.html\n"
           "* On Fedora compatible systems: https://alice-doc.github.io/alice-analysis-tutorial/building/prereq-fedora.html\n"
           "* On Ubuntu compatible systems: https://alice-doc.github.io/alice-analysis-tutorial/building/prereq-ubuntu.html\n"
           "* On macOS: https://alice-doc.github.io/alice-analysis-tutorial/building/prereq-macos.html\n",
