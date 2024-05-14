@@ -80,7 +80,8 @@ def doDoctor(args, parser):
   # Decide if we can use homebrew. If not, we replace it with "true" so
   # that we do not get spurious messages on linux
   homebrew_replacement = ""
-  err, output = getstatusoutput("type c++")
+  with DockerRunner(args.dockerImage, args.docker_extra_args) as getstatusoutput_docker:
+    err, output = getstatusoutput_docker("type c++")
   if err:
     warning("Unable to find system compiler.\n"
             "%s\n"
