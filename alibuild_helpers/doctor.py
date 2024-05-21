@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 import os, re, sys
 from os.path import exists, abspath, expanduser
 import logging

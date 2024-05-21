@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 import os, subprocess, sys
 from os.path import exists, expanduser
 from os import unlink
