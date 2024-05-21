@@ -671,6 +671,10 @@ def doBuild(args, parser):
         spec[full_key].add(dep)
         # Runtime deps of build deps should count as build deps.
         spec[full_key] |= specs[dep]["full_requires" if key == "build_requires" else full_key]
+    # Propagate build deps of runtime deps, so that they are not added into
+    # the generated modulefile by alibuild-generate-module.
+    for dep in spec["runtime_requires"]:
+      spec["full_build_requires"] |= specs[dep]["full_build_requires"]
     # If something requires or runtime_requires a package, then it's not a
     # pure build_requires only anymore, so we drop it from the list.
     spec["full_build_requires"] -= spec["full_runtime_requires"]
