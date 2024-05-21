@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 import yaml
 from os.path import exists
 import hashlib
