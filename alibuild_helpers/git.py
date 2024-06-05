@@ -84,12 +84,13 @@ def git(args, directory=".", check=True, prompt=True):
   err, output = getstatusoutput("""\
   set -e +x
   cd {directory} >/dev/null 2>&1
-  {prompt_var} git {args}
+  {prompt_var} {directory_safe_var} git {args}
   """.format(
     directory=quote(directory),
     args=" ".join(map(quote, args)),
     # GIT_TERMINAL_PROMPT is only supported in git 2.3+.
     prompt_var="GIT_TERMINAL_PROMPT=0" if not prompt else "",
+    directory_safe_var="GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.directory GIT_CONFIG_VALUE_0={}".format(directory) if directory else "",
   ), timeout=GIT_COMMAND_TIMEOUT_SEC)
   if check and err != 0:
     raise SCMError("Error {} from git {}: {}".format(err, " ".join(args), output))
