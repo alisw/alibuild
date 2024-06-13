@@ -2,6 +2,7 @@ from shlex import quote
 from alibuild_helpers.cmd import getstatusoutput
 from alibuild_helpers.log import debug
 from alibuild_helpers.scm import SCM, SCMError
+import os
 
 GIT_COMMAND_TIMEOUT_SEC = 120
 """How many seconds to let any git command execute before being terminated."""
@@ -75,6 +76,7 @@ class Git(SCM):
 
 
 def git(args, directory=".", check=True, prompt=True):
+  lastGitOverride = int(os.environ.get("GIT_CONFIG_COUNT", "0"))
   debug("Executing git %s (in directory %s)", " ".join(args), directory)
   # We can't use git --git-dir=%s/.git or git -C %s here as the former requires
   # that the directory we're inspecting to be the root of a git directory, not
@@ -89,8 +91,8 @@ def git(args, directory=".", check=True, prompt=True):
     directory=quote(directory),
     args=" ".join(map(quote, args)),
     # GIT_TERMINAL_PROMPT is only supported in git 2.3+.
-    prompt_var="GIT_TERMINAL_PROMPT=0" if not prompt else "",
-    directory_safe_var="GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.directory GIT_CONFIG_VALUE_0=$PWD" if directory else "",
+    prompt_var=f"GIT_TERMINAL_PROMPT=0" if not prompt else "",
+    directory_safe_var=f"GIT_CONFIG_COUNT={lastGitOverride+1} GIT_CONFIG_KEY_{lastGitOverride}=safe.directory GIT_CONFIG_VALUE_{lastGitOverride}=$PWD" if directory else "",
   ), timeout=GIT_COMMAND_TIMEOUT_SEC)
   if check and err != 0:
     raise SCMError("Error {} from git {}: {}".format(err, " ".join(args), output))
