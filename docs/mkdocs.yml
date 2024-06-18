@@ -15,6 +15,7 @@ nav:
   - Alice/O2 tutorial: "https://alice-doc.github.io/alice-analysis-tutorial/building/"
 
 markdown_extensions:
+  # Syntax hightlighting for code blocks
   - pymdownx.highlight:
       anchor_linenums: true
       line_spans: __span
