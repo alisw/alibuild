@@ -8,13 +8,8 @@ GIT_COMMAND_TIMEOUT_SEC = 120
 """How many seconds to let any git command execute before being terminated."""
 
 
-# Don't recalculate this every time we need it.
-_clone_speedup_cache = None
 def clone_speedup_options():
   """Return a list of options supported by the system git which speed up cloning."""
-  if _clone_speedup_cache is not None:
-    return _clone_speedup_cache
-
   for filter_option in ("--filter=tree:0", "--filter=blob:none"):
     _, out = getstatusoutput("LANG=C git clone " + filter_option)
     if "unknown option" not in out and "invalid filter-spec" not in out:
