@@ -63,7 +63,7 @@ class Git(SCM):
     return ["checkout", "-f", ref]
 
   def fetchCmd(self, source, *refs):
-    return ["fetch", "-f"] + clone_speedup_options() + [source, *refs] 
+    return ["fetch", "-f"] + clone_speedup_options() + [source, *refs]
 
   def setWriteUrlCmd(self, url):
     return ["remote", "set-url", "--push", "origin", url]
