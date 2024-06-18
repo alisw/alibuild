@@ -1,12 +1,11 @@
 ---
-title: ALIBUILD
 subtitle: User command line reference manual
 layout: main
 ---
 
 ## SYNOPSIS
 
-For a quick start introduction, please look [here](./quick.html).
+For a quick start introduction, please look [here](quick.md).
 
 ```
 aliBuild build [-h] [--defaults DEFAULT]
@@ -243,7 +242,7 @@ validated for datataking and the choice will not change until the end of
 RUN2 of LHC. In order to change that and use, for example, a more recent
 version of ROOT you can use the `--default root6` option which will
 enable ROOT6 based builds. For a more complete description of how defaults
-works please look at [the reference manual](reference.html#defaults).
+works please look at [the reference manual](reference.md#defaults).
 
 ## Disabling packages
 
