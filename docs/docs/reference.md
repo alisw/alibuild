@@ -1,5 +1,4 @@
 ---
-title: BITS
 subtitle: Recipe reference manual
 layout: main
 ---

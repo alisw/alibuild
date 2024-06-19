@@ -1,5 +1,4 @@
 ---
-title: BITS
 subtitle: Troubleshooting
 layout: main
 ---
@@ -223,8 +222,8 @@ or as a matter of fact any packages you have two options:
   and add the options there.
 
 Finally, for certain common options, e.g. debug flags, we provide a
-precooked configuration using so called [defaults](user.html#defaults).
-Simply add `--defaults debug` to your buits flags and it will add
+precooked configuration using so called [defaults](user.md#defaults).
+Simply add `--defaults debug` to your bits flags and it will add
 debug flags to all your packages.
 
 ### AliPhysics takes very long time to build and builds things like autotools, GCC
