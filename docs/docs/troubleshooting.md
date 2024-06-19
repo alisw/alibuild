@@ -1,5 +1,4 @@
 ---
-title: ALIBUILD
 subtitle: Troubleshooting
 layout: main
 ---
@@ -223,7 +222,7 @@ or as a matter of fact any packages you have two options:
   and add the options there.
 
 Finally, for certain common options, e.g. debug flags, we provide a
-precooked configuration using so called [defaults](user.html#defaults).
+precooked configuration using so called [defaults](user.md#defaults).
 Simply add `--defaults debug` to your aliBuild flags and it will add
 debug flags to all your packages.
 

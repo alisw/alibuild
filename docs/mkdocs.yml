@@ -1,0 +1,26 @@
+site_name: "aliBuild: ALICE software builder"
+repo_name: View source code
+repo_url: https://github.com/alisw/alibuild
+
+theme:
+  name: material
+
+use_directory_urls: false
+
+nav:
+  - Home: index.md
+  - Quickstart: quick.md
+  - User manual: user.md
+  - Reference: reference.md
+  - ALICE/O2 tutorial: "https://alice-doc.github.io/alice-analysis-tutorial/building/"
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - toc:
+      permalink: "#"
