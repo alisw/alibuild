@@ -1,5 +1,4 @@
 ---
-title: ALIBUILD
 subtitle: Quick Start
 layout: main
 ---
@@ -7,7 +6,7 @@ layout: main
 aliBuild is a tool to simplify building and installing ALICE / ALFA
 software. This is a quickstart Guide which will show you how to build
 and use a package, for extended documentation please have a look at the
-[user guide](user.html).
+[user guide](user.md).
 
 ## Setting up
 
@@ -71,7 +70,6 @@ For example, on Centos7:
     sw/slc7_x86-64/AliRoot/v6-16-01-1
 
 ## Using the built package
-{: #loading-the-package-environment}
 
 Environment for packages built using aliBuild is managed by [Environment
 Modules](http://modules.sourceforge.net) and a wrapper script called alienv.
@@ -88,4 +86,4 @@ to list the available packages, and:
     alienv enter VO_ALICE@PackageA::VersionA[,VO_ALICE@PackageB::VersionB...]
 
 to enter a shell with the appropriate environment set. To learn more about alienv you
-can also look at the [user guide](user.html#using-the-packages-you-have-built).
+can also look at the [user guide](user.md#using-the-packages-you-have-built).
