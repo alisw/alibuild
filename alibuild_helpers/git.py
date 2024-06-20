@@ -9,6 +9,7 @@ GIT_COMMAND_TIMEOUT_SEC = 120
 
 GIT_CMD_TIMEOUTS = {
   "clone": 600,
+  "checkout": 600
 }
 """Customised timeout for some commands."""
 
