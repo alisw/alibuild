@@ -5,8 +5,13 @@ from alibuild_helpers.scm import SCM, SCMError
 import os
 
 GIT_COMMAND_TIMEOUT_SEC = 120
-"""How many seconds to let any git command execute before being terminated."""
+"""Default value for how many seconds to let any git command execute before being terminated."""
 
+GIT_CMD_TIMEOUTS = {
+  "clone": 600,
+  "checkout": 600
+}
+"""Customised timeout for some commands."""
 
 def clone_speedup_options():
   """Return a list of options supported by the system git which speed up cloning."""
@@ -93,7 +98,7 @@ def git(args, directory=".", check=True, prompt=True):
     # GIT_TERMINAL_PROMPT is only supported in git 2.3+.
     prompt_var=f"GIT_TERMINAL_PROMPT=0" if not prompt else "",
     directory_safe_var=f"GIT_CONFIG_COUNT={lastGitOverride+2} GIT_CONFIG_KEY_{lastGitOverride}=safe.directory GIT_CONFIG_VALUE_{lastGitOverride}=$PWD GIT_CONFIG_KEY_{lastGitOverride+1}=gc.auto GIT_CONFIG_VALUE_{lastGitOverride+1}=0" if directory else "",
-  ), timeout=GIT_COMMAND_TIMEOUT_SEC)
+  ), timeout=GIT_CMD_TIMEOUTS.get(args[0] if len(args) else "*", GIT_COMMAND_TIMEOUT_SEC))
   if check and err != 0:
     raise SCMError("Error {} from git {}: {}".format(err, " ".join(args), output))
   return output if check else (err, output)
