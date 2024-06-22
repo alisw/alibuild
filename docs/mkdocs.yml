@@ -15,6 +15,7 @@ nav:
   - Quickstart: quick.md
   - User manual: user.md
   - Reference: reference.md
+  - Troubleshooting: troubleshooting.md
   - ALICE/O2 tutorial: "https://alice-doc.github.io/alice-analysis-tutorial/building/"
 
 markdown_extensions:
