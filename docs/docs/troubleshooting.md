@@ -322,3 +322,17 @@ git config --global credential.helper 'cache --timeout 3600'
 ```
 
 You can adjust the timeout (3600 seconds, above) to your liking, if you would prefer git to remember your passwords for longer.
+
+#### I get an HTTP/2 related error
+
+Some network provider do not support HTTP/2 apparently. If you get:
+
+```bash
+error: RPC failed; curl 92 HTTP/2 stream 5 was not closed cleanly: CANCEL (err 8)
+```
+
+or similar message, try to disable HTTP/2 with something like:
+
+```
+git config --global http.version HTTP/1.1
+```
