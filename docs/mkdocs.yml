@@ -28,3 +28,9 @@ markdown_extensions:
   - pymdownx.superfences
   - toc:
       permalink: "#"
+
+plugins:
+  - redirects:
+      redirect_maps:
+        'o2-tutorial.html': 'https://alice-doc.github.io/alice-analysis-tutorial/building/'
+        'tutorial.html': 'https://alice-doc.github.io/alice-analysis-tutorial/building/'
