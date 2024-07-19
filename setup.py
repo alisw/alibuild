@@ -58,7 +58,7 @@ setup(
         'Programming Language :: Python :: 3.10',  # ubuntu2204
         'Programming Language :: Python :: 3.11',  # MacOS
         'Programming Language :: Python :: 3.12',  # MacOS
-    ],
+    ] + ['packaging<=23'] if sys.version_info <(3, 7) else [],
 
     # What does your project relate to?
     keywords='HEP ALICE',
