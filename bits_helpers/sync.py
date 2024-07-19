@@ -340,12 +340,13 @@ class CVMFSRemoteSync:
     links_path = resolve_links_path(self.architecture, spec["package"])
     os.makedirs(os.path.join(self.workdir, links_path), exist_ok=True)
 
+    cvmfs_architecture = re.sub(r"slc(\d+)_x86-64", r"el\1-x86_64", self.architecture)
     err = execute("""\
     set -x
     # Exit without error in case we do not have any package published
-    test -d "{remote_store}/{architecture}/{package}" || exit 0
+    test -d "{remote_store}/{cvmfs_architecture}/Packages/{package}" || exit 0
     mkdir -p "{workDir}/{links_path}"
-    for install_path in $(find "{remote_store}/{architecture}/{package}" -type d -mindepth 1 -maxdepth 1); do
+    for install_path in $(find "{remote_store}/{cvmfs_architecture}/Packages/{package}" -type d -mindepth 1 -maxdepth 1); do
       full_version="${{install_path##*/}}"
       tarball={package}-$full_version.{architecture}.tar.gz
       pkg_hash=$(cat "${{install_path}}/.build-hash" || jq -r '.package.hash' <${{install_path}}/.meta.json)
@@ -356,15 +357,16 @@ class CVMFSRemoteSync:
       # Create the dummy tarball, if it does not exists
       test -f "{workDir}/{architecture}/store/${{pkg_hash:0:2}}/$pkg_hash/$tarball" && continue
       mkdir -p "{workDir}/INSTALLROOT/$pkg_hash/{architecture}/{package}"
-      ln -sf "{remote_store}/{architecture}/{package}/$full_version" "{workDir}/INSTALLROOT/$pkg_hash/{architecture}/{package}"
+      ln -sf "{remote_store}/{cvmfs_architecture}/Packages/{package}/$full_version" "{workDir}/INSTALLROOT/$pkg_hash/{architecture}/{package}"
       mkdir -p "{workDir}/TARS/{architecture}/store/${{pkg_hash:0:2}}/$pkg_hash"
-      tar -C "{workDir}/INSTALLROOT/$pkg_hash" -cf "{workDir}/TARS/{architecture}/store/${{pkg_hash:0:2}}/$pkg_hash/$tarball" .
+      tar -C "{workDir}/INSTALLROOT/$pkg_hash" -czf "{workDir}/TARS/{architecture}/store/${{pkg_hash:0:2}}/$pkg_hash/$tarball" .
       rm -rf "{workDir}/INSTALLROOT/$pkg_hash"
     done
     """.format(
       workDir=self.workdir,
       b=self.remoteStore,
       architecture=self.architecture,
+      cvmfs_architecture=cvmfs_architecture,
       package=spec["package"],
       remote_store=self.remoteStore,
       links_path=links_path,
