@@ -348,7 +348,10 @@ class CVMFSRemoteSync:
     for install_path in $(find "{remote_store}/{architecture}/{package}" -type d -mindepth 1 -maxdepth 1); do
       full_version="${{install_path##*/}}"
       tarball={package}-$full_version.{architecture}.tar.gz
-      pkg_hash=$(cat "${{install_path}}/.build-hash")
+      pkg_hash=$(cat "${{install_path}}/.build-hash" || jq -r '.package.hash' <${{install_path}}/.meta.json)
+      if [ "X$pkg_hash" = X ]; then
+        continue
+      fi
       ln -sf ../../{architecture}/store/${{pkg_hash:0:2}}/$pkg_hash/$tarball "{workDir}/{links_path}/$tarball"
       # Create the dummy tarball, if it does not exists
       test -f "{workDir}/{architecture}/store/${{pkg_hash:0:2}}/$pkg_hash/$tarball" && continue
