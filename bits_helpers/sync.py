@@ -325,7 +325,7 @@ class CVMFSRemoteSync:
   def fetch_tarball(self, spec):
     info("Downloading tarball for %s@%s-%s, if available", spec["package"], spec["version"], spec["revision"])
     # If we already have a tarball with any equivalent hash, don't check S3.
-    for pkg_hash in spec["remote_hashes"]:
+    for pkg_hash in spec["remote_hashes"] + spec["local_hashes"]:
       store_path = resolve_store_path(self.architecture, pkg_hash)
       pattern = os.path.join(self.workdir, store_path, "%s-*.tar.gz" % spec["package"])
       if glob.glob(pattern):
