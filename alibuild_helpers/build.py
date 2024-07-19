@@ -899,12 +899,18 @@ def doBuild(args, parser):
 
     # Now that we have all the information about the package we want to build, let's
     # check if it wasn't built / unpacked already.
-    hashFile = "%s/%s/%s/%s-%s/.build-hash" % (workDir,
-                                               args.architecture,
-                                               spec["package"],
-                                               spec["version"],
-                                               spec["revision"])
-    fileHash = readHashFile(hashFile)
+    hashPath= "%s/%s/%s/%s-%s" % (workDir,
+                                  args.architecture,
+                                  spec["package"],
+                                  spec["version"],
+                                  spec["revision"])
+    hashFile = hashPath + "/.build-hash"
+    # If the folder is a symlink, we consider it to be to CVMFS and
+    # take the hash for good.
+    if os.path.islink(hashPath):
+      fileHash = spec["hash"]
+    else:
+      fileHash = readHashFile(hashFile)
     # Development packages have their own rebuild-detection logic above.
     # spec["hash"] is only useful here for regular packages.
     if fileHash == spec["hash"] and not spec["is_devel_pkg"]:
