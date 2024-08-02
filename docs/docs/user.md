@@ -103,7 +103,7 @@ provides tarballs for the most common supported architectures.
 ## Using precompiled packages
 
 By running aliBuild with no special option on CentOS/Alma 7, 8 or 9, or on
-Ubuntu 20.04 or 22.04, it will automatically try to
+Ubuntu 20.04, 22.04 or 24.04, it will automatically try to
 use as many precompiled packages as possible by downloading them from a default
 central server. By using precompiled packages you lose the ability to pick some
 of them from your system. If you do not want to use precompiled packages and you
