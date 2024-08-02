@@ -377,6 +377,7 @@ On Linux, x86-64:
    RHEL9 / ALMA9 compatible: slc9_x86-64
    Ubuntu 20.04 compatible: ubuntu2004_x86-64
    Ubuntu 22.04 compatible: ubuntu2204_x86-64
+   Ubuntu 24.04 compatible: ubuntu2404_x86-64
    Fedora 33 compatible: fedora33_x86-64
    Fedora 34 compatible: fedora34_x86-64
 
@@ -391,8 +392,8 @@ On Mac, 1-2 latest supported OSX versions:
    Apple Silicon: osx_arm64
 """
 
-# When updating this variable, also update docs/user.markdown!
-S3_SUPPORTED_ARCHS = "slc7_x86-64", "slc8_x86-64", "ubuntu2004_x86-64", "ubuntu2204_x86-64", "slc9_x86-64", "slc9_aarch64"
+# When updating this variable, also update docs/docs/user.md!
+S3_SUPPORTED_ARCHS = "slc7_x86-64", "slc8_x86-64", "ubuntu2004_x86-64", "ubuntu2204_x86-64", "ubuntu2404_x86-64", "slc9_x86-64", "slc9_aarch64"
 
 def finaliseArgs(args, parser):
 
