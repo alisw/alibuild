@@ -555,12 +555,13 @@ def doBuild(args, parser):
                         for x in buildOrder if x != "defaults-release"))
 
   if develPkgs:
-    banner("You have packages in development mode.\n"
+    banner("You have packages in development mode (%s).\n"
            "This means their source code can be freely modified under:\n\n"
            "  %s/<package_name>\n\n"
            "aliBuild does not automatically update such packages to avoid work loss.\n"
            "In most cases this is achieved by doing in the package source directory:\n\n"
            "  git pull --rebase\n",
+           ", ".join(develPkgs),
            os.getcwd())
 
   for pkg, spec in specs.items():
