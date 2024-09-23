@@ -15,7 +15,7 @@ from bits_helpers.init import doInit
 from bits_helpers.clean import doClean
 from bits_helpers.doctor import doDoctor
 from bits_helpers.deps import doDeps
-from bits_helpers.log import info, warning, debug, logger, error
+from bits_helpers.log import info, debug, logger, error
 from bits_helpers.utilities import detectArch
 from bits_helpers.build import doBuild
 
@@ -40,7 +40,6 @@ def doMain(args, parser):
     "LC_MONETARY": "C",
     "LC_NUMERIC": "C",
     "LC_TIME": "C",
-    "LC_ALL": "C",
     "GREP_OPTIONS": "",
     "BASH_ENV": "",
     "BITS_ARCHITECTURE": args.architecture
