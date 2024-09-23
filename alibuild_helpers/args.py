@@ -7,10 +7,7 @@ import re
 import os
 import shlex
 
-try:
-  import commands
-except ImportError:
-  import subprocess as commands
+import subprocess as commands
 from os.path import abspath, dirname, basename
 import sys
 
