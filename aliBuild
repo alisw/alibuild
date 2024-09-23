@@ -15,7 +15,7 @@ from alibuild_helpers.init import doInit
 from alibuild_helpers.clean import doClean
 from alibuild_helpers.doctor import doDoctor
 from alibuild_helpers.deps import doDeps
-from alibuild_helpers.log import info, warning, debug, logger, error
+from alibuild_helpers.log import info, debug, logger, error
 from alibuild_helpers.utilities import detectArch
 from alibuild_helpers.build import doBuild
 
@@ -40,7 +40,6 @@ def doMain(args, parser):
     "LC_MONETARY": "C",
     "LC_NUMERIC": "C",
     "LC_TIME": "C",
-    "LC_ALL": "C",
     "GREP_OPTIONS": "",
     "BASH_ENV": "",
     "ALIBUILD_ARCHITECTURE": args.architecture
