@@ -22,14 +22,8 @@ from alibuild_helpers.workarea import logged_scm, updateReferenceRepoSpec, check
 from alibuild_helpers.log import ProgressPrint, log_current_package
 from glob import glob
 from textwrap import dedent
-try:
-  from collections import OrderedDict
-except ImportError:
-  from ordereddict import OrderedDict
-try:
-  from shlex import quote  # Python 3.3+
-except ImportError:
-  from pipes import quote  # Python 2.7
+from collections import OrderedDict
+from shlex import quote  # Python 3.3+
 
 import concurrent.futures
 import importlib
