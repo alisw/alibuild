@@ -8,10 +8,6 @@ from shlex import quote
 
 from alibuild_helpers.log import debug, warning, dieOnError
 
-def is_string(s):
-  return isinstance(s, str)
-
-
 def decode_with_fallback(data):
   """Try to decode DATA as utf-8; if that doesn't work, fall back to latin-1.
 
@@ -29,7 +25,7 @@ def decode_with_fallback(data):
 
 def getoutput(command, timeout=None):
   """Run command, check it succeeded, and return its stdout as a string."""
-  proc = Popen(command, shell=is_string(command), stdout=PIPE, stderr=PIPE)
+  proc = Popen(command, shell=isinstance(command, str), stdout=PIPE, stderr=PIPE)
   try:
     stdout, stderr = proc.communicate(timeout=timeout)
   except TimeoutExpired:
@@ -43,7 +39,7 @@ def getoutput(command, timeout=None):
 
 def getstatusoutput(command, timeout=None):
   """Run command and return its return code and output (stdout and stderr)."""
-  proc = Popen(command, shell=is_string(command), stdout=PIPE, stderr=STDOUT)
+  proc = Popen(command, shell=isinstance(command, str), stdout=PIPE, stderr=STDOUT)
   try:
     merged_output, _ = proc.communicate(timeout=timeout)
   except TimeoutExpired:
@@ -59,7 +55,7 @@ def getstatusoutput(command, timeout=None):
 
 
 def execute(command, printer=debug, timeout=None):
-  popen = Popen(command, shell=is_string(command), stdout=PIPE, stderr=STDOUT)
+  popen = Popen(command, shell=isinstance(command, str), stdout=PIPE, stderr=STDOUT)
   start_time = time.time()
   for line in iter(popen.stdout.readline, b""):
     printer("%s", decode_with_fallback(line).strip("\n"))
