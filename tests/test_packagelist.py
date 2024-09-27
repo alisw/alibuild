@@ -1,10 +1,7 @@
 from __future__ import print_function
 from textwrap import dedent
 import unittest
-try:                  # Python 3
-    from unittest import mock
-except ImportError:   # Python 2
-    import mock
+from unittest import mock
 
 from alibuild_helpers.cmd import getstatusoutput
 from alibuild_helpers.utilities import getPackageList

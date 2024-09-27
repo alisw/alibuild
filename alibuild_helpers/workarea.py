@@ -4,10 +4,7 @@ import os
 import os.path
 import shutil
 import tempfile
-try:
-  from collections import OrderedDict
-except ImportError:
-  from ordereddict import OrderedDict
+from collections import OrderedDict
 
 from alibuild_helpers.log import dieOnError, debug, error
 from alibuild_helpers.utilities import call_ignoring_oserrors, symlink, short_commit_hash

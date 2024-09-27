@@ -1,12 +1,8 @@
 import unittest
-import platform
 from alibuild_helpers.utilities import parseRecipe, getRecipeReader, parseDefaults
 from alibuild_helpers.utilities import FileReader, GitReader
-from alibuild_helpers.utilities import validateDefaults, SpecError
-try:
-  from collections import OrderedDict
-except ImportError:
-  from ordereddict import OrderedDict
+from alibuild_helpers.utilities import validateDefaults
+from collections import OrderedDict
 
 TEST1="""package: foo
 version: bar

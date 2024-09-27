@@ -1,13 +1,5 @@
-try:
-    from unittest.mock import patch, call, MagicMock  # In Python 3, mock is built-in
-    from io import StringIO
-except ImportError:
-    from mock import patch, call, MagicMock  # Python 2
-    from StringIO import StringIO
-try:
-    from collections import OrderedDict
-except ImportError:
-    from ordereddict import OrderedDict
+from unittest.mock import patch, MagicMock
+from io import StringIO
 
 from alibuild_helpers.deps import doDeps
 from argparse import Namespace

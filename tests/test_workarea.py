@@ -1,13 +1,7 @@
 from os import getcwd
 import unittest
-try:
-    from unittest.mock import patch, MagicMock  # In Python 3, mock is built-in
-except ImportError:
-    from mock import patch, MagicMock  # Python 2
-try:
-    from collections import OrderedDict
-except ImportError:
-    from ordereddict import OrderedDict
+from unittest.mock import patch, MagicMock  # In Python 3, mock is built-in
+from collections import OrderedDict
 
 from alibuild_helpers.workarea import updateReferenceRepoSpec
 from alibuild_helpers.git import Git
