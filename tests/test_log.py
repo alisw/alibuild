@@ -1,8 +1,5 @@
 import unittest
-try:
-    from unittest.mock import MagicMock, patch  # In Python 3, mock is built-in
-except ImportError:
-    from mock import MagicMock, patch  # Python 2
+from unittest.mock import MagicMock, patch
 
 from alibuild_helpers.log import dieOnError, ProgressPrint
 

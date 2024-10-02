@@ -1,16 +1,9 @@
 from argparse import Namespace
 import os.path as path
 import unittest
-try:
-    from unittest.mock import MagicMock, call, patch  # In Python 3, mock is built-in
-    from io import StringIO
-except ImportError:
-    from mock import MagicMock, call, patch  # Python 2
-    from StringIO import StringIO
-try:
-    from collections import OrderedDict
-except ImportError:
-    from ordereddict import OrderedDict
+from unittest.mock import call, patch  # In Python 3, mock is built-in
+from io import StringIO
+from collections import OrderedDict
 
 from alibuild_helpers.init import doInit, parsePackagesDefinition
 

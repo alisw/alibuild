@@ -115,10 +115,7 @@ if __name__ == "__main__":
     if profiler:
       print("profiler started")
       import cProfile, pstats
-      try:
-        from StringIO import StringIO
-      except ImportError:
-        from io import StringIO
+      from io import StringIO
       pr = cProfile.Profile()
       pr.enable()
       def profiler():

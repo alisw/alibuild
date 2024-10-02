@@ -6,16 +6,9 @@ import re
 import sys
 import unittest
 # Assuming you are using the mock library to ... mock things
-try:
-    from unittest.mock import call, patch, MagicMock, DEFAULT  # In Python 3, mock is built-in
-    from io import StringIO
-except ImportError:
-    from mock import call, patch, MagicMock, DEFAULT  # Python 2
-    from StringIO import StringIO
-try:
-    from collections import OrderedDict
-except ImportError:
-    from ordereddict import OrderedDict
+from unittest.mock import call, patch, MagicMock, DEFAULT
+from io import StringIO
+from collections import OrderedDict
 
 from alibuild_helpers.utilities import parseRecipe, resolve_tag
 from alibuild_helpers.build import doBuild, storeHashes, generate_initdotsh
@@ -79,8 +72,7 @@ TEST_ROOT_GIT_REFS = """\
 87b87c4322d2a3fad315c919cb2e2dd73f2154dc\trefs/heads/master
 f7b336611753f1f4aaa94222b0d620748ae230c0\trefs/heads/v6-08-00-patches
 f7b336611753f1f4aaa94222b0d620748ae230c0\trefs/tags/test-tag"""
-TEST_ROOT_BUILD_HASH = ("96cf657d1a5e2d41f16dfe42ced8c3522ab4e413" if sys.version_info.major < 3 else
-                        "8ec3f41b6b585ef86a02e9c595eed67f34d63f08")
+TEST_ROOT_BUILD_HASH = ("8ec3f41b6b585ef86a02e9c595eed67f34d63f08")
 
 
 TEST_EXTRA_RECIPE = """\
@@ -97,8 +89,7 @@ f000\trefs/heads/master
 ba22\trefs/tags/v1
 ba22\trefs/tags/v2
 baad\trefs/tags/v3"""
-TEST_EXTRA_BUILD_HASH = ("9f9eb8696b7722df52c4703f5fe7acc4b8000ba2" if sys.version_info.major < 3 else
-                         "5afae57bfc6a374e74c1c4427698ab5edebce0bc")
+TEST_EXTRA_BUILD_HASH = ("5afae57bfc6a374e74c1c4427698ab5edebce0bc")
 
 
 GIT_CLONE_REF_ZLIB_ARGS = ("clone", "--bare", "https://github.com/star-externals/zlib",
