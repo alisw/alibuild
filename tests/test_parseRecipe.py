@@ -3,10 +3,7 @@ import platform
 from bits_helpers.utilities import parseRecipe, getRecipeReader, parseDefaults
 from bits_helpers.utilities import FileReader, GitReader
 from bits_helpers.utilities import validateDefaults, SpecError
-try:
-  from collections import OrderedDict
-except ImportError:
-  from ordereddict import OrderedDict
+from collections import OrderedDict
 
 TEST1="""package: foo
 version: bar

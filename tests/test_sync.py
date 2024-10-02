@@ -4,10 +4,7 @@ import sys
 import unittest
 from io import BytesIO
 
-try:
-    from unittest.mock import patch, MagicMock   # In Python 3, mock is built-in
-except ImportError:
-    from mock import patch, MagicMock   # Python 2
+from unittest.mock import patch, MagicMock
 
 from bits_helpers import sync
 from bits_helpers.utilities import resolve_links_path, resolve_store_path

@@ -17,13 +17,12 @@ from bits_helpers.git import Git, git
 from bits_helpers.sl import Sapling
 from bits_helpers.scm import SCMError
 from bits_helpers.sync import remote_from_url
-import yaml
 from bits_helpers.workarea import logged_scm, updateReferenceRepoSpec, checkout_sources
 from bits_helpers.log import ProgressPrint, log_current_package
 from glob import glob
 from textwrap import dedent
 from collections import OrderedDict
-from shlex import quote  # Python 3.3+
+from shlex import quote
 
 import concurrent.futures
 import importlib
@@ -190,10 +189,7 @@ def storeHashes(package, specs, considerRelocation):
       hasher(data)
 
   for key in ("env", "append_path", "prepend_path"):
-    if sys.version_info[0] < 3 and key in spec and isinstance(spec[key], OrderedDict):
-      # Python 2: use YAML dict order to prevent changing hashes
-      h_all(str(yaml.safe_load(yamlDump(spec[key]))))
-    elif key not in spec:
+    if key not in spec:
       h_all("none")
     else:
       # spec["env"] is of type OrderedDict[str, str].
@@ -486,7 +482,7 @@ def doBuild(args, parser):
     checkedOutCommitName = scm.checkedOutCommitName(directory=args.configDir)
   except SCMError:
     dieOnError(True, "Cannot find SCM directory in %s." % args.configDir)
-  os.environ["BITS_DIST_HASH"] = checkedOutCommitName
+  os.environ["BITS_DIST_HASH"] = checkedOutCommitName # type: ignore
 
   debug("Building for architecture %s", args.architecture)
   debug("Number of parallel builds: %d", args.jobs)

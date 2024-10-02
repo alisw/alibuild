@@ -46,8 +46,8 @@ class Git(SCM):
   def listRefsCmd(self, repository):
     return ["ls-remote", "--heads", "--tags", repository]
 
-  def cloneReferenceCmd(self, source, referenceRepo, usePartialClone):
-    cmd = ["clone", "--bare", source, referenceRepo]
+  def cloneReferenceCmd(self, spec, referenceRepo, usePartialClone):
+    cmd = ["clone", "--bare", spec, referenceRepo]
     if usePartialClone:
       cmd.extend(clone_speedup_options())
     return cmd
@@ -64,11 +64,11 @@ class Git(SCM):
       cmd.extend(clone_speedup_options())
     return cmd
 
-  def checkoutCmd(self, ref):
-    return ["checkout", "-f", ref]
+  def checkoutCmd(self, tag):
+    return ["checkout", "-f", tag]
 
-  def fetchCmd(self, source, *refs):
-    return ["fetch", "-f"] + clone_speedup_options() + [source, *refs]
+  def fetchCmd(self, remote, *refs):
+    return ["fetch", "-f"] + clone_speedup_options() + [remote, *refs]
 
   def setWriteUrlCmd(self, url):
     return ["remote", "set-url", "--push", "origin", url]
