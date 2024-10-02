@@ -697,6 +697,12 @@ def doBuild(args, parser):
     deps=",".join(buildOrder[:-1]),
   ), args.architecture)
 
+  # If we are building only the dependencies, the last package in
+  # the build order can be considered done.
+  if args.onlyDeps and len(buildOrder) > 1:
+    mainPackage = buildOrder.pop()
+    warning("Not rebuilding %s because --only-deps option provided.", mainPackage)
+
   while buildOrder:
     p = buildOrder[0]
     spec = specs[p]

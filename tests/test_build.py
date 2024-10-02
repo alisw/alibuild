@@ -285,6 +285,7 @@ class BuildTestCase(unittest.TestCase):
             environment={},
             autoCleanup=False,
             noDevel=[],
+            onlyDeps=False,
             fetchRepos=False,
             forceTracked=False,
             plugin="legacy"
