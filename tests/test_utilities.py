@@ -3,10 +3,7 @@
 import unittest
 
 # Assuming you are using the mock library to ... mock things
-try:
-    from unittest.mock import patch  # In Python 3, mock is built-in
-except ImportError:
-    from mock import patch  # Python 2
+from unittest.mock import patch
 
 from alibuild_helpers.utilities import doDetectArch, filterByArchitecture
 from alibuild_helpers.utilities import Hasher

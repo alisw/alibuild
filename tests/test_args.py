@@ -1,11 +1,7 @@
 from __future__ import print_function
 # Assuming you are using the mock library to ... mock things
-try:
-    from unittest import mock
-    from unittest.mock import patch, call  # In Python 3, mock is built-in
-except ImportError:
-    import mock
-    from mock import patch, call  # Python 2
+from unittest import mock
+from unittest.mock import patch, call
 
 import alibuild_helpers.args
 from alibuild_helpers.args import doParseArgs, matchValidArch, finaliseArgs, DEFAULT_WORK_DIR, DEFAULT_CHDIR, ARCHITECTURE_TABLE
@@ -16,12 +12,8 @@ import os.path
 import unittest
 import shlex
 
-if (sys.version_info[0] >= 3):
-  BUILD_MISSING_PKG_ERROR = "the following arguments are required: PACKAGE"
-  ANALYTICS_MISSING_STATE_ERROR = "the following arguments are required: state"
-else:
-  BUILD_MISSING_PKG_ERROR = "too few arguments"
-  ANALYTICS_MISSING_STATE_ERROR = "too few arguments"
+BUILD_MISSING_PKG_ERROR = "the following arguments are required: PACKAGE"
+ANALYTICS_MISSING_STATE_ERROR = "the following arguments are required: state"
 
 # A few errors we should handle, together with the expected result
 ARCHITECTURE_ERROR = [call(u"Unknown / unsupported architecture: foo.\n\n{table}Alternatively, you can use the `--force-unknown-architecture' option.".format(table=ARCHITECTURE_TABLE))]

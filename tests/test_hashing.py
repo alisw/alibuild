@@ -3,10 +3,7 @@ import os.path
 import re
 import unittest
 
-try:
-    from collections import OrderedDict
-except ImportError:
-    from ordereddict import OrderedDict
+from collections import OrderedDict
 
 from alibuild_helpers.build import storeHashes
 

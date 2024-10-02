@@ -1,9 +1,6 @@
 from __future__ import print_function
 # Assuming you are using the mock library to ... mock things
-try:
-    from unittest import mock  # In Python 3, mock is built-in
-except ImportError:
-    import mock  # Python 2
+from unittest import mock
 
 from alibuild_helpers.cmd import execute, DockerRunner
 

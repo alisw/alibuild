@@ -1,32 +1,12 @@
 import os
 import os.path
-import sys
 import time
 from subprocess import Popen, PIPE, STDOUT
 from textwrap import dedent
-try:
-  from subprocess import TimeoutExpired
-except ImportError:
-  class TimeoutExpired(Exception):
-    """Stub exception for Python 2."""
-try:
-  from shlex import quote  # Python 3.3+
-except ImportError:
-  from pipes import quote  # Python 2.7
+from subprocess import TimeoutExpired
+from shlex import quote
 
 from alibuild_helpers.log import debug, warning, dieOnError
-
-# Keep the linter happy
-if sys.version_info[0] >= 3:
-  basestring = str
-  unicode = None
-
-
-def is_string(s):
-  if sys.version_info[0] >= 3:
-    return isinstance(s, str)
-  return isinstance(s, basestring)
-
 
 def decode_with_fallback(data):
   """Try to decode DATA as utf-8; if that doesn't work, fall back to latin-1.
@@ -34,34 +14,23 @@ def decode_with_fallback(data):
   This combination should cover every possible byte string, as latin-1 covers
   every possible single byte.
   """
-  if sys.version_info[0] >= 3:
-    if isinstance(data, bytes):
-      try:
-        return data.decode("utf-8")
-      except UnicodeDecodeError:
-        return data.decode("latin-1")
-    else:
-      return str(data)
-  elif isinstance(data, str):
-    return unicode(data, "utf-8")  # utf-8 is a safe assumption
-  elif not isinstance(data, unicode):
-    return unicode(str(data))
-  return data
+  if isinstance(data, bytes):
+    try:
+      return data.decode("utf-8")
+    except UnicodeDecodeError:
+      return data.decode("latin-1")
+  else:
+    return str(data)
 
 
 def getoutput(command, timeout=None):
   """Run command, check it succeeded, and return its stdout as a string."""
-  proc = Popen(command, shell=is_string(command), stdout=PIPE, stderr=PIPE)
+  proc = Popen(command, shell=isinstance(command, str), stdout=PIPE, stderr=PIPE)
   try:
     stdout, stderr = proc.communicate(timeout=timeout)
   except TimeoutExpired:
     warning("Process %r timed out; terminated", command)
     proc.terminate()
-    stdout, stderr = proc.communicate()
-  except TypeError:
-    # On Python 2, we don't have the timeout= parameter. However, "regular"
-    # users shouldn't be running under Python 2 any more, so just don't timeout
-    # there and let the admins handle it manually.
     stdout, stderr = proc.communicate()
   dieOnError(proc.returncode, "Command %s failed with code %d: %s" %
              (command, proc.returncode, decode_with_fallback(stderr)))
@@ -70,17 +39,12 @@ def getoutput(command, timeout=None):
 
 def getstatusoutput(command, timeout=None):
   """Run command and return its return code and output (stdout and stderr)."""
-  proc = Popen(command, shell=is_string(command), stdout=PIPE, stderr=STDOUT)
+  proc = Popen(command, shell=isinstance(command, str), stdout=PIPE, stderr=STDOUT)
   try:
     merged_output, _ = proc.communicate(timeout=timeout)
   except TimeoutExpired:
     warning("Process %r timed out; terminated", command)
     proc.terminate()
-    merged_output, _ = proc.communicate()
-  except TypeError:
-    # On Python 2, we don't have the timeout= parameter. However, "regular"
-    # users shouldn't be running under Python 2 any more, so just don't timeout
-    # there and let the admins handle it manually.
     merged_output, _ = proc.communicate()
   merged_output = decode_with_fallback(merged_output)
   # Strip a single trailing newline, if one exists, to match the behaviour of
@@ -91,7 +55,7 @@ def getstatusoutput(command, timeout=None):
 
 
 def execute(command, printer=debug, timeout=None):
-  popen = Popen(command, shell=is_string(command), stdout=PIPE, stderr=STDOUT)
+  popen = Popen(command, shell=isinstance(command, str), stdout=PIPE, stderr=STDOUT)
   start_time = time.time()
   for line in iter(popen.stdout.readline, b""):
     printer("%s", decode_with_fallback(line).strip("\n"))
