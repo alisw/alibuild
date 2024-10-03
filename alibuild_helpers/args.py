@@ -107,6 +107,8 @@ def doParseArgs():
                                   "in multiple packages. The comment will only be stored if "
                                   "PACKAGE is compiled or downloaded during this run; if it "
                                   "already exists, this does not happen."))
+  build_parser.add_argument("--only-deps", dest="onlyDeps", default=False, action="store_true",
+                            help="Only build dependencies, not the main package (e.g. for caching)")
 
   build_docker = build_parser.add_argument_group(title="Build inside a container", description="""\
   Builds can be done inside a Docker container, to make it easier to get a
