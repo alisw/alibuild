@@ -424,6 +424,10 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
     filename = taps.get(pkg_filename, "%s/%s.sh" % (configDir, pkg_filename))
     err, spec, recipe = parseRecipe(getRecipeReader(filename, configDir))
     dieOnError(err, err)
+    # Unless there was an error, both spec and recipe should be valid.
+    # otherwise the error should have been caught above.
+    assert(spec is not None)
+    assert(recipe is not None)
     dieOnError(spec["package"].lower() != pkg_filename,
                "%s.sh has different package field: %s" % (p, spec["package"]))
 
