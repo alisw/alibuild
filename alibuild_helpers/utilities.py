@@ -488,28 +488,32 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
         else:
           # The check printed the name of a replacement; use it.
           key = match.group("key").strip()
-          try:
-            replacement = spec["prefer_system_replacement_specs"][key]
-          except KeyError:
-            dieOnError(True, "Could not find named replacement spec for "
-                       "%s: %s" % (spec["package"], key))
+          replacement = None
+          for replacement_matcher in spec["prefer_system_replacement_specs"]:
+            if re.match(replacement_matcher, key):
+              replacement = spec["prefer_system_replacement_specs"][replacement_matcher]
+              break
+          dieOnError(replacement is None, "Could not find named replacement spec for "
+                     "%s: %s" % (spec["package"], key))
+          assert(replacement)
+          # We must keep the package name the same, since it is used to
+          # specify dependencies.
+          replacement["package"] = spec["package"]
+          # The version is required for all specs. What we put there will
+          # influence the package's hash, so allow the user to override it.
+          replacement.setdefault("version", requested_version)
+          spec = replacement
+          # Allows generalising the version based on the actual key provided
+          spec["version"] = spec["version"].replace("%(key)s", key)
+          recipe = replacement.get("recipe", "")
+          # If there's an explicitly-specified recipe, we're still building
+          # the package. If not, aliBuild will still "build" it, but it's
+          # basically instantaneous, so report to the user that we're taking
+          # it from the system.
+          if recipe:
+            ownPackages.add(spec["package"])
           else:
-            # We must keep the package name the same, since it is used to
-            # specify dependencies.
-            replacement["package"] = spec["package"]
-            # The version is required for all specs. What we put there will
-            # influence the package's hash, so allow the user to override it.
-            replacement.setdefault("version", requested_version)
-            spec = replacement
-            recipe = replacement.get("recipe", "")
-            # If there's an explicitly-specified recipe, we're still building
-            # the package. If not, aliBuild will still "build" it, but it's
-            # basically instantaneous, so report to the user that we're taking
-            # it from the system.
-            if recipe:
-              ownPackages.add(spec["package"])
-            else:
-              systemPackages.add(spec["package"])
+            systemPackages.add(spec["package"])
 
     dieOnError(("system_requirement" in spec) and recipe.strip("\n\t "),
                "System requirements %s cannot have a recipe" % spec["package"])
