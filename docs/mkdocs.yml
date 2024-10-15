@@ -30,6 +30,7 @@ markdown_extensions:
       permalink: "#"
 
 plugins:
+  - search
   - redirects:
       redirect_maps:
         'o2-tutorial.html': 'https://alice-doc.github.io/alice-analysis-tutorial/building/'
