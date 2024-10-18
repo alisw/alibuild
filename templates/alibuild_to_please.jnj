@@ -1,0 +1,63 @@
+# A alibuild template to convert the alidist recipes to
+# the please build system. While not fully functional, it serves
+# as explanatory example on how one can use templates to
+# extract informations from alidist, without having to instrument
+# alibuild itself.
+#
+# Use with:
+#
+# cat alibuild_to_please.jnj | python3 alibuild/aliBuild build lz4 --defaults o2 --debug --no-system --plugin templating --no-system --no-local alibuild-recipe-tools > opendata/BUILD.plz
+#
+{% for name, spec in specs.items() %}
+
+{% if spec.source is defined %}
+# {{ spec.source is defined  }}
+new_http_archive(
+  name = "download_{{name}}",
+  urls = ["{{spec.source}}/archive/refs/tags/{{spec.tag}}.tar.gz"],
+  )
+{% endif %}
+
+genrule(
+    name = "build_{{name}}",
+    output_dirs = ["_out"],
+    outs = [
+{% if spec.tools is defined %}
+{% for tool in spec.tools%}
+      "_out/{{tool}}",
+{% endfor %}
+{% endif %}
+{% if spec.tools is defined %}
+{% for lib in spec.libs%}
+      "_out/{{lib}}",
+{% endfor %}
+{% endif %}
+    ],
+{% if spec.source is defined %}
+    srcs = [":download_{{name}}"],
+{% endif %}
+    deps = [
+{% for build_require_name in spec.build_requires %}
+      ":build_{{build_require_name}}",{% endfor %}
+    ],
+    cmd = """
+      PKGNAME="{{name}}"
+      PKGVERSION="{{spec.version}}"
+      PKGREVISION="{{spec.revision}}"
+      PKGHASH="{{spec.package_hash}}"
+{% if spec.source is defined %}
+      SOURCEDIR="$PWD/$SRCS/*"
+{% endif %}
+      INSTALLROOT="$PWD/_out"
+      BUILDDIR="$PWD/_build"
+      JOBS="10"
+      mkdir -p $BUILDDIR
+      pushd $BUILDDIR
+      set -e
+      {{ spec.recipe | replace('\$', '\\\\\\\\$')}}
+      mkdir -p $INSTALLROOT
+      touch $INSTALLROOT/.please-did-build
+      popd
+    """,
+  )
+{% endfor %}
