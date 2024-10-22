@@ -373,7 +373,7 @@ class CVMFSRemoteSync:
     ))
 
   def upload_symlinks_and_tarball(self, spec):
-    dieOnError(self.writeStore, "CVMFS backend does not support uploading directly")
+    dieOnError(True, "CVMFS backend does not support uploading directly")
 
 class S3RemoteSync:
   """Sync package build directory from and to S3 using s3cmd.
