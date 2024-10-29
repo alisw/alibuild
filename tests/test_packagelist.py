@@ -157,10 +157,14 @@ class ReplacementTestCase(unittest.TestCase):
     @mock.patch("bits_helpers.utilities.dieOnError")
     def test_missing_replacement_spec(self, mock_dieOnError):
         """Check an error is thrown when the replacement spec is not found."""
-        specs, systemPkgs, ownPkgs, failedReqs, validDefaults = \
-            getPackageListWithDefaults(["missing-spec"])
-        mock_dieOnError.assert_any_call(True, "Could not find named replacement "
-                                        "spec for missing-spec: missing_tag")
+        assert_msg = "Could not find named replacement spec for missing-spec: missing_tag"
+        # Change the behaviour from sys.exit to a regular exception. Without it
+        # we don't stop execution properly and other asserts might trigger
+        mock_dieOnError.side_effect = lambda cond, _: (_ for _ in ()).throw(Exception("dieOnError called")) if cond else None
+        with self.assertRaises(Exception, msg=assert_msg) as context:
+            specs, systemPkgs, ownPkgs, failedReqs, validDefaults = \
+                getPackageListWithDefaults(["missing-spec"])
+        self.assertEqual(str(context.exception), "dieOnError called", msg=assert_msg)
 
 
 @mock.patch("bits_helpers.utilities.getRecipeReader", new=MockReader)
