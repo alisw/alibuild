@@ -4,6 +4,7 @@ name: Release
 'on':
   release:
     types: [published]
+  workflow_dispatch:
 
 permissions:
   contents: read  # required for github.ref to be set
@@ -16,6 +17,8 @@ jobs:
     steps:
       - name: Checkout alibuild
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
