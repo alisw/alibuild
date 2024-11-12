@@ -12,30 +12,15 @@ from requests.exceptions import RequestException
 from alibuild_helpers.cmd import execute
 from alibuild_helpers.log import debug, info, error, dieOnError, ProgressPrint
 from alibuild_helpers.utilities import resolve_store_path, resolve_links_path, symlink
-
-
-def remote_from_url(read_url, write_url, architecture, work_dir, insecure=False):
-  """Parse remote store URLs and return the correct RemoteSync instance for them."""
-  if read_url.startswith("http"):
-    return HttpRemoteSync(read_url, architecture, work_dir, insecure)
-  if read_url.startswith("s3://"):
-    return S3RemoteSync(read_url, write_url, architecture, work_dir)
-  if read_url.startswith("b3://"):
-    return Boto3RemoteSync(read_url, write_url, architecture, work_dir)
-  if read_url.startswith("cvmfs://"):
-    return CVMFSRemoteSync(read_url, None, architecture, work_dir)
-  if read_url:
-    return RsyncRemoteSync(read_url, write_url, architecture, work_dir)
-  return NoRemoteSync()
-
+from typing import TypeAlias
 
 class NoRemoteSync:
   """Helper class which does not do anything to sync"""
-  def fetch_symlinks(self, spec):
+  def fetch_symlinks(self, spec) -> None:
     pass
-  def fetch_tarball(self, spec):
+  def fetch_tarball(self, spec) -> None:
     pass
-  def upload_symlinks_and_tarball(self, spec):
+  def upload_symlinks_and_tarball(self, spec) -> None:
     pass
 
 class PartialDownloadError(Exception):
@@ -47,7 +32,7 @@ class PartialDownloadError(Exception):
 
 
 class HttpRemoteSync:
-  def __init__(self, remoteStore, architecture, workdir, insecure):
+  def __init__(self, remoteStore: str, architecture: str, workdir: str, insecure: bool):
     self.remoteStore = remoteStore
     self.writeStore = ""
     self.architecture = architecture
@@ -233,7 +218,7 @@ class HttpRemoteSync:
               os.path.join(self.workdir, links_path, linkname))
 
   def upload_symlinks_and_tarball(self, spec):
-    pass
+    dieOnError(True, "HTTP backend does not support uploading directly")
 
 
 class RsyncRemoteSync:
@@ -691,3 +676,21 @@ class Boto3RemoteSync:
 
     self.s3.upload_file(Bucket=self.writeStore, Key=tar_path,
                         Filename=os.path.join(self.workdir, tar_path))
+
+RemoteSync: TypeAlias = HttpRemoteSync | S3RemoteSync | Boto3RemoteSync | CVMFSRemoteSync | RsyncRemoteSync | NoRemoteSync
+
+def remote_from_url(read_url: str, write_url: str, architecture: str, work_dir: str, insecure=False) -> RemoteSync:
+  """Parse remote store URLs and return the correct RemoteSync instance for them."""
+  if read_url.startswith("http"):
+    return HttpRemoteSync(read_url, architecture, work_dir, insecure)
+  if read_url.startswith("s3://"):
+    return S3RemoteSync(read_url, write_url, architecture, work_dir)
+  if read_url.startswith("b3://"):
+    return Boto3RemoteSync(read_url, write_url, architecture, work_dir)
+  if read_url.startswith("cvmfs://"):
+    return CVMFSRemoteSync(read_url, None, architecture, work_dir)
+  if read_url:
+    return RsyncRemoteSync(read_url, write_url, architecture, work_dir)
+  return NoRemoteSync()
+
+

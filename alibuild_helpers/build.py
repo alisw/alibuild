@@ -35,7 +35,7 @@ import sys
 import time
 
 
-def writeAll(fn, txt):
+def writeAll(fn: str, txt: str) -> None:
   f = open(fn, "w")
   f.write(txt)
   f.close()
@@ -983,7 +983,7 @@ def doBuild(args, parser):
       fp.close()
     except:
       from pkg_resources import resource_string
-      cmd_raw = resource_string("alibuild_helpers", 'build_template.sh')
+      cmd_raw = resource_string("alibuild_helpers", 'build_template.sh').decode()
 
     if args.docker:
       cachedTarball = re.sub("^" + workDir, "/sw", spec["cachedTarball"])
@@ -1077,7 +1077,7 @@ def doBuild(args, parser):
        args.develPrefix if "develPrefix" in args and spec["is_devel_pkg"] else spec["version"])
     )
     err = execute(build_command, printer=progress)
-    progress.end("failed" if err else "done", err)
+    progress.end("failed" if err else "done", bool(err))
     report_event("BuildError" if err else "BuildSuccess", spec["package"], " ".join((
       args.architecture,
       spec["version"],

@@ -2,7 +2,7 @@ from alibuild_helpers.git import git, Git
 from alibuild_helpers.utilities import getPackageList, parseDefaults, readDefaults, validateDefaults
 from alibuild_helpers.log import debug, error, warning, banner, info
 from alibuild_helpers.log import dieOnError
-from alibuild_helpers.workarea import cleanup_git_log, updateReferenceRepoSpec
+from alibuild_helpers.workarea import updateReferenceRepoSpec
 
 from os.path import join
 import os.path as path
@@ -23,8 +23,10 @@ def doInit(args):
          "--dry-run / -n specified. Doing nothing.", ",".join(x["name"] for x in pkgs))
     sys.exit(0)
   try:
-    path.exists(args.develPrefix) or os.mkdir(args.develPrefix)
-    path.exists(args.referenceSources) or os.makedirs(args.referenceSources)
+    if not path.exists(args.develPrefix):
+      os.mkdir(args.develPrefix)
+    if not path.exists(args.referenceSources):
+      os.makedirs(args.referenceSources)
   except OSError as e:
     error("%s", e)
     sys.exit(1)
@@ -66,9 +68,10 @@ def doInit(args):
 
   for p in pkgs:
     spec = specs.get(p["name"])
+    dieOnError(spec is None, "cannot find recipe for package %s" % p["name"])
+    assert spec
     spec["is_devel_pkg"] = False
     spec["scm"] = Git()
-    dieOnError(spec is None, "cannot find recipe for package %s" % p["name"])
     dest = join(args.develPrefix, spec["package"])
     writeRepo = spec.get("write_repo", spec.get("source"))
     dieOnError(not writeRepo, "package %s has no source field and cannot be developed" % spec["package"])
