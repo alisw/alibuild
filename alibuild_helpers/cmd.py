@@ -54,9 +54,10 @@ def getstatusoutput(command, timeout=None):
   return proc.returncode, merged_output
 
 
-def execute(command, printer=debug, timeout=None):
+def execute(command: str | list[str], printer=debug, timeout:int | None =None) -> int:
   popen = Popen(command, shell=isinstance(command, str), stdout=PIPE, stderr=STDOUT)
   start_time = time.time()
+  assert popen.stdout is not None, "Could not open stdout for command"
   for line in iter(popen.stdout.readline, b""):
     printer("%s", decode_with_fallback(line).strip("\n"))
     if timeout is not None and time.time() > start_time + timeout:

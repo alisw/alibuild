@@ -8,7 +8,7 @@ from os.path import join
 import os.path as path
 import os, sys
 
-def parsePackagesDefinition(pkgname):
+def parsePackagesDefinition(pkgname: str):
   return [ dict(zip(["name","ver"], y.split("@")[0:2]))
            for y in [ x+"@" for x in list(filter(lambda y: y, pkgname.split(","))) ] ]
 
