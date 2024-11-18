@@ -1119,8 +1119,7 @@ def doBuild(args, parser):
       safe_args = {
         "pkgname", "defaults", "architecture", "forceUnknownArch",
         "develPrefix", "jobs", "noSystem", "noDevel", "forceTracked", "plugin",
-        "disable", "annotate", "onlyDeps", "docker", "docker_extra_args",
-        "remoteStore"
+        "disable", "annotate", "onlyDeps", "docker"
           }
       args_str = " ".join(f"--{k}={v}" for k, v in vars(args).items() if v and k in safe_args)
       detected_arch = detectArch()
