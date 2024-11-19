@@ -4,8 +4,8 @@ from alibuild_helpers import __version__
 from alibuild_helpers.analytics import report_event
 from alibuild_helpers.log import debug, info, banner, warning
 from alibuild_helpers.log import dieOnError
-from alibuild_helpers.cmd import execute, DockerRunner, BASH, install_wrapper_script
-from alibuild_helpers.utilities import prunePaths, symlink, call_ignoring_oserrors, topological_sort
+from alibuild_helpers.cmd import execute, DockerRunner, BASH, install_wrapper_script, getstatusoutput
+from alibuild_helpers.utilities import prunePaths, symlink, call_ignoring_oserrors, topological_sort, detectArch
 from alibuild_helpers.utilities import resolve_store_path
 from alibuild_helpers.utilities import parseDefaults, readDefaults
 from alibuild_helpers.utilities import getPackageList, asList
@@ -1111,6 +1111,29 @@ def doBuild(args, parser):
       To update all development packages required for this build it is usually sufficient to do:
       """)
       buildErrMsg += "".join("\n  ( cd %s && git pull --rebase )" % dp for dp in updatablePkgs)
+
+    # Gather build info for the error message
+    try:
+      safe_args = {
+        "pkgname", "defaults", "architecture", "forceUnknownArch",
+        "develPrefix", "jobs", "noSystem", "noDevel", "forceTracked", "plugin",
+        "disable", "annotate", "onlyDeps", "docker"
+          }
+      args_str = " ".join(f"--{k}={v}" for k, v in vars(args).items() if v and k in safe_args)
+      detected_arch = detectArch()
+      buildErrMsg += dedent(f"""
+      Build info:
+      OS: {detected_arch}
+      Using aliBuild from alibuild@{__version__ or "unknown"} recipes in alidist@{os.environ["ALIBUILD_ALIDIST_HASH"][:10]}
+      Build arguments: {args_str}
+      """)
+
+      if detected_arch.startswith("osx"):
+        buildErrMsg += f'XCode version: {getstatusoutput("xcodebuild -version")[1]}'
+
+    except Exception as exc:
+      warning("Failed to gather build info", exc_info=exc)
+
 
     dieOnError(err, buildErrMsg.strip())
 
