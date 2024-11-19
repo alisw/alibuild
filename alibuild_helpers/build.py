@@ -414,8 +414,6 @@ def create_provenance_info(package, specs, args):
   def dependency_list(key):
     return [spec_info(specs[dep]) for dep in specs[package].get(key, ())]
 
-  a = os.environ["ALIBUILD_ALIDIST_HASH"]
-
   return json.dumps({
     "comment": args.annotate.get(package),
     "alibuild_version": __version__,
