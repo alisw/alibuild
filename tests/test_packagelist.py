@@ -154,17 +154,20 @@ class ReplacementTestCase(unittest.TestCase):
         self.assertNotIn("with-replacement-recipe", systemPkgs)
         self.assertIn("with-replacement-recipe", ownPkgs)
 
-    @mock.patch("bits_helpers.utilities.dieOnError")
-    def test_missing_replacement_spec(self, mock_dieOnError):
-        """Check an error is thrown when the replacement spec is not found."""
-        assert_msg = "Could not find named replacement spec for missing-spec: missing_tag"
-        # Change the behaviour from sys.exit to a regular exception. Without it
-        # we don't stop execution properly and other asserts might trigger
-        mock_dieOnError.side_effect = lambda cond, _: (_ for _ in ()).throw(Exception("dieOnError called")) if cond else None
-        with self.assertRaises(Exception, msg=assert_msg) as context:
-            specs, systemPkgs, ownPkgs, failedReqs, validDefaults = \
-                getPackageListWithDefaults(["missing-spec"])
-        self.assertEqual(str(context.exception), "dieOnError called", msg=assert_msg)
+    @mock.patch("bits_helpers.utilities.warning")
+    def test_missing_replacement_spec(self, mock_warning):
+        """Check a warning is displayed when the replacement spec is not found."""
+        warning_msg = "falling back to building the package ourselves"
+        warning_exists = False
+        def side_effect(msg, *args, **kwargs):
+            nonlocal warning_exists
+            if warning_msg in str(msg):
+              warning_exists = True
+        mock_warning.side_effect = side_effect
+        specs, systemPkgs, ownPkgs, failedReqs, validDefaults = \
+            getPackageListWithDefaults(["missing-spec"])
+        self.assertTrue(warning_exists)
+
 
 
 @mock.patch("bits_helpers.utilities.getRecipeReader", new=MockReader)
