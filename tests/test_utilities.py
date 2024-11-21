@@ -226,6 +226,12 @@ class TestUtilities(unittest.TestCase):
     self.assertTrue(resolve_version(spec, "o2", "stream/v1", "v1"), "O2")
     spec["version"] = "NO%(defaults_upper)s"
     self.assertTrue(resolve_version(spec, "release", "stream/v1", "v1"), "NO")
+    spec_float_version = {"package": "test-pkg",
+      "version": 1.0,
+      "tag": "foo/bar",
+      "commit_hash": "000000000000000000000000000"
+    }
+    self.assertTrue(resolve_version(spec_float_version, "release", "stream/v1", "v1"), "NO")
 
 
 class TestTopologicalSort(unittest.TestCase):

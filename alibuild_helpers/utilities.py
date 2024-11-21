@@ -123,7 +123,7 @@ def resolve_version(spec, defaults, branch_basename, branch_stream):
   defaults_upper = defaults != "release" and "_" + defaults.upper().replace("-", "_") or ""
   commit_hash = spec.get("commit_hash", "hash_unknown")
   tag = str(spec.get("tag", "tag_unknown"))
-  return spec["version"] % {
+  return str(spec["version"]) % {
     "commit_hash": commit_hash,
     "short_hash": commit_hash[0:10],
     "tag": tag,
