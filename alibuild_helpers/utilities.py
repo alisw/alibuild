@@ -123,6 +123,15 @@ def resolve_version(spec, defaults, branch_basename, branch_stream):
   defaults_upper = defaults != "release" and "_" + defaults.upper().replace("-", "_") or ""
   commit_hash = spec.get("commit_hash", "hash_unknown")
   tag = str(spec.get("tag", "tag_unknown"))
+  version = spec["version"]
+  if not isinstance(version, str):
+    raise ValueError(
+      "Version for the package {package} must be a string, got {version}. "
+      "Please, make sure the version is quoted in the config file, e.g., \"1.0\"".format(
+        package=spec.get("package", "package_unknown"),
+        version=version
+      )
+    )
   return spec["version"] % {
     "commit_hash": commit_hash,
     "short_hash": commit_hash[0:10],
