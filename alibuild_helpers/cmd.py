@@ -8,7 +8,7 @@ from shlex import quote
 
 from alibuild_helpers.log import debug, warning, dieOnError
 
-def decode_with_fallback(data):
+def decode_with_fallback(data : bytes | str) -> str:
   """Try to decode DATA as utf-8; if that doesn't work, fall back to latin-1.
 
   This combination should cover every possible byte string, as latin-1 covers
@@ -23,7 +23,7 @@ def decode_with_fallback(data):
     return str(data)
 
 
-def getoutput(command, timeout=None):
+def getoutput(command:str, timeout=None) -> str:
   """Run command, check it succeeded, and return its stdout as a string."""
   proc = Popen(command, shell=isinstance(command, str), stdout=PIPE, stderr=PIPE)
   try:
@@ -37,7 +37,7 @@ def getoutput(command, timeout=None):
   return decode_with_fallback(stdout)
 
 
-def getstatusoutput(command, timeout=None):
+def getstatusoutput(command:str, timeout: int | None = None) -> tuple[int, str]:
   """Run command and return its return code and output (stdout and stderr)."""
   proc = Popen(command, shell=isinstance(command, str), stdout=PIPE, stderr=STDOUT)
   try:
