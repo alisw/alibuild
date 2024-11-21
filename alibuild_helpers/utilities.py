@@ -132,7 +132,7 @@ def resolve_version(spec, defaults, branch_basename, branch_stream):
         version=version
       )
     )
-  return spec["version"] % {
+  return version % {
     "commit_hash": commit_hash,
     "short_hash": commit_hash[0:10],
     "tag": tag,
