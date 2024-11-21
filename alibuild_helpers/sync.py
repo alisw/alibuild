@@ -218,7 +218,7 @@ class HttpRemoteSync:
               os.path.join(self.workdir, links_path, linkname))
 
   def upload_symlinks_and_tarball(self, spec):
-    dieOnError(True, "HTTP backend does not support uploading directly")
+    pass
 
 
 class RsyncRemoteSync:
