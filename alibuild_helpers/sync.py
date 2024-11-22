@@ -12,7 +12,7 @@ from requests.exceptions import RequestException
 from alibuild_helpers.cmd import execute
 from alibuild_helpers.log import debug, info, error, dieOnError, ProgressPrint
 from alibuild_helpers.utilities import resolve_store_path, resolve_links_path, symlink
-from typing import TypeAlias
+from typing import Union
 
 class NoRemoteSync:
   """Helper class which does not do anything to sync"""
@@ -677,7 +677,7 @@ class Boto3RemoteSync:
     self.s3.upload_file(Bucket=self.writeStore, Key=tar_path,
                         Filename=os.path.join(self.workdir, tar_path))
 
-RemoteSync: TypeAlias = HttpRemoteSync | S3RemoteSync | Boto3RemoteSync | CVMFSRemoteSync | RsyncRemoteSync | NoRemoteSync
+RemoteSync = Union[HttpRemoteSync, S3RemoteSync, Boto3RemoteSync, CVMFSRemoteSync, RsyncRemoteSync, NoRemoteSync]
 
 def remote_from_url(read_url: str, write_url: str, architecture: str, work_dir: str, insecure=False) -> RemoteSync:
   """Parse remote store URLs and return the correct RemoteSync instance for them."""

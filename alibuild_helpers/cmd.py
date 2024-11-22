@@ -5,10 +5,11 @@ from subprocess import Popen, PIPE, STDOUT
 from textwrap import dedent
 from subprocess import TimeoutExpired
 from shlex import quote
+from typing import Union, Tuple, List
 
 from alibuild_helpers.log import debug, warning, dieOnError
 
-def decode_with_fallback(data : bytes | str) -> str:
+def decode_with_fallback(data : Union[bytes, str]) -> str:
   """Try to decode DATA as utf-8; if that doesn't work, fall back to latin-1.
 
   This combination should cover every possible byte string, as latin-1 covers
@@ -37,7 +38,7 @@ def getoutput(command:str, timeout=None) -> str:
   return decode_with_fallback(stdout)
 
 
-def getstatusoutput(command:str, timeout: int | None = None) -> tuple[int, str]:
+def getstatusoutput(command:str, timeout: Union[int, None] = None) -> Tuple[int, str]:
   """Run command and return its return code and output (stdout and stderr)."""
   proc = Popen(command, shell=isinstance(command, str), stdout=PIPE, stderr=STDOUT)
   try:
@@ -54,7 +55,7 @@ def getstatusoutput(command:str, timeout: int | None = None) -> tuple[int, str]:
   return proc.returncode, merged_output
 
 
-def execute(command: str | list[str], printer=debug, timeout:int | None =None) -> int:
+def execute(command: Union[str, List[str]], printer=debug, timeout:Union[int, None] =None) -> int:
   popen = Popen(command, shell=isinstance(command, str), stdout=PIPE, stderr=STDOUT)
   start_time = time.time()
   assert popen.stdout is not None, "Could not open stdout for command"
