@@ -471,14 +471,14 @@ class Boto3RemoteSync:
   time.
   """
 
-  def __init__(self, remoteStore, writeStore, architecture, workdir):
+  def __init__(self, remoteStore, writeStore, architecture, workdir) -> None:
     self.remoteStore = re.sub("^b3://", "", remoteStore)
     self.writeStore = re.sub("^b3://", "", writeStore)
     self.architecture = architecture
     self.workdir = workdir
     self._s3_init()
 
-  def _s3_init(self):
+  def _s3_init(self) -> None:
     # This is a separate method so that we can patch it out for unit tests.
     # Import boto3 here, so that if we don't use this remote store, we don't
     # have to install it in the first place.
@@ -515,7 +515,7 @@ class Boto3RemoteSync:
       raise
     return True
 
-  def fetch_tarball(self, spec):
+  def fetch_tarball(self, spec) -> None:
     debug("Updating remote store for package %s with hashes %s", spec["package"],
           ", ".join(spec["remote_hashes"]))
 
@@ -553,7 +553,7 @@ class Boto3RemoteSync:
     debug("Remote has no tarballs for %s with hashes %s", spec["package"],
           ", ".join(spec["remote_hashes"]))
 
-  def fetch_symlinks(self, spec):
+  def fetch_symlinks(self, spec) -> None:
     from botocore.exceptions import ClientError
     links_path = resolve_links_path(self.architecture, spec["package"])
     os.makedirs(os.path.join(self.workdir, links_path), exist_ok=True)

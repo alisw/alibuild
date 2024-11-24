@@ -566,7 +566,7 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
 
 
 class Hasher:
-  def __init__(self):
+  def __init__(self) -> None:
     self.h = hashlib.sha1()
   def __call__(self, txt):
     if not type(txt) == bytes:

@@ -87,7 +87,7 @@ class ProgressPrint:
     self.lasttime = time.time()
     sys.stderr.flush()
 
-  def erase(self):
+  def erase(self) -> None:
     nerase = len(self.STAGES[self.count]) if self.count > -1 else 0
     if self.percent > -1:
       nerase = nerase + 7
