@@ -1,6 +1,9 @@
 # This file is needed to package build_template.sh.
 
 # Single-source a PEP440-compliant version using setuptools_scm.
+
+from typing import Optional
+__version__ : Optional[str]
 try:
     # This is an sdist or wheel, and it's properly installed.
     from alibuild_helpers._version import version as __version__
