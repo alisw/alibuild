@@ -9,6 +9,7 @@ import unittest
 from unittest.mock import call, patch, MagicMock, DEFAULT
 from io import StringIO
 from collections import OrderedDict
+from typing import Dict
 
 from alibuild_helpers.utilities import parseRecipe, resolve_tag
 from alibuild_helpers.build import doBuild, storeHashes, generate_initdotsh
@@ -130,7 +131,7 @@ def dummy_git(args, directory=".", check=True, prompt=True):
     }[(tuple(args), directory, check)]
 
 
-TIMES_ASKED = {}
+TIMES_ASKED : Dict[str, int] = {}
 
 
 def dummy_open(x, mode="r", encoding=None, errors=None):
