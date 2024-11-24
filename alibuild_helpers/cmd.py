@@ -42,12 +42,12 @@ def getstatusoutput(command:str, timeout: Union[int, None] = None) -> Tuple[int,
   """Run command and return its return code and output (stdout and stderr)."""
   proc = Popen(command, shell=isinstance(command, str), stdout=PIPE, stderr=STDOUT)
   try:
-    merged_output, _ = proc.communicate(timeout=timeout)
+    merged_output_bytes, _ = proc.communicate(timeout=timeout)
   except TimeoutExpired:
     warning("Process %r timed out; terminated", command)
     proc.terminate()
-    merged_output, _ = proc.communicate()
-  merged_output = decode_with_fallback(merged_output)
+    merged_output_bytes, _ = proc.communicate()
+  merged_output = decode_with_fallback(merged_output_bytes)
   # Strip a single trailing newline, if one exists, to match the behaviour of
   # subprocess.getstatusoutput.
   if merged_output.endswith("\n"):
