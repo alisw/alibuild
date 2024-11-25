@@ -3,10 +3,9 @@ import sys
 import re
 import time
 import datetime
+from typing import Any
 
-debug, error, warning, info, success = (None, None, None, None, None)
-
-def dieOnError(err, msg):
+def dieOnError(err: Any, msg: str) -> None:
   if err:
     error("%s", msg)
     sys.exit(1)
@@ -60,7 +59,7 @@ class ProgressPrint:
     self.lasttime = 0
     self.STAGES = ".", "..", "...", "....", ".....", "....", "...", ".."
     self.begin_msg = begin_msg
-    self.percent = -1
+    self.percent: float = -1
 
   def __call__(self, txt, *args):
     if logger.level <= logging.DEBUG or not sys.stdout.isatty():
@@ -88,7 +87,7 @@ class ProgressPrint:
     self.lasttime = time.time()
     sys.stderr.flush()
 
-  def erase(self):
+  def erase(self) -> None:
     nerase = len(self.STAGES[self.count]) if self.count > -1 else 0
     if self.percent > -1:
       nerase = nerase + 7

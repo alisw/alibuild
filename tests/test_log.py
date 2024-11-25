@@ -20,7 +20,7 @@ class LogTestCase(unittest.TestCase):
 
     @patch("sys.stdout.isatty", new=MagicMock(return_value=True))
     @patch("sys.stderr", new=MagicMock(return_value=True))
-    def test_ProgressPrint(self):
+    def test_ProgressPrint(self) -> None:
         """Make sure ProgressPrint updates correctly."""
         # ProgressPrint only parses messages every 0.5s. Trick it into thinking
         # the last message was <interval> seconds ago.

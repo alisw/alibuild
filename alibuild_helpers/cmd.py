@@ -5,10 +5,11 @@ from subprocess import Popen, PIPE, STDOUT
 from textwrap import dedent
 from subprocess import TimeoutExpired
 from shlex import quote
+from typing import Union, Tuple, List
 
 from alibuild_helpers.log import debug, warning, dieOnError
 
-def decode_with_fallback(data):
+def decode_with_fallback(data : Union[bytes, str]) -> str:
   """Try to decode DATA as utf-8; if that doesn't work, fall back to latin-1.
 
   This combination should cover every possible byte string, as latin-1 covers
@@ -23,7 +24,7 @@ def decode_with_fallback(data):
     return str(data)
 
 
-def getoutput(command, timeout=None):
+def getoutput(command:str, timeout: Union[int, None] = None) -> str:
   """Run command, check it succeeded, and return its stdout as a string."""
   proc = Popen(command, shell=isinstance(command, str), stdout=PIPE, stderr=PIPE)
   try:
@@ -37,16 +38,16 @@ def getoutput(command, timeout=None):
   return decode_with_fallback(stdout)
 
 
-def getstatusoutput(command, timeout=None):
+def getstatusoutput(command:str, timeout: Union[int, None] = None) -> Tuple[int, str]:
   """Run command and return its return code and output (stdout and stderr)."""
   proc = Popen(command, shell=isinstance(command, str), stdout=PIPE, stderr=STDOUT)
   try:
-    merged_output, _ = proc.communicate(timeout=timeout)
+    merged_output_bytes, _ = proc.communicate(timeout=timeout)
   except TimeoutExpired:
     warning("Process %r timed out; terminated", command)
     proc.terminate()
-    merged_output, _ = proc.communicate()
-  merged_output = decode_with_fallback(merged_output)
+    merged_output_bytes, _ = proc.communicate()
+  merged_output = decode_with_fallback(merged_output_bytes)
   # Strip a single trailing newline, if one exists, to match the behaviour of
   # subprocess.getstatusoutput.
   if merged_output.endswith("\n"):
@@ -54,9 +55,10 @@ def getstatusoutput(command, timeout=None):
   return proc.returncode, merged_output
 
 
-def execute(command, printer=debug, timeout=None):
+def execute(command: Union[str, List[str]], printer=debug, timeout:Union[int, None] =None) -> int:
   popen = Popen(command, shell=isinstance(command, str), stdout=PIPE, stderr=STDOUT)
   start_time = time.time()
+  assert popen.stdout is not None, "Could not open stdout for command"
   for line in iter(popen.stdout.readline, b""):
     printer("%s", decode_with_fallback(line).strip("\n"))
     if timeout is not None and time.time() > start_time + timeout:
