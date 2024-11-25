@@ -24,7 +24,7 @@ def decode_with_fallback(data : Union[bytes, str]) -> str:
     return str(data)
 
 
-def getoutput(command:str, timeout=None) -> str:
+def getoutput(command:str, timeout: Union[int, None] = None) -> str:
   """Run command, check it succeeded, and return its stdout as a string."""
   proc = Popen(command, shell=isinstance(command, str), stdout=PIPE, stderr=PIPE)
   try:

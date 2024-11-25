@@ -5,7 +5,7 @@ import time
 import datetime
 from typing import Any
 
-def dieOnError(err: Any, msg) -> None:
+def dieOnError(err: Any, msg: str) -> None:
   if err:
     error("%s", msg)
     sys.exit(1)
