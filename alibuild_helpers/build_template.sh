@@ -55,6 +55,7 @@ else
 fi
 export SOURCEDIR="$WORK_DIR/SOURCES/$PKGNAME/$PKGVERSION/$COMMIT_HASH"
 export BUILDDIR="$BUILDROOT/$PKGNAME"
+export PKGDIR=$WORK_DIR/../alidist # FIXME!
 
 rm -fr "$WORK_DIR/INSTALLROOT/$PKGHASH"
 # We remove the build directory only if we are not in incremental mode.
@@ -120,15 +121,20 @@ cd "$BUILDDIR"
 #   simply rebuild as usual.
 # - In case we have a cached tarball, we skip the build and expand it, change
 #   the relocation script so that it takes into account the new location.
+
+function Run() { # dummy function
+    true
+}
+
 if [[ "$CACHED_TARBALL" == "" && ! -f $BUILDROOT/log ]]; then
   set -o pipefail
-  (set -x; unset DYLD_LIBRARY_PATH; source "$WORK_DIR/SPECS/$ARCHITECTURE/$PKGNAME/$PKGVERSION-$PKGREVISION/$PKGNAME.sh" 2>&1) | tee "$BUILDROOT/log"
+  (set -x; unset DYLD_LIBRARY_PATH; source "$WORK_DIR/SPECS/$ARCHITECTURE/$PKGNAME/$PKGVERSION-$PKGREVISION/$PKGNAME.sh"; Run $* 2>&1) | tee "$BUILDROOT/log"
 elif [[ "$CACHED_TARBALL" == "" && $INCREMENTAL_BUILD_HASH != "0" && -f "$BUILDDIR/.build_succeeded" ]]; then
   set -o pipefail
   (%(incremental_recipe)s) 2>&1 | tee "$BUILDROOT/log"
 elif [[ "$CACHED_TARBALL" == "" ]]; then
   set -o pipefail
-  (set -x; unset DYLD_LIBRARY_PATH; source "$WORK_DIR/SPECS/$ARCHITECTURE/$PKGNAME/$PKGVERSION-$PKGREVISION/$PKGNAME.sh" 2>&1) | tee "$BUILDROOT/log"
+  (set -x; unset DYLD_LIBRARY_PATH; source "$WORK_DIR/SPECS/$ARCHITECTURE/$PKGNAME/$PKGVERSION-$PKGREVISION/$PKGNAME.sh"; Run $* 2>&1) | tee "$BUILDROOT/log"
 else
   # Unpack the cached tarball in the $INSTALLROOT and remove the unrelocated
   # files.

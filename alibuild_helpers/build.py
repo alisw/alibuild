@@ -40,8 +40,11 @@ import re
 import shutil
 import sys
 import time
+import subprocess
 
+from jinja2.sandbox import SandboxedEnvironment
 
+    
 def writeAll(fn, txt):
   f = open(fn, "w")
   f.write(txt)
@@ -456,6 +459,9 @@ def doBuild(args, parser):
   workDir = abspath(args.workDir)
   prunePaths(workDir)
 
+  buildTargets = " ".join(args.pkgname)
+  buildTargetsDone = []
+
   dieOnError(not exists(args.configDir),
              'Cannot find alidist recipes under directory "%s".\n'
              'Maybe you need to "cd" to the right directory or '
@@ -529,6 +535,9 @@ def doBuild(args, parser):
   if systemPackages:
     banner("aliBuild can take the following packages from the system and will not build them:\n  %s",
            ", ".join(systemPackages))
+    for pkg in systemPackages:
+      buildTargetsDone.append(pkg)
+
   if ownPackages:
     banner("The following packages cannot be taken from the system and will be built:\n  %s",
            ", ".join(ownPackages))
@@ -582,6 +591,8 @@ def doBuild(args, parser):
   # about them at the end of the build.
   untrackedFilesDirectories = []
 
+  buildTargets = []
+  
   # Resolve the tag to the actual commit ref
   for p in buildOrder:
     spec = specs[p]
@@ -678,8 +689,7 @@ def doBuild(args, parser):
     # If something requires or runtime_requires a package, then it's not a
     # pure build_requires only anymore, so we drop it from the list.
     spec["full_build_requires"] -= spec["full_runtime_requires"]
-
-  # Use the selected plugin to build, instead of the default behaviour, if a
+   # Use the selected plugin to build, instead of the default behaviour, if a
   # plugin was selected.
   if args.plugin != "legacy":
     return importlib.import_module("alibuild_helpers.%s_plugin" % args.plugin) \
@@ -701,6 +711,9 @@ def doBuild(args, parser):
     own=",".join(sorted(ownPackages)),
     deps=",".join(buildOrder[:-1]),
   ), args.architecture)
+  
+
+  buildList=[]
 
   while buildOrder:
     p = buildOrder[0]
@@ -894,6 +907,7 @@ def doBuild(args, parser):
       debug("Checking if devel package %s needs rebuild", spec["package"])
       if spec["devel_hash"]+spec["deps_hash"] == spec["old_devel_hash"]:
         info("Development package %s does not need rebuild", spec["package"])
+        buildTargetsDone.append(spec["package"])
         buildOrder.pop(0)
         continue
 
@@ -919,6 +933,7 @@ def doBuild(args, parser):
       if "obsolete_tarball" in spec:
         unlink(realpath(spec["obsolete_tarball"]))
         unlink(spec["obsolete_tarball"])
+      buildTargetsDone.append(spec["package"])
       buildOrder.pop(0)
       # We can now delete the INSTALLROOT and BUILD directories,
       # assuming the package is not a development one. We also can
@@ -1058,54 +1073,110 @@ def doBuild(args, parser):
       os.environ.update(buildEnvironment)
       build_command = "%s -e -x %s/build.sh 2>&1" % (BASH, quote(scriptDir))
 
-    debug("Build command: %s", build_command)
-    progress = ProgressPrint(
-      ("Unpacking %s@%s" if cachedTarball else
-       "Compiling %s@%s (use --debug for full output)") %
-      (spec["package"],
-       args.develPrefix if "develPrefix" in args and spec["is_devel_pkg"] else spec["version"])
-    )
-    err = execute(build_command, printer=progress)
-    progress.end("failed" if err else "done", err)
-    report_event("BuildError" if err else "BuildSuccess", spec["package"], " ".join((
+    benv  = ""
+    for val in buildEnvironment:
+      benv += val[0] +"='"+val[1]+"' "
+    breq  = " ".join([str(element) + ".build" for element in spec["full_requires"]])
+    buildTargets.append(spec["package"])
+    buildList.append((p,build_command,buildEnvironment,cachedTarball,benv,breq))
+    buildOrder.pop(0)
+
+  if args.makeflow:
+    mFlow = "%s/makeflow" % (dirname(realpath(__file__)))
+    mfDir = join(workDir, "BUILD", spec["hash"], "flow")
+    mfFile = mfDir + "/Makeflow"
+    mfCmd = "(cd %s; %s --clean; %s)" % (mfDir, mFlow,mFlow)  
+    makedirs(mfDir, exist_ok=True)
+    jnj = ""
+    try:
+      fp = open(dirname(realpath(__file__))+'/Makeflow.jnj', 'r')
+      jnj = fp.read()
+      fp.close()
+    except:
+      from pkg_resources import resource_string
+      jnj = resource_string("alibuild_helpers", 'Makeflow.jnj')
+    with open(mfFile, 'w') as mf:
+      mf.write (SandboxedEnvironment(autoescape=False)
+               .from_string(jnj)
+               .render(specs=specs, args=args, ToDo=buildList, Done=buildTargetsDone)
+              )
+    for (p, build_command, buildEnvironment, cachedTarball, benv,breq) in buildList:
+      spec = specs[p]
+      print (
+        ("Unpacking %s@%s" if cachedTarball else
+         "Compiling %s@%s (use --debug for full output)") %
+        (spec["package"],
+         args.develPrefix if "develPrefix" in args and spec["is_devel_pkg"] else spec["version"])
+      )
+    child = subprocess.run(mfCmd, shell=True, capture_output=True, text=True)
+    err = child.returncode
+    print(err,child.stdout)
+    if(err):
+      print(child.stdout)
+    #err = execute(mfCmd, printer=progress)
+    print("failed" if err else "done", err)
+    buildErrMsg = dedent("""\
+      Error while executing {cmd} on `{h}'.
+      Log can be found in {w}/log
+      Please upload it to CERNBox/Dropbox if you intend to request support.
+      """).format(
+        h=socket.gethostname(),
+        cmd=mfCmd,
+        w=mfDir
+      )
+    dieOnError(err, buildErrMsg.strip())
+  else:
+    for (p, build_command, buildEnvironment,cachedTarball,benv,breq) in buildList:
+      spec = specs[p]
+      os.environ.update(buildEnvironment)
+      debug("Build command: %s", build_command)
+      progress = ProgressPrint(
+        ("Unpacking %s@%s" if cachedTarball else
+         "Compiling %s@%s (use --debug for full output)") %
+        (spec["package"],
+         args.develPrefix if "develPrefix" in args and spec["is_devel_pkg"] else spec["version"])
+      )
+
+      err = execute(build_command, printer=progress)
+      progress.end("failed" if err else "done", err)
+      report_event("BuildError" if err else "BuildSuccess", spec["package"], " ".join((
       args.architecture,
       spec["version"],
       spec["commit_hash"],
       os.environ["ALIBUILD_ALIDIST_HASH"][:10],
-    )))
+       )))
 
-    updatablePkgs = [dep for dep in spec["requires"] if specs[dep]["is_devel_pkg"]]
-    if spec["is_devel_pkg"]:
-      updatablePkgs.append(spec["package"])
+      updatablePkgs = [dep for dep in spec["requires"] if specs[dep]["is_devel_pkg"]]
+      if spec["is_devel_pkg"]:
+        updatablePkgs.append(spec["package"])
 
-    buildErrMsg = dedent("""\
-    Error while executing {sd}/build.sh on `{h}'.
-    Log can be found in {w}/BUILD/{p}-latest{devSuffix}/log
-    Please upload it to CERNBox/Dropbox if you intend to request support.
-    Build directory is {w}/BUILD/{p}-latest{devSuffix}/{p}.
-    """).format(
-      h=socket.gethostname(),
-      sd=scriptDir,
-      w=abspath(args.workDir),
-      p=spec["package"],
-      devSuffix="-" + args.develPrefix
-      if "develPrefix" in args and spec["is_devel_pkg"]
-      else "",
-    )
-    if updatablePkgs:
-      buildErrMsg += dedent("""
-      Note that you have packages in development mode.
-      Devel sources are not updated automatically, you must do it by hand.\n
-      This problem might be due to one or more outdated devel sources.
-      To update all development packages required for this build it is usually sufficient to do:
-      """)
-      buildErrMsg += "".join("\n  ( cd %s && git pull --rebase )" % dp for dp in updatablePkgs)
-
-    dieOnError(err, buildErrMsg.strip())
+      buildErrMsg = dedent("""\
+      Error while executing {sd}/build.sh on `{h}'.
+      Log can be found in {w}/BUILD/{p}-latest{devSuffix}/log
+      Please upload it to CERNBox/Dropbox if you intend to request support.
+      Build directory is {w}/BUILD/{p}-latest{devSuffix}/{p}.
+      """).format(
+        h=socket.gethostname(),
+        sd=scriptDir,
+        w=abspath(args.workDir),
+        p=spec["package"],
+        devSuffix="-" + args.develPrefix
+        if "develPrefix" in args and spec["is_devel_pkg"]
+        else "",
+      )
+      if updatablePkgs:
+        buildErrMsg += dedent("""
+        Note that you have packages in development mode.
+        Devel sources are not updated automatically, you must do it by hand.\n
+        This problem might be due to one or more outdated devel sources.
+        To update all development packages required for this build it is usually sufficient to do:
+        """)
+        buildErrMsg += "".join("\n  ( cd %s && git pull --rebase )" % dp for dp in updatablePkgs)
+      dieOnError(err, buildErrMsg.strip())
 
     # We need to create 2 sets of links, once with the full requires,
     # once with only direct dependencies, since that's required to
-    # register packages in Alien.
+    # register packages.
     createDistLinks(spec, specs, args, syncHelper, "dist", "full_requires")
     createDistLinks(spec, specs, args, syncHelper, "dist-direct", "requires")
     createDistLinks(spec, specs, args, syncHelper, "dist-runtime", "full_runtime_requires")
