@@ -1082,8 +1082,8 @@ def doBuild(args, parser):
     buildOrder.pop(0)
 
   if args.makeflow:
-    mFlow = "%s/makeflow" % (dirname(realpath(__file__)))
-    mfDir = join(workDir, "BUILD", spec["hash"], "flow")
+    mFlow = "makeflow"
+    mfDir = join(workDir, "BUILD", spec["hash"], "makeflow")
     mfFile = mfDir + "/Makeflow"
     mfCmd = "(cd %s; %s --clean; %s)" % (mfDir, mFlow,mFlow)  
     makedirs(mfDir, exist_ok=True)
