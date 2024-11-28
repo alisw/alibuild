@@ -1,27 +1,27 @@
 .. image:: https://badge.fury.io/py/alibuild.svg
 .. image:: https://github.com/alisw/alibuild/actions/workflows/pr-check.yml/badge.svg?branch=master&event=push
 
-aliBuild
+bits
 ========
 
-A simple build tool for ALICE experiment software and its externals. Recipes
-for the externals and ALICE software are stored in
-`alidist <https://github.com/alisw/alidist>`_.
+Bits is a tool to build, install and package large software stacks. It originates from the aliBuild 
+tool, originally developed to simplify building and installing ALICE / ALFA software and attempts to
+ make it more general and usable for other communities that share similar problems and have overlapp
+ing dependencies.
 
 Instant gratification with::
 
-    pip install alibuild
-    git clone https://github.com/alisw/alidist.git
-    aliBuild build AliRoot
-    alienv enter AliRoot/latest
-    aliroot -b
+    pip install bits
+    mkdir repositories; cd repositories
+    git clone https://github.com/bitsorg/common.bits   
+    bits build ROOT
+    bits enter ROOT/latest
+    root -b
 
 Full documentation at:
-
-https://alisw.github.io/alibuild
 
 Pre-requisites
 ==============
 
-If you are using aliBuild directly from git clone, you should make sure
+If you are using bits directly from git clone, you should make sure
 you have `pyyaml` and `argparse` in your python distribution.
