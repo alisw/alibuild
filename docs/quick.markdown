@@ -1,11 +1,12 @@
 ---
-title: ALIBUILD
+title: BITS
 subtitle: Quick Start
 layout: main
 ---
 
-aliBuild is a tool to simplify building and installing ALICE / ALFA
-software. This is a quickstart Guide which will show you how to build
+Bits is a tool to build, install and package large software stacks. It originates from the aliBuild tool, originally developed to simplify building and installing ALICE / ALFA software and attempts to make it more general and usable for other communities that share similar problems and have overlapping dependencies.
+
+This is a quickstart Guide which will show you how to build
 and use a package, for extended documentation please have a look at the
 [user guide](user.html).
 
@@ -14,34 +15,29 @@ and use a package, for extended documentation please have a look at the
 The tool itself is available as a standard PyPi package. You
 can install it via:
 
-    pip install alibuild
+    pip install bits
 
 Alternatively, if you cannot use pip, you can checkout the Github repository and
 use it from there:
 
-    git clone https://github.com/alisw/alibuild.git
+    git clone https://github.com/bitsorg/bits.git
 
 This will provide you the tool itself. 
 
-In order to work you will need a set of recipes from a repository called
-[alidist](https://github.com/alisw/alidist.git). On the first invokation of
-`alibuild` the recipes will be downloaded and put in a `alidist` folder. 
-In case you need to use a special branch / repository you can always `git clone` 
-the repository yourself. By default alibuild will pickup the recipes found
-in `$PWD/alidist`.
+In order to work, you will need a set of recipes from a repository called
+[common.bits, hep.bits, alice.bits. fair.bits,..](see https://github.com/orgs/bitsorg/repositories). The recipes will be downloaded and put in a `repositories` folder on the first invocation of' bits'.
+If you need to use a particular branch / repository you can always `git clone` the repository yourself. By default `bits` will look for the recipes found in `$PWD/repositories` folder.
 
 ## Building a package
 
 Once you have obtained both repository, you can trigger a build via:
 
-    aliBuild [-d] -j <jobs> build <package>
+    bits [-d] -j <jobs> build <package>
 
-(or alibuild/aliBuild if you are working from sources) where:
+where:
 
 - `<package>`: is the name of the package you want to build, e.g.: 
-  - `AliRoot`
-  - `AliPhysics`
-  - `O2`
+  - `GEANT4`
   - `ROOT`
 - `-d` can be used to have verbose debug output.
 - `<jobs>` is the maximum number of parallel processes to be used for
@@ -49,7 +45,7 @@ Once you have obtained both repository, you can trigger a build via:
   omitted).
 
 If you need to modify the compile options, you can do so by looking at the
-recipes in your local `alidist` folder and amend them.
+recipes in your local `bits` folder and amend them.
 
 ## Results of a build
 
@@ -73,19 +69,18 @@ For example, on Centos7:
 ## Using the built package
 {: #loading-the-package-environment}
 
-Environment for packages built using aliBuild is managed by [Environment
-Modules](http://modules.sourceforge.net) and a wrapper script called alienv.
-Notice you will need the package `environment-modules` on Linux or `modules` on
-macOS for the following to work.
+Environment for packages built using bits is managed by [Environment
+Modules](http://modules.sourceforge.net). Notice you will need the package
+`environment-modules` on Linux or `modules` on macOS for the following to work.
 
-Assuming you are in the toplevel directory containing `alibuild`, `alidist` and
+Assuming you are in the toplevel directory containing `bits`, `repositories` and
 `sw` you can do:
 
-    alienv q
+    bits q
 
 to list the available packages, and:
 
-    alienv enter VO_ALICE@PackageA::VersionA[,VO_ALICE@PackageB::VersionB...]
+    bits enter [VO_ALICE@]PackageA::VersionA[,[VO_ALICE@]PackageB::VersionB...]
 
-to enter a shell with the appropriate environment set. To learn more about alienv you
+to enter a shell with the appropriate environment set. To learn more about `bits` you
 can also look at the [user guide](user.html#using-the-packages-you-have-built).

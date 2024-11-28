@@ -1,5 +1,5 @@
 ---
-title: ALIBUILD
+title: BITS
 subtile: About this tool
 layout: main
 ---
@@ -13,19 +13,12 @@ A simple build tool for ALICE experiment software and its externals. Recipes
 for the externals and ALICE software are stored in
 [alidist](https://github.com/alisw/alidist).
 
-You can install aliBuild on [Ubuntu][ubuntu], [MacOS][mac], [CentOS 7][centos7], [Alma 8][alma8], [Alma 9][alma9] and [Fedora][fedora].
-
-[centos7]: https://alice-doc.github.io/alice-analysis-tutorial/building/prereq-centos7.html
-[alma8]: https://alice-doc.github.io/alice-analysis-tutorial/building/prereq-centos8.html
-[alma9]: https://alice-doc.github.io/alice-analysis-tutorial/building/prereq-alma9.html
-[ubuntu]: https://alice-doc.github.io/alice-analysis-tutorial/building/prereq-ubuntu.html
-[mac]: https://alice-doc.github.io/alice-analysis-tutorial/building/prereq-macos.html
-[fedora]: https://alice-doc.github.io/alice-analysis-tutorial/building/prereq-fedora.html
+You can install bits on [Ubuntu][ubuntu], [MacOS][mac], [CentOS 7][centos7], [Alma 8][alma8], [Alma 9][alma9] and [Fedora][fedora].
 
 Then, build ALICE's software with:
 
     git clone https://github.com/alisw/alidist.git
-    aliBuild build O2Physics
+    bits build O2Physics
 
 For a more verbose documentation of what is happening have a look at
 the [quickstart guide](quick.html). See the [user guide](user.html)
@@ -42,12 +35,12 @@ package your own software.
       <br/><a href="reference.html">Read more</a>
     </div>
     <div class="pure-u-1-3"><h3>Reuses system tools</h3>
-      If desired, aliBuild will do its best to reuse what is available
+      If desired, bits will do its best to reuse what is available
       on the system, if compatible to what is found in the recipe.
       <br/><a href="user.html#controlling-which-system-packages-are-picked-up">Read more</a>
     </div>
     <div class="pure-u-1-3"><h3>Docker support</h3>
-      aliBuild allows builds to happen inside a docker container, so
+      bits allows builds to happen inside a docker container, so
       that you can develop on Mac and build on your production Linux
       platform.
       <br/><a href="user.html#running-in-docker">Read more</a>
@@ -55,13 +48,13 @@ package your own software.
 </div>
 <div class="pure-g">
     <div class="pure-u-1-3"><h3>Binary packages</h3>
-      aliBuild provides the ability to reuse binary packages which were
+      bits provides the ability to reuse binary packages which were
       previously centrally built, when they match the one that would be
       built locally.
       <br/><a href="user.html#using-precompiled-packages">Read more</a>
     </div>
     <div class="pure-u-1-3"><h3>Developer mode</h3>
-      Besides building and packaging your dependencies, aliBuild
+      Besides building and packaging your dependencies, bits
       provides you the ability to develop those via a simple git clone.
       <br/><a href="user.html#developing-packages-locally">Read more</a>
     </div>

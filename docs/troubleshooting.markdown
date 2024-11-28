@@ -1,5 +1,5 @@
 ---
-title: ALIBUILD
+title: BITS
 subtitle: Troubleshooting
 layout: main
 ---
@@ -12,21 +12,21 @@ build failed is `boost`, you will find its log under:
 
     sw/BUILD/boost-latest/log
 
-Note that when running `aliBuild --debug` the output is also echoed in your
+Note that when running `bits --debug` the output is also echoed in your
 current terminal.
 
 ## Common issues
 
 ### I have an error while compiling AliPhysics / AliRoot.
 
-Notice that in general this kind of errors are not really aliBuild
+Notice that in general this kind of errors are not really bits
 related, but they are genuine issues in either AliRoot and AliPhysics.
 To get the accurate and fastest feedback, the "best practice" is to do
 the following:
 
 - Make sure you have the latest version of both AliPhysics **and** AliRoot. If
   not, update to it and rebuild. Most likely someone else has already noticed
-  your problem and fixed it. aliBuild will actually remind you of doing so if
+  your problem and fixed it. bits will actually remind you of doing so if
   you are using master.
 - If you still have a message, read what the error log for your package
   is saying and try to extract the first error. In general you can simply
@@ -49,9 +49,9 @@ the following:
   Dropbox or alikes which allow to share files by providing a link to them,
   rather than by attachment.
 
-### What are the system prerequisites of alibuild?
+### What are the system prerequisites of bits?
 
-In principle aliBuild should now notify you for missing required system
+In principle bits should now notify you for missing required system
 dependencies and complain with a clear message if that is not the case. For
 example if you lack bz2 it will now tell you with the following message:
 
@@ -63,7 +63,7 @@ AliRoot it will also pick up your version. Failing that it will build it
 for you. You can have a look at what AliRoot will do by adding the `--dry-run`
 option to your build command, e.g.:
 
-    alibuild --dry-run <additional options you might have> build AliRoot
+    bits --dry-run <additional options you might have> build AliRoot
 
 will tell you something like:
 
@@ -93,19 +93,19 @@ it can happen this is not the case. If so, you can usually get it via:
 Alternatively you can try to install it by hand by following the [instructions
 here](https://pip.pypa.io/en/stable/installation/#supported-methods).
 
-### Package branch was updated, but aliBuild does not rebuild it
+### Package branch was updated, but bits does not rebuild it
 
 Some recipes specify branches in the `tag:` field instead of an actual tag. For
-such recipes, aliBuild must contact remote servers in order to determine what is
+such recipes, bits must contact remote servers in order to determine what is
 the latest commit for that branch. Since this is a corner case and the operation
 is expensive and slow, it is off by default, and cached information is used
-instead. Try to ask aliBuild to update its cached information by using the `-u`
+instead. Try to ask bits to update its cached information by using the `-u`
 or `--fetch-repos` switch.
 
 
-### AliEn broken after building with aliBuild
+### AliEn broken after building with bits
 
-If you are migrating from other ALICE build instructions to use aliBuild
+If you are ALICE user migrating from other build systems to use bits
 and you are running on OSX, it could happen that you encounter an error
 of the kind:
 
@@ -127,7 +127,7 @@ Load Error: Failed to load Dynamic link library /Users/me/alice/sw/osx_x86-64/Al
 E-P010_TAlien: Please fix your loader path environment variable to be able to load libRAliEn.so
 ```
 
-This happens because the new version of AliEn compiled by aliBuild is
+This happens because the new version of AliEn compiled by bits is
 incompatible with the old one. You can fix this issue by doing:
 
 1. Remove old alien token stuff from `/tmp` (e.g. `rm /tmp/gclient_env* /tmp/gclient_token* /tmp/x509*`)
@@ -137,29 +137,29 @@ incompatible with the old one. You can fix this issue by doing:
 
 and trying again.
 
-### aliBuild does not work on OSX with Python shipped with ANACONDA
+### bits does not work on OSX with Python shipped with ANACONDA
 
 If you are using ANACONDA (`which python` to verify), the old version of
-aliBuild had troubles with it. Upgrading to the latest version via:
+bits had troubles with it. Upgrading to the latest version via:
 
-    pip install --upgrade alibuild
+    pip install --upgrade bits
 
 or by doing `git pull` should fix the issue.
 
 
-### aliBuild does not pick up tool X from the sytem
+### bits does not pick up tool X from the sytem
 
-By default aliBuild prefers using tools from the system whenever
+By default bits prefers using tools from the system whenever
 possible. Examples of those tools are CMake, the GCC compiler or the
 autotools suite. If this does not happen even if you have it installed
-it means that aliBuild does not consider you system tool good enough to
+it means that bits does not consider you system tool good enough to
 be compatible with the one provided by the recipe. You can verify what
 happens during the system tool detection by running:
 
     aliDoctor <package name>
 
 
-### AliBuild fails with `cannot open file "AvailabilityMacros.h`
+### bits fails with `cannot open file "AvailabilityMacros.h`
 
 If your build fails with:
 
@@ -176,37 +176,37 @@ xcode-select --install
 
 ### I do not have privileges and I cannot install via pip
 
-If you do not have root privileges on your machine and `pip install alibuild`
+If you do not have root privileges on your machine and `pip install bits`
 fails, you have two options:
 
 - If your pip supports it, you can add the `--user` flag and that will install
-  alibuild in `~/.local`. I.e.:
+  bits in `~/.local`. I.e.:
 
-      pip install --user alibuild
+      pip install --user bits
 
 - If your pip is old or if you do not have pip at all on your system or
   you do not want to use pip for whatever reasons, you can still simply
   checkout the sources with:
 
-      git clone https://github.com/alisw/alibuild
-
-  and simply run alibuild by invoking `alibuild/aliBuild`.
+      https://github.com/bitsorg/bits.git
+ 
+  and simply run bits by invoking `bits/bits`.
 
 ### I am changing an uncommitted file in a development package, but it is not updated in the installation folder.
 
 If you add a file to a development package and the build recipe is
 able to handle uncommitted files, it will be copied the first time.
 
-However alibuild considers any untracked file as the same, and therefore unless
+However bits considers any untracked file as the same, and therefore unless
 the file is added or committed to the local clone of the development package any
 subsequent rebuild will ignore the changes. This can be worked around in two ways:
 
 1. You add the file to your local clone via git add / git commit
 2. You add an incremental_recipe which is able to handle uncommitted files
 
-What 1. does is to make alibuild aware of the changes of the new file, so you
+What 1. does is to make bits aware of the changes of the new file, so you
 will get a new build for each change to the file. What 2. does is to always
-execute the incremental recipe to refresh the installation folder on each aliBuild
+execute the incremental recipe to refresh the installation folder on each bits
 invokation, possibly updating untracked files if so specified in the recipe itself.
 
 ### How do I set compilation options for AliRoot and / or AliPhysics?
@@ -216,7 +216,7 @@ or as a matter of fact any packages you have two options:
 
 - If the package itself is one which you are developing locally, i.e.
   you have the checkout available, you can modify its CMakeFile, add
-  whatever options you like there and then issue again your aliBuild
+  whatever options you like there and then issue again your bits
   command.
 - On contrary, if you do not have a local checkout but you still want to
   modify it's compiler flags, you can edit the `alidist/aliroot.sh` recipe
@@ -224,13 +224,13 @@ or as a matter of fact any packages you have two options:
 
 Finally, for certain common options, e.g. debug flags, we provide a
 precooked configuration using so called [defaults](user.html#defaults).
-Simply add `--defaults debug` to your aliBuild flags and it will add
+Simply add `--defaults debug` to your buits flags and it will add
 debug flags to all your packages.
 
 ### AliPhysics takes very long time to build and builds things like autotools, GCC
 
 In order to build AliPhysics, a number of externals are required,
-including working autotools, boost, and GCC. While aliBuild tries it
+including working autotools, boost, and GCC. While buits tries it
 best to reuse whatever comes from the system, it will not complain when
 building unless one of the system dependencies is absolutely required
 (e.g. X11, perl). This might lead to the fact it will rebuild large
@@ -244,7 +244,7 @@ starting to build, so that they can get an overview of what will be
 picked up from the system and what not.
 
 Notice that if you change (either add or remove) your set of system
-dependencies, aliBuild will trigger a rebuild of whatever depends on
+dependencies, bits will trigger a rebuild of whatever depends on
 them, taking additional time, so make sure you do this when not pressed
 for a deadline.
 
@@ -252,20 +252,12 @@ for a deadline.
 
 When attempting to do `alienv` operations on shared (farm) installations you
 might get a number of `Permission denied` errors. In order to fix this problem
-you need to make sure that shared builds with `aliBuild` are always made by the
-same user. In addition after every `aliBuild` run the person who has run it has
+you need to make sure that shared builds with `buits` are always made by the
+same user. In addition after every `bits` run the person who has run it has
 to run the following command in order to generate all the correct modulefiles
 as seen by the users:
 
-    alienv q
-
-Users have to append the `--no-refresh` option to every `alienv` operation, for
-instance:
-
-    alienv --no-refresh enter AliPhysics/latest
-
-Note that the `--no-refresh` option is not necessary anymore starting from
-`v1.4.0.rc1`.
+    bits q
 
 ### Building on Windows Ubuntu environment does not work
 
@@ -289,22 +281,22 @@ if you still want to try, you can use the `--force-unknown-architecture` option 
 
 If you want to run on a system where you do not have global install rights, and
 the PyYAML package is not installed (e.g. lxplus), you can still do so by using
-the `--user` flag when you install with `pip`. This will install alibuild under
+the `--user` flag when you install with `pip`. This will install bits under
 `~/.local/bin`.
 
 This means that you need to do (only once):
 
-    pip install --user --upgrade alibuild
+    pip install --user --upgrade bits
 
 and then adapt you PATH to pickup the local installation, e.g. via:
 
     export PATH=~/.local/bin:$PATH
 
 
-### aliBuild keeps asking for my password
+### bits keeps asking for my password
 
 Some packages you may need to build have their source code in a protected repository on CERN GitLab.
-This means that you may be asked for a username and password when you run `aliBuild build`.
+This means that you may be asked for a username and password when you run `bits build`.
 See below for ways to avoid being prompted too often.
 
 #### SSH authentication

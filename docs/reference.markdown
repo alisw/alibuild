@@ -1,5 +1,5 @@
 ---
-title: ALIBUILD
+title: BITS
 subtitle: Recipe reference manual
 layout: main
 ---
@@ -81,7 +81,7 @@ The following entries are optional in the header:
     It's good practice to make sure that they are already patched, so that you
     can easily point to the actual sources used by the software.
   - `write_repo`: in case the repository URL to be used for developing is
-    different from the `source`, set this key. It is used by `aliBuild init`,
+    different from the `source`, set this key. It is used by `bits init`,
     which will initialise your local repository with the `upstream` remote
     pointing at this URL instead of the one in `source`.
   - `tag`: git reference in the above mentioned repository which points to the
@@ -153,7 +153,7 @@ The following entries are optional in the header:
     `build_requires`, and `alibuild-generate-module` won't pull in build
     requirements' modulefiles.
   - `force_rebuild`: set it to `true` to force re-running the build recipe every
-    time you invoke alibuild on it.
+    time you invoke bits on it.
   - `prefer_system_check`: a script which is used to determine whether
     or not the system equivalent of the package can be used. See also
     `prefer_system`. If the `--no-system` option is specified, this key is not
@@ -221,7 +221,7 @@ uppercased):
 
 ### Defaults
 
-aliBuild uses a special file, called `defaults-release.sh` which will be
+bits uses a special file, called `defaults-release.sh` which will be
 included as a build requires of any recipe. This is in general handy to
 specify common options like `CXXFLAGS` or dependencies. It's up to the
 recipe handle correctly the presence of these options.
@@ -253,7 +253,7 @@ If you want to add your own default, you should at least provide:
 - `LDFLAGS`: the `LDFLAGS` to use
 - `CMAKE_BUILD_TYPE`: the build type which needs to be used by cmake projects
 
-Besides specifying extra global variables, starting from aliBuild
+Besides specifying extra global variables, starting from bits
 1.4.0, it's also possible to use defaults to override metadata of other
 packages . This is done by specifying the `overrides` dictionary in the
 metadata of your defaults file. For example to switch between ROOT6 and
@@ -303,7 +303,7 @@ defaults.
 
 ## Relocation
 
-aliBuild supports relocating binary packages so that the scratch space used for
+bits supports relocating binary packages so that the scratch space used for
 builds (*e.g.* `/build`) and the actual installation folder (*i.e.*
 `/cvmfs/alice.cern.ch`) do not need to be the same. By design this is done
 automatically, and the user should not have to care about it. The procedure
@@ -316,14 +316,14 @@ The internal procedure is roughly as follows:
   `INSTALLROOT=<work-dir>/INSTALLROOT/<package-hash>/<architecture>/<package>/<version>-<revisions>`.
   This way we know that every file which contains `<package-hash>` needs to be
   relocated.
-* Once the build is completed, aliBuild looks for the above mentioned
+* Once the build is completed, bits looks for the above mentioned
   `<package-hash>` and generates a script in the `$INSTALLROOT/relocate-me.sh`
   which can be used to relocate the binary installation, once it has been
   unpacked.
 * The path under `<work-dir>/INSTALLROOT/<package-hash>` is tarred up in a
   binary tarball.
 
-When a tarball is installed, either because it was downloaded by aliBuild or by
+When a tarball is installed, either because it was downloaded by bits or by
 some other script (*e.g.* the CVMFS publisher, the following happens:
 
 * The tarball is expanded.
@@ -341,7 +341,7 @@ the actual revision of the package in the relocated file.
 
 ## Build environment
 
-Before each package is built, aliBuild will populate the environment with build
+Before each package is built, bits will populate the environment with build
 related information. For a complete list of those see
 [the body section](#the-body). After the build is done the user has access to
 the environment of the build by sourcing the
@@ -400,7 +400,7 @@ Please keep in mind the following recommendation when writing the modulefile:
   in a mode where system dependencies are used, we cannot rely on their
   presence.
 * Use `<package>_REVISION` to guard inclusion of extra dependencies. This will
-  make sure that only dependencies which were actually built via `aliBuild` will
+  make sure that only dependencies which were actually built via `bits` will
   be included in the modulefile.
 
 It's also now possible to generate automatically the initial part of the

@@ -1,5 +1,5 @@
 ---
-title: ALIBUILD
+title: BITS
 subtitle: User command line reference manual
 layout: main
 ---
@@ -9,16 +9,16 @@ layout: main
 For a quick start introduction, please look [here](./quick.html).
 
 ```
-aliBuild build [-h] [--defaults DEFAULT]
-               [-a ARCH] [--force-unknown-architecture]
-               [-z [DEVELPREFIX]] [-e ENVIRONMENT] [-j JOBS] [-u]
-               [--no-local PKGLIST] [--disable PACKAGE]
-               [--always-prefer-system | --no-system]
-               [--docker] [--docker-image IMAGE] [--docker-extra-args ARGLIST] [-v VOLUMES]
-               [--no-remote-store] [--remote-store STORE] [--write-store STORE] [--insecure] 
-               [-C DIR] [-w WORKDIR] [-c CONFIGDIR] [--reference-sources MIRRORDIR]
-               [--aggressive-cleanup] [--no-auto-cleanup]
-               PACKAGE [PACKAGE ...]
+bits build [-h] [--defaults DEFAULT]
+           [-a ARCH] [--force-unknown-architecture]
+           [-z [DEVELPREFIX]] [-e ENVIRONMENT] [-j JOBS] [-u]
+           [--no-local PKGLIST] [--disable PACKAGE]
+           [--always-prefer-system | --no-system]
+           [--docker] [--docker-image IMAGE] [--docker-extra-args ARGLIST] [-v VOLUMES]
+           [--no-remote-store] [--remote-store STORE] [--write-store STORE] [--insecure] 
+           [-C DIR] [-w WORKDIR] [-c CONFIGDIR] [--reference-sources MIRRORDIR]
+           [--aggressive-cleanup] [--no-auto-cleanup]
+           PACKAGE [PACKAGE ...]
 ```
 
 - `PACKAGE`: One of the packages in `CONFIGDIR`. May be specified multiple
