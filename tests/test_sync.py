@@ -9,8 +9,8 @@ try:
 except ImportError:
     from mock import patch, MagicMock   # Python 2
 
-from alibuild_helpers import sync
-from alibuild_helpers.utilities import resolve_links_path, resolve_store_path
+from bits_helpers import sync
+from bits_helpers.utilities import resolve_links_path, resolve_store_path
 
 
 ARCHITECTURE = "slc7_x86-64"
@@ -68,7 +68,7 @@ class MockRequest:
                 self._bytes_left -= toread
 
 
-@patch("alibuild_helpers.sync.ProgressPrint", new=MagicMock())
+@patch("bits_helpers.sync.ProgressPrint", new=MagicMock())
 class SyncTestCase(unittest.TestCase):
     def mock_get(self, url, *args, **kw):
         if NONEXISTENT_HASH in url:
@@ -86,15 +86,15 @@ class SyncTestCase(unittest.TestCase):
                                 {"name": tarball_name(BAD_SPEC)}])
         raise NotImplementedError(url)
 
-    @patch("alibuild_helpers.sync.open", new=lambda fn, mode: BytesIO())
+    @patch("bits_helpers.sync.open", new=lambda fn, mode: BytesIO())
     @patch("os.path.isfile", new=MagicMock(return_value=False))
     @patch("os.rename", new=MagicMock(return_value=None))
     @patch("os.makedirs", new=MagicMock(return_value=None))
     @patch("os.listdir", new=MagicMock(return_value=[]))
-    @patch("alibuild_helpers.sync.symlink", new=MagicMock(return_value=None))
-    @patch("alibuild_helpers.sync.execute", new=MagicMock(return_value=None))
-    @patch("alibuild_helpers.sync.debug")
-    @patch("alibuild_helpers.sync.error")
+    @patch("bits_helpers.sync.symlink", new=MagicMock(return_value=None))
+    @patch("bits_helpers.sync.execute", new=MagicMock(return_value=None))
+    @patch("bits_helpers.sync.debug")
+    @patch("bits_helpers.sync.error")
     @patch("requests.Session.get")
     def test_http_remote(self, mock_get, mock_error, mock_debug):
         """Test HTTPS remote store."""
@@ -140,8 +140,8 @@ class SyncTestCase(unittest.TestCase):
         mock_debug.assert_called_with("Nothing fetched for %s (%s)",
                                       MISSING_SPEC["package"], NONEXISTENT_HASH)
 
-    @patch("alibuild_helpers.sync.execute", new=lambda cmd, printer=None: 0)
-    @patch("alibuild_helpers.sync.os")
+    @patch("bits_helpers.sync.execute", new=lambda cmd, printer=None: 0)
+    @patch("bits_helpers.sync.os")
     def test_sync(self, mock_os):
         """Check NoRemoteSync, rsync:// and s3:// remote stores."""
         # file does not exist locally: force download
@@ -174,10 +174,10 @@ class SyncTestCase(unittest.TestCase):
 
 @unittest.skipIf(sys.version_info < (3, 6), "python >= 3.6 is required for boto3")
 @patch("os.makedirs", new=MagicMock(return_value=None))
-@patch("alibuild_helpers.sync.symlink", new=MagicMock(return_value=None))
-@patch("alibuild_helpers.sync.ProgressPrint", new=MagicMock())
-@patch("alibuild_helpers.log.error", new=MagicMock())
-@patch("alibuild_helpers.sync.Boto3RemoteSync._s3_init", new=MagicMock())
+@patch("bits_helpers.sync.symlink", new=MagicMock(return_value=None))
+@patch("bits_helpers.sync.ProgressPrint", new=MagicMock())
+@patch("bits_helpers.log.error", new=MagicMock())
+@patch("bits_helpers.sync.Boto3RemoteSync._s3_init", new=MagicMock())
 class Boto3TestCase(unittest.TestCase):
     """Check the b3:// remote is working properly."""
 
@@ -268,7 +268,7 @@ class Boto3TestCase(unittest.TestCase):
     @patch("os.path.exists", new=MagicMock(return_value=False))
     @patch("os.path.isfile", new=MagicMock(return_value=False))
     @patch("os.path.islink", new=MagicMock(return_value=False))
-    @patch("alibuild_helpers.sync.execute", new=MagicMock(return_value=0))
+    @patch("bits_helpers.sync.execute", new=MagicMock(return_value=0))
     def test_tarball_download(self):
         """Test boto3 behaviour when downloading tarballs from the remote."""
         b3sync = sync.Boto3RemoteSync(

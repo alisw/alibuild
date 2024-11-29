@@ -24,23 +24,23 @@ node {
   stage "Run tests"
   def build_script = '''
       (cd alibuild && git show && git log HEAD~5..)
-      alibuild/aliBuild --help
+      bits/bitsBuild --help
       rm -fr alidist
       git clone https://github.com/alisw/alidist
       CHANGED_FILES=`cd alibuild && git diff --name-only origin/$CHANGE_TARGET.. | sed -e 's|/.*||' | sort -u`
       for d in $CHANGED_FILES; do
         case $d in
-          # Changes in alibuild_helpers can we tested in isolation, so we
+          # Changes in bits_helpers can we tested in isolation, so we
           # do so.
-          alibuild_helpers|tests)
-            PYTHONPATH=alibuild python alibuild/tests/test_utilities.py
-            PYTHONPATH=alibuild python alibuild/tests/test_analytics.py
+          bits_helpers|tests)
+            PYTHONPATH=bits python bits/tests/test_utilities.py
+            PYTHONPATH=bits python bits/tests/test_analytics.py
             ;;
           # Changes to alibuild require a full rebuild to be validated. The
           # goal as usual is to fail fast.
           aliBuild)
-            alibuild/aliBuild -d build zlib
-            alibuild/aliBuild --reference-sources /build/mirror -d build AliRoot -n
+            bits/bitsBuild -d build zlib
+            bits/bitsBuild --reference-sources /build/mirror -d build AliRoot -n
             ;;
           # All the other changes we do not have tests right now.
           *) ;;
@@ -52,7 +52,7 @@ node {
         case $d in
           # Rebuild everything if aliBuild or build_template.sh changed
           aliBuild|*build_template.sh)
-            alibuild/aliBuild --reference-sources /build/mirror --remote-store rsync://repo.marathon.mesos/store/ -d build AliRoot
+            bits/bitsBuild --reference-sources /build/mirror --remote-store rsync://repo.marathon.mesos/store/ -d build AliRoot
             ;;
           # All the other changes we do not have tests right now.
           *) ;;

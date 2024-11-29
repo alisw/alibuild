@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = 'alibuild'
 dynamic = ['readme', 'version']
-description = 'ALICE Build Tool'
+description = 'Build Tool'
 keywords = ['HEP', 'ALICE']
 license = {text = 'GPL'}
 authors = [
@@ -38,14 +38,14 @@ dependencies = [
 homepage = 'https://alisw.github.io/alibuild'
 
 [scripts]
-aliBuild = {path = "aliBuild"}
-alienv = {path = "alienv"}
-aliDoctor = {path = "aliDoctor"}
-aliDeps = {path = "aliDeps"}
+alienv = {path = "bits"}
+bitsBuild = {path = "bitsBuild"}
+bitsDoctor = {path = "bitsDoctor"}
+bitsDeps = {path = "bitsDeps"}
 pb = {path = "pb"}
 
 [tool.setuptools_scm]
-write_to = "alibuild_helpers/_version.py"
+write_to = "bits_helpers/_version.py"
 
 [tool.setuptools.package-data]
-alibuild_helpers = ['build_template.sh']
+bits_helpers = ['build_template.sh']

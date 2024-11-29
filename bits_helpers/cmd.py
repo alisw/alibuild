@@ -14,7 +14,7 @@ try:
 except ImportError:
   from pipes import quote  # Python 2.7
 
-from alibuild_helpers.log import debug, warning, dieOnError
+from bits_helpers.log import debug, warning, dieOnError
 
 # Keep the linter happy
 if sys.version_info[0] >= 3:

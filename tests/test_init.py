@@ -12,7 +12,7 @@ try:
 except ImportError:
     from ordereddict import OrderedDict
 
-from alibuild_helpers.init import doInit, parsePackagesDefinition
+from bits_helpers.init import doInit, parsePackagesDefinition
 
 
 def dummy_exists(x):
@@ -40,9 +40,9 @@ class InitTestCase(unittest.TestCase):
                        [{'ver': '', 'name': 'AliRoot'},
                         {'ver': 'v5-08-16-01', 'name': 'AliPhysics'}])
 
-    @patch("alibuild_helpers.init.info")
-    @patch("alibuild_helpers.init.path")
-    @patch("alibuild_helpers.init.os")
+    @patch("bits_helpers.init.info")
+    @patch("bits_helpers.init.path")
+    @patch("bits_helpers.init.os")
     def test_doDryRunInit(self, mock_os, mock_path,  mock_info):
       fake_dist = {"repo": "alisw/alidist", "ver": "master"}
       args = Namespace(
@@ -59,14 +59,14 @@ class InitTestCase(unittest.TestCase):
       self.assertRaises(SystemExit, doInit, args)
       self.assertEqual(mock_info.mock_calls, [call('This will initialise local checkouts for %s\n--dry-run / -n specified. Doing nothing.', 'zlib,AliRoot')])
 
-    @patch("alibuild_helpers.init.banner")
-    @patch("alibuild_helpers.init.info")
-    @patch("alibuild_helpers.init.path")
-    @patch("alibuild_helpers.init.os")
-    @patch("alibuild_helpers.init.git")
-    @patch("alibuild_helpers.init.updateReferenceRepoSpec")
-    @patch("alibuild_helpers.utilities.open")
-    @patch("alibuild_helpers.init.readDefaults")
+    @patch("bits_helpers.init.banner")
+    @patch("bits_helpers.init.info")
+    @patch("bits_helpers.init.path")
+    @patch("bits_helpers.init.os")
+    @patch("bits_helpers.init.git")
+    @patch("bits_helpers.init.updateReferenceRepoSpec")
+    @patch("bits_helpers.utilities.open")
+    @patch("bits_helpers.init.readDefaults")
     def test_doRealInit(self, mock_read_defaults, mock_open, mock_update_reference, mock_git, mock_os, mock_path,  mock_info, mock_banner):
       fake_dist = {"repo": "alisw/alidist", "ver": "master"}
       mock_open.side_effect = lambda x: {

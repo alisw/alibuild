@@ -85,7 +85,7 @@ provides tarballs for the most common supported architectures.
 ### Customise aliBuild directories
 
 - `-C DIR`, `--chdir DIR`: Change to the specified directory before building.
-  Alternatively, set `ALIBUILD_CHDIR`. Default `.`.
+  Alternatively, set `BITS_CHDIR`. Default `.`.
 - `-w WORKDIR`, `--work-dir WORKDIR` The toplevel directory under which builds
   should be done and build results should be installed. Default `sw`.
 - `-c CONFIGDIR`, `--config-dir CONFIGDIR`: The directory containing build
@@ -340,11 +340,11 @@ server-side pull request checks).
 
 ## Generating a dependency graph
 
-It is possible to generating a PDF with a dependency graph using the `aliDeps`
+It is possible to generating a PDF with a dependency graph using the `bitsDeps`
 tool. Assuming you run it from a directory containing `alidist`, and you have
 Graphviz installed on your system, you can simply run:
 
-    aliDeps O2 --outgraph graph.pdf
+    bitsDeps O2 --outgraph graph.pdf
 
 The example above generates a dependency graph for the package `O2`, and saving
 the results to a PDF file named `graph.pdf`. This is what the graph looks like:
@@ -358,13 +358,13 @@ others (this can indicate an error in the recipes).
 Connections are color-coded as well: blue connections indicate a runtime
 dependency whereas a grey connection indicate a build dependency.
 
-By default, `aliDeps` runs the usual system checks to exclude packages that can
+By default, `bitsDeps` runs the usual system checks to exclude packages that can
 be taken from the system. If you want to display the full list of dependencies,
 you may want to use:
 
-    aliDeps O2 --no-system --outgraph graph.pdf
+    bitsDeps O2 --no-system --outgraph graph.pdf
 
-Please run `aliDeps --help` for further information.
+Please run `bitsDeps --help` for further information.
 
 ## Using the packages you have built
 

@@ -63,7 +63,7 @@ AliRoot it will also pick up your version. Failing that it will build it
 for you. You can have a look at what AliRoot will do by adding the `--dry-run`
 option to your build command, e.g.:
 
-    bits --dry-run <additional options you might have> build AliRoot
+    bits --dry-run <additional options you might have> build ROOT
 
 will tell you something like:
 
@@ -74,10 +74,10 @@ will tell you something like:
     Using package autotools from the system as preferred choice.
     Using package GSL from the system as preferred choice.
     System package boost cannot be used. Building our own copy.
-    We will build packages in the following order: defaults-release AliEn-CAs GMP UUID gSOAP ApMon-CPP GEANT4 boost MPFR MonALISA-gSOAP-client cgal XRootD fastjet xalienfs AliEn-Runtime ROOT vgm GEANT3 GEANT4_VMC AliRoot
+    We will build packages in the following order: defaults-release GMP UUID gSOAP GEANT4 boost MPFR cgal XRootD fastjet ROOT
 
 If you have a system package which you think should be used but it's not, you
-can run `aliDoctor <package-name>` to try to understand why that was the case
+can run `Doctor <package-name>` to try to understand why that was the case
 (or you can [open a bug report](https://github.com/alisw/alidist/issues) with its output and we will look at it).
 
 ### What is PIP ? How do I install it?
@@ -156,7 +156,7 @@ it means that bits does not consider you system tool good enough to
 be compatible with the one provided by the recipe. You can verify what
 happens during the system tool detection by running:
 
-    aliDoctor <package name>
+    bitsDoctor <package name>
 
 
 ### bits fails with `cannot open file "AvailabilityMacros.h`
@@ -237,7 +237,7 @@ building unless one of the system dependencies is absolutely required
 tool, where simply installing them might be a better option. For this
 reason we suggest that users run:
 
-    aliDoctor AliPhysics
+    bitsDoctor AliPhysics
 
 in the same path where their `alidist` folder is, before actually
 starting to build, so that they can get an overview of what will be

@@ -5,14 +5,14 @@ try:
 except ImportError:
     import mock  # Python 2
 
-from alibuild_helpers.cmd import execute, DockerRunner
+from bits_helpers.cmd import execute, DockerRunner
 
 import unittest
 
 
-@mock.patch("alibuild_helpers.cmd.BASH", new="/bin/bash")
+@mock.patch("bits_helpers.cmd.BASH", new="/bin/bash")
 class CmdTestCase(unittest.TestCase):
-    @mock.patch("alibuild_helpers.cmd.debug")
+    @mock.patch("bits_helpers.cmd.debug")
     def test_execute(self, mock_debug):
         err = execute("echo foo", mock_debug)
         self.assertEqual(err, 0)
@@ -22,8 +22,8 @@ class CmdTestCase(unittest.TestCase):
         self.assertEqual(err, 127)
         self.assertEqual(mock_debug.mock_calls, [])
 
-    @mock.patch("alibuild_helpers.cmd.getoutput")
-    @mock.patch("alibuild_helpers.cmd.getstatusoutput")
+    @mock.patch("bits_helpers.cmd.getoutput")
+    @mock.patch("bits_helpers.cmd.getstatusoutput")
     def test_DockerRunner(self, mock_getstatusoutput, mock_getoutput):
         mock_getoutput.side_effect = lambda cmd: "container-id\n"
         with DockerRunner("image", ["extra arg"]) as getstatusoutput_docker:

@@ -1,5 +1,3 @@
-.. image:: https://badge.fury.io/py/alibuild.svg
-.. image:: https://github.com/alisw/alibuild/actions/workflows/pr-check.yml/badge.svg?branch=master&event=push
 
 bits
 ========

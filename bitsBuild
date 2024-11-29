@@ -7,17 +7,17 @@ import logging
 import traceback
 
 from os.path import exists, expanduser
-from alibuild_helpers import __version__
-from alibuild_helpers.analytics import decideAnalytics, askForAnalytics, report_screenview, report_exception, report_event
-from alibuild_helpers.analytics import enable_analytics, disable_analytics
-from alibuild_helpers.args import doParseArgs
-from alibuild_helpers.init import doInit
-from alibuild_helpers.clean import doClean
-from alibuild_helpers.doctor import doDoctor
-from alibuild_helpers.deps import doDeps
-from alibuild_helpers.log import info, warning, debug, logger, error
-from alibuild_helpers.utilities import detectArch
-from alibuild_helpers.build import doBuild
+from bits_helpers import __version__
+from bits_helpers.analytics import decideAnalytics, askForAnalytics, report_screenview, report_exception, report_event
+from bits_helpers.analytics import enable_analytics, disable_analytics
+from bits_helpers.args import doParseArgs
+from bits_helpers.init import doInit
+from bits_helpers.clean import doClean
+from bits_helpers.doctor import doDoctor
+from bits_helpers.deps import doDeps
+from bits_helpers.log import info, warning, debug, logger, error
+from bits_helpers.utilities import detectArch
+from bits_helpers.build import doBuild
 
 
 def doMain(args, parser):
@@ -26,7 +26,7 @@ def doMain(args, parser):
   # breaking aliBuild.
   # We set all the locale related environment to C to make sure
   # do not get fooled when parsing localized messages.
-  # We set ALIBUILD_ARCHITECTURE so that it's picked up by the external
+  # We set BITS_ARCHITECTURE so that it's picked up by the external
   # command which does the reporting.
   if not "architecture" in args:
     args.architecture = detectArch()
@@ -43,7 +43,7 @@ def doMain(args, parser):
     "LC_ALL": "C",
     "GREP_OPTIONS": "",
     "BASH_ENV": "",
-    "ALIBUILD_ARCHITECTURE": args.architecture
+    "BITS_ARCHITECTURE": args.architecture
   }
   os.environ.update(ENVIRONMENT_OVERRIDES)
   report_screenview(args.action)
@@ -91,8 +91,8 @@ if __name__ == "__main__":
   # This is valid for everything
   logger.setLevel(logging.DEBUG if args.debug else logging.INFO)
 
-  os.environ["ALIBUILD_ANALYTICS_ID"] = "UA-77346950-1"
-  os.environ["ALIBUILD_VERSION"] = __version__ or ""
+  os.environ["BITS_ANALYTICS_ID"] = "UA-77346950-1"
+  os.environ["BITS_VERSION"] = __version__ or ""
   if args.action == "analytics":
     if args.state == "off":
       disable_analytics()
@@ -104,13 +104,13 @@ if __name__ == "__main__":
     print(arch if arch else "<unknown>")
     exit(0)
 
-  if not decideAnalytics(exists(expanduser("~/.config/alibuild/disable-analytics")),
-                         exists(expanduser("~/.config/alibuild/analytics-uuid")),
+  if not decideAnalytics(exists(expanduser("~/.config/bits/disable-analytics")),
+                         exists(expanduser("~/.config/bits/analytics-uuid")),
                          sys.stdin.isatty(),
                          askForAnalytics):
-    os.environ["ALIBUILD_NO_ANALYTICS"] = "1"
+    os.environ["BITS_NO_ANALYTICS"] = "1"
   else:
-    os.environ["ALIBUILD_ANALYTICS_USER_UUID"] = open(expanduser("~/.config/alibuild/analytics-uuid")).read().strip()
+    os.environ["BITS_ANALYTICS_USER_UUID"] = open(expanduser("~/.config/bits/analytics-uuid")).read().strip()
   try:
     profiler = "--profile" in sys.argv
     if profiler:

@@ -8,12 +8,12 @@ try:
 except ImportError:
     from mock import patch  # Python 2
 
-from alibuild_helpers.utilities import doDetectArch, filterByArchitecture
-from alibuild_helpers.utilities import Hasher
-from alibuild_helpers.utilities import asList
-from alibuild_helpers.utilities import prunePaths
-from alibuild_helpers.utilities import resolve_version
-from alibuild_helpers.utilities import topological_sort
+from bits_helpers.utilities import doDetectArch, filterByArchitecture
+from bits_helpers.utilities import Hasher
+from bits_helpers.utilities import asList
+from bits_helpers.utilities import prunePaths
+from bits_helpers.utilities import resolve_version
+from bits_helpers.utilities import topological_sort
 import os
 import string
 
@@ -190,14 +190,14 @@ class TestUtilities(unittest.TestCase):
       "PATH": "/sw/bin:/usr/local/bin",
       "LD_LIBRARY_PATH": "/sw/lib",
       "DYLD_LIBRARY_PATH": "/sw/lib",
-      "ALIBUILD_VERSION": "v1.0.0",
+      "BITS_VERSION": "v1.0.0",
       "ROOT_VERSION": "v1.0.0"
     }
     fake_env_copy = {
       "PATH": "/sw/bin:/usr/local/bin",
       "LD_LIBRARY_PATH": "/sw/lib",
       "DYLD_LIBRARY_PATH": "/sw/lib",
-      "ALIBUILD_VERSION": "v1.0.0",
+      "BITS_VERSION": "v1.0.0",
       "ROOT_VERSION": "v1.0.0"
     }
     with patch.object(os, "environ", fake_env):
@@ -206,7 +206,7 @@ class TestUtilities(unittest.TestCase):
       self.assertTrue(fake_env["PATH"] == "/usr/local/bin")
       self.assertTrue(fake_env["LD_LIBRARY_PATH"] == "")
       self.assertTrue(fake_env["DYLD_LIBRARY_PATH"] == "")
-      self.assertTrue(fake_env["ALIBUILD_VERSION"] == "v1.0.0")
+      self.assertTrue(fake_env["BITS_VERSION"] == "v1.0.0")
 
     with patch.object(os, "environ", fake_env_copy):
       prunePaths("/foo")
@@ -214,7 +214,7 @@ class TestUtilities(unittest.TestCase):
       self.assertTrue(fake_env_copy["PATH"] == "/sw/bin:/usr/local/bin")
       self.assertTrue(fake_env_copy["LD_LIBRARY_PATH"] == "/sw/lib")
       self.assertTrue(fake_env_copy["DYLD_LIBRARY_PATH"] == "/sw/lib")
-      self.assertTrue(fake_env_copy["ALIBUILD_VERSION"] == "v1.0.0")
+      self.assertTrue(fake_env_copy["BITS_VERSION"] == "v1.0.0")
 
   def test_resolver(self):
     spec = {"package": "test-pkg",

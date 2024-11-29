@@ -9,7 +9,7 @@ try:
 except ImportError:
     from ordereddict import OrderedDict
 
-from alibuild_helpers.deps import doDeps
+from bits_helpers.deps import doDeps
 from argparse import Namespace
 import unittest
 
@@ -44,9 +44,9 @@ build_requires:
 
 class DepsTestCase(unittest.TestCase):
 
-    @patch("alibuild_helpers.deps.open")
-    @patch("alibuild_helpers.deps.execute", new=lambda cmd: True)
-    @patch("alibuild_helpers.utilities.open", new=lambda f: StringIO(RECIPES[f]))
+    @patch("bits_helpers.deps.open")
+    @patch("bits_helpers.deps.execute", new=lambda cmd: True)
+    @patch("bits_helpers.utilities.open", new=lambda f: StringIO(RECIPES[f]))
     def test_deps(self, mockDepsOpen):
         """Check doDeps doesn't raise an exception."""
         dot = StringIO()

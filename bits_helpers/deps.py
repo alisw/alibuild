@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 
 from __future__ import print_function
-from alibuild_helpers.log import debug, error, info, dieOnError
-from alibuild_helpers.utilities import parseDefaults, readDefaults, getPackageList, validateDefaults
-from alibuild_helpers.cmd import DockerRunner, execute
+from bits_helpers.log import debug, error, info, dieOnError
+from bits_helpers.utilities import parseDefaults, readDefaults, getPackageList, validateDefaults
+from bits_helpers.cmd import DockerRunner, execute
 from tempfile import NamedTemporaryFile
 from os import remove
 

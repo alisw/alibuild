@@ -9,9 +9,9 @@ import time
 import requests
 from requests.exceptions import RequestException
 
-from alibuild_helpers.cmd import execute
-from alibuild_helpers.log import debug, info, error, dieOnError, ProgressPrint
-from alibuild_helpers.utilities import resolve_store_path, resolve_links_path, symlink
+from bits_helpers.cmd import execute
+from bits_helpers.log import debug, info, error, dieOnError, ProgressPrint
+from bits_helpers.utilities import resolve_store_path, resolve_links_path, symlink
 
 
 def remote_from_url(read_url, write_url, architecture, work_dir, insecure=False):

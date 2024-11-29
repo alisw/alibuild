@@ -1,25 +1,25 @@
 from os.path import abspath, exists, basename, dirname, join, realpath
 from os import makedirs, unlink, readlink, rmdir
-from alibuild_helpers import __version__
-from alibuild_helpers.analytics import report_event
-from alibuild_helpers.log import debug, info, banner, warning
-from alibuild_helpers.log import dieOnError
-from alibuild_helpers.cmd import execute, DockerRunner, BASH, install_wrapper_script
-from alibuild_helpers.utilities import prunePaths, symlink, call_ignoring_oserrors, topological_sort
-from alibuild_helpers.utilities import resolve_store_path
-from alibuild_helpers.utilities import parseDefaults, readDefaults
-from alibuild_helpers.utilities import getPackageList, asList
-from alibuild_helpers.utilities import validateDefaults
-from alibuild_helpers.utilities import Hasher
-from alibuild_helpers.utilities import yamlDump
-from alibuild_helpers.utilities import resolve_tag, resolve_version, short_commit_hash
-from alibuild_helpers.git import Git, git
-from alibuild_helpers.sl import Sapling
-from alibuild_helpers.scm import SCMError
-from alibuild_helpers.sync import remote_from_url
+from bits_helpers import __version__
+from bits_helpers.analytics import report_event
+from bits_helpers.log import debug, info, banner, warning
+from bits_helpers.log import dieOnError
+from bits_helpers.cmd import execute, DockerRunner, BASH, install_wrapper_script
+from bits_helpers.utilities import prunePaths, symlink, call_ignoring_oserrors, topological_sort
+from bits_helpers.utilities import resolve_store_path
+from bits_helpers.utilities import parseDefaults, readDefaults
+from bits_helpers.utilities import getPackageList, asList
+from bits_helpers.utilities import validateDefaults
+from bits_helpers.utilities import Hasher
+from bits_helpers.utilities import yamlDump
+from bits_helpers.utilities import resolve_tag, resolve_version, short_commit_hash
+from bits_helpers.git import Git, git
+from bits_helpers.sl import Sapling
+from bits_helpers.scm import SCMError
+from bits_helpers.sync import remote_from_url
 import yaml
-from alibuild_helpers.workarea import logged_scm, updateReferenceRepoSpec, checkout_sources
-from alibuild_helpers.log import ProgressPrint, log_current_package
+from bits_helpers.workarea import logged_scm, updateReferenceRepoSpec, checkout_sources
+from bits_helpers.log import ProgressPrint, log_current_package
 from glob import glob
 from textwrap import dedent
 try:
@@ -112,8 +112,8 @@ def update_git_repos(args, specs, buildOrder):
     for package in requires_auth:
         banner("If prompted now, enter your username and password for %s below\n"
                "If you are prompted too often, see: "
-               "https://alisw.github.io/alibuild/troubleshooting.html"
-               "#alibuild-keeps-asking-for-my-password",
+               "https://github.com/bitsorg/bits/blob/main/docs/troubleshooting.markdown"
+               "#bits-keeps-asking-for-my-password",
                specs[package]["source"])
         update_repo(package, git_prompt=True)
         debug("%r package updated: %d refs found", package,
@@ -327,10 +327,10 @@ def generate_initdotsh(package, specs, architecture, post_build=False):
   itself; else, only generate variables pointing at it dependencies.
   """
   spec = specs[package]
-  # Allow users to override ALIBUILD_ARCH_PREFIX if they manually source
+  # Allow users to override BITS_ARCH_PREFIX if they manually source
   # init.sh. This is useful for development off CVMFS, since we have a
   # slightly different directory hierarchy there.
-  lines = [': "${ALIBUILD_ARCH_PREFIX:=%s}"' % architecture]
+  lines = [': "${BITS_ARCH_PREFIX:=%s}"' % architecture]
 
   # Generate the part which sources the environment for all the dependencies.
   # We guarantee that a dependency is always sourced before the parts
@@ -340,7 +340,7 @@ def generate_initdotsh(package, specs, architecture, post_build=False):
   # generate them.
   lines.extend((
     '[ -n "${{{bigpackage}_REVISION}}" ] || '
-    '. "$WORK_DIR/$ALIBUILD_ARCH_PREFIX"/{package}/{version}-{revision}/etc/profile.d/init.sh'
+    '. "$WORK_DIR/$BITS_ARCH_PREFIX"/{package}/{version}-{revision}/etc/profile.d/init.sh'
   ).format(
     bigpackage=dep.upper().replace("-", "_"),
     package=quote(specs[dep]["package"]),
@@ -361,7 +361,7 @@ def generate_initdotsh(package, specs, architecture, post_build=False):
       hash=quote(spec["hash"]),
       commit_hash=quote(spec["commit_hash"]),
     ) for line in (
-      'export {bigpackage}_ROOT="$WORK_DIR/$ALIBUILD_ARCH_PREFIX"/{package}/{version}-{revision}',
+      'export {bigpackage}_ROOT="$WORK_DIR/$BITS_ARCH_PREFIX"/{package}/{version}-{revision}',
       "export {bigpackage}_VERSION={version}",
       "export {bigpackage}_REVISION={revision}",
       "export {bigpackage}_HASH={hash}",
@@ -431,7 +431,7 @@ def create_provenance_info(package, specs, args):
     "comment": args.annotate.get(package),
     "alibuild_version": __version__,
     "alidist": {
-      "commit": os.environ["ALIBUILD_ALIDIST_HASH"],
+      "commit": os.environ["BITS_ALIDIST_HASH"],
     },
     "architecture": args.architecture,
     "defaults": args.defaults,
@@ -492,12 +492,12 @@ def doBuild(args, parser):
     checkedOutCommitName = scm.checkedOutCommitName(directory=args.configDir)
   except SCMError:
     dieOnError(True, "Cannot find SCM directory in %s." % args.configDir)
-  os.environ["ALIBUILD_ALIDIST_HASH"] = checkedOutCommitName
+  os.environ["BITS_ALIDIST_HASH"] = checkedOutCommitName
 
   debug("Building for architecture %s", args.architecture)
   debug("Number of parallel builds: %d", args.jobs)
   debug("Using aliBuild from alibuild@%s recipes in alidist@%s",
-        __version__ or "unknown", os.environ["ALIBUILD_ALIDIST_HASH"])
+        __version__ or "unknown", os.environ["BITS_ALIDIST_HASH"])
 
   install_wrapper_script("git", workDir)
 
@@ -524,7 +524,7 @@ def doBuild(args, parser):
              "Valid defaults:\n\n- %s" % (args.defaults, "\n- ".join(sorted(validDefaults or []))))
   dieOnError(failed,
              "The following packages are system requirements and could not be found:\n\n- %s\n\n"
-             "Please run:\n\n\taliDoctor --defaults %s %s\n\nto get a full diagnosis." %
+             "Please run:\n\n\tbitsDoctor --defaults %s %s\n\nto get a full diagnosis." %
              ("\n- ".join(sorted(failed)), args.defaults, " ".join(args.pkgname)))
 
   for x in specs.values():
@@ -692,7 +692,7 @@ def doBuild(args, parser):
    # Use the selected plugin to build, instead of the default behaviour, if a
   # plugin was selected.
   if args.plugin != "legacy":
-    return importlib.import_module("alibuild_helpers.%s_plugin" % args.plugin) \
+    return importlib.import_module("bits_helpers.%s_plugin" % args.plugin) \
                     .build_plugin(specs, args, buildOrder)
 
   debug("We will build packages in the following order: %s", " ".join(buildOrder))
@@ -987,7 +987,7 @@ def doBuild(args, parser):
       fp.close()
     except:
       from pkg_resources import resource_string
-      cmd_raw = resource_string("alibuild_helpers", 'build_template.sh')
+      cmd_raw = resource_string("bits_helpers", 'build_template.sh')
 
     if args.docker:
       cachedTarball = re.sub("^" + workDir, "/sw", spec["cachedTarball"])
@@ -1094,7 +1094,7 @@ def doBuild(args, parser):
       fp.close()
     except:
       from pkg_resources import resource_string
-      jnj = resource_string("alibuild_helpers", 'Makeflow.jnj')
+      jnj = resource_string("bits_helpers", 'Makeflow.jnj')
     with open(mfFile, 'w') as mf:
       mf.write (SandboxedEnvironment(autoescape=False)
                .from_string(jnj)
@@ -1143,7 +1143,7 @@ def doBuild(args, parser):
       args.architecture,
       spec["version"],
       spec["commit_hash"],
-      os.environ["ALIBUILD_ALIDIST_HASH"][:10],
+      os.environ["BITS_ALIDIST_HASH"][:10],
        )))
 
       updatablePkgs = [dep for dep in spec["requires"] if specs[dep]["is_devel_pkg"]]

@@ -74,7 +74,7 @@ setup(
     # Single-source our package version using setuptools_scm. This makes it
     # PEP440-compliant, and it always references the alibuild commit that
     # aliBuild was built from.
-    use_scm_version={'write_to': 'alibuild_helpers/_version.py'},
+    use_scm_version={'write_to': 'bits_helpers/_version.py'},
     setup_requires=[
         # The 6.* series removed support for Python 2.7.
         'setuptools_scm<6.0.0' if sys.version_info < (3, 0) else
@@ -94,11 +94,11 @@ setup(
     # have to be included in MANIFEST.in as well.
     include_package_data=True,
     package_data={
-      'alibuild_helpers': ['build_template.sh'],
+      'bits_helpers': ['build_template.sh'],
     },
 
     # To provide executable scripts, use entry points in preference to the
     # "scripts" keyword. Entry points provide cross-platform support and allow
     # pip to create the appropriate form of executable for the target platform.
-    scripts = ["aliBuild", "alienv", "aliDoctor", "aliDeps", "pb"]
+    scripts = ["bitsBuild", "bits", "bitsDoctor", "bitsDeps", "pb"]
 )

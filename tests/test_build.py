@@ -17,8 +17,8 @@ try:
 except ImportError:
     from ordereddict import OrderedDict
 
-from alibuild_helpers.utilities import parseRecipe, resolve_tag
-from alibuild_helpers.build import doBuild, storeHashes, generate_initdotsh
+from bits_helpers.utilities import parseRecipe, resolve_tag
+from bits_helpers.build import doBuild, storeHashes, generate_initdotsh
 
 
 TEST_DEFAULT_RELEASE = """\
@@ -124,7 +124,7 @@ GIT_CHECKOUT_ROOT_ARGS = ("checkout", "-f", "v6-08-00-patches"), \
 
 def dummy_git(args, directory=".", check=True, prompt=True):
     return {
-        (("symbolic-ref", "-q", "HEAD"), "/alidist", False): (0, "master"),
+        (("symbolic-ref", "-q", "HEAD"), "/bits", False): (0, "master"),
         (("rev-parse", "HEAD"), "/alidist", True): "6cec7b7b3769826219dfa85e5daa6de6522229a0",
         (("ls-remote", "--heads", "--tags", "/sw/MIRROR/root"), ".", False): (0, TEST_ROOT_GIT_REFS),
         (("ls-remote", "--heads", "--tags", "/sw/MIRROR/zlib"), ".", False): (0, TEST_ZLIB_GIT_REFS),
@@ -145,7 +145,7 @@ TIMES_ASKED = {}
 def dummy_open(x, mode="r", encoding=None, errors=None):
     if x.endswith("/fetch-log.txt") and mode == "w":
         return MagicMock(__enter__=lambda _: StringIO())
-    if x.endswith("/alibuild_helpers/build_template.sh"):
+    if x.endswith("/bits_helpers/build_template.sh"):
         return DEFAULT  # actually open the real build_template.sh
     if mode == "r":
         try:
@@ -188,7 +188,7 @@ def dummy_readlink(x):
 
 
 def dummy_exists(x):
-    if x.endswith("alibuild_helpers/.git"):
+    if x.endswith("bits_helpers/.git"):
         return False
     return {
         "/alidist": True,
@@ -202,38 +202,38 @@ def dummy_exists(x):
 
 
 # A few errors we should handle, together with the expected result
-@patch("alibuild_helpers.git.clone_speedup_options",
+@patch("bits_helpers.git.clone_speedup_options",
        new=MagicMock(return_value=["--filter=blob:none"]))
-@patch("alibuild_helpers.build.BASH", new="/bin/bash")
+@patch("bits_helpers.build.BASH", new="/bin/bash")
 class BuildTestCase(unittest.TestCase):
-    @patch("alibuild_helpers.analytics", new=MagicMock())
+    @patch("bits_helpers.analytics", new=MagicMock())
     @patch("requests.Session.get", new=MagicMock())
-    @patch("alibuild_helpers.sync.execute", new=dummy_execute)
-    @patch("alibuild_helpers.git.git")
-    @patch("alibuild_helpers.build.exists", new=MagicMock(side_effect=dummy_exists))
+    @patch("bits_helpers.sync.execute", new=dummy_execute)
+    @patch("bits_helpers.git.git")
+    @patch("bits_helpers.build.exists", new=MagicMock(side_effect=dummy_exists))
     @patch("os.path.exists", new=MagicMock(side_effect=dummy_exists))
-    @patch("alibuild_helpers.build.sys")
-    @patch("alibuild_helpers.build.dieOnError", new=MagicMock())
-    @patch("alibuild_helpers.utilities.dieOnError", new=MagicMock())
-    @patch("alibuild_helpers.utilities.warning")
-    @patch("alibuild_helpers.build.readDefaults",
+    @patch("bits_helpers.build.sys")
+    @patch("bits_helpers.build.dieOnError", new=MagicMock())
+    @patch("bits_helpers.utilities.dieOnError", new=MagicMock())
+    @patch("bits_helpers.utilities.warning")
+    @patch("bits_helpers.build.readDefaults",
            new=MagicMock(return_value=(OrderedDict({"package": "defaults-release", "disable": []}), "")))
     @patch("shutil.rmtree", new=MagicMock(return_value=None))
     @patch("os.makedirs", new=MagicMock(return_value=None))
-    @patch("alibuild_helpers.build.makedirs", new=MagicMock(return_value=None))
-    @patch("alibuild_helpers.build.symlink", new=MagicMock(return_value=None))
-    @patch("alibuild_helpers.workarea.symlink", new=MagicMock(return_value=None))
-    @patch("alibuild_helpers.utilities.open", new=lambda x: {
+    @patch("bits_helpers.build.makedirs", new=MagicMock(return_value=None))
+    @patch("bits_helpers.build.symlink", new=MagicMock(return_value=None))
+    @patch("bits_helpers.workarea.symlink", new=MagicMock(return_value=None))
+    @patch("bits_helpers.utilities.open", new=lambda x: {
         "/alidist/root.sh": StringIO(TEST_ROOT_RECIPE),
         "/alidist/zlib.sh": StringIO(TEST_ZLIB_RECIPE),
         "/alidist/defaults-release.sh": StringIO(TEST_DEFAULT_RELEASE)
     }[x])
-    @patch("alibuild_helpers.sync.open", new=MagicMock(side_effect=dummy_open))
-    @patch("alibuild_helpers.build.open", new=MagicMock(side_effect=dummy_open))
+    @patch("bits_helpers.sync.open", new=MagicMock(side_effect=dummy_open))
+    @patch("bits_helpers.build.open", new=MagicMock(side_effect=dummy_open))
     @patch("codecs.open", new=MagicMock(side_effect=dummy_open))
-    @patch("alibuild_helpers.build.shutil", new=MagicMock())
+    @patch("bits_helpers.build.shutil", new=MagicMock())
     @patch("os.listdir")
-    @patch("alibuild_helpers.build.glob", new=lambda pattern: {
+    @patch("bits_helpers.build.glob", new=lambda pattern: {
         "*": ["zlib"],
         "/sw/TARS/osx_x86-64/store/%s/%s/*gz" % (TEST_DEFAULT_RELEASE_BUILD_HASH[:2],
                                                  TEST_DEFAULT_RELEASE_BUILD_HASH): [],
@@ -243,12 +243,12 @@ class BuildTestCase(unittest.TestCase):
         ["../../osx_x86-64/store/%s/%s/defaults-release-v1-1.osx_x86-64.tar.gz" %
          (TEST_DEFAULT_RELEASE_BUILD_HASH[:2], TEST_DEFAULT_RELEASE_BUILD_HASH)],
     }[pattern])
-    @patch("alibuild_helpers.build.readlink", new=dummy_readlink)
-    @patch("alibuild_helpers.build.banner", new=MagicMock(return_value=None))
-    @patch("alibuild_helpers.build.debug")
-    @patch("alibuild_helpers.workarea.is_writeable", new=MagicMock(return_value=True))
-    @patch("alibuild_helpers.build.basename", new=MagicMock(return_value="aliBuild"))
-    @patch("alibuild_helpers.build.install_wrapper_script", new=MagicMock())
+    @patch("bits_helpers.build.readlink", new=dummy_readlink)
+    @patch("bits_helpers.build.banner", new=MagicMock(return_value=None))
+    @patch("bits_helpers.build.debug")
+    @patch("bits_helpers.workarea.is_writeable", new=MagicMock(return_value=True))
+    @patch("bits_helpers.build.basename", new=MagicMock(return_value="aliBuild"))
+    @patch("bits_helpers.build.install_wrapper_script", new=MagicMock())
     def test_coverDoBuild(self, mock_debug, mock_listdir, mock_warning, mock_sys, mock_git_git):
         mock_git_git.side_effect = dummy_git
         mock_debug.side_effect = lambda *args: None
@@ -258,7 +258,7 @@ class BuildTestCase(unittest.TestCase):
             "/sw/TARS/osx_x86-64/zlib": [],
             "/sw/TARS/osx_x86-64/ROOT": [],
         }.get(directory, DEFAULT)
-        os.environ["ALIBUILD_NO_ANALYTICS"] = "1"
+        os.environ["BITS_NO_ANALYTICS"] = "1"
 
         mock_parser = MagicMock()
         args = Namespace(
@@ -417,8 +417,8 @@ class BuildTestCase(unittest.TestCase):
         self.assertNotIn("Extra", complete_initdotsh)
 
         # Dependencies must be loaded both for this build and for subsequent ones.
-        self.assertIn('. "$WORK_DIR/$ALIBUILD_ARCH_PREFIX"/zlib/v1.2.3-1/etc/profile.d/init.sh', setup_initdotsh)
-        self.assertIn('. "$WORK_DIR/$ALIBUILD_ARCH_PREFIX"/zlib/v1.2.3-1/etc/profile.d/init.sh', complete_initdotsh)
+        self.assertIn('. "$WORK_DIR/$BITS_ARCH_PREFIX"/zlib/v1.2.3-1/etc/profile.d/init.sh', setup_initdotsh)
+        self.assertIn('. "$WORK_DIR/$BITS_ARCH_PREFIX"/zlib/v1.2.3-1/etc/profile.d/init.sh', complete_initdotsh)
 
         # ROOT-specific variables must not be set during ROOT's build yet...
         self.assertNotIn("export ROOT_VERSION=", setup_initdotsh)

@@ -1,5 +1,5 @@
 import unittest
-from alibuild_helpers.analytics import decideAnalytics
+from bits_helpers.analytics import decideAnalytics
 
 def noAnalytics():
     return False

@@ -1,8 +1,8 @@
 import unittest
 import platform
-from alibuild_helpers.utilities import parseRecipe, getRecipeReader, parseDefaults
-from alibuild_helpers.utilities import FileReader, GitReader
-from alibuild_helpers.utilities import validateDefaults, SpecError
+from bits_helpers.utilities import parseRecipe, getRecipeReader, parseDefaults
+from bits_helpers.utilities import FileReader, GitReader
+from bits_helpers.utilities import validateDefaults, SpecError
 try:
   from collections import OrderedDict
 except ImportError:

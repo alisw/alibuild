@@ -4,12 +4,12 @@ try:
 except ImportError:
     from mock import MagicMock, patch  # Python 2
 
-from alibuild_helpers.log import dieOnError, ProgressPrint
+from bits_helpers.log import dieOnError, ProgressPrint
 
 
 class LogTestCase(unittest.TestCase):
-    @patch("alibuild_helpers.log.error")
-    @patch("alibuild_helpers.log.sys")
+    @patch("bits_helpers.log.error")
+    @patch("bits_helpers.log.sys")
     def test_dieOnError(self, mock_sys, mock_error):
         """Check dieOnError dies on error."""
         dieOnError(True, "Message")

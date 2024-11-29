@@ -1,6 +1,6 @@
 highlighter: rouge
 baseurl: /alibuild
-menu_header: ALIBUILD
+menu_header: BITS
 menu:
   -
     name: quick.html

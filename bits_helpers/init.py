@@ -1,8 +1,8 @@
-from alibuild_helpers.git import git, Git
-from alibuild_helpers.utilities import getPackageList, parseDefaults, readDefaults, validateDefaults
-from alibuild_helpers.log import debug, error, warning, banner, info
-from alibuild_helpers.log import dieOnError
-from alibuild_helpers.workarea import cleanup_git_log, updateReferenceRepoSpec
+from bits_helpers.git import git, Git
+from bits_helpers.utilities import getPackageList, parseDefaults, readDefaults, validateDefaults
+from bits_helpers.log import debug, error, warning, banner, info
+from bits_helpers.log import dieOnError
+from bits_helpers.workarea import cleanup_git_log, updateReferenceRepoSpec
 
 from os.path import join
 import os.path as path

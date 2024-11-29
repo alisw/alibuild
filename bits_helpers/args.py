@@ -1,6 +1,6 @@
 import argparse
-from alibuild_helpers.utilities import detectArch, normalise_multiple_options
-from alibuild_helpers.workarea import cleanup_git_log
+from bits_helpers.utilities import detectArch, normalise_multiple_options
+from bits_helpers.workarea import cleanup_git_log
 import multiprocessing
 
 import re
@@ -15,10 +15,10 @@ from os.path import abspath, dirname, basename
 import sys
 
 # Default workdir: fall back on "sw" if env is not set or empty
-DEFAULT_WORK_DIR = os.environ.get("ALIBUILD_WORK_DIR") or os.environ.get("ALICE_WORK_DIR") or "sw"
+DEFAULT_WORK_DIR = os.environ.get("BITS_WORK_DIR") or os.environ.get("ALICE_WORK_DIR") or "sw"
 
 # cd to this directory before start
-DEFAULT_CHDIR = os.environ.get("ALIBUILD_CHDIR") or "."
+DEFAULT_CHDIR = os.environ.get("BITS_CHDIR") or "."
 
 
 # This is syntactic sugar for the --dist option (which should really be called
@@ -159,7 +159,7 @@ def doParseArgs():
   build_dirs = build_parser.add_argument_group(title="Customise aliBuild directories")
   build_dirs.add_argument("-C", "--chdir", metavar="DIR", dest="chdir", default=DEFAULT_CHDIR,
                           help=("Change to the specified directory before building. "
-                                "Alternatively, set ALIBUILD_CHDIR. Default '%(default)s'."))
+                                "Alternatively, set BITS_CHDIR. Default '%(default)s'."))
   build_dirs.add_argument("-w", "--work-dir", dest="workDir", default=DEFAULT_WORK_DIR,
                           help=("The toplevel directory under which builds should be done and build results "
                                 "should be installed. Default '%(default)s'."))
@@ -191,7 +191,7 @@ def doParseArgs():
   clean_dirs = clean_parser.add_argument_group(title="Customise aliBuild directories")
   clean_dirs.add_argument("-C", "--chdir", metavar="DIR", dest="chdir", default=DEFAULT_CHDIR,
                           help=("Change to the specified directory before cleaning up. "
-                                "Alternatively, set ALIBUILD_CHDIR. Default '%(default)s'."))
+                                "Alternatively, set BITS_CHDIR. Default '%(default)s'."))
   clean_dirs.add_argument("-w", "--work-dir", dest="workDir", default=DEFAULT_WORK_DIR,
                           help="The toplevel directory used in previous builds. Default '%(default)s'.")
 
@@ -305,7 +305,7 @@ def doParseArgs():
   doctor_dirs = doctor_parser.add_argument_group(title="Customise aliBuild directories")
   doctor_dirs.add_argument("-C", "--chdir", metavar="DIR", dest="chdir", default=DEFAULT_CHDIR,
                            help=("Change to the specified directory before doing anything. "
-                                 "Alternatively, set ALIBUILD_CHDIR. Default '%(default)s'."))
+                                 "Alternatively, set BITS_CHDIR. Default '%(default)s'."))
   doctor_dirs.add_argument("-w", "--work-dir", dest="workDir", default=DEFAULT_WORK_DIR,  # TODO: previous default was "workDir".
                            help=("The toplevel directory under which builds should be done and build results "
                                  "should be installed. Default '%(default)s'."))
@@ -335,7 +335,7 @@ def doParseArgs():
   init_dirs = init_parser.add_argument_group(title="Customise aliBuild directories")
   init_dirs.add_argument("-C", "--chdir", metavar="DIR", dest="chdir", default=DEFAULT_CHDIR,
                          help=("Change to the specified directory before doing anything. "
-                               "Alternatively, set ALIBUILD_CHDIR. Default '%(default)s'."))
+                               "Alternatively, set BITS_CHDIR. Default '%(default)s'."))
   init_dirs.add_argument("-w", "--work-dir", dest="workDir", default=DEFAULT_WORK_DIR,
                          help=("The toplevel directory under which builds should be done and "
                                "build results should be installed. Default '%(default)s'."))

@@ -19,9 +19,9 @@ try:
 except ImportError:
   from pipes import quote  # Python 2.7
 
-from alibuild_helpers.cmd import getoutput
-from alibuild_helpers.git import git
-from alibuild_helpers.log import warning, dieOnError
+from bits_helpers.cmd import getoutput
+from bits_helpers.git import git
+from bits_helpers.log import warning, dieOnError
 
 
 class SpecError(Exception):
@@ -160,7 +160,7 @@ def prunePaths(workDir):
     workDirEscaped = re.escape("%s" % workDir) + "[^:]*:?"
     os.environ[x] = re.sub(workDirEscaped, "", os.environ[x])
   for x in list(os.environ.keys()):
-    if x.endswith("_VERSION") and x != "ALIBUILD_VERSION":
+    if x.endswith("_VERSION") and x != "BITS_VERSION":
       os.environ.pop(x)
 
 def validateSpec(spec):

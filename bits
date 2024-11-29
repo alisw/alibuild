@@ -187,11 +187,11 @@ fi
 
 case $1 in
     analytics|architecture|build|clean|deps|doctor|init|version)
-        $(dirname "$0")/aliBuild $@
+        $(dirname "$0")/bitsBuild $@
 	exit $?
         ;;
     -h|--help|-d|--debug|-n|--dry-run)
-        $(dirname "$0")/aliBuild $@
+        $(dirname "$0")/bitsBuild $@
 	exit $?
          ;;
 	 *)
@@ -299,7 +299,7 @@ fi
 [[ ! -d "$WORK_DIR" ]] && { printHelp "Work dir $WORK_DIR cannot be accessed"; false; }
 WORK_DIR=$(cd "$WORK_DIR"; pwd)
 [[ -z "$ARCHITECTURE" ]] && ARCHITECTURE="$("aliBuild" architecture 2> /dev/null || true)"
-[[ -z "$ARCHITECTURE" ]] && ARCHITECTURE="$("$(dirname "$0")/aliBuild" architecture 2> /dev/null || true)"
+[[ -z "$ARCHITECTURE" ]] && ARCHITECTURE="$("$(dirname "$0")/bitsBuild" architecture 2> /dev/null || true)"
 [[ -z "$ARCHITECTURE" || "$ARCHITECTURE" == "<unknown>" ]] && ARCHITECTURE=$(ls -1t $WORK_DIR | grep -vE '^[A-Z]+$' | head -n1)
 [[ -z "$ARCHITECTURE" ]] && { printHelp "Cannot autodetect architecture"; false; }
 
@@ -401,7 +401,7 @@ case "$ACTION" in
     exec $MODULECMD "${ARGS[@]}"
     ;;
   '')
-    $(dirname "$0")/aliBuild --help
+    $(dirname "$0")/bitsBuild --help
     printHelp "What do you want to do?"
     ;;
   *)

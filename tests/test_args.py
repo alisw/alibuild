@@ -7,8 +7,8 @@ except ImportError:
     import mock
     from mock import patch, call  # Python 2
 
-import alibuild_helpers.args
-from alibuild_helpers.args import doParseArgs, matchValidArch, finaliseArgs, DEFAULT_WORK_DIR, DEFAULT_CHDIR, ARCHITECTURE_TABLE
+import bits_helpers.args
+from bits_helpers.args import doParseArgs, matchValidArch, finaliseArgs, DEFAULT_WORK_DIR, DEFAULT_CHDIR, ARCHITECTURE_TABLE
 import sys
 import os
 import os.path
@@ -75,7 +75,7 @@ CORRECT_BEHAVIOR = [
   ((), "analytics off"                                                                 , [("state", "off")]),
   ((), "analytics on"                                                                  , [("state", "on")]),
 
-  # With ALIBUILD_WORK_DIR and ALIBUILD_CHDIR set
+  # With BITS_WORK_DIR and BITS_CHDIR set
   (("sw2", ".")    , "build --force-unknown-architecture zlib"                         , [("action", "build"), ("workDir", "sw2"), ("referenceSources", "sw2/MIRROR"), ("chdir", ".")]),
   (("sw3", "mydir"), "init"                                                            , [("action", "init"), ("workDir", "sw3"), ("referenceSources", "sw3/MIRROR"), ("chdir", "mydir")]),
   (("sw", ".")     , "clean --chdir mydir2 --work-dir sw4"                             , [("action", "clean"), ("workDir", "sw4"), ("chdir", "mydir2")]),
@@ -88,21 +88,21 @@ GETSTATUSOUTPUT_MOCKS = {
 }
 
 class ArgsTestCase(unittest.TestCase):
-  @mock.patch("alibuild_helpers.utilities.getoutput", new=lambda cmd: "x86_64")   # for uname -m
-  @mock.patch('alibuild_helpers.args.commands')
+  @mock.patch("bits_helpers.utilities.getoutput", new=lambda cmd: "x86_64")   # for uname -m
+  @mock.patch('bits_helpers.args.commands')
   def test_actionParsing(self, mock_commands):
     mock_commands.getstatusoutput.side_effect = lambda x : GETSTATUSOUTPUT_MOCKS[x]
     for (env, cmd, effects) in CORRECT_BEHAVIOR:
-      (alibuild_helpers.args.DEFAULT_WORK_DIR,
-       alibuild_helpers.args.DEFAULT_CHDIR) = env or ("sw", ".")
+      (bits_helpers.args.DEFAULT_WORK_DIR,
+       bits_helpers.args.DEFAULT_CHDIR) = env or ("sw", ".")
       with patch.object(sys, "argv", ["alibuild"] + shlex.split(cmd)):
         args, parser = doParseArgs()
         args = vars(args)
         for k, v in effects:
           self.assertEqual(args[k], v)
 
-  @mock.patch("alibuild_helpers.utilities.getoutput", new=lambda cmd: "x86_64")   # for uname -m
-  @mock.patch('alibuild_helpers.args.argparse.ArgumentParser.error')
+  @mock.patch("bits_helpers.utilities.getoutput", new=lambda cmd: "x86_64")   # for uname -m
+  @mock.patch('bits_helpers.args.argparse.ArgumentParser.error')
   def test_failingParsing(self, mock_print):
     mock_print.side_effect = FakeExit("raised")
     for (cmd, calls) in PARSER_ERRORS.items():

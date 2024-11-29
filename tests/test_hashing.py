@@ -8,7 +8,7 @@ try:
 except ImportError:
     from ordereddict import OrderedDict
 
-from alibuild_helpers.build import storeHashes
+from bits_helpers.build import storeHashes
 
 LOGFILE = "build.log"
 SPEC_RE = re.compile(r"spec = (OrderedDict\(\[\('package', '([^']+)'.*\)\]\))")

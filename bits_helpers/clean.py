@@ -7,7 +7,7 @@ import os
 import glob
 import sys
 import shutil
-from alibuild_helpers import log
+from bits_helpers import log
 
 
 def decideClean(workDir, architecture, aggressiveCleanup):

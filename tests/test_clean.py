@@ -6,7 +6,7 @@ try:
 except ImportError:
     from mock import patch, call  # Python 2
 
-from alibuild_helpers.clean import decideClean, doClean
+from bits_helpers.clean import decideClean, doClean
 
 import unittest
 
@@ -55,9 +55,9 @@ READLINK_MOCKUP_DB = {
 
 
 class CleanTestCase(unittest.TestCase):
-    @patch('alibuild_helpers.clean.glob')
-    @patch('alibuild_helpers.clean.os')
-    @patch('alibuild_helpers.clean.path')
+    @patch('bits_helpers.clean.glob')
+    @patch('bits_helpers.clean.os')
+    @patch('bits_helpers.clean.path')
     def test_decideClean(self, mock_path, mock_os, mock_glob):
         mock_path.realpath.side_effect = lambda x : REALPATH_WITH_OBSOLETE_FILES[x]
         mock_path.islink.side_effect = lambda x : "latest" in x
@@ -77,11 +77,11 @@ class CleanTestCase(unittest.TestCase):
         self.assertEqual(toDelete, ['sw/TMP', 'sw/INSTALLROOT', 'sw/TARS/slc7_x86-64/store',
                                     'sw/SOURCES', 'sw/BUILD/somethingtodelete'])
 
-    @patch('alibuild_helpers.clean.glob')
-    @patch('alibuild_helpers.clean.os')
-    @patch('alibuild_helpers.clean.path')
-    @patch('alibuild_helpers.clean.shutil')
-    @patch('alibuild_helpers.clean.log')
+    @patch('bits_helpers.clean.glob')
+    @patch('bits_helpers.clean.os')
+    @patch('bits_helpers.clean.path')
+    @patch('bits_helpers.clean.shutil')
+    @patch('bits_helpers.clean.log')
     def test_doClean(self, mock_log, mock_shutil, mock_path, mock_os, mock_glob):
         mock_path.realpath.side_effect = lambda x: REALPATH_WITH_OBSOLETE_FILES[x]
         mock_path.islink.side_effect = lambda x: "latest" in x

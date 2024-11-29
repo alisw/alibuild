@@ -2,10 +2,10 @@
 import os, re, sys
 from os.path import exists, abspath, expanduser
 import logging
-from alibuild_helpers.log import debug, error, banner, info, success, warning
-from alibuild_helpers.log import logger
-from alibuild_helpers.utilities import getPackageList, parseDefaults, readDefaults, validateDefaults
-from alibuild_helpers.cmd import getstatusoutput, DockerRunner
+from bits_helpers.log import debug, error, banner, info, success, warning
+from bits_helpers.log import logger
+from bits_helpers.utilities import getPackageList, parseDefaults, readDefaults, validateDefaults
+from bits_helpers.cmd import getstatusoutput, DockerRunner
 
 def prunePaths(workDir):
   for x in ["PATH", "LD_LIBRARY_PATH", "DYLD_LIBRARY_PATH"]:

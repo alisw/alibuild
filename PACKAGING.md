@@ -2,7 +2,7 @@
 
 alibuild is available from PyPi. Package page at:
 
-<https://pypi.python.org/pypi/alibuild/>
+<https://pypi.python.org/pypi/bits/>
 
 In order to publish a new version:
 

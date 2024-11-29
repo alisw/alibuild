@@ -6,8 +6,8 @@ try:                  # Python 3
 except ImportError:   # Python 2
     import mock
 
-from alibuild_helpers.cmd import getstatusoutput
-from alibuild_helpers.utilities import getPackageList
+from bits_helpers.cmd import getstatusoutput
+from bits_helpers.utilities import getPackageList
 
 
 RECIPES = {
@@ -108,7 +108,7 @@ def getPackageListWithDefaults(packages, force_rebuild=()):
     return (specs, *return_values)
 
 
-@mock.patch("alibuild_helpers.utilities.getRecipeReader", new=MockReader)
+@mock.patch("bits_helpers.utilities.getRecipeReader", new=MockReader)
 class ReplacementTestCase(unittest.TestCase):
     """Test that system package replacements are working."""
 
@@ -157,7 +157,7 @@ class ReplacementTestCase(unittest.TestCase):
         self.assertNotIn("with-replacement-recipe", systemPkgs)
         self.assertIn("with-replacement-recipe", ownPkgs)
 
-    @mock.patch("alibuild_helpers.utilities.dieOnError")
+    @mock.patch("bits_helpers.utilities.dieOnError")
     def test_missing_replacement_spec(self, mock_dieOnError):
         """Check an error is thrown when the replacement spec is not found."""
         specs, systemPkgs, ownPkgs, failedReqs, validDefaults = \
@@ -166,7 +166,7 @@ class ReplacementTestCase(unittest.TestCase):
                                         "spec for missing-spec: missing_tag")
 
 
-@mock.patch("alibuild_helpers.utilities.getRecipeReader", new=MockReader)
+@mock.patch("bits_helpers.utilities.getRecipeReader", new=MockReader)
 class ForceRebuildTestCase(unittest.TestCase):
     """Test that force_rebuild keys are applied properly."""
 

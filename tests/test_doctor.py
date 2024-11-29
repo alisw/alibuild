@@ -10,7 +10,7 @@ try:
 except ImportError:
   from ordereddict import OrderedDict
 
-from alibuild_helpers.doctor import doDoctor
+from bits_helpers.doctor import doDoctor
 from argparse import Namespace
 import unittest
 
@@ -59,11 +59,11 @@ valid_defaults:
 """
 class DoctorTestCase(unittest.TestCase):
 
-  @patch("alibuild_helpers.doctor.banner")
-  @patch("alibuild_helpers.doctor.warning")
-  @patch("alibuild_helpers.doctor.error")
-  @patch("alibuild_helpers.doctor.exists")
-  @patch("alibuild_helpers.utilities.open")
+  @patch("bits_helpers.doctor.banner")
+  @patch("bits_helpers.doctor.warning")
+  @patch("bits_helpers.doctor.error")
+  @patch("bits_helpers.doctor.exists")
+  @patch("bits_helpers.utilities.open")
   def test_doctor(self, mockOpen, mockExists, mockPrintError, mockPrintWarning, mockPrintBanner):
     mockExists.return_value = True
     mockOpen.side_effect = lambda f: { "/dist/package1.sh"         : StringIO(RECIPE_PACKAGE1),
