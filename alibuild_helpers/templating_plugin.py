@@ -11,7 +11,7 @@ import sys
 from jinja2.sandbox import SandboxedEnvironment
 
 
-def build_plugin(specs, args, build_order):
+def build_plugin(specs, args, build_order) -> None:
     """Read a user-provided template from stdin and render it."""
     print(SandboxedEnvironment(autoescape=False)
           .from_string(sys.stdin.read())
