@@ -18,6 +18,7 @@ from alibuild_helpers.deps import doDeps
 from alibuild_helpers.log import info, debug, logger, error
 from alibuild_helpers.utilities import detectArch
 from alibuild_helpers.build import doBuild
+from alibuild_helpers.git import git
 
 
 def doMain(args, parser):
@@ -60,6 +61,10 @@ def doMain(args, parser):
   if args.action == "version" or args.action == None:
     print("aliBuild version: {version} ({arch})".format(
       version=__version__ or "unknown", arch=args.architecture or "unknown"))
+    alidist = os.path.join(os.getcwd(), "alidist")
+    if os.path.exists(alidist):
+      alidist_version = git(("rev-parse", "--short", "HEAD"), directory=alidist)
+      print(f"alidist version: {alidist_version}")
     sys.exit(0)
 
   if args.action == "doctor":
