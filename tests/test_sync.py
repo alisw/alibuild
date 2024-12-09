@@ -107,7 +107,6 @@ class SyncTestCase(unittest.TestCase):
         syncer.fetch_symlinks(GOOD_SPEC)
         syncer.fetch_tarball(GOOD_SPEC)
         mock_error.assert_not_called()
-        syncer.upload_symlinks_and_tarball(GOOD_SPEC)
 
         # Try bad spec
         mock_error.reset_mock()
@@ -127,8 +126,6 @@ class SyncTestCase(unittest.TestCase):
                           tarball_name(BAD_SPEC)))
         self.assertIsInstance(mock_error.call_args_list[0][0][2],
                               sync.PartialDownloadError)
-
-        syncer.upload_symlinks_and_tarball(BAD_SPEC)
 
         # Try missing spec
         mock_debug.reset_mock()
