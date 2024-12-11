@@ -303,7 +303,7 @@ def readDefaults(configDir, defaults, error, architecture):
     defaultsBody += "\n# Architecture defaults\n" + archBody
   return (defaultsMeta, defaultsBody)
 
-# Get the appropriate recipe reader depending on th filename
+
 def getRecipeReader(url, dist=None):
   m = re.search(r'^dist:(.*)@([^@]+)$', url)
   if m and dist:
@@ -404,6 +404,29 @@ def parseDefaults(disable, defaultsGetter, log):
     overrides[f] = dict(**(v or {}))
   return (None, overrides, taps)
 
+def checkForFilename(taps, pkg, d):
+  filename = taps.get(pkg, "%s/%s.sh" % (d, pkg))
+  if not os.path.exists(filename):
+    if "/" in pkg:
+      filename = taps.get(pkg, "%s/%s" % (d, pkg))
+    else:
+      filename = taps.get(pkg, "%s/%s/latest" % (d, pkg))
+  return filename
+
+def resolveFilename(taps, pkg, configDir):
+  configPath = os.environ.get("BITS_PATH")
+  cfgDir = configDir
+  pkgDirs = [cfgDir]
+
+  if configPath:
+    for d in configPath.split(","):
+       pkgDirs.append(cfgDir + "/" + d)
+
+  for d in pkgDirs:
+    filename = checkForFilename(taps,pkg,d)
+    if os.path.exists(filename):
+      return(filename,os.path.abspath(d))
+    
 def getPackageList(packages, specs, configDir, preferSystem, noSystem,
                    architecture, disable, defaults, performPreferCheck, performRequirementCheck,
                    performValidateDefaults, overrides, taps, log, force_rebuild=()):
@@ -414,6 +437,7 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
   requirementsCache = {}
   packages = packages[:]
   validDefaults = []  # empty list: all OK; None: no valid default; non-empty list: list of valid ones
+
   while packages:
     p = packages.pop(0)
     if p in specs or (p == "defaults-release" and ("defaults-" + defaults) in specs):
@@ -427,16 +451,14 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
     # "defaults-release" for this to work, since the defaults are a dependency
     # and all dependencies' names go into a package's hash.
     pkg_filename = ("defaults-" + defaults) if p == "defaults-release" else p.lower()
-    filename = taps.get(pkg_filename, "%s/%s.sh" % (configDir, pkg_filename))
-    if not os.path.exists(filename):
-      if "/" in pkg_filename:
-        filename = taps.get(pkg_filename, "%s/%s" % (configDir, pkg_filename))
-      else:
-        filename = taps.get(pkg_filename, "%s/%s/latest" % (configDir, pkg_filename))
+
+    filename,pkgdir = resolveFilename(taps, pkg_filename, configDir)
+
     err, spec, recipe = parseRecipe(getRecipeReader(filename, configDir))
     dieOnError(err, err)
     dieOnError(spec["package"].lower() != pkg_filename,
                "%s.sh has different package field: %s" % (p, spec["package"]))
+    spec["pkgdir"] = pkgdir
 
     if p == "defaults-release":
       # Re-rewrite the defaults' name to "defaults-release". Everything auto-

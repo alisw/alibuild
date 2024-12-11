@@ -35,6 +35,7 @@ export PATH=$WORK_DIR/wrapper-scripts:$PATH
 # - PKGVERSION
 # - REQUIRES
 # - RUNTIME_REQUIRES
+# - PKGDIR
 
 export PKG_NAME="$PKGNAME"
 export PKG_VERSION="$PKGVERSION"
@@ -55,7 +56,6 @@ else
 fi
 export SOURCEDIR="$WORK_DIR/SOURCES/$PKGNAME/$PKGVERSION/$COMMIT_HASH"
 export BUILDDIR="$BUILDROOT/$PKGNAME"
-export PKGDIR=$WORK_DIR/../alidist # FIXME!
 
 rm -fr "$WORK_DIR/INSTALLROOT/$PKGHASH"
 # We remove the build directory only if we are not in incremental mode.

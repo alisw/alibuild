@@ -1,4 +1,8 @@
-#!/bin/bash -e
+#!/bin/bash -evx
+
+BITSDIR=`dirname $0`
+
+ARGV=("$@"); ARGC=("$#")
 
 function printHelp() {
 cat >&2 <<EoF
@@ -140,72 +144,108 @@ function stripDyld() {
   echo unset $( (typeset | grep ^DYLD | cut -d= -f1 | grep '_modshare$' | xargs echo ) 2> /dev/null; echo ';' )
 }
 
-# Load and test Modulefiles created by recipes.
+# Backward compatibility defaults
 
-config_file=$HOME/.bits.ini
+BITS_BRANDING=${BITS_BRANDING:="bits"}
+BITS_PATH=${BITS_PATH:=""}
+BITS_REPO_DIR=${BITS_REPO_DIR:="alidist"}
+BITS_WORK_DIR=${BITS_WORK_DIR:="sw"}
+BITS_ORGANISATION=${BITS_ORGANISATION:="ALICE"}
+BITS_PKG_PREFIX=${BITS_PKG_PREFIX:="VO_ALICE"}
+
+config_file=.bitsrc
 
 if [ -f $config_file ]
 then   
    source <(grep = <(awk '/^\[bits]$/,/^$/ {print}' $config_file | sed 's/ *= */=/g'))
 fi
 
-export BITS_ORGANIZATION=${organisation:="ALICE"}
-export BITS_BUILD_TOOL=${build_tool:="aliBuild"}
-
 if [ -f $config_file ]
 then
-   source <(grep = <(awk '/^\[$BITS_ORGANISATION]$/,/^$/ {print}' $config_file | sed 's/ *= */=/g'))
+   source <(grep = <(awk "/^\[$organisation]$/,/^$/ {print}" $config_file | sed 's/ *= */=/g' | grep -v "^\[$organisation\]"))
 fi
 
+update_config=0
+
+for ((i=0;i<$ARGC;i++));
+do
+    arg=${ARGV[$i]}
+    opt=${arg%%=*}
+    val=${arg##*=}
+
+    case $opt in
+       --config)
+         update_config=1
+         ;;
+       --help|-h|help)
+         printf "bits --config [--help|-h|help]\n"
+         printf "bits --config --organisation=<org> --pkg_prefix=<prefix> --pkg-dir=<dir> --work-dir=<dir> --search-path=<path>\n" 
+         exit
+         ;;
+       --organisation)
+         organisation=$val
+         ;;
+       --branding)
+         branding=$val
+         ;;
+       --pkg_prefix)
+         pkg_prefix=$val
+         ;;
+       --repo-dir)
+         repo_dir=$val
+         ;;
+       --pkg-dir)
+         pkg_dir=$val
+         ;;
+       --work-dir)
+         work_dir=$val
+         ;;
+       --search_path)
+         search_path=$val
+         ;;
+       *)
+         ;;
+   esac
+done
+
+
+if [ $update_config -eq 1 ]
+then
+   cat<<EOF>$config_file
+[bits]
+  organisation=$organisation
+
+[$organisation]
+  pkg_prefix=$pkg_prefix
+  work_dir=$work_dir
+  repo_dir=$repo_dir
+  search_path=$search_path
+  branding=$branding
+EOF
+  exit
+fi
+
+export BITS_ORGANISATION=$organisation
+export BITS_BRANDING=$branding
+export BITS_PATH=$search_path
+export BITS_REPO_DIR=$repo_dir
+export BITS_WORK_DIR=$work_dir
 export BITS_PKG_PREFIX=${pkg_prefix:="VO_"$organisation}
 
-case $1 in
-    -c)
-       config_file=$1
-       shift 
-       ;;
-    --init-bits-organisation=*)
-      organisation="${i#*=}"
-      shift
-      ;;
-    --init-bits-build_tool=*)
-      build_tool="${i#*=}"
-      shift
-      ;;
-    --init-org-build_pkg_prefix=*)
-      pkg_prefix="${i#*=}"
-      shift
-      ;;
-      *)
-      ;;
-esac
-
-if [ ! -f $config_file ]
-then
-   source <(grep = <(awk '/^\[bits]$/,/^$/ {print}' $config_file | sed 's/ *= */=/g'))
-fi
+mkdir -p $work_dir || echo "Cannot create directory: " $work_dir 
 
 case $1 in
     analytics|architecture|build|clean|deps|doctor|init|version)
-        $(dirname "$0")/bitsBuild $@
+        $BITSDIR/bitsBuild $@
 	exit $?
         ;;
     -h|--help|-d|--debug|-n|--dry-run)
-        $(dirname "$0")/bitsBuild $@
+        $BITSDIR/bitsBuild $@
 	exit $?
          ;;
 	 *)
         ;;
 esac
-
-cat<<EOF>$config_file
-[bits]
-  organisation=$organisation
-  build_tool=$build_tool
-
-[$organisation]
-  pkg_prefix=$pkg_prefix
-EOF
 
 
 # If we are on a TTY, enable colors
@@ -298,8 +338,8 @@ if [[ -z "$WORK_DIR" ]]; then
 fi
 [[ ! -d "$WORK_DIR" ]] && { printHelp "Work dir $WORK_DIR cannot be accessed"; false; }
 WORK_DIR=$(cd "$WORK_DIR"; pwd)
-[[ -z "$ARCHITECTURE" ]] && ARCHITECTURE="$("aliBuild" architecture 2> /dev/null || true)"
-[[ -z "$ARCHITECTURE" ]] && ARCHITECTURE="$("$(dirname "$0")/bitsBuild" architecture 2> /dev/null || true)"
+[[ -z "$ARCHITECTURE" ]] && ARCHITECTURE="$("bitsBuild" architecture 2> /dev/null || true)"
+[[ -z "$ARCHITECTURE" ]] && ARCHITECTURE="$("$BITSDIR/bitsBuild" architecture 2> /dev/null || true)"
 [[ -z "$ARCHITECTURE" || "$ARCHITECTURE" == "<unknown>" ]] && ARCHITECTURE=$(ls -1t $WORK_DIR | grep -vE '^[A-Z]+$' | head -n1)
 [[ -z "$ARCHITECTURE" ]] && { printHelp "Cannot autodetect architecture"; false; }
 
@@ -401,7 +441,7 @@ case "$ACTION" in
     exec $MODULECMD "${ARGS[@]}"
     ;;
   '')
-    $(dirname "$0")/bitsBuild --help
+    $BITSDIR/bitsBuild --help
     printHelp "What do you want to do?"
     ;;
   *)

@@ -25,10 +25,11 @@ DEFAULT_CHDIR = os.environ.get("BITS_CHDIR") or "."
 # --dist-tag). It can be either:
 # - A tag name
 # - A repository spec in the for org/repo@tag
-def alidist_string(s):
+def bits_string(s):
   repo, have_repo_spec, ver = s.partition("@")
   if not have_repo_spec:
-    repo, ver = "alisw/alidist", s
+    repo, ver = "alisw/alidist", "master"
+    print(s)
   return {"repo": repo, "ver": ver}
 
 
@@ -111,7 +112,7 @@ def doParseArgs():
                                   "PACKAGE is compiled or downloaded during this run; if it "
                                   "already exists, this does not happen."))
   build_parser.add_argument("--makeflow", default=False, action="store_true",
-                            help=("Print Makeflow file. "))
+                            help=("Use makeflow for paralle workflow execution. "))
 
   build_docker = build_parser.add_argument_group(title="Build inside a container", description="""\
   Builds can be done inside a Docker container, to make it easier to get a
@@ -163,7 +164,7 @@ def doParseArgs():
   build_dirs.add_argument("-w", "--work-dir", dest="workDir", default=DEFAULT_WORK_DIR,
                           help=("The toplevel directory under which builds should be done and build results "
                                 "should be installed. Default '%(default)s'."))
-  build_dirs.add_argument("-c", "--config-dir", dest="configDir", default="alidist",
+  build_dirs.add_argument("-c", "--config-dir", dest="configDir", default=os.environ.get("BITS_REPO_DIR","alidist"),
                           help="The directory containing build recipes. Default '%(default)s'.")
   build_dirs.add_argument("--reference-sources", dest="referenceSources", metavar="MIRRORDIR",
                           default="%(workDir)s/MIRROR",
@@ -326,7 +327,7 @@ def doParseArgs():
                                  "See also: -c/--config-dir. Default '%(default)s'."))
 
   init_parser.add_argument("--dist", metavar="[USER/REPO@]BRANCH", dest="dist", default="",
-                           type=alidist_string,
+                           type=bits_string,
                            help=("Download the given repository containing build recipes into "
                                  "CONFIGDIR. Syntax: [user/repo@]branch or [url@]branch. The "
                                  "default repo is 'alisw/alidist; the default branch is the "

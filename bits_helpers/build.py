@@ -463,9 +463,9 @@ def doBuild(args, parser):
   buildTargetsDone = []
 
   dieOnError(not exists(args.configDir),
-             'Cannot find alidist recipes under directory "%s".\n'
+             'Cannot find recipes under directory "%s".\n'
              'Maybe you need to "cd" to the right directory or '
-             'you forgot to run "aliBuild init"?' % args.configDir)
+             'you forgot to run "bits init"?' % args.configDir)
 
   _, value = git(("symbolic-ref", "-q", "HEAD"), directory=args.configDir, check=False)
   branch_basename = re.sub("refs/heads/", "", value)
@@ -496,7 +496,7 @@ def doBuild(args, parser):
 
   debug("Building for architecture %s", args.architecture)
   debug("Number of parallel builds: %d", args.jobs)
-  debug("Using aliBuild from alibuild@%s recipes in alidist@%s",
+  debug("Using bitsBuild from alibuild@%s recipes in alidist@%s",
         __version__ or "unknown", os.environ["BITS_ALIDIST_HASH"])
 
   install_wrapper_script("git", workDir)
@@ -1033,6 +1033,7 @@ def doBuild(args, parser):
       ("JOBS", str(args.jobs)),
       ("PKGHASH", spec["hash"]),
       ("PKGNAME", spec["package"]),
+      ("PKGDIR", spec["pkgdir"]),
       ("PKGREVISION", spec["revision"]),
       ("PKGVERSION", spec["version"]),
       ("RELOCATE_PATHS", " ".join(spec.get("relocate_paths", []))),
