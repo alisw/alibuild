@@ -471,7 +471,7 @@ def doBuild(args, parser):
   if (not args.no_remote_store and
       not args.remoteStore and
       args.architecture not in S3_SUPPORTED_ARCHS):
-    warning(f"Not using remote store cache because architecture {args.architecture} is not supported.")
+    warning(f"Not using remote store cache because architecture {args.architecture} doesn't have a nightly build")
 
   _, value = git(("symbolic-ref", "-q", "HEAD"), directory=args.configDir, check=False)
   branch_basename = re.sub("refs/heads/", "", value)
