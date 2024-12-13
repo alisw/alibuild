@@ -12,30 +12,15 @@ from requests.exceptions import RequestException
 from alibuild_helpers.cmd import execute
 from alibuild_helpers.log import debug, info, error, dieOnError, ProgressPrint
 from alibuild_helpers.utilities import resolve_store_path, resolve_links_path, symlink
-
-
-def remote_from_url(read_url, write_url, architecture, work_dir, insecure=False):
-  """Parse remote store URLs and return the correct RemoteSync instance for them."""
-  if read_url.startswith("http"):
-    return HttpRemoteSync(read_url, architecture, work_dir, insecure)
-  if read_url.startswith("s3://"):
-    return S3RemoteSync(read_url, write_url, architecture, work_dir)
-  if read_url.startswith("b3://"):
-    return Boto3RemoteSync(read_url, write_url, architecture, work_dir)
-  if read_url.startswith("cvmfs://"):
-    return CVMFSRemoteSync(read_url, None, architecture, work_dir)
-  if read_url:
-    return RsyncRemoteSync(read_url, write_url, architecture, work_dir)
-  return NoRemoteSync()
-
+from typing import Union
 
 class NoRemoteSync:
   """Helper class which does not do anything to sync"""
-  def fetch_symlinks(self, spec):
+  def fetch_symlinks(self, spec) -> None:
     pass
-  def fetch_tarball(self, spec):
+  def fetch_tarball(self, spec) -> None:
     pass
-  def upload_symlinks_and_tarball(self, spec):
+  def upload_symlinks_and_tarball(self, spec) -> None:
     pass
 
 class PartialDownloadError(Exception):
@@ -47,7 +32,7 @@ class PartialDownloadError(Exception):
 
 
 class HttpRemoteSync:
-  def __init__(self, remoteStore, architecture, workdir, insecure):
+  def __init__(self, remoteStore: str, architecture: str, workdir: str, insecure: bool):
     self.remoteStore = remoteStore
     self.writeStore = ""
     self.architecture = architecture
@@ -486,14 +471,14 @@ class Boto3RemoteSync:
   time.
   """
 
-  def __init__(self, remoteStore, writeStore, architecture, workdir):
+  def __init__(self, remoteStore, writeStore, architecture, workdir) -> None:
     self.remoteStore = re.sub("^b3://", "", remoteStore)
     self.writeStore = re.sub("^b3://", "", writeStore)
     self.architecture = architecture
     self.workdir = workdir
     self._s3_init()
 
-  def _s3_init(self):
+  def _s3_init(self) -> None:
     # This is a separate method so that we can patch it out for unit tests.
     # Import boto3 here, so that if we don't use this remote store, we don't
     # have to install it in the first place.
@@ -530,7 +515,7 @@ class Boto3RemoteSync:
       raise
     return True
 
-  def fetch_tarball(self, spec):
+  def fetch_tarball(self, spec) -> None:
     debug("Updating remote store for package %s with hashes %s", spec["package"],
           ", ".join(spec["remote_hashes"]))
 
@@ -568,7 +553,7 @@ class Boto3RemoteSync:
     debug("Remote has no tarballs for %s with hashes %s", spec["package"],
           ", ".join(spec["remote_hashes"]))
 
-  def fetch_symlinks(self, spec):
+  def fetch_symlinks(self, spec) -> None:
     from botocore.exceptions import ClientError
     links_path = resolve_links_path(self.architecture, spec["package"])
     os.makedirs(os.path.join(self.workdir, links_path), exist_ok=True)
@@ -691,3 +676,21 @@ class Boto3RemoteSync:
 
     self.s3.upload_file(Bucket=self.writeStore, Key=tar_path,
                         Filename=os.path.join(self.workdir, tar_path))
+
+RemoteSync = Union[HttpRemoteSync, S3RemoteSync, Boto3RemoteSync, CVMFSRemoteSync, RsyncRemoteSync, NoRemoteSync]
+
+def remote_from_url(read_url: str, write_url: str, architecture: str, work_dir: str, insecure=False) -> RemoteSync:
+  """Parse remote store URLs and return the correct RemoteSync instance for them."""
+  if read_url.startswith("http"):
+    return HttpRemoteSync(read_url, architecture, work_dir, insecure)
+  if read_url.startswith("s3://"):
+    return S3RemoteSync(read_url, write_url, architecture, work_dir)
+  if read_url.startswith("b3://"):
+    return Boto3RemoteSync(read_url, write_url, architecture, work_dir)
+  if read_url.startswith("cvmfs://"):
+    return CVMFSRemoteSync(read_url, None, architecture, work_dir)
+  if read_url:
+    return RsyncRemoteSync(read_url, write_url, architecture, work_dir)
+  return NoRemoteSync()
+
+

@@ -104,7 +104,7 @@ def report_exception(e):
     exd = e.__class__.__name__,
     exf = "1")
 
-def enable_analytics():
+def enable_analytics() -> None:
   if exists(expanduser("~/.config/alibuild/disable-analytics")):
     unlink(expanduser("~/.config/alibuild/disable-analytics"))
   if not exists(expanduser("~/.config/alibuild/analytics-uuid")):

@@ -21,7 +21,7 @@ PARSER_ERRORS = {
   "build --force-unknown-architecture": [call(BUILD_MISSING_PKG_ERROR)],
   "build --force-unknown-architecture zlib --foo": [call('unrecognized arguments: --foo')],
   "init --docker-image": [call('unrecognized arguments: --docker-image')],
-  "builda --force-unknown-architecture zlib" : [call("argument action: invalid choice: 'builda' (choose from 'analytics', 'architecture', 'build', 'clean', 'deps', 'doctor', 'init', 'version')")],
+  "builda --force-unknown-architecture zlib" : [call("argument action: invalid choice: 'builda' (choose from analytics, architecture, build, clean, deps, doctor, init, version)")],
   "build --force-unknown-architecture zlib --no-system --always-prefer-system" : [call('argument --always-prefer-system: not allowed with argument --no-system')],
   "build zlib --architecture foo": ARCHITECTURE_ERROR,
   "build --force-unknown-architecture zlib --remote-store rsync://test1.local/::rw --write-store rsync://test2.local/::rw ": [call('cannot specify ::rw and --write-store at the same time')],
@@ -95,15 +95,20 @@ class ArgsTestCase(unittest.TestCase):
 
   @mock.patch("alibuild_helpers.utilities.getoutput", new=lambda cmd: "x86_64")   # for uname -m
   @mock.patch('alibuild_helpers.args.argparse.ArgumentParser.error')
-  def test_failingParsing(self, mock_print):
+  def test_failingParsing(self, mock_print) -> None:
     mock_print.side_effect = FakeExit("raised")
     for (cmd, calls) in PARSER_ERRORS.items():
       mock_print.mock_calls = []
       with patch.object(sys, "argv", ["alibuild"] + shlex.split(cmd)):
         self.assertRaises(FakeExit, doParseArgs)
+        if mock_print.mock_calls != calls:
+          import json
+          print('Failed test:', cmd)
+          print("Expected calls: ", json.dumps(calls, indent=2, default=str))
+          print("Actual calls: ", json.dumps(mock_print.mock_calls, indent=2, default=str))
         self.assertEqual(mock_print.mock_calls, calls)
 
-  def test_validArchitectures(self):
+  def test_validArchitectures(self) -> None:
     for arch in VALID_ARCHS:
       self.assertTrue(matchValidArch(arch))
     for arch in INVALID_ARCHS:
