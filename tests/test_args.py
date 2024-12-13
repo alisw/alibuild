@@ -21,7 +21,7 @@ PARSER_ERRORS = {
   "build --force-unknown-architecture": [call(BUILD_MISSING_PKG_ERROR)],
   "build --force-unknown-architecture zlib --foo": [call('unrecognized arguments: --foo')],
   "init --docker-image": [call('unrecognized arguments: --docker-image')],
-  "builda --force-unknown-architecture zlib" : [call("argument action: invalid choice: 'builda' (choose from 'analytics', 'architecture', 'build', 'clean', 'deps', 'doctor', 'init', 'version')")],
+  "builda --force-unknown-architecture zlib" : [call("argument action: invalid choice: 'builda' (choose from analytics, architecture, build, clean, deps, doctor, init, version)")],
   "build --force-unknown-architecture zlib --no-system --always-prefer-system" : [call('argument --always-prefer-system: not allowed with argument --no-system')],
   "build zlib --architecture foo": ARCHITECTURE_ERROR,
   "build --force-unknown-architecture zlib --remote-store rsync://test1.local/::rw --write-store rsync://test2.local/::rw ": [call('cannot specify ::rw and --write-store at the same time')],
