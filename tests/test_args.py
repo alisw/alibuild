@@ -101,6 +101,11 @@ class ArgsTestCase(unittest.TestCase):
       mock_print.mock_calls = []
       with patch.object(sys, "argv", ["alibuild"] + shlex.split(cmd)):
         self.assertRaises(FakeExit, doParseArgs)
+        if mock_print.mock_calls != calls:
+          import json
+          print('Failed test:', cmd)
+          print("Expected calls: ", json.dumps(calls, indent=2, default=str))
+          print("Actual calls: ", json.dumps(mock_print.mock_calls, indent=2, default=str))
         self.assertEqual(mock_print.mock_calls, calls)
 
   def test_validArchitectures(self) -> None:
