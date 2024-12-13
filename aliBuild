@@ -28,7 +28,7 @@ def doMain(args, parser):
   # do not get fooled when parsing localized messages.
   # We set ALIBUILD_ARCHITECTURE so that it's picked up by the external
   # command which does the reporting.
-  if not "architecture" in args:
+  if "architecture" not in args:
     args.architecture = detectArch()
   ENVIRONMENT_OVERRIDES = {
     "LANG": "C",
@@ -57,7 +57,7 @@ def doMain(args, parser):
       error(e.message)
       exit(1)
 
-  if args.action == "version" or args.action == None:
+  if args.action == "version" or args.action is None:
     print("aliBuild version: {version} ({arch})".format(
       version=__version__ or "unknown", arch=args.architecture or "unknown"))
     sys.exit(0)
@@ -118,6 +118,7 @@ if __name__ == "__main__":
       from io import StringIO
       pr = cProfile.Profile()
       pr.enable()
+
       def profiler():
         pr.disable()
         print("profiler stopped")
