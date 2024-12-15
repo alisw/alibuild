@@ -126,6 +126,8 @@ function Run() { # dummy function
     true
 }
 
+printenv
+
 if [[ "$CACHED_TARBALL" == "" && ! -f $BUILDROOT/log ]]; then
   set -o pipefail
   (set -x; unset DYLD_LIBRARY_PATH; source "$WORK_DIR/SPECS/$ARCHITECTURE/$PKGNAME/$PKGVERSION-$PKGREVISION/$PKGNAME.sh"; Run $* 2>&1) | tee "$BUILDROOT/log"

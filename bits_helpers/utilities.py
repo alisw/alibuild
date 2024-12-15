@@ -280,12 +280,16 @@ def disabledByArchitecture(arch, requires):
       yield require
 
 def readDefaults(configDir, defaults, error, architecture):
+  '''
   defaultsFilename = "%s/defaults-%s.sh" % (configDir, defaults)
   if not exists(defaultsFilename):
     error("Default `%s' does not exists. Viable options:\n%s" %
           (defaults or "<no defaults specified>",
            "\n".join("- " + basename(x).replace("defaults-", "").replace(".sh", "")
                      for x in glob(join(configDir, "defaults-*.sh")))))
+  '''
+  defaultsFilename = resolveDefaultsFilename(defaults,configDir)
+  
   err, defaultsMeta, defaultsBody = parseRecipe(getRecipeReader(defaultsFilename))
   if err:
     error(err)
@@ -420,12 +424,31 @@ def resolveFilename(taps, pkg, configDir):
 
   if configPath:
     for d in configPath.split(","):
-       pkgDirs.append(cfgDir + "/" + d)
+       pkgDirs.append(cfgDir + "/" + d + ".bits")
 
   for d in pkgDirs:
     filename = checkForFilename(taps,pkg,d)
     if os.path.exists(filename):
       return(filename,os.path.abspath(d))
+
+def resolveDefaultsFilename(defaults, configDir):
+  configPath = os.environ.get("BITS_PATH")
+  cfgDir = configDir
+  pkgDirs = [cfgDir]
+
+  if configPath:
+    for d in configPath.split(","):
+       pkgDirs.append(cfgDir + "/" + d + ".bits")
+
+  for d in pkgDirs:
+    filename = "%s/defaults-%s.sh" % (d, defaults)
+    if os.path.exists(filename):
+      return(filename)
+
+  error("Default `%s' does not exists. Viable options:\n%s" %
+          (defaults or "<no defaults specified>",
+           "\n".join("- " + basename(x).replace("defaults-", "").replace(".sh", "")
+                     for x in glob(join(configDir, "defaults-*.sh")))))
     
 def getPackageList(packages, specs, configDir, preferSystem, noSystem,
                    architecture, disable, defaults, performPreferCheck, performRequirementCheck,

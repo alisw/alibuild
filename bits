@@ -1,4 +1,4 @@
-#!/bin/bash -evx
+#!/bin/bash -e
 
 BITSDIR=`dirname $0`
 
