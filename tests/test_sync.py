@@ -220,7 +220,7 @@ class Boto3TestCase(unittest.TestCase):
                 ]}]
             elif dir.endswith("-" + BAD_SPEC["revision"]):
                 # Simulate partially complete upload of symlinks, e.g. by
-                # another aliBuild running in parallel.
+                # another bits running in parallel.
                 return [{"Contents": [
                     {"Key": dir + Delimiter + "somepackage-v1-1.%s.tar.gz" % ARCHITECTURE},
                 ]}]

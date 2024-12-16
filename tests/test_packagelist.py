@@ -29,7 +29,7 @@ RECIPES = {
     version: v1
     prefer_system: '.*'
     prefer_system_check: |
-        echo 'alibuild_system_replace: replacement'
+        echo 'bits_system_replace: replacement'
     prefer_system_replacement_specs:
         replacement:
             env:
@@ -41,7 +41,7 @@ RECIPES = {
     version: v1
     prefer_system: '.*'
     prefer_system_check: |
-        echo 'alibuild_system_replace: replacement'
+        echo 'bits_system_replace: replacement'
     prefer_system_replacement_specs:
         replacement:
             recipe: 'true'
@@ -52,7 +52,7 @@ RECIPES = {
     version: v1
     prefer_system: '.*'
     prefer_system_check: |
-        echo 'alibuild_system_replace: missing_tag'
+        echo 'bits_system_replace: missing_tag'
     prefer_system_replacement_specs: {}
     ---
     """),
@@ -115,7 +115,7 @@ class ReplacementTestCase(unittest.TestCase):
     def test_disable(self):
         """Check that not specifying any replacement disables the package.
 
-        This is was the only available behaviour in previous aliBuild versions
+        This is was the only available behaviour in previous bits versions
         and must be preserved for backward compatibility.
         """
         specs, systemPkgs, ownPkgs, failedReqs, validDefaults = \

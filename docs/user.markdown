@@ -82,7 +82,7 @@ provides tarballs for the most common supported architectures.
 - `--insecure`: Don't validate TLS certificates when connecting to an `https://`
   remote store.
 
-### Customise aliBuild directories
+### Customise bits directories
 
 - `-C DIR`, `--chdir DIR`: Change to the specified directory before building.
   Alternatively, set `BITS_CHDIR`. Default `.`.
@@ -103,7 +103,7 @@ provides tarballs for the most common supported architectures.
 
 ## Using precompiled packages
 
-By running aliBuild with no special option on CentOS/Alma 7, 8 or 9, or on
+By running bits with no special option on CentOS/Alma 7, 8 or 9, or on
 Ubuntu 20.04 or 22.04, it will automatically try to
 use as many precompiled packages as possible by downloading them from a default
 central server. By using precompiled packages you lose the ability to pick some
@@ -120,7 +120,7 @@ others.
 In order to specify the cache store, use the option `--remote-store <uri>`,
 where `<uri>` can be:
 
-* a local path, for instance `/opt/alibuild_cache`,
+* a local path, for instance `/opt/bits_cache`,
 * a remote SSH accessible path, `ssh://<host>:<path>`,
 * an unencrypted rsync path, `rsync://<host>/path`,
 * a CERN S3 bucket, `b3://<bucket>`,
@@ -137,7 +137,7 @@ course.
 It is also possible to specify a write store different from the read one by
 using the `--write-store` option.
 
-aliBuild can reuse precompiled packages if they were built with a different tag,
+bits can reuse precompiled packages if they were built with a different tag,
 if that tag points to the same actual commit that you're building now. (This is
 used for the nightly tags, as they are built from a branch named
 `rc/nightly-YYYYMMDD`, while alidist is updated to have a tag like
@@ -155,7 +155,7 @@ One of the use cases we want to cover is the ability to develop external
 packages without having to go through an commit - push - pull cycle.
 
 In order to do so, you can simply checkout the package you want to
-develop at the same level as alibuild and alidist.
+develop at the same level as bits and repository directory.
 
 For example, if you want to build O2 while having the ability to modify
 ROOT, you can do the following:
@@ -163,7 +163,7 @@ ROOT, you can do the following:
     git clone https://github.com/alisw/alidist
     git clone https://github.com/root-mirror/root ROOT
     <modify files in ROOT/>
-    aliBuild ... build O2
+    bits ... build O2
 
 The above will make sure the build will pick up your changes in the local
 directory.
@@ -198,7 +198,7 @@ case the incremental recipe will always be executed.
 
 ### Forcing a different architecture
 
-While alibuild does its best to find out which OS / distribution you are
+While bits does its best to find out which OS / distribution you are
 using, sometimes it might fail to do so, for example in the case you
 start using a new *buntu flavour or a bleeding edge version of Centos.
 In order to force the the correct architecture for the build you can use
@@ -217,7 +217,7 @@ Very often one needs to run on a platform which is different from
 the one being used for development. The common use case is that
 development happens on a Mac while production runs on some older Linux
 distribution like SLC5 or SLC6. In order to improve the experience
-of cross platform development aliBuild now offers the ability to run
+of cross platform development bits now offers the ability to run
 in [Docker](https://docker.io) via the `--docker` option. When it is
 specified the first part of the architecture will be used to construct
 the name of the docker container to be used for the build and the build
@@ -225,7 +225,7 @@ itself will be performed inside that container. For example if you
 specify:
 
 ```bash
-alibuild --docker -a slc7_x86-64 build ROOT
+bits --docker -a slc7_x86-64 build ROOT
 ```
 
 the build itself will happen inside the alisw/slc7-builder Docker
@@ -235,7 +235,7 @@ option using the same syntax used by Docker.
 
 ## Defaults
 
-By default `aliBuild` is tuned to build the production version of ALICE
+By default `bits` is tuned to build the production version of ALICE
 Offline software, as deployed on the Grid, so some of the choices in
 terms of version of the packages and compilation flags are tweaked for
 that. For example, ROOT5 is used because that's what is what has been
@@ -250,8 +250,7 @@ works please look at [the reference manual](reference.html#defaults).
 You can optionally disable certain packages by specifying them as a comma
 separated list with the `--disable` option.
 
-Moreover, starting from aliBuild 1.4.0, it will also be
-possible to disable packages by adding them to the `disable`
+It is possible to disable packages by adding them to the `disable`
 keyword of your defaults file (see previous paragraph). See the
 [defaults-o2.sh](https://github.com/alisw/alidist/blob/master/defaults-o2.sh)
 file for an example of how to disable `AliEn-Runtime` and `AliRoot`
@@ -267,7 +266,7 @@ zlib or cmake which should be available on a standard developer machine
 and we rebuild them as last resort. In certain cases, to ensure full
 compatibility on what is done in production it might be desirable to
 always pick up our own version of the tools. This can be done by passing
-the `--no-system` option to alibuild. On the other hand, there might
+the `--no-system` option to bits. On the other hand, there might
 be cases in which you want to pick up not only basic tools, but also
 advanced ones like ROOT, Geant4, or Pythia from the system, either to
 save time or because you have a pre-existing setup which you do not want
@@ -277,7 +276,7 @@ checking they are actually compatible with the one used in the recipe).
 
 ## Cleaning up the build area (new in 1.1.0)
 
-Whenever you build using a different recipe or set of sources, alibuild
+Whenever you build using a different recipe or set of sources, bits
 makes sure that all the dependent packages which might be affected
 by the change are rebuild, and it does so in a different directory.
 This can lead to the profiliferation of many build / installation
@@ -288,35 +287,35 @@ In order to remove all past builds and only keep the latest one for each
 alidist area you might have used and for each breanch (but not commit)
 ever build for a given development package you can use the
 
-    aliBuild clean
+    bits clean
 
 subcommand which will do its best to clean up your build and
 installation area.
 
-## Upgrading aliBuild
+## Upgrading bits
 
-aliBuild is installed via `pip`. In order to upgrade it on most laptops (in
+bits is installed via `pip`. In order to upgrade it on most laptops (in
 particular Macs) do:
 
-    pip install --upgrade alibuild
+    pip install --upgrade bits
 
 or in case you need to be root (_e.g._ on Ubuntu and most Linux distributions
 for convenience):
 
-    sudo pip install --upgrade alibuild
+    sudo pip install --upgrade bits
 
-In general updating aliBuild is safe and it should never trigger a rebuild or
+In general updating bits is safe and it should never trigger a rebuild or
 break compilation of older versions of alidist (i.e. we do try to guarantee
-backward compatibility). In no case an update of aliBuild will result in the
+backward compatibility). In no case an update of bits will result in the
 update of `alidist`, which users will have to be done separately.
-In case some yet to appear bug in alibuild will force us to rebuild a
+In case some yet to appear bug in bits will force us to rebuild a
 previously built area, this will be widely publicized and users will get a warning
 when running the command.
 
-You can also upgrade / install a specific version of alibuild by specifying it on the 
+You can also upgrade / install a specific version of bits by specifying it on the 
 command line. E.g.:
 
-    pip install alibuild=1.5.5.rc1
+    pip install bits=1.5.5.rc1
     
 this is in particular required when you want to try out release candidates (rc) builds which
 are masked out by default.
@@ -325,15 +324,15 @@ are masked out by default.
 
 Generally, recipes specify a Git _tag_ name in the `tag:` field. In some cases,
 _branch names_ might be used instead (such as `tag: master` or `tag: dev`). In
-such a rare case, aliBuild needs to know what is the last branch commit to
+such a rare case, bits needs to know what is the last branch commit to
 determine whether a rebuild is necessary.
 
 Such check by default uses cached information instead of doing very slow queries
-to remote servers. This means that aliBuild is fast in determining which
+to remote servers. This means that bits is fast in determining which
 packages to build. However, packages using branch names might not get rebuilt as
 expected when new changes are pushed to those branches.
 
-In this case, you can ask aliBuild to update cached branches information by
+In this case, you can ask bits to update cached branches information by
 adding the `-u` or `--fetch-repos` option. Note that by default this is not
 needed, it's only for very special use cases (such as centralized builds and
 server-side pull request checks).
@@ -370,7 +369,7 @@ Please run `bitsDeps --help` for further information.
 
 ### Loading the package environment
 
-Environment for packages built using aliBuild is managed by
+Environment for packages built using bits is managed by
 [Environment Modules](http://modules.sourceforge.net) and the wrapper script
 `alienv`. To list the available packages you can do:
 
@@ -396,7 +395,7 @@ Environment Modules is required: the package is usually called
 `environment-modules` on Linux, or simply `modules` if using Homebrew on OSX.
 
 Note that `alienv` works exactly like the one found on CVMFS, but for local
-packages built with `aliBuild`.
+packages built with `bits`.
 
 ### Environment for packages lacking a module definition
 

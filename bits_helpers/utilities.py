@@ -531,7 +531,7 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
         ownPackages.add(spec["package"])
       else:
         # prefer_system_check succeeded; this means we should use the system package.
-        match = re.search(r"^alibuild_system_replace:(?P<key>.*)$", output, re.MULTILINE)
+        match = re.search(r"^bits_system_replace:(?P<key>.*)$", output, re.MULTILINE)
         if not match:
           # No replacement spec name given. Fall back to old system package
           # behaviour and just disable the package.
@@ -555,7 +555,7 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
             spec = replacement
             recipe = replacement.get("recipe", "")
             # If there's an explicitly-specified recipe, we're still building
-            # the package. If not, aliBuild will still "build" it, but it's
+            # the package. If not, bits will still "build" it, but it's
             # basically instantaneous, so report to the user that we're taking
             # it from the system.
             if recipe:

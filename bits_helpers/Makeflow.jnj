@@ -1,13 +1,4 @@
-# A alibuild template to convert the alidist recipes to
-# the please build system. While not fully functional, it serves
-# as explanatory example on how one can use templates to
-# extract informations from alidist, without having to instrument
-# alibuild itself.
-#
-# Use with:
-#
-# cat Makeflow.jnj | python3 aliBuild build lz4 --defaults o2 --debug --no-system --plugin templating --no-system --no-local alibuild-recipe-tools > Makeflow
-#
+# Makeflow template
 
 {% for target in Done %}
 {{target}}.build:

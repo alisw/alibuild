@@ -235,7 +235,8 @@ export BITS_PKG_PREFIX=${pkg_prefix:="VO_"$organisation}
 mkdir -p $work_dir || echo "Cannot create directory: " $work_dir 
 
 case $1 in
-    analytics|architecture|build|clean|deps|doctor|init|version)
+#   analytics|architecture|build|clean|deps|doctor|init|version)
+    architecture|build|clean|deps|doctor|init|version)
         $BITSDIR/bitsBuild $@
 	exit $?
         ;;

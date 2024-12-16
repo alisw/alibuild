@@ -3,14 +3,15 @@ requires = ["setuptools>=45", "setuptools_scm[toml]>=6.2"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = 'alibuild'
+name = 'bits'
 dynamic = ['readme', 'version']
 description = 'Build Tool'
-keywords = ['HEP', 'ALICE']
+keywords = ['HEP', 'CERN']
 license = {text = 'GPL'}
 authors = [
   {name = 'Giulio Eulisse', email = 'giulio.eulisse@cern.ch'},
   {name = 'Timo Wilken', email = 'timo.wilken@cern.ch'},
+  {name = 'Predrag Buncic', email = 'predrag.buncic@cern.ch'},
 ]
 
 classifiers = [
@@ -35,7 +36,7 @@ dependencies = [
 ]
 
 [project.urls]
-homepage = 'https://alisw.github.io/alibuild'
+homepage = 'https://github.com/bitsorg/bits'
 
 [scripts]
 alienv = {path = "bits"}

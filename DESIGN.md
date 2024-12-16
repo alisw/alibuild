@@ -1,4 +1,4 @@
-This is a list of a few design choices of aliBuild with the rationale for it.
+This is a list of a few design choices of bits with the rationale for it.
 
 # git is the only "native" backend for sources
 

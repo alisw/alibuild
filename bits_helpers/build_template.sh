@@ -17,7 +17,7 @@ export WORK_DIR="${WORK_DIR_OVERRIDE:-%(workDir)s}"
 export PATH=$WORK_DIR/wrapper-scripts:$PATH
 
 # The following environment variables are setup by
-# the aliBuild script itself
+# the bits script itself
 #
 # - ARCHITECTURE
 # - BUILD_REQUIRES

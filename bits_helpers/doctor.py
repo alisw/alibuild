@@ -16,7 +16,7 @@ def prunePaths(workDir):
 
 def checkPreferSystem(spec, cmd, homebrew_replacement, getstatusoutput_docker):
     if cmd == "false":
-      debug("Package %s can only be managed via alibuild.", spec["package"])
+      debug("Package %s can only be managed via bits.", spec["package"])
       return (1, "")
     cmd = homebrew_replacement + cmd
     err, out = getstatusoutput_docker(cmd)
@@ -26,7 +26,7 @@ def checkPreferSystem(spec, cmd, homebrew_replacement, getstatusoutput_docker):
         debug("%s: %s", spec["package"], x)
       return (err, "")
 
-    warning("Package %s cannot be picked up from the system and will be built by aliBuild.\n"
+    warning("Package %s cannot be picked up from the system and will be built by bits.\n"
             "This is due to the fact the following script fails:\n\n%s\n\n"
             "with the following output:\n\n%s\n",
             spec["package"], cmd, "\n".join("%s: %s" % (spec["package"], x) for x in out.split("\n")))
@@ -156,7 +156,7 @@ def doDoctor(args, parser):
 
   alwaysBuilt = set(x for x in specs) - fromSystem - own - failed
   if alwaysBuilt:
-    banner("The following packages will be built by aliBuild because\n"
+    banner("The following packages will be built by bits because\n"
            " usage of a system version of it is not allowed or supported, by policy:\n\n- %s",
            " \n- ".join(alwaysBuilt))
   if fromSystem:
@@ -164,9 +164,9 @@ def doDoctor(args, parser):
            "If this is not you want, you have to uninstall / unload them.",
            "\n- ".join(fromSystem))
   if own:
-    banner("The following packages will be built by aliBuild because they couldn't be picked up from the system:\n\n"
+    banner("The following packages will be built by bits because they couldn't be picked up from the system:\n\n"
            "- %s\n\n"
-           "This is not a real issue, but it might take longer the first time you invoke aliBuild.\n"
+           "This is not a real issue, but it might take longer the first time you invoke bits.\n"
            "Look at the error messages above to get hints on what packages you need to install separately.",
            "\n- ".join(own))
   if failed:

@@ -49,7 +49,7 @@ jobs:
         run: tox
 
       - name: Convert coverage information
-        if: ${{ always() && github.event.repository.owner.login == 'alisw' }}
+        if: ${{ always() && github.event.repository.owner.login == 'bits' }}
         run: |
           coverage combine .tox/coverage.*
           # Codecov only understands XML, JSON and LCOV files.
@@ -59,7 +59,7 @@ jobs:
           coverage json --ignore-errors -o coverage.json
 
       - name: Upload coverage information
-        if: ${{ always() && github.event.repository.owner.login == 'alisw' }}
+        if: ${{ always() && github.event.repository.owner.login == 'bits' }}
         uses: codecov/codecov-action@v3
         with:
           files: coverage.json
@@ -84,14 +84,13 @@ jobs:
 
       - name: Install test dependencies
         run: |
-          brew install modules alisw/system-deps/o2-full-deps sapling
           python3 -m pip install --upgrade tox tox-gh-actions coverage
 
       - name: Run tests
         run: tox -e darwin
 
       - name: Convert coverage information
-        if: ${{ always() && github.event.repository.owner.login == 'alisw' }}
+        if: ${{ always() && github.event.repository.owner.login == 'bits' }}
         run: |
           coverage combine .tox/coverage.*
           # Codecov only understands XML, JSON and LCOV files.
@@ -101,7 +100,7 @@ jobs:
           coverage json --ignore-errors -o coverage.json
 
       - name: Upload coverage information
-        if: ${{ always() && github.event.repository.owner.login == 'alisw' }}
+        if: ${{ always() && github.event.repository.owner.login == 'bits' }}
         uses: codecov/codecov-action@v3
         with:
           files: coverage.json

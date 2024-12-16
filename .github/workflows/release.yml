@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
     steps:
-      - name: Checkout alibuild
+      - name: Checkout bits
         uses: actions/checkout@v4
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -40,21 +40,21 @@ jobs:
         run: brew install pipgrip
       - name: Checkout Homebrew repo
         run: brew tap alisw/system-deps
-      - name: Update alibuild formula with new version
+      - name: Update bits formula with new version
         run: |
           set -x
-          json=$(curl -fSsL "https://pypi.org/pypi/alibuild/${GITHUB_REF#refs/tags/}/json")
+          json=$(curl -fSsL "https://pypi.org/pypi/bits/${GITHUB_REF#refs/tags/}/json")
           sha=$(echo "$json" | jq -r '.urls[0].digests.sha256')
           url=$(echo "$json" | jq -r '.urls[0].url')
           # Replace keys with two leading spaces only, so we get the toplevel
-          # ones applying to alibuild, not those for dependencies.
+          # ones applying to bits, not those for dependencies.
           sed -i.bak "
           s|^  url .*|  url \"$url\"|;
           s|^  sha256 .*|  sha256 \"$sha\"|;
           s|^  version .*|  version \"${GITHUB_REF#refs/tags/v}\"|
-          " "$(brew formula alibuild)"
-          rm -f "$(brew formula alibuild).bak"
-      - name: Regenerate alibuild formula
+          " "$(brew formula bits)"
+          rm -f "$(brew formula bits).bak"
+      - name: Regenerate bits formula
         run: |
           set -x
           # Sometimes, brew update-python-resources apparently randomly fails,
@@ -62,18 +62,18 @@ jobs:
           attempt=0
           while [ $((attempt++)) -lt 5 ]; do
             echo "Attempt $attempt/5..." >&2
-            brew update-python-resources alibuild && break
+            brew update-python-resources bits && break
             sleep 300
           done
       - name: Push updated formula
         run: |
           set -x
-          cd "$(dirname "$(brew formula alibuild)")"
-          git config user.name alibuild
-          git config user.email 'alibuild@cern.ch'
-          git add alibuild.rb
-          git commit -m "Update alibuild to ${GITHUB_REF#refs/tags/}"
+          cd "$(dirname "$(brew formula bits)")"
+          git config user.name bits
+          git config user.email 'bits@cern.ch'
+          git add bits.rb
+          git commit -m "Update bits to ${GITHUB_REF#refs/tags/}"
           git show
-          git push "https://alibuild:$GITHUB_TOKEN@github.com/alisw/homebrew-system-deps" master
+          git push "https://bits:$GITHUB_TOKEN@github.com/bitsorg/homebrew-system-deps" master
         env:
           GITHUB_TOKEN: ${{ secrets.homebrew_repo_token }}

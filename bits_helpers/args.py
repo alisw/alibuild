@@ -45,8 +45,10 @@ def doParseArgs():
                       help="Print what would happen, without actually doing it.")
 
   subparsers = parser.add_subparsers(dest="action")
+  '''
   analytics_parser = subparsers.add_parser("analytics", help="turn on / off analytics",
                                            description="Control analytics state.")
+  '''
   subparsers.add_parser("architecture", help="display detected architecture",
                         description="Display the detected architecture.")
   build_parser = subparsers.add_parser("build", help="build a package",
@@ -63,7 +65,7 @@ def doParseArgs():
                                          description="Display %(prog)s and architecture.")
 
   # Options for the analytics command
-  analytics_parser.add_argument("state", choices=["on", "off"], help="Whether to report analytics or not")
+  # analytics_parser.add_argument("state", choices=["on", "off"], help="Whether to report analytics or not")
 
   # Options for the build command
   build_parser.add_argument("pkgname", metavar="PACKAGE", nargs="+",
@@ -157,7 +159,7 @@ def doParseArgs():
   build_remote.add_argument("--insecure", dest="insecure", action="store_true",
                             help="Don't validate TLS certificates when connecting to an https:// remote store.")
 
-  build_dirs = build_parser.add_argument_group(title="Customise aliBuild directories")
+  build_dirs = build_parser.add_argument_group(title="Customise bits directories")
   build_dirs.add_argument("-C", "--chdir", metavar="DIR", dest="chdir", default=DEFAULT_CHDIR,
                           help=("Change to the specified directory before building. "
                                 "Alternatively, set BITS_CHDIR. Default '%(default)s'."))
@@ -189,7 +191,7 @@ def doParseArgs():
                                   "architecture, which is '%(default)s'."))
   clean_parser.add_argument("--aggressive-cleanup", dest="aggressiveCleanup", action="store_true",
                             help="Delete as much build data as possible when cleaning up.")
-  clean_dirs = clean_parser.add_argument_group(title="Customise aliBuild directories")
+  clean_dirs = clean_parser.add_argument_group(title="Customise bits directories")
   clean_dirs.add_argument("-C", "--chdir", metavar="DIR", dest="chdir", default=DEFAULT_CHDIR,
                           help=("Change to the specified directory before cleaning up. "
                                 "Alternatively, set BITS_CHDIR. Default '%(default)s'."))
@@ -220,7 +222,7 @@ def doParseArgs():
                           help="Store final output PDF file in %(metavar)s.")
 
   deps_docker = deps_parser.add_argument_group(title="Use a Docker container", description="""\
-  If you're planning to build inside a Docker container, e.g. using aliBuild
+  If you're planning to build inside a Docker container, e.g. using bits
   build's --docker option, it may be useful to resolve dependencies inside that
   container as well, as which system packages are picked up may differ.
   """)
@@ -234,7 +236,7 @@ def doParseArgs():
                                  "Passed through verbatim -- separate multiple arguments "
                                  "with spaces, and make sure quoting is correct! Implies --docker."))
 
-  deps_parser.add_argument_group(title="Customise aliBuild directories") \
+  deps_parser.add_argument_group(title="Customise bits directories") \
              .add_argument("-c", "--config-dir", dest="configDir", default="alidist",
                            help="The directory containing build recipes. Default '%(default)s'.")
 
@@ -266,7 +268,7 @@ def doParseArgs():
                              help="Never use system packages, even if compatible.")
 
   doctor_docker = doctor_parser.add_argument_group(title="Use a Docker container", description="""\
-  If you're planning to build inside a Docker container, e.g. using aliBuild
+  If you're planning to build inside a Docker container, e.g. using bits
   build's --docker option, it may be useful to resolve dependencies inside that
   container as well, as which system packages are picked up may differ.
   """)
@@ -303,7 +305,7 @@ def doParseArgs():
   doctor_remote.add_argument("--insecure", dest="insecure", action="store_true",
                             help="Don't validate TLS certificates when connecting to an https:// remote store.")
 
-  doctor_dirs = doctor_parser.add_argument_group(title="Customise aliBuild directories")
+  doctor_dirs = doctor_parser.add_argument_group(title="Customise bits directories")
   doctor_dirs.add_argument("-C", "--chdir", metavar="DIR", dest="chdir", default=DEFAULT_CHDIR,
                            help=("Change to the specified directory before doing anything. "
                                  "Alternatively, set BITS_CHDIR. Default '%(default)s'."))
@@ -333,7 +335,7 @@ def doParseArgs():
                                  "default repo is 'alisw/alidist; the default branch is the "
                                  "repository's main branch."))
 
-  init_dirs = init_parser.add_argument_group(title="Customise aliBuild directories")
+  init_dirs = init_parser.add_argument_group(title="Customise bits directories")
   init_dirs.add_argument("-C", "--chdir", metavar="DIR", dest="chdir", default=DEFAULT_CHDIR,
                          help=("Change to the specified directory before doing anything. "
                                "Alternatively, set BITS_CHDIR. Default '%(default)s'."))
@@ -359,7 +361,8 @@ def doParseArgs():
   def optionOrder(x):
     if x in ["--debug", "-d", "-n", "--dry-run"]:
       return 0
-    if x in ["build", "init", "clean", "analytics", "doctor", "deps"]:
+#   if x in ["build", "init", "clean", "analytics", "doctor", "deps"]:
+    if x in ["build", "init", "clean", "doctor", "deps"]:
       return 1
     return 2
   rest.sort(key=optionOrder)
@@ -395,9 +398,10 @@ On Mac, 1-2 latest supported OSX versions:
 S3_SUPPORTED_ARCHS = "slc7_x86-64", "slc8_x86-64", "ubuntu2004_x86-64", "ubuntu2204_x86-64", "slc9_x86-64"
 
 def finaliseArgs(args, parser):
-
+  
   # Nothing to finalise for version or analytics
-  if args.action in ["version", "analytics", "architecture"]:
+  # if args.action in ["version", "analytics", "architecture"]:
+  if args.action in ["version", "architecture"]:
     return args
 
   # --architecture can be specified in both clean and build.

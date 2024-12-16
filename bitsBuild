@@ -93,6 +93,7 @@ if __name__ == "__main__":
 
   os.environ["BITS_ANALYTICS_ID"] = "UA-77346950-1"
   os.environ["BITS_VERSION"] = __version__ or ""
+
   if args.action == "analytics":
     if args.state == "off":
       disable_analytics()
@@ -104,6 +105,8 @@ if __name__ == "__main__":
     print(arch if arch else "<unknown>")
     exit(0)
 
+  os.environ["BITS_NO_ANALYTICS"] = "1"
+  '''
   if not decideAnalytics(exists(expanduser("~/.config/bits/disable-analytics")),
                          exists(expanduser("~/.config/bits/analytics-uuid")),
                          sys.stdin.isatty(),
@@ -111,6 +114,7 @@ if __name__ == "__main__":
     os.environ["BITS_NO_ANALYTICS"] = "1"
   else:
     os.environ["BITS_ANALYTICS_USER_UUID"] = open(expanduser("~/.config/bits/analytics-uuid")).read().strip()
+  '''
   try:
     profiler = "--profile" in sys.argv
     if profiler:

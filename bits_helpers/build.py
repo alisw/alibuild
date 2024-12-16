@@ -82,7 +82,7 @@ def update_git_repos(args, specs, buildOrder):
 
     progress = ProgressPrint("Updating repositories")
     requires_auth = set()
-    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
         future_to_download = {
           executor.submit(update_repo, package, git_prompt=False): package
           for package in buildOrder if "source" in specs[package]
@@ -294,7 +294,7 @@ def hash_local_changes(spec):
     dieOnError(err, "Unable to detect source code changes.")
   except UntrackedChangesError:
     untrackedFilesDirectories = [directory]
-    warning("You have untracked changes in %s, so aliBuild cannot detect "
+    warning("You have untracked changes in %s, so bits cannot detect "
             "whether it needs to rebuild the package. Therefore, the package "
             "is being rebuilt unconditionally. Please use 'git add' and/or "
             "'git commit' to track your changes in git.", directory)
@@ -429,9 +429,9 @@ def create_provenance_info(package, specs, args):
 
   return json.dumps({
     "comment": args.annotate.get(package),
-    "alibuild_version": __version__,
-    "alidist": {
-      "commit": os.environ["BITS_ALIDIST_HASH"],
+    "bits_version": __version__,
+    "dist": {
+      "commit": os.environ["BITS_DIST_HASH"],
     },
     "architecture": args.architecture,
     "defaults": args.defaults,
@@ -485,19 +485,19 @@ def doBuild(args, parser):
   # If the alidist workdir contains a .sl directory, we use Sapling as SCM.
   # Otherwise, we default to git (without checking for the actual presence of
   # .git). We mustn't check for a .git directory, because some tests use a
-  # subdirectory of the alibuild source tree as the "alidist" checkout, and
+  # subdirectory of the bits source tree as the "alidist" checkout, and
   # that won't have a .git directory.
   scm = exists("%s/.sl" % args.configDir) and Sapling() or Git()
   try:
     checkedOutCommitName = scm.checkedOutCommitName(directory=args.configDir)
   except SCMError:
     dieOnError(True, "Cannot find SCM directory in %s." % args.configDir)
-  os.environ["BITS_ALIDIST_HASH"] = checkedOutCommitName
+  os.environ["BITS_DIST_HASH"] = checkedOutCommitName
 
   debug("Building for architecture %s", args.architecture)
   debug("Number of parallel builds: %d", args.jobs)
-  debug("Using bitsBuild from alibuild@%s recipes in alidist@%s",
-        __version__ or "unknown", os.environ["BITS_ALIDIST_HASH"])
+  debug("Using bitsBuild from bits@%s recipes in dist@%s",
+        __version__ or "unknown", os.environ["BITS_DIST_HASH"])
 
   install_wrapper_script("git", workDir)
 
@@ -533,7 +533,7 @@ def doBuild(args, parser):
     x["runtime_requires"] = [r for r in x["runtime_requires"] if not r in args.disable]
 
   if systemPackages:
-    banner("aliBuild can take the following packages from the system and will not build them:\n  %s",
+    banner("bits can take the following packages from the system and will not build them:\n  %s",
            ", ".join(systemPackages))
     for pkg in systemPackages:
       buildTargetsDone.append(pkg)
@@ -567,7 +567,7 @@ def doBuild(args, parser):
     banner("You have packages in development mode.\n"
            "This means their source code can be freely modified under:\n\n"
            "  %s/<package_name>\n\n"
-           "aliBuild does not automatically update such packages to avoid work loss.\n"
+           "bits does not automatically update such packages to avoid work loss.\n"
            "In most cases this is achieved by doing in the package source directory:\n\n"
            "  git pull --rebase\n",
            os.getcwd())
@@ -606,7 +606,7 @@ def doBuild(args, parser):
                "Found a directory called {package} here, but we're not "
                "expecting any code for the package {package}. If this is a "
                "mistake, please rename the {package} directory or use the "
-               "'--no-local {package}' option. If aliBuild should pick up "
+               "'--no-local {package}' option. If bits should pick up "
                "source code from this directory, add a 'source:' key to "
                "alidist/{recipe}.sh instead."
                .format(package=p, recipe=p.lower()))
@@ -683,7 +683,7 @@ def doBuild(args, parser):
         # Runtime deps of build deps should count as build deps.
         spec[full_key] |= specs[dep]["full_requires" if key == "build_requires" else full_key]
     # Propagate build deps of runtime deps, so that they are not added into
-    # the generated modulefile by alibuild-generate-module.
+    # the generated modulefile by bits-generate-module.
     for dep in spec["runtime_requires"]:
       spec["full_build_requires"] |= specs[dep]["full_build_requires"]
     # If something requires or runtime_requires a package, then it's not a
@@ -699,7 +699,6 @@ def doBuild(args, parser):
   if args.dryRun:
     info("--dry-run / -n specified. Not building.")
     return
-
   # We now iterate on all the packages, making sure we build correctly every
   # single one of them. This is done this way so that the second time we run we
   # can check if the build was consistent and if it is, we bail out.
@@ -711,7 +710,6 @@ def doBuild(args, parser):
     own=",".join(sorted(ownPackages)),
     deps=",".join(buildOrder[:-1]),
   ), args.architecture)
-  
 
   buildList=[]
 
@@ -1144,7 +1142,7 @@ def doBuild(args, parser):
       args.architecture,
       spec["version"],
       spec["commit_hash"],
-      os.environ["BITS_ALIDIST_HASH"][:10],
+      os.environ["BITS_DIST_HASH"][:10],
        )))
 
       updatablePkgs = [dep for dep in spec["requires"] if specs[dep]["is_devel_pkg"]]

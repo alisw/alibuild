@@ -1,4 +1,4 @@
-"""Sync backends for alibuild."""
+"""Sync backends for bits."""
 
 import glob
 import os
@@ -65,7 +65,7 @@ class HttpRemoteSync:
         # If the download has failed, enable debug output, even if it was
         # disabled before. We disable debug output for e.g. symlink downloads
         # to make sure the output log isn't overwhelmed. If the download
-        # failed, we want to know about it, though. Note that aliBuild has to
+        # failed, we want to know about it, though. Note that bits has to
         # be called with --debug for this to take effect.
         log = True
       try:
@@ -439,7 +439,7 @@ class Boto3RemoteSync:
                              aws_secret_access_key=os.environ["AWS_SECRET_ACCESS_KEY"])
     except KeyError:
       error("you must pass the AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY env "
-            "variables to aliBuild in order to use the S3 remote store")
+            "variables to bits in order to use the S3 remote store")
       sys.exit(1)
 
   def _s3_listdir(self, dirname):
