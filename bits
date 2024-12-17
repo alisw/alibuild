@@ -144,6 +144,17 @@ function stripDyld() {
   echo unset $( (typeset | grep ^DYLD | cut -d= -f1 | grep '_modshare$' | xargs echo ) 2> /dev/null; echo ';' )
 }
 
+function readBitsRc() {
+  cfgfile=$1
+  tmpfile=`mktemp`
+  if [ -f $cfgfile ]
+  then   
+    awk '/^\[bits]$/,/^$/ {print}' $cfgfile | sed 's/ *= */=/g' | grep  = > $tmpfile &&  . $tmpfile
+    awk "/^\[$organisation]$/,/^$/ {print}" $cfgfile | sed 's/ *= */=/g' | grep -v "^\[$organisation\]" | grep = > $tmpfile && . $tmpfile
+  fi
+  rm -rf $tmpfile
+}
+
 # Backward compatibility defaults
 
 BITS_BRANDING=${BITS_BRANDING:="bits"}
@@ -155,15 +166,17 @@ BITS_PKG_PREFIX=${BITS_PKG_PREFIX:="VO_ALICE"}
 
 config_file=.bitsrc
 
-if [ -f $config_file ]
-then   
-   source <(grep = <(awk '/^\[bits]$/,/^$/ {print}' $config_file | sed 's/ *= */=/g'))
-fi
+readBitsRc $config_file
 
-if [ -f $config_file ]
-then
-   source <(grep = <(awk "/^\[$organisation]$/,/^$/ {print}" $config_file | sed 's/ *= */=/g' | grep -v "^\[$organisation\]"))
-fi
+#if [ -f $config_file ]
+#then   
+#   source <(grep = <(awk '/^\[bits]$/,/^$/ {print}' $config_file | sed 's/ *= */=/g'))
+#fi
+
+#if [ -f $config_file ]
+#then
+#   source <(grep = <(awk "/^\[$organisation]$/,/^$/ {print}" $config_file | sed 's/ *= */=/g' | grep -v "^\[$organisation\]"))
+#fi
 
 update_config=0
 
@@ -179,7 +192,7 @@ do
          ;;
        --help|-h|help)
          printf "bits --config [--help|-h|help]\n"
-         printf "bits --config --organisation=<org> --pkg_prefix=<prefix> --pkg-dir=<dir> --work-dir=<dir> --search-path=<path>\n" 
+         printf "bits --config --organisation=<org> --pkg_prefix=<prefix> --repo-dir=<dir> --sw-dir=<dir> --search-path=<path>\n" 
          exit
          ;;
        --organisation)
@@ -188,19 +201,16 @@ do
        --branding)
          branding=$val
          ;;
-       --pkg_prefix)
+       --pkg-prefix)
          pkg_prefix=$val
          ;;
        --repo-dir)
          repo_dir=$val
          ;;
-       --pkg-dir)
-         pkg_dir=$val
+       --sw-dir)
+         sw_dir=$val
          ;;
-       --work-dir)
-         work_dir=$val
-         ;;
-       --search_path)
+       --search-path)
          search_path=$val
          ;;
        *)
@@ -208,20 +218,19 @@ do
    esac
 done
 
-
 if [ $update_config -eq 1 ]
 then
-   cat<<EOF>$config_file
+   cat<<EoF>$config_file
 [bits]
   organisation=$organisation
 
 [$organisation]
   pkg_prefix=$pkg_prefix
-  work_dir=$work_dir
+  sw_dir=$sw_dir
   repo_dir=$repo_dir
   search_path=$search_path
   branding=$branding
-EOF
+EoF
   exit
 fi
 
@@ -229,10 +238,10 @@ export BITS_ORGANISATION=$organisation
 export BITS_BRANDING=$branding
 export BITS_PATH=$search_path
 export BITS_REPO_DIR=$repo_dir
-export BITS_WORK_DIR=$work_dir
+export BITS_WORK_DIR=$sw_dir
 export BITS_PKG_PREFIX=${pkg_prefix:="VO_"$organisation}
 
-mkdir -p $work_dir || echo "Cannot create directory: " $work_dir 
+mkdir -p $sw_dir || echo "Cannot create directory: " $sw_dir 
 
 case $1 in
 #   analytics|architecture|build|clean|deps|doctor|init|version)
