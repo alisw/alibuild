@@ -155,108 +155,78 @@ function readBitsRc() {
   rm -rf $tmpfile
 }
 
-# Backward compatibility defaults
+function configBits() {
 
-BITS_BRANDING=${BITS_BRANDING:="bits"}
-BITS_PATH=${BITS_PATH:=""}
-BITS_REPO_DIR=${BITS_REPO_DIR:="alidist"}
-BITS_WORK_DIR=${BITS_WORK_DIR:="sw"}
-BITS_ORGANISATION=${BITS_ORGANISATION:="ALICE"}
-BITS_PKG_PREFIX=${BITS_PKG_PREFIX:="VO_ALICE"}
+	# Backward compatibility defaults
 
-config_file=.bitsrc
+	BITS_BRANDING=${BITS_BRANDING:-"bits"}
+	BITS_PATH=${BITS_PATH:-""}
+	BITS_REPO_DIR=${BITS_REPO_DIR:-"alidist"}
+	BITS_WORK_DIR=${BITS_WORK_DIR:-"sw"}
+	BITS_ORGANISATION=${BITS_ORGANISATION:-"ALICE"}
+	BITS_PKG_PREFIX=${BITS_PKG_PREFIX:-"VO_"$BITS_ORGANISATION}
+    
+    cfile=""
 
-readBitsRc $config_file
+    for cfg in  $1 .bitsrc $HOME/.bitsrc 
+    do
+	  if [ "x$cfg" !=  "x" -a -f $cfg ]
+	  then
+	    cfile=$cfg
+	    break
+      fi
+    done
+    
+    if [ "x$cfile" != "x" ] 
+    then
+	  readBitsRc $cfile
+    fi
+    
+	export BITS_ORGANISATION=${organisation:-$BITS_ORGANISATION}
+	export BITS_BRANDING=${branding:-$BITS_BRANDING}
+	export BITS_PATH=${search_path:-$BITS_PATH}
+	export BITS_REPO_DIR=${repo_dir:-$BITS_REPO_DIR}
+	export BITS_WORK_DIR=${sw_dir:-$BITS_WORK_DIR}
+	export BITS_PKG_PREFIX=${pkg_prefix:-$BITS_PKG_PREFIX}
 
-#if [ -f $config_file ]
-#then   
-#   source <(grep = <(awk '/^\[bits]$/,/^$/ {print}' $config_file | sed 's/ *= */=/g'))
-#fi
+	mkdir -p $BITS_WORK_DIR || echo "Cannot create directory: " BITS_WORK_DIR 
+}
 
-#if [ -f $config_file ]
-#then
-#   source <(grep = <(awk "/^\[$organisation]$/,/^$/ {print}" $config_file | sed 's/ *= */=/g' | grep -v "^\[$organisation\]"))
-#fi
-
-update_config=0
+config_file=""
 
 for ((i=0;i<$ARGC;i++));
 do
     arg=${ARGV[$i]}
     opt=${arg%%=*}
     val=${arg##*=}
-
     case $opt in
        --config)
-         update_config=1
-         ;;
-       --help|-h|help)
-         printf "bits --config [--help|-h|help]\n"
-         printf "bits --config --organisation=<org> --pkg_prefix=<prefix> --repo-dir=<dir> --sw-dir=<dir> --search-path=<path>\n" 
-         exit
-         ;;
-       --organisation)
-         organisation=$val
-         ;;
-       --branding)
-         branding=$val
-         ;;
-       --pkg-prefix)
-         pkg_prefix=$val
-         ;;
-       --repo-dir)
-         repo_dir=$val
-         ;;
-       --sw-dir)
-         sw_dir=$val
-         ;;
-       --search-path)
-         search_path=$val
-         ;;
+          config_file=$val
+       ;;   
        *)
          ;;
    esac
 done
 
-if [ $update_config -eq 1 ]
-then
-   cat<<EoF>$config_file
-[bits]
-  organisation=$organisation
+configBits $config_file
 
-[$organisation]
-  pkg_prefix=$pkg_prefix
-  sw_dir=$sw_dir
-  repo_dir=$repo_dir
-  search_path=$search_path
-  branding=$branding
-EoF
-  exit
-fi
-
-export BITS_ORGANISATION=$organisation
-export BITS_BRANDING=$branding
-export BITS_PATH=$search_path
-export BITS_REPO_DIR=$repo_dir
-export BITS_WORK_DIR=$sw_dir
-export BITS_PKG_PREFIX=${pkg_prefix:="VO_"$organisation}
-
-mkdir -p $sw_dir || echo "Cannot create directory: " $sw_dir 
-
-case $1 in
-#   analytics|architecture|build|clean|deps|doctor|init|version)
-    architecture|build|clean|deps|doctor|init|version)
+for arg in $@
+do
+  case $arg in
+    analytics|architecture|build|clean|deps|doctor|init|version)
         $BITSDIR/bitsBuild $@
-	exit $?
+	    exit $?
         ;;
     -h|--help|-d|--debug|-n|--dry-run)
+        configBits $config_file
         $BITSDIR/bitsBuild $@
-	exit $?
-         ;;
-	 *)
+	    exit $?
         ;;
-esac
-
+	 *)
+	    shift
+        ;;
+  esac
+done
 
 # If we are on a TTY, enable colors
 if test -t 1; then

@@ -10,8 +10,10 @@ ing dependencies.
 Instant gratification with::
 
     pip install bits
-    mkdir repositories; cd repositories
-    git clone https://github.com/bitsorg/common.bits   
+     or
+    git clone git@github.com:bitsorg/bits.git; cd bits; export PATH=$PWD:$PATH; cd ..
+    git clone git@github.com:bitsorg/general.bits.git
+    bits init -c general 
     bits build ROOT
     bits enter ROOT/latest
     root -b
