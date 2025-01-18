@@ -33,7 +33,7 @@ An example recipe for `zlib` is the following:
 ```yaml
 package: zlib
 version: v1.2.8
-source: https://github.com/star-externals/zlib
+source: https://github.com/madler/zlib
 tag: v1.2.8
 ---
 #!/bin/bash -ex

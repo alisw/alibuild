@@ -318,7 +318,7 @@ Then, configure git to use SSH to authenticate with CERN GitLab using the follow
 git config --global 'url.ssh://git@gitlab.cern.ch:7999/.insteadof' 'https://gitlab.cern.ch/'
 ```
 
-[gitlab-ssh-key]: https://gitlab.cern.ch/-/profile/keys
+[gitlab-ssh-key]: https://gitlab.cern.ch/-/user_settings/ssh_keys
 
 #### Caching passwords
 
