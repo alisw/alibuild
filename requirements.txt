@@ -2,4 +2,4 @@ requests
 pyyaml
 distro
 jinja2
-boto3; python_version >= '3.6'
+boto3==1.35.95; python_version >= '3.6' # https://github.com/boto/boto3/issues/4398
