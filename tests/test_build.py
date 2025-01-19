@@ -26,7 +26,7 @@ TEST_DEFAULT_RELEASE_BUILD_HASH = "27ce49698e818e8efb56b6eff6dd785e503df341"
 TEST_ZLIB_RECIPE = """\
 package: zlib
 version: v1.2.3
-source: https://github.com/star-externals/zlib
+source: https://github.com/madler/zlib
 tag: master
 ---
 ./configure
@@ -93,12 +93,12 @@ baad\trefs/tags/v3"""
 TEST_EXTRA_BUILD_HASH = ("5afae57bfc6a374e74c1c4427698ab5edebce0bc")
 
 
-GIT_CLONE_REF_ZLIB_ARGS = ("clone", "--bare", "https://github.com/star-externals/zlib",
+GIT_CLONE_REF_ZLIB_ARGS = ("clone", "--bare", "https://github.com/madler/zlib",
                            "/sw/MIRROR/zlib", "--filter=blob:none"), ".", False
-GIT_CLONE_SRC_ZLIB_ARGS = ("clone", "-n", "https://github.com/star-externals/zlib",
+GIT_CLONE_SRC_ZLIB_ARGS = ("clone", "-n", "https://github.com/madler/zlib",
                            "/sw/SOURCES/zlib/v1.2.3/8822efa61f",
                            "--dissociate", "--reference", "/sw/MIRROR/zlib", "--filter=blob:none"), ".", False
-GIT_SET_URL_ZLIB_ARGS = ("remote", "set-url", "--push", "origin", "https://github.com/star-externals/zlib"), \
+GIT_SET_URL_ZLIB_ARGS = ("remote", "set-url", "--push", "origin", "https://github.com/madler/zlib"), \
     "/sw/SOURCES/zlib/v1.2.3/8822efa61f", False
 GIT_CHECKOUT_ZLIB_ARGS = ("checkout", "-f", "master"), \
     "/sw/SOURCES/zlib/v1.2.3/8822efa61f", False
