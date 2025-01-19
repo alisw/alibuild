@@ -24,6 +24,7 @@ classifiers = [
     'Programming Language :: Python :: 3.10',  # ubuntu2204
     'Programming Language :: Python :: 3.11',  # MacOS
     'Programming Language :: Python :: 3.12',  # MacOS
+    'Programming Language :: Python :: 3.13',  # MacOS
 ]
 
 dependencies = [
