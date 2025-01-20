@@ -51,7 +51,7 @@ found unexpected end of stream
     ^"""
 
 class Recoder(object):
-  def __init__(self):
+  def __init__(self) -> None:
     self.buffer = ""
   def __call__(self, s, *a):
     self.buffer += s % a
@@ -67,7 +67,7 @@ class BufferReader(object):
       return self.buffer
 
 class TestRecipes(unittest.TestCase):
-  def test_recipes(self):
+  def test_recipes(self) -> None:
     err, meta, body = parseRecipe(BufferReader("test1.sh", TEST1))
     self.assertEqual(err, None)
     self.assertEqual(meta["package"], "foo")
@@ -88,7 +88,7 @@ class TestRecipes(unittest.TestCase):
     err, meta, body = parseRecipe(BufferReader("test_broken_6.sh", TEST_BROKEN_6))
     self.assertEqual(err.strip(), ERROR_MSG_6.strip())
 
-  def test_getRecipeReader(self):
+  def test_getRecipeReader(self) -> None:
     f = getRecipeReader("foo")
     self.assertEqual(type(f), FileReader)
     f = getRecipeReader("dist:foo@master")
@@ -107,7 +107,7 @@ class TestRecipes(unittest.TestCase):
     self.assertEqual(overrides, {'defaults-release': {}, 'root': {'requires': 'GCC'}})
     self.assertEqual(taps, {'root': 'dist:ROOT@master'})
 
-  def test_validateDefault(self):
+  def test_validateDefault(self) -> None:
     ok, out, validDefaults = validateDefaults({"something": True}, "release")
     self.assertEqual(ok, True)
     ok, out, validDefaults = validateDefaults({"package": "foo","valid_defaults": ["o2", "o2-dataflow"]}, "release")
