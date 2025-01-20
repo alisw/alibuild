@@ -274,12 +274,8 @@ def disabledByArchitecture(arch, requires):
       yield require
 
 def readDefaults(configDir, defaults, error, architecture):
-  defaultsFilename = "%s/defaults-%s.sh" % (configDir, defaults)
-  if not exists(defaultsFilename):
-    error("Default `%s' does not exists. Viable options:\n%s" %
-          (defaults or "<no defaults specified>",
-           "\n".join("- " + basename(x).replace("defaults-", "").replace(".sh", "")
-                     for x in glob(join(configDir, "defaults-*.sh")))))
+  defaultsFilename = resolveDefaultsFilename(defaults,configDir)
+
   err, defaultsMeta, defaultsBody = parseRecipe(getRecipeReader(defaultsFilename))
   if err:
     error(err)
@@ -297,7 +293,7 @@ def readDefaults(configDir, defaults, error, architecture):
     defaultsBody += "\n# Architecture defaults\n" + archBody
   return (defaultsMeta, defaultsBody)
 
-# Get the appropriate recipe reader depending on th filename
+
 def getRecipeReader(url, dist=None):
   m = re.search(r'^dist:(.*)@([^@]+)$', url)
   if m and dist:
@@ -398,6 +394,38 @@ def parseDefaults(disable, defaultsGetter, log):
     overrides[f] = dict(**(v or {}))
   return (None, overrides, taps)
 
+def checkForFilename(taps, pkg, d):
+  filename = taps.get(pkg, join(d, f"{pkg}.sh"))
+  if not os.path.exists(filename):
+    if "/" in pkg:
+      filename = taps.get(pkg, join(d, pkg))
+    else:
+      filename = taps.get(pkg, join(d, pkg, "latest"))
+  return filename
+
+def resolveFilename(taps, pkg, configDir):
+  configPath = os.environ.get("BITS_PATH", "") + ":"
+  pkgDirs = [join(configDir, d) for d in configPath.lstrip(":").split(":")]
+
+  for d in pkgDirs:
+    filename = checkForFilename(taps,pkg,d)
+    if os.path.exists(filename):
+      return (filename, os.path.abspath(d))
+
+def resolveDefaultsFilename(defaults, configDir):
+  configPath = os.environ.get("BITS_PATH", "") + ":"
+  pkgDirs = [join(configDir, d) for d in configPath.lstrip(":").split(":")]
+
+  for d in pkgDirs:
+    filename = join(d, f"defaults-{defaults}.sh")
+    if os.path.exists(filename):
+      return (filename)
+
+  dieOnError(True, "Default `%s' does not exists. Viable options:\n%s" %
+          (defaults or "<no defaults specified>",
+           "\n".join("- " + basename(x).replace("defaults-", "").replace(".sh", "")
+                     for x in glob(join(configDir, "defaults-*.sh")))))
+
 def getPackageList(packages, specs, configDir, preferSystem, noSystem,
                    architecture, disable, defaults, performPreferCheck, performRequirementCheck,
                    performValidateDefaults, overrides, taps, log, force_rebuild=()):
@@ -421,7 +449,9 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
     # "defaults-release" for this to work, since the defaults are a dependency
     # and all dependencies' names go into a package's hash.
     pkg_filename = ("defaults-" + defaults) if p == "defaults-release" else p.lower()
-    filename = taps.get(pkg_filename, "%s/%s.sh" % (configDir, pkg_filename))
+
+    filename, pkgdir = resolveFilename(taps, pkg_filename, configDir)
+
     err, spec, recipe = parseRecipe(getRecipeReader(filename, configDir))
     dieOnError(err, err)
     # Unless there was an error, both spec and recipe should be valid.
@@ -430,6 +460,7 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
     assert(recipe is not None)
     dieOnError(spec["package"].lower() != pkg_filename,
                "%s.sh has different package field: %s" % (p, spec["package"]))
+    spec["pkgdir"] = pkgdir
 
     if p == "defaults-release":
       # Re-rewrite the defaults' name to "defaults-release". Everything auto-
