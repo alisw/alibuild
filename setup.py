@@ -19,7 +19,7 @@ install_requires = ['pyyaml', 'requests', 'distro', 'jinja2']
 # Old setuptools versions (which pip2 uses) don't support range comparisons
 # (like :python_version >= "3.6") in extras_require, so do this ourselves here.
 if sys.version_info >= (3, 6):
-    install_requires.append('boto3')
+    install_requires.append('boto3==1.23.10')
 
 setup(
     name='alibuild',
