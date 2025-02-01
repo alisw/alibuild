@@ -96,7 +96,7 @@ class ArgsTestCase(unittest.TestCase):
 
   @mock.patch("alibuild_helpers.utilities.getoutput", new=lambda cmd: "x86_64")   # for uname -m
   @mock.patch('alibuild_helpers.args.argparse.ArgumentParser.error')
-  def test_failingParsing(self, mock_print):
+  def test_failingParsing(self, mock_print) -> None:
     mock_print.side_effect = FakeExit("raised")
     for (cmd, pattern) in PARSER_ERRORS.items():
       mock_print.mock_calls = []
@@ -110,7 +110,7 @@ class ArgsTestCase(unittest.TestCase):
                 f"Expected '{args[0]}' matching '{pattern}' but it's not the case."
             )
 
-  def test_validArchitectures(self):
+  def test_validArchitectures(self) -> None:
     for arch in VALID_ARCHS:
       self.assertTrue(matchValidArch(arch))
     for arch in INVALID_ARCHS:

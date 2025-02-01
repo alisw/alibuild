@@ -136,18 +136,18 @@ macOSArchitecturePayloads = [
 ]
 
 class TestUtilities(unittest.TestCase):
-  def test_osx(self):
+  def test_osx(self) -> None:
     for payload in architecturePayloads:
       result, hasOsRelease, osReleaseLines, platformTuple, platformSystem, platformProcessor = payload
       self.assertEqual(result, doDetectArch(hasOsRelease, osReleaseLines, platformTuple, platformSystem, platformProcessor))
   # Test by mocking platform.processor
-  def test_osx_mock(self):
+  def test_osx_mock(self) -> None:
     for payload in macOSArchitecturePayloads:
       result, hasOsRelease, osReleaseLines, platformTuple, platformSystem, platformProcessor = payload
       with patch('platform.machine', return_value=platformProcessor):
         platformProcessor = None
         self.assertEqual(result, doDetectArch(hasOsRelease, osReleaseLines, platformTuple, platformSystem, None))
-  def test_Hasher(self):
+  def test_Hasher(self) -> None:
     h = Hasher()
     h("foo")
     self.assertEqual("0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33", h.hexdigest())
@@ -157,7 +157,7 @@ class TestUtilities(unittest.TestCase):
     h("bar")
     self.assertEqual("8843d7f92416211de9ebb963ff4ce28125932878", h.hexdigest())
 
-  def test_UTF8_Hasher(self):
+  def test_UTF8_Hasher(self) -> None:
     h1 = Hasher()
     h2 = Hasher()
     h3 = Hasher()
@@ -169,30 +169,18 @@ class TestUtilities(unittest.TestCase):
     self.assertEqual(h3.hexdigest(), "0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33")
     self.assertNotEqual(h1.hexdigest(), h2.hexdigest())
 
-  def test_asList(self):
+  def test_asList(self) -> None:
     self.assertEqual(asList("a"), ["a"])
     self.assertEqual(asList(["a"]), ["a"])
     self.assertEqual(asList(None), [None])
 
-  def test_filterByArchitecture(self):
-    self.assertEqual(["AliRoot"], list(filterByArchitectureDefaults("osx_x86-64", "ali", ["AliRoot"])))
-    self.assertEqual([], list(filterByArchitectureDefaults("osx_x86-64", "ali", ["AliRoot:(?!osx)"])))
-    self.assertEqual(["GCC"], list(filterByArchitectureDefaults("osx_x86-64", "ali", ["AliRoot:(?!osx)", "GCC"])))
-    self.assertEqual(["AliRoot", "GCC"], list(filterByArchitectureDefaults("osx_x86-64", "ali", ["AliRoot:(?!slc6)", "GCC"])))
-    self.assertEqual(["GCC"], list(filterByArchitectureDefaults("osx_x86-64", "ali", ["AliRoot:slc6", "GCC:osx"])))
-    self.assertEqual([], list(filterByArchitectureDefaults("osx_x86-64", "ali", [])))
-    self.assertEqual(["GCC"], list(filterByArchitectureDefaults("osx_x86-64", "ali", ["AliRoot:slc6", "GCC:defaults=ali"])))
-    self.assertEqual([], list(filterByArchitectureDefaults("osx_x86-64", "o2", ["AliRoot:slc6", "GCC:defaults=ali"])))
-
-  def test_disabledByArchitecture(self):
-    self.assertEqual([], list(disabledByArchitectureDefaults("osx_x86-64", "ali", ["AliRoot"])))
-    self.assertEqual(["AliRoot"], list(disabledByArchitectureDefaults("osx_x86-64", "ali", ["AliRoot:(?!osx)"])))
-    self.assertEqual(["AliRoot"], list(disabledByArchitectureDefaults("osx_x86-64", "ali", ["AliRoot:(?!osx)", "GCC"])))
-    self.assertEqual([], list(disabledByArchitectureDefaults("osx_x86-64", "ali", ["AliRoot:(?!slc6)", "GCC"])))
-    self.assertEqual(["AliRoot"], list(disabledByArchitectureDefaults("osx_x86-64", "ali", ["AliRoot:slc6", "GCC:osx"])))
-    self.assertEqual([], list(disabledByArchitectureDefaults("osx_x86-64", "ali", [])))
-    self.assertEqual(["AliRoot"], list(disabledByArchitectureDefaults("osx_x86-64", "ali", ["AliRoot:slc6", "GCC:defaults=ali"])))
-    self.assertEqual(["AliRoot", "GCC"], list(disabledByArchitectureDefaults("osx_x86-64", "o2", ["AliRoot:slc6", "GCC:defaults=ali"])))
+  def test_filterByArchitecture(self) -> None:
+    self.assertEqual(["AliRoot"], list(filterByArchitecture("osx_x86-64", ["AliRoot"])))
+    self.assertEqual([], list(filterByArchitecture("osx_x86-64", ["AliRoot:(?!osx)"])))
+    self.assertEqual(["GCC"], list(filterByArchitecture("osx_x86-64", ["AliRoot:(?!osx)", "GCC"])))
+    self.assertEqual(["AliRoot", "GCC"], list(filterByArchitecture("osx_x86-64", ["AliRoot:(?!slc6)", "GCC"])))
+    self.assertEqual(["GCC"], list(filterByArchitecture("osx_x86-64", ["AliRoot:slc6", "GCC:osx"])))
+    self.assertEqual([], list(filterByArchitecture("osx_x86-64", [])))
 
   def test_prunePaths(self):
     fake_env = {
@@ -225,7 +213,7 @@ class TestUtilities(unittest.TestCase):
       self.assertTrue(fake_env_copy["DYLD_LIBRARY_PATH"] == "/sw/lib")
       self.assertTrue(fake_env_copy["ALIBUILD_VERSION"] == "v1.0.0")
 
-  def test_resolver(self):
+  def test_resolver(self) -> None:
     spec = {"package": "test-pkg",
       "version": "%(tag_basename)s",
       "tag": "foo/bar",
@@ -243,7 +231,7 @@ class TestUtilities(unittest.TestCase):
 class TestTopologicalSort(unittest.TestCase):
     """Check that various properties of topological sorting hold."""
 
-    def test_resolve_dependency_chain(self):
+    def test_resolve_dependency_chain(self) -> None:
         """Test that topological sorting correctly sorts packages in a dependency chain."""
         # Topological sorting only takes "requires" into account, since the
         # build/runtime distinction does not matter for resolving build order.
@@ -253,7 +241,7 @@ class TestTopologicalSort(unittest.TestCase):
             "c": {"package": "c", "requires": []},
         })))
 
-    def test_diamond_dependency(self):
+    def test_diamond_dependency(self) -> None:
         """Test that a diamond dependency relationship is handled correctly."""
         self.assertEqual(["base", "mid2", "mid1", "top"], list(topological_sort({
             "top": {"package": "top", "requires": ["mid1", "mid2"]},
@@ -263,7 +251,7 @@ class TestTopologicalSort(unittest.TestCase):
             "base": {"package": "base", "requires": []},
         })))
 
-    def test_dont_drop_packages(self):
+    def test_dont_drop_packages(self) -> None:
         """Check that topological sorting doesn't drop any packages."""
         # For half the packages, depend on the first package, to make this a
         # little more than trivial.
