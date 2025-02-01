@@ -1,6 +1,7 @@
 from __future__ import print_function
 from unittest.mock import patch, MagicMock
 from io import StringIO
+import os.path
 
 from alibuild_helpers.doctor import doDoctor
 from argparse import Namespace
@@ -84,42 +85,45 @@ class DoctorTestCase(unittest.TestCase):
                      disable=[],
                      defaults="release")
 
-    # What to call (longer names deprecated in Python 3.5+)
-    if not hasattr(self, "assertRegex"):
-      self.assertRegex = self.assertRegexpMatches
-      self.assertNotRegex = self.assertNotRegexpMatches
+    def fake_exists(n):
+        return {"/alidist/aliroot.sh": True}
+    with patch.object(os.path, "exists", fake_exists):
+        # What to call (longer names deprecated in Python 3.5+)
+        if not hasattr(self, "assertRegex"):
+          self.assertRegex = self.assertRegexpMatches
+          self.assertNotRegex = self.assertNotRegexpMatches
 
-    # Test: all should go OK (exit with 0)
-    out = resetOut()
-    with self.assertRaises(SystemExit) as cm:
-      args.packages=["Package1"]
-      doDoctor(args, MagicMock())
-    self.assertEqual(cm.exception.code, 0)
+        # Test: all should go OK (exit with 0)
+        out = resetOut()
+        with self.assertRaises(SystemExit) as cm:
+          args.packages=["Package1"]
+          doDoctor(args, MagicMock())
+        self.assertEqual(cm.exception.code, 0)
 
-    # Test: system dependency not found
-    out = resetOut()
-    with self.assertRaises(SystemExit) as cm:
-      args.packages=["SysDep"]
-      doDoctor(args, MagicMock())
-    self.assertEqual(cm.exception.code, 1)
+        # Test: system dependency not found
+        out = resetOut()
+        with self.assertRaises(SystemExit) as cm:
+          args.packages=["SysDep"]
+          doDoctor(args, MagicMock())
+        self.assertEqual(cm.exception.code, 1)
 
-    # Test: invalid default
-    out = resetOut()
-    with self.assertRaises(SystemExit) as cm:
-      args.packages=["BreakDefaults"]
-      doDoctor(args, MagicMock())
-    self.assertEqual(cm.exception.code, 2)
-    self.assertRegex(out["error"].getvalue(), "- its_not_there")
+        # Test: invalid default
+        out = resetOut()
+        with self.assertRaises(SystemExit) as cm:
+          args.packages=["BreakDefaults"]
+          doDoctor(args, MagicMock())
+        self.assertEqual(cm.exception.code, 2)
+        self.assertRegex(out["error"].getvalue(), "- its_not_there")
 
-    # Test: common defaults
-    out = resetOut()
-    with self.assertRaises(SystemExit) as cm:
-      args.packages=["TestDef1"]
-      doDoctor(args, MagicMock())
-    self.assertEqual(cm.exception.code, 2)
-    self.assertRegex(out["banner"].getvalue(), "- common_default")
-    self.assertNotRegex(out["banner"].getvalue(), "- default1")
-    self.assertNotRegex(out["banner"].getvalue(), "- default2")
+        # Test: common defaults
+        out = resetOut()
+        with self.assertRaises(SystemExit) as cm:
+          args.packages=["TestDef1"]
+          doDoctor(args, MagicMock())
+        self.assertEqual(cm.exception.code, 2)
+        self.assertRegex(out["banner"].getvalue(), "- common_default")
+        self.assertNotRegex(out["banner"].getvalue(), "- default1")
+        self.assertNotRegex(out["banner"].getvalue(), "- default2")
 
 if __name__ == '__main__':
   unittest.main()
