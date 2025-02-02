@@ -1,5 +1,6 @@
 from unittest.mock import patch, MagicMock
 from io import StringIO
+import os.path
 
 from alibuild_helpers.deps import doDeps
 from argparse import Namespace
@@ -64,12 +65,14 @@ class DepsTestCase(unittest.TestCase):
                          outgraph="/tmp/outgraph.pdf",
                          package="AliRoot",
                          defaults="release")
+        def fake_exists(n):
+            return {"/alidist/aliroot.sh": True}
+        with patch.object(os.path, "exists", fake_exists):
+            doDeps(args, MagicMock())
 
-        doDeps(args, MagicMock())
-
-        # Same check without explicit intermediate dotfile
-        args.outdot = None
-        doDeps(args, MagicMock())
+            # Same check without explicit intermediate dotfile
+            args.outdot = None
+            doDeps(args, MagicMock())
 
 
 if __name__ == '__main__':

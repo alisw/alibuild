@@ -12,6 +12,7 @@ import platform
 from datetime import datetime
 from collections import OrderedDict
 from shlex import quote
+from typing import Optional
 
 from alibuild_helpers.cmd import getoutput
 from alibuild_helpers.git import git
@@ -282,8 +283,8 @@ def disabledByArchitectureDefaults(arch, defaults, requires):
       yield require
 
 def readDefaults(configDir, defaults, error, architecture):
-  defaultsFilename = "%s/defaults-%s.sh" % (configDir, defaults)
-  if not exists(defaultsFilename):
+  defaultsFilename = resolveDefaultsFilename(defaults, configDir)
+  if not defaultsFilename:
     error("Default `%s' does not exists. Viable options:\n%s" %
           (defaults or "<no defaults specified>",
            "\n".join("- " + basename(x).replace("defaults-", "").replace(".sh", "")
@@ -305,7 +306,7 @@ def readDefaults(configDir, defaults, error, architecture):
     defaultsBody += "\n# Architecture defaults\n" + archBody
   return (defaultsMeta, defaultsBody)
 
-# Get the appropriate recipe reader depending on th filename
+
 def getRecipeReader(url, dist=None):
   m = re.search(r'^dist:(.*)@([^@]+)$', url)
   if m and dist:
@@ -406,9 +407,30 @@ def parseDefaults(disable, defaultsGetter, log):
     overrides[f] = dict(**(v or {}))
   return (None, overrides, taps)
 
+def checkForFilename(taps: dict, pkg: str, d: str):
+  return taps.get(pkg, join(d, f"{pkg}.sh"))
+
+def getPkgDirs(configDir):
+  configPath = os.environ.get("BITS_PATH", "").rstrip(":") + ":"
+  pkgDirs = [join(configDir, d) for d in configPath.lstrip(":").split(":")]
+  return pkgDirs
+
+def resolveFilename(taps: dict, pkg: str, configDir: str):
+  for d in getPkgDirs(configDir):
+    filename = checkForFilename(taps, pkg, d)
+    if os.path.exists(filename):
+      return (filename, os.path.abspath(d))
+  return (None, None)
+
+def resolveDefaultsFilename(defaults, configDir) -> Optional[str]:
+  for d in getPkgDirs(configDir):
+    filename = join(d, f"defaults-{defaults}.sh")
+    if os.path.exists(filename):
+      return filename
+
 def getPackageList(packages, specs, configDir, preferSystem, noSystem,
                    architecture, disable, defaults, performPreferCheck, performRequirementCheck,
-                   performValidateDefaults, overrides, taps, log, force_rebuild=()):
+                   performValidateDefaults, overrides, taps: dict, log, force_rebuild=()):
   systemPackages = set()
   ownPackages = set()
   failedRequirements = set()
@@ -429,7 +451,9 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
     # "defaults-release" for this to work, since the defaults are a dependency
     # and all dependencies' names go into a package's hash.
     pkg_filename = ("defaults-" + defaults) if p == "defaults-release" else p.lower()
-    filename = taps.get(pkg_filename, "%s/%s.sh" % (configDir, pkg_filename))
+
+    filename, pkgdir = resolveFilename(taps, pkg_filename, configDir)
+
     err, spec, recipe = parseRecipe(getRecipeReader(filename, configDir))
     dieOnError(err, err)
     # Unless there was an error, both spec and recipe should be valid.
@@ -438,6 +462,7 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
     assert(recipe is not None)
     dieOnError(spec["package"].lower() != pkg_filename,
                "%s.sh has different package field: %s" % (p, spec["package"]))
+    spec["pkgdir"] = pkgdir
 
     if p == "defaults-release":
       # Re-rewrite the defaults' name to "defaults-release". Everything auto-
