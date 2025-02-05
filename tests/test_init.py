@@ -1,5 +1,6 @@
 from argparse import Namespace
 import os.path as path
+import os.path
 import unittest
 from unittest.mock import call, patch  # In Python 3, mock is built-in
 from io import StringIO
@@ -82,17 +83,20 @@ class InitTestCase(unittest.TestCase):
         fetchRepos = False,
         architecture = "slc7_x86-64"
       )
-      doInit(args)
-      self.assertEqual(mock_git.mock_calls, CLONE_EVERYTHING)
-      mock_path.exists.assert_has_calls([call('.'), call('/sw/MIRROR'), call('/alidist'), call('./AliRoot')])
+      def fake_exists(n):
+          return {"/alidist/aliroot.sh": True}
+      with patch.object(os.path, "exists", fake_exists):
+        doInit(args)
+        self.assertEqual(mock_git.mock_calls, CLONE_EVERYTHING)
+        mock_path.exists.assert_has_calls([call('.'), call('/sw/MIRROR'), call('/alidist'), call('./AliRoot')])
 
-      # Force fetch repos
-      mock_git.reset_mock()
-      mock_path.reset_mock()
-      args.fetchRepos = True
-      doInit(args)
-      self.assertEqual(mock_git.mock_calls, CLONE_EVERYTHING)
-      mock_path.exists.assert_has_calls([call('.'), call('/sw/MIRROR'), call('/alidist'), call('./AliRoot')])
+        # Force fetch repos
+        mock_git.reset_mock()
+        mock_path.reset_mock()
+        args.fetchRepos = True
+        doInit(args)
+        self.assertEqual(mock_git.mock_calls, CLONE_EVERYTHING)
+        mock_path.exists.assert_has_calls([call('.'), call('/sw/MIRROR'), call('/alidist'), call('./AliRoot')])
 
 
 if __name__ == '__main__':

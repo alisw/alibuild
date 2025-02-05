@@ -30,6 +30,7 @@ jobs:
           - '3.10.6'  # ubuntu2204 container
           - '3.11'
           - '3.12'
+          - '3.13'
 
     steps:
       - uses: actions/checkout@v4
@@ -60,13 +61,13 @@ jobs:
 
       - name: Upload coverage information
         if: ${{ always() && github.event.repository.owner.login == 'alisw' }}
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v5
         with:
           files: coverage.json
 
   mac-unittest:
     name: mac-python${{ matrix.python-version }}
-    runs-on: macos-latest
+    runs-on: macos-14
 
     strategy:
       fail-fast: false   # continue executing other checks if one fails
@@ -75,15 +76,18 @@ jobs:
           - '3.11'
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
 
       - name: Install test dependencies
         run: |
+          # Hack to remove whatever the CI default image brings now, as it
+          # conflicts with the one in o2-full-deps [O2-5580]
+          brew uninstall --ignore-dependencies --force pkg-config@0.29.2 
           brew install modules alisw/system-deps/o2-full-deps sapling
           python3 -m pip install --upgrade tox tox-gh-actions coverage
 
@@ -102,7 +106,7 @@ jobs:
 
       - name: Upload coverage information
         if: ${{ always() && github.event.repository.owner.login == 'alisw' }}
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v5
         with:
           files: coverage.json
 
@@ -111,10 +115,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: 3.x
 

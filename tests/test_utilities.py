@@ -5,12 +5,13 @@ import unittest
 # Assuming you are using the mock library to ... mock things
 from unittest.mock import patch
 
-from alibuild_helpers.utilities import doDetectArch, filterByArchitecture
+from alibuild_helpers.utilities import doDetectArch, filterByArchitectureDefaults, disabledByArchitectureDefaults, getPkgDirs
 from alibuild_helpers.utilities import Hasher
 from alibuild_helpers.utilities import asList
 from alibuild_helpers.utilities import prunePaths
 from alibuild_helpers.utilities import resolve_version
 from alibuild_helpers.utilities import topological_sort
+from alibuild_helpers.utilities import resolveFilename, resolveDefaultsFilename
 import os
 import string
 
@@ -175,12 +176,24 @@ class TestUtilities(unittest.TestCase):
     self.assertEqual(asList(None), [None])
 
   def test_filterByArchitecture(self):
-    self.assertEqual(["AliRoot"], list(filterByArchitecture("osx_x86-64", ["AliRoot"])))
-    self.assertEqual([], list(filterByArchitecture("osx_x86-64", ["AliRoot:(?!osx)"])))
-    self.assertEqual(["GCC"], list(filterByArchitecture("osx_x86-64", ["AliRoot:(?!osx)", "GCC"])))
-    self.assertEqual(["AliRoot", "GCC"], list(filterByArchitecture("osx_x86-64", ["AliRoot:(?!slc6)", "GCC"])))
-    self.assertEqual(["GCC"], list(filterByArchitecture("osx_x86-64", ["AliRoot:slc6", "GCC:osx"])))
-    self.assertEqual([], list(filterByArchitecture("osx_x86-64", [])))
+    self.assertEqual(["AliRoot"], list(filterByArchitectureDefaults("osx_x86-64", "ali", ["AliRoot"])))
+    self.assertEqual([], list(filterByArchitectureDefaults("osx_x86-64", "ali", ["AliRoot:(?!osx)"])))
+    self.assertEqual(["GCC"], list(filterByArchitectureDefaults("osx_x86-64", "ali", ["AliRoot:(?!osx)", "GCC"])))
+    self.assertEqual(["AliRoot", "GCC"], list(filterByArchitectureDefaults("osx_x86-64", "ali", ["AliRoot:(?!slc6)", "GCC"])))
+    self.assertEqual(["GCC"], list(filterByArchitectureDefaults("osx_x86-64", "ali", ["AliRoot:slc6", "GCC:osx"])))
+    self.assertEqual([], list(filterByArchitectureDefaults("osx_x86-64", "ali", [])))
+    self.assertEqual(["GCC"], list(filterByArchitectureDefaults("osx_x86-64", "ali", ["AliRoot:slc6", "GCC:defaults=ali"])))
+    self.assertEqual([], list(filterByArchitectureDefaults("osx_x86-64", "o2", ["AliRoot:slc6", "GCC:defaults=ali"])))
+
+  def test_disabledByArchitecture(self):
+    self.assertEqual([], list(disabledByArchitectureDefaults("osx_x86-64", "ali", ["AliRoot"])))
+    self.assertEqual(["AliRoot"], list(disabledByArchitectureDefaults("osx_x86-64", "ali", ["AliRoot:(?!osx)"])))
+    self.assertEqual(["AliRoot"], list(disabledByArchitectureDefaults("osx_x86-64", "ali", ["AliRoot:(?!osx)", "GCC"])))
+    self.assertEqual([], list(disabledByArchitectureDefaults("osx_x86-64", "ali", ["AliRoot:(?!slc6)", "GCC"])))
+    self.assertEqual(["AliRoot"], list(disabledByArchitectureDefaults("osx_x86-64", "ali", ["AliRoot:slc6", "GCC:osx"])))
+    self.assertEqual([], list(disabledByArchitectureDefaults("osx_x86-64", "ali", [])))
+    self.assertEqual(["AliRoot"], list(disabledByArchitectureDefaults("osx_x86-64", "ali", ["AliRoot:slc6", "GCC:defaults=ali"])))
+    self.assertEqual(["AliRoot", "GCC"], list(disabledByArchitectureDefaults("osx_x86-64", "o2", ["AliRoot:slc6", "GCC:defaults=ali"])))
 
   def test_prunePaths(self):
     fake_env = {
@@ -227,15 +240,86 @@ class TestUtilities(unittest.TestCase):
     spec["version"] = "NO%(defaults_upper)s"
     self.assertTrue(resolve_version(spec, "release", "stream/v1", "v1"), "NO")
 
-    spec_float_version = {"package": "test-pkg",
-                          "version": 1.0,
-                          "tag": "foo/bar",
-                          "commit_hash": "000000000000000000000000000"
-                          }
-    self.assertRaises(
-      ValueError,
-      lambda: resolve_version(spec_float_version, "release", "stream/v1", "v1")
-    )
+  def test_get_pkg_dirs(self):
+      self.assertEqual(getPkgDirs("alidist"), ["alidist/"])
+      with patch.object(os, "environ", {"BITS_PATH": ""}):
+          self.assertEqual(getPkgDirs("alidist"), ["alidist/"])
+      with patch.object(os, "environ", {"BITS_PATH": "/foo/bar"}):
+          self.assertEqual(getPkgDirs("alidist"), ["/foo/bar", "alidist/"])
+      with patch.object(os, "environ", {"BITS_PATH": "/foo/bar:"}):
+          self.assertEqual(getPkgDirs("alidist"), ["/foo/bar", "alidist/"])
+      with patch.object(os, "environ", {"BITS_PATH": "foo/bar:"}):
+          self.assertEqual(getPkgDirs("alidist"), ["alidist/foo/bar", "alidist/"])
+      with patch.object(os, "environ", {"BITS_PATH": "foo/bar:/bar"}):
+          self.assertEqual(getPkgDirs("alidist"), ["alidist/foo/bar", "/bar", "alidist/"])
+
+  def test_resolveDefaults(self):
+      def fake_exists(n):
+          return {"alidist/defaults-release.sh": True,
+                  "/foo/defaults-o2.sh": True,
+                  "/bar/defaults-o2.sh": True,
+                  "alidist/bar/defaults-o2.sh": True
+                  }.get(n, False)
+
+      with patch.object(os.path, "exists", fake_exists):
+          self.assertEqual(resolveDefaultsFilename("release", "alidist"), "alidist/defaults-release.sh")
+          self.assertEqual(resolveDefaultsFilename("release", "alidost"), None)
+          self.assertEqual(resolveDefaultsFilename("o2", "alidist"), None)
+      with patch.object(os.path, "exists", fake_exists), \
+            patch.object(os, "environ", {"BITS_PATH": "/foo"}):
+          self.assertEqual(resolveDefaultsFilename("release", "alidist"), "alidist/defaults-release.sh")
+          self.assertEqual(resolveDefaultsFilename("release", "alidost"), None)
+          self.assertEqual(resolveDefaultsFilename("o2", "alidist"), "/foo/defaults-o2.sh")
+      with patch.object(os.path, "exists", fake_exists), \
+            patch.object(os, "environ", {"BITS_PATH": "/bar:/foo"}):
+          self.assertEqual(resolveDefaultsFilename("release", "alidist"), "alidist/defaults-release.sh")
+          self.assertEqual(resolveDefaultsFilename("release", "alidost"), None)
+          self.assertEqual(resolveDefaultsFilename("o2", "alidist"), "/bar/defaults-o2.sh")
+      with patch.object(os.path, "exists", fake_exists), \
+            patch.object(os, "environ", {"BITS_PATH": "bar:/foo"}):
+          self.assertEqual(resolveDefaultsFilename("release", "alidist"), "alidist/defaults-release.sh")
+          self.assertEqual(resolveDefaultsFilename("release", "alidost"), None)
+          self.assertEqual(resolveDefaultsFilename("o2", "alidist"), "alidist/bar/defaults-o2.sh")
+
+  def test_resolveFilename(self):
+      def fake_exists(n):
+          return {
+                  "alidist/defaults-release.sh": True,
+                  "alidist/zlib.sh": True,
+                  "/foo/defaults-o2.sh": True,
+                  "/bar/defaults-o2.sh": True,
+                  "alidist/bar/defaults-o2.sh": True,
+                  "/bar/python.sh": True
+                  }.get(n, False)
+
+      def fake_abspath(n):
+          return os.path.join("/fake/", n)
+
+      with patch.object(os.path, "exists", fake_exists), \
+                patch.object(os.path, "abspath", fake_abspath):
+          self.assertEqual(resolveFilename({}, "zlib", "alidist"), ("alidist/zlib.sh", "/fake/alidist/"))
+
+      with patch.object(os.path, "exists", fake_exists), \
+            patch.object(os.path, "abspath", fake_abspath), \
+            patch.object(os, "environ", {"BITS_PATH": "/foo"}):
+          self.assertEqual(resolveFilename({}, "zlib", "alidist"), ("alidist/zlib.sh", "/fake/alidist/"))
+
+      with patch.object(os.path, "exists", fake_exists), \
+            patch.object(os.path, "abspath", fake_abspath), \
+            patch.object(os, "environ", {"BITS_PATH": "/bar:/foo"}):
+          self.assertEqual(resolveFilename({}, "zlib", "alidist"), ("alidist/zlib.sh", "/fake/alidist/"))
+          self.assertEqual(resolveFilename({}, "zlib", "alidost"), (None, None))
+          self.assertEqual(resolveFilename({}, "python", "alidist"), ("/bar/python.sh", "/bar"))
+
+      spec_float_version = {"package": "test-pkg",
+                            "version": 1.0,
+                            "tag": "foo/bar",
+                            "commit_hash": "000000000000000000000000000"
+                            }
+      self.assertRaises(
+        ValueError,
+        lambda: resolve_version(spec_float_version, "release", "stream/v1", "v1")
+      )
 
 
 class TestTopologicalSort(unittest.TestCase):
@@ -269,7 +353,6 @@ class TestTopologicalSort(unittest.TestCase):
                  for pkg in string.ascii_lowercase}
         self.assertEqual(frozenset(specs.keys()),
                          frozenset(topological_sort(specs)))
-
 
 if __name__ == '__main__':
     unittest.main()

@@ -33,7 +33,7 @@ An example recipe for `zlib` is the following:
 ```yaml
 package: zlib
 version: v1.2.8
-source: https://github.com/star-externals/zlib
+source: https://github.com/madler/zlib
 tag: v1.2.8
 ---
 #!/bin/bash -ex
@@ -130,7 +130,10 @@ The following entries are optional in the header:
 
     The specified dependencies will be built before building the given package.
     You can specify platform-specific dependencies by appending `:<regexp>` to
-    the dependency name. Such a regular expression will be matched against the
+    the dependency name. Similarly, you can specify build default specific dependencies
+    by appending `:defaults=<regex>`.
+
+    Such a regular expression will be matched against the
     architecture provided via `--architecture`, and if it does not match, the
     requirement will not be included. For instance:
 
