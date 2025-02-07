@@ -251,29 +251,41 @@ ARCHITECTURE=
 WORK_DIR=
 NO_REFRESH=
 DEFAULT_WORK_DIRS=("$BITS_WORK_DIR" "$BITS_WORK_DIR" ${BITSBUILD_CHDIR:+"$BITSBUILD_CHDIR/sw"} sw ../sw)
-ARGS=()
 COMMAND_IN_ENV=()
 CLEAN_ENV=1
 DEVOPT=0
 VERBOSE=1
 
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --architecture|-a) ARCHITECTURE="$2"; shift 2 ;;
-    --work-dir|-w) WORK_DIR="$2"; shift 2 ;;
-    --no-refresh) NO_REFRESH=1; shift ;;
-    -q) unset VERBOSE; shift ;;
-    --shellrc) unset CLEAN_ENV; shift ;;
-    --dev) DEVOPT=1; shift ;;
-    --help|help) printHelp; exit 0 ;;
-    -c) shift; COMMAND_IN_ENV=("$@"); break ;;
-    *) ARGS+=("$1"); shift ;;
+ARGS=()
+
+for ((i=0;i<$ARGC;i++));
+do
+  case "${ARGV[$i]}" in
+      --architecture|-a)
+	  i+=1 ;ARCHITECTURE="${ARGV[$i]}";;
+      --work-dir|-w)
+	  i+=1; WORK_DIR="${ARGV[$i]}";;
+      --no-refresh)
+	  NO_REFRESH=1;;
+      -q)
+	  unset VERBOSE;;
+      --shellrc)
+	  unset CLEAN_ENV;;
+      --dev)
+	  DEVOPT=1;;
+      --help|help)
+	  printHelp; exit 0 ;;
+      -c) 
+	  i+=1; COMMAND_IN_ENV=("$@");
+	  break ;;
+      *)
+	  ARGS+=(${ARGV[$i]});
   esac
+  i+=1;
 done
 
 ACTION="${ARGS[0]}"
 ARGS=("${ARGS[@]:1}")
-
 export BITSLVL=$((BITSLVL+1))
 
 if [[ "$ACTION" == "shell-helper" ]]; then
