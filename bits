@@ -279,13 +279,14 @@ do
 	  i+=1; COMMAND_IN_ENV=("$@");
 	  break ;;
       *)
-	  ARGS+=(${ARGV[$i]});
-  esac
-  i+=1;
+	  ARGS+=(${ARGV[$i]});;
+   esac
 done
 
 ACTION="${ARGS[0]}"
+
 ARGS=("${ARGS[@]:1}")
+
 export BITSLVL=$((BITSLVL+1))
 
 if [[ "$ACTION" == "shell-helper" ]]; then
