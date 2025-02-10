@@ -37,8 +37,7 @@ import subprocess
 
 from jinja2.sandbox import SandboxedEnvironment
 
-    
-def writeAll(fn, txt):
+def writeAll(fn, txt) -> None:
   f = open(fn, "w")
   f.write(txt)
   f.close()

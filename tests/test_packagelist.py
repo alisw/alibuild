@@ -138,7 +138,7 @@ class ReplacementTestCase(unittest.TestCase):
         self.assertIn("with-replacement", systemPkgs)
         self.assertNotIn("with-replacement", ownPkgs)
 
-    def test_replacement_recipe_given(self):
+    def test_replacement_recipe_given(self) -> None:
         """Check that specifying a replacement recipe means it is used.
 
         Also check that we report to the user that a package will be compiled
@@ -155,7 +155,7 @@ class ReplacementTestCase(unittest.TestCase):
         self.assertIn("with-replacement-recipe", ownPkgs)
 
     @mock.patch("bits_helpers.utilities.warning")
-    def test_missing_replacement_spec(self, mock_warning):
+    def test_missing_replacement_spec(self, mock_warning) -> None:
         """Check a warning is displayed when the replacement spec is not found."""
         warning_msg = "falling back to building the package ourselves"
         warning_exists = False
@@ -174,13 +174,13 @@ class ReplacementTestCase(unittest.TestCase):
 class ForceRebuildTestCase(unittest.TestCase):
     """Test that force_rebuild keys are applied properly."""
 
-    def test_force_rebuild_recipe(self):
+    def test_force_rebuild_recipe(self) -> None:
         """If the recipe specifies force_rebuild, it must be applied."""
         specs, _, _, _, _ = getPackageListWithDefaults(["force-rebuild"])
         self.assertTrue(specs["force-rebuild"]["force_rebuild"])
         self.assertFalse(specs["defaults-release"]["force_rebuild"])
 
-    def test_force_rebuild_command_line(self):
+    def test_force_rebuild_command_line(self) -> None:
         """The --force-rebuild option must take precedence, if given."""
         specs, _, _, _, _ = getPackageListWithDefaults(
             ["force-rebuild"], force_rebuild=["defaults-release", "force-rebuild"],

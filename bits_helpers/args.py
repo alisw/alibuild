@@ -481,7 +481,7 @@ def finaliseArgs(args, parser):
       args.writeStore = args.remoteStore
 
   if args.action in ["build", "init"]:
-    if "develPrefix" in args and args.develPrefix == None:
+    if "develPrefix" in args and args.develPrefix is None:
       if "chdir" in args:
         args.develPrefix = basename(abspath(args.chdir))
       else:

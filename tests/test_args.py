@@ -110,7 +110,7 @@ class ArgsTestCase(unittest.TestCase):
                 f"Expected '{args[0]}' matching '{pattern}' but it's not the case."
             )
 
-  def test_validArchitectures(self):
+  def test_validArchitectures(self) -> None:
     for arch in VALID_ARCHS:
       self.assertTrue(matchValidArch(arch))
     for arch in INVALID_ARCHS:
