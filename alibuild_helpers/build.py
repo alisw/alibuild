@@ -35,7 +35,7 @@ import sys
 import time
 
 
-def writeAll(fn, txt):
+def writeAll(fn, txt) -> None:
   f = open(fn, "w")
   f.write(txt)
   f.close()

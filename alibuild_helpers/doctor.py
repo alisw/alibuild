@@ -7,7 +7,7 @@ from alibuild_helpers.log import logger
 from alibuild_helpers.utilities import getPackageList, parseDefaults, readDefaults, validateDefaults
 from alibuild_helpers.cmd import getstatusoutput, DockerRunner
 
-def prunePaths(workDir):
+def prunePaths(workDir) -> None:
   for x in ["PATH", "LD_LIBRARY_PATH", "DYLD_LIBRARY_PATH"]:
     if not x in os.environ:
       continue
@@ -52,7 +52,7 @@ def checkRequirements(spec, cmd, homebrew_replacement, getstatusoutput_docker):
           spec.get("system_requirement_missing"))
     return (err, "")
 
-def systemInfo():
+def systemInfo() -> None:
   _,out = getstatusoutput("env")
   debug("Environment:\n%s", out)
   _,out = getstatusoutput("uname -a")

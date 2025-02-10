@@ -7,11 +7,11 @@ def noAnalytics():
 def yesAnalytics():
     return True
 
-def notInvoked():
+def notInvoked() -> None:
     assert(False)
 
 class TestAnalytics(unittest.TestCase):
-    def test_analytics(self):
+    def test_analytics(self) -> None:
         self.assertEqual(False,  decideAnalytics(hasDisableFile=False,
                                                  hasUuid=False,
                                                  isTty=False,
