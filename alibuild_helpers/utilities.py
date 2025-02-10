@@ -316,14 +316,14 @@ def getRecipeReader(url, dist=None):
 
 # Read a recipe from a file
 class FileReader(object):
-  def __init__(self, url):
+  def __init__(self, url) -> None:
     self.url = url
   def __call__(self):
     return open(self.url).read()
 
 # Read a recipe from a git repository using git show.
 class GitReader(object):
-  def __init__(self, url, configDir):
+  def __init__(self, url, configDir) -> None:
     self.url, self.configDir = url, configDir
   def __call__(self):
     m = re.search(r'^dist:(.*)@([^@]+)$', self.url)
@@ -600,7 +600,7 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
 
 
 class Hasher:
-  def __init__(self):
+  def __init__(self) -> None:
     self.h = hashlib.sha1()
   def __call__(self, txt):
     if not type(txt) == bytes:

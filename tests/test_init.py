@@ -26,7 +26,7 @@ CLONE_EVERYTHING = [
 
 
 class InitTestCase(unittest.TestCase):
-    def test_packageDefinition(self):
+    def test_packageDefinition(self) -> None:
       self.assertEqual(parsePackagesDefinition("AliRoot@v5-08-16,AliPhysics@v5-08-16-01"),
                        [{'ver': 'v5-08-16', 'name': 'AliRoot'},
                         {'ver': 'v5-08-16-01', 'name': 'AliPhysics'}])
@@ -37,7 +37,7 @@ class InitTestCase(unittest.TestCase):
     @patch("alibuild_helpers.init.info")
     @patch("alibuild_helpers.init.path")
     @patch("alibuild_helpers.init.os")
-    def test_doDryRunInit(self, mock_os, mock_path,  mock_info):
+    def test_doDryRunInit(self, mock_os, mock_path,  mock_info) -> None:
       fake_dist = {"repo": "alisw/alidist", "ver": "master"}
       args = Namespace(
         develPrefix = ".",
@@ -61,7 +61,7 @@ class InitTestCase(unittest.TestCase):
     @patch("alibuild_helpers.init.updateReferenceRepoSpec")
     @patch("alibuild_helpers.utilities.open")
     @patch("alibuild_helpers.init.readDefaults")
-    def test_doRealInit(self, mock_read_defaults, mock_open, mock_update_reference, mock_git, mock_os, mock_path,  mock_info, mock_banner):
+    def test_doRealInit(self, mock_read_defaults, mock_open, mock_update_reference, mock_git, mock_os, mock_path,  mock_info, mock_banner) -> None:
       fake_dist = {"repo": "alisw/alidist", "ver": "master"}
       mock_open.side_effect = lambda x: {
         "/alidist/defaults-release.sh": StringIO("package: defaults-release\nversion: v1\n---"),

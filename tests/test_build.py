@@ -240,7 +240,7 @@ class BuildTestCase(unittest.TestCase):
     @patch("alibuild_helpers.workarea.is_writeable", new=MagicMock(return_value=True))
     @patch("alibuild_helpers.build.basename", new=MagicMock(return_value="aliBuild"))
     @patch("alibuild_helpers.build.install_wrapper_script", new=MagicMock())
-    def test_coverDoBuild(self, mock_debug, mock_listdir, mock_warning, mock_sys, mock_git_git):
+    def test_coverDoBuild(self, mock_debug, mock_listdir, mock_warning, mock_sys, mock_git_git) -> None:
         mock_git_git.side_effect = dummy_git
         mock_debug.side_effect = lambda *args: None
         mock_warning.side_effect = lambda *args: None
@@ -339,7 +339,7 @@ class BuildTestCase(unittest.TestCase):
         spec["tag"] = resolve_tag(spec)
         return spec
 
-    def test_hashing(self):
+    def test_hashing(self) -> None:
         """Check that the hashes assigned to packages remain constant."""
         default = self.setup_spec(TEST_DEFAULT_RELEASE)
         zlib = self.setup_spec(TEST_ZLIB_RECIPE)
@@ -387,7 +387,7 @@ class BuildTestCase(unittest.TestCase):
         self.assertEqual(len(extra["remote_hashes"]), 3)
         self.assertEqual(extra["local_hashes"][0], TEST_EXTRA_BUILD_HASH)
 
-    def test_initdotsh(self):
+    def test_initdotsh(self) -> None:
         """Sanity-check the generated init.sh for a few variables."""
         specs = {
             # Add some attributes that are normally set by doBuild(), but
