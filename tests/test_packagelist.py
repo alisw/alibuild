@@ -81,7 +81,6 @@ class MockReader:
         return self._contents
 
 
-
 def getPackageListWithDefaults(packages, force_rebuild=()):
     specs = {}   # getPackageList will mutate this
     return_values = getPackageList(
@@ -171,6 +170,7 @@ class ReplacementTestCase(unittest.TestCase):
         """Check a warning is displayed when the replacement spec is not found."""
         warning_msg = "falling back to building the package ourselves"
         warning_exists = False
+
         def fake_exists(n):
             return n in RECIPES.keys()
         with patch.object(os.path, "exists", fake_exists):
@@ -182,7 +182,6 @@ class ReplacementTestCase(unittest.TestCase):
             specs, systemPkgs, ownPkgs, failedReqs, validDefaults = \
                 getPackageListWithDefaults(["missing-spec"])
             self.assertTrue(warning_exists)
-
 
 
 @mock.patch("alibuild_helpers.utilities.getRecipeReader", new=MockReader)

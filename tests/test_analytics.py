@@ -1,21 +1,25 @@
 import unittest
 from alibuild_helpers.analytics import decideAnalytics
 
+
 def noAnalytics():
     return False
+
 
 def yesAnalytics():
     return True
 
+
 def notInvoked() -> None:
-    assert(False)
+    assert (False)
+
 
 class TestAnalytics(unittest.TestCase):
     def test_analytics(self) -> None:
-        self.assertEqual(False,  decideAnalytics(hasDisableFile=False,
-                                                 hasUuid=False,
-                                                 isTty=False,
-                                                 questionCallback=notInvoked))
+        self.assertEqual(False, decideAnalytics(hasDisableFile=False,
+                                                hasUuid=False,
+                                                isTty=False,
+                                                questionCallback=notInvoked))
         self.assertEqual(False, decideAnalytics(hasDisableFile=False,
                                                 hasUuid=False,
                                                 isTty=True,

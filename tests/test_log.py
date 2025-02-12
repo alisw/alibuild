@@ -46,5 +46,6 @@ class LogTestCase(unittest.TestCase):
         p("%s", "Last message")
         p.end()
 
+
 if __name__ == '__main__':
-  unittest.main()
+    unittest.main()

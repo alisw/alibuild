@@ -394,10 +394,10 @@ class BuildTestCase(unittest.TestCase):
             # required by generate_initdotsh().
             spec["package"]: dict(spec, revision="1", commit_hash="424242", hash="010101")
             for spec in map(self.setup_spec, (
-                    TEST_DEFAULT_RELEASE,
-                    TEST_ZLIB_RECIPE,
-                    TEST_ROOT_RECIPE,
-                    TEST_EXTRA_RECIPE,
+                TEST_DEFAULT_RELEASE,
+                TEST_ZLIB_RECIPE,
+                TEST_ROOT_RECIPE,
+                TEST_EXTRA_RECIPE,
             ))
         }
 

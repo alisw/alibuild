@@ -10,6 +10,8 @@ PRIVATE_REPO = "https://gitlab.cern.ch/ALICEPrivateExternals/FLUKA.git"
 
 
 err, out = git(("--help",), check=False)
+
+
 @unittest.skipUnless(not err and out.startswith("usage:"),
                      "need a working git executable on the system")
 class GitWrapperTestCase(unittest.TestCase):

@@ -79,7 +79,7 @@ setup(
         # The 7.* series removed support for Python 3.6.
         'setuptools_scm<7.0.0' if sys.version_info < (3, 7) else
         'setuptools_scm'
-    ] + (['packaging<=23'] if sys.version_info <(3, 7) else []),
+    ] + (['packaging<=23'] if sys.version_info < (3, 7) else []),
 
     # List run-time dependencies here.  These will be installed by pip when
     # your project is installed. For an analysis of "install_requires" vs pip's
@@ -92,11 +92,11 @@ setup(
     # have to be included in MANIFEST.in as well.
     include_package_data=True,
     package_data={
-      'alibuild_helpers': ['build_template.sh'],
+        'alibuild_helpers': ['build_template.sh'],
     },
 
     # To provide executable scripts, use entry points in preference to the
     # "scripts" keyword. Entry points provide cross-platform support and allow
     # pip to create the appropriate form of executable for the target platform.
-    scripts = ["aliBuild", "alienv", "aliDoctor", "aliDeps", "pb"]
+    scripts=["aliBuild", "alienv", "aliDoctor", "aliDeps", "pb"]
 )

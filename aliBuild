@@ -21,118 +21,120 @@ from alibuild_helpers.build import doBuild
 
 
 def doMain(args, parser):
-  # We need to unset BASH_ENV because in certain environments (e.g.
-  # NERSC) this is used to source a (non -e safe) bashrc, effectively
-  # breaking aliBuild.
-  # We set all the locale related environment to C to make sure
-  # do not get fooled when parsing localized messages.
-  # We set ALIBUILD_ARCHITECTURE so that it's picked up by the external
-  # command which does the reporting.
-  if not "architecture" in args:
-    args.architecture = detectArch()
-  ENVIRONMENT_OVERRIDES = {
-    "LANG": "C",
-    "LANGUAGE": "C",
-    "LC_ALL": "C",
-    "LC_COLLATE": "C",
-    "LC_CTYPE": "C",
-    "LC_MESSAGES": "C",
-    "LC_MONETARY": "C",
-    "LC_NUMERIC": "C",
-    "LC_TIME": "C",
-    "GREP_OPTIONS": "",
-    "BASH_ENV": "",
-    "ALIBUILD_ARCHITECTURE": args.architecture
-  }
-  os.environ.update(ENVIRONMENT_OVERRIDES)
-  report_screenview(args.action)
+    # We need to unset BASH_ENV because in certain environments (e.g.
+    # NERSC) this is used to source a (non -e safe) bashrc, effectively
+    # breaking aliBuild.
+    # We set all the locale related environment to C to make sure
+    # do not get fooled when parsing localized messages.
+    # We set ALIBUILD_ARCHITECTURE so that it's picked up by the external
+    # command which does the reporting.
+    if not "architecture" in args:
+        args.architecture = detectArch()
+    ENVIRONMENT_OVERRIDES = {
+        "LANG": "C",
+        "LANGUAGE": "C",
+        "LC_ALL": "C",
+        "LC_COLLATE": "C",
+        "LC_CTYPE": "C",
+        "LC_MESSAGES": "C",
+        "LC_MONETARY": "C",
+        "LC_NUMERIC": "C",
+        "LC_TIME": "C",
+        "GREP_OPTIONS": "",
+        "BASH_ENV": "",
+        "ALIBUILD_ARCHITECTURE": args.architecture
+    }
+    os.environ.update(ENVIRONMENT_OVERRIDES)
+    report_screenview(args.action)
 
-  # Move to the specified working directory before doing anything else
-  if "chdir" in args:
-    try:
-      os.chdir(os.path.expanduser(args.chdir))
-      debug("Current working directory is %s" % os.getcwd())
-    except Exception as e:
-      error("Cannot change to directory \"%s\"." % args.chdir)
-      error(e.message)
-      exit(1)
+    # Move to the specified working directory before doing anything else
+    if "chdir" in args:
+        try:
+            os.chdir(os.path.expanduser(args.chdir))
+            debug("Current working directory is %s" % os.getcwd())
+        except Exception as e:
+            error("Cannot change to directory \"%s\"." % args.chdir)
+            error(e.message)
+            exit(1)
 
-  if args.action == "version" or args.action is None:
-    print("aliBuild version: {version} ({arch})".format(
-      version=__version__ or "unknown", arch=args.architecture or "unknown"))
-    sys.exit(0)
+    if args.action == "version" or args.action is None:
+        print("aliBuild version: {version} ({arch})".format(
+            version=__version__ or "unknown", arch=args.architecture or "unknown"))
+        sys.exit(0)
 
-  if args.action == "doctor":
-    doDoctor(args, parser)
+    if args.action == "doctor":
+        doDoctor(args, parser)
 
-  logger.setLevel(logging.DEBUG if args.debug else logging.INFO)
+    logger.setLevel(logging.DEBUG if args.debug else logging.INFO)
 
-  if args.action == "deps":
-    sys.exit(0 if doDeps(args, parser) else 1)
+    if args.action == "deps":
+        sys.exit(0 if doDeps(args, parser) else 1)
 
-  if args.action == "clean":
-    doClean(workDir=args.workDir, architecture=args.architecture, aggressiveCleanup=args.aggressiveCleanup, dryRun=args.dryRun)
-    exit(0)
+    if args.action == "clean":
+        doClean(workDir=args.workDir, architecture=args.architecture, aggressiveCleanup=args.aggressiveCleanup, dryRun=args.dryRun)
+        exit(0)
 
-  # Setup build environment.
-  if args.action == "init":
-    doInit(args)
-    exit(0)
+    # Setup build environment.
+    if args.action == "init":
+        doInit(args)
+        exit(0)
 
-  if args.action == "build":
-    doBuild(args, parser)
-    sys.exit(0)
+    if args.action == "build":
+        doBuild(args, parser)
+        sys.exit(0)
 
 
 if __name__ == "__main__":
-  args, parser = doParseArgs()
+    args, parser = doParseArgs()
 
-  # This is valid for everything
-  logger.setLevel(logging.DEBUG if args.debug else logging.INFO)
+    # This is valid for everything
+    logger.setLevel(logging.DEBUG if args.debug else logging.INFO)
 
-  os.environ["ALIBUILD_ANALYTICS_ID"] = "UA-77346950-1"
-  os.environ["ALIBUILD_VERSION"] = __version__ or ""
-  if args.action == "analytics":
-    if args.state == "off":
-      disable_analytics()
+    os.environ["ALIBUILD_ANALYTICS_ID"] = "UA-77346950-1"
+    os.environ["ALIBUILD_VERSION"] = __version__ or ""
+    if args.action == "analytics":
+        if args.state == "off":
+            disable_analytics()
+        else:
+            enable_analytics()
+        exit(0)
+    elif args.action == "architecture":
+        arch = detectArch()
+        print(arch if arch else "<unknown>")
+        exit(0)
+
+    if not decideAnalytics(exists(expanduser("~/.config/alibuild/disable-analytics")),
+                           exists(expanduser("~/.config/alibuild/analytics-uuid")),
+                           sys.stdin.isatty(),
+                           askForAnalytics):
+        os.environ["ALIBUILD_NO_ANALYTICS"] = "1"
     else:
-      enable_analytics()
-    exit(0)
-  elif args.action == "architecture":
-    arch = detectArch()
-    print(arch if arch else "<unknown>")
-    exit(0)
+        os.environ["ALIBUILD_ANALYTICS_USER_UUID"] = open(expanduser("~/.config/alibuild/analytics-uuid")).read().strip()
+    try:
+        profiler = "--profile" in sys.argv
+        if profiler:
+            print("profiler started")
+            import cProfile
+            import pstats
+            from io import StringIO
+            pr = cProfile.Profile()
+            pr.enable()
 
-  if not decideAnalytics(exists(expanduser("~/.config/alibuild/disable-analytics")),
-                         exists(expanduser("~/.config/alibuild/analytics-uuid")),
-                         sys.stdin.isatty(),
-                         askForAnalytics):
-    os.environ["ALIBUILD_NO_ANALYTICS"] = "1"
-  else:
-    os.environ["ALIBUILD_ANALYTICS_USER_UUID"] = open(expanduser("~/.config/alibuild/analytics-uuid")).read().strip()
-  try:
-    profiler = "--profile" in sys.argv
-    if profiler:
-      print("profiler started")
-      import cProfile, pstats
-      from io import StringIO
-      pr = cProfile.Profile()
-      pr.enable()
-      def profiler():
-        pr.disable()
-        print("profiler stopped")
-        s = StringIO()
-        sortby = 'time'
-        ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
-        ps.print_stats()
-        print(s.getvalue())
-      atexit.register(profiler)
-    doMain(args, parser)
-  except KeyboardInterrupt as e:
-    info(str(e))
-    report_event("user", "ctrlc")
-    exit(1)
-  except Exception as e:
-    traceback.print_exc()
-    report_exception(e)
-    exit(1)
+            def profiler():
+                pr.disable()
+                print("profiler stopped")
+                s = StringIO()
+                sortby = 'time'
+                ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
+                ps.print_stats()
+                print(s.getvalue())
+            atexit.register(profiler)
+        doMain(args, parser)
+    except KeyboardInterrupt as e:
+        info(str(e))
+        report_event("user", "ctrlc")
+        exit(1)
+    except Exception as e:
+        traceback.print_exc()
+        report_exception(e)
+        exit(1)
