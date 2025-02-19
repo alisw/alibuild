@@ -1,5 +1,4 @@
 from __future__ import print_function
-from textwrap import dedent
 # Assuming you are using the mock library to ... mock things
 from unittest.mock import patch, call
 

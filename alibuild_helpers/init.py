@@ -2,11 +2,12 @@ from alibuild_helpers.git import git, Git
 from alibuild_helpers.utilities import getPackageList, parseDefaults, readDefaults, validateDefaults
 from alibuild_helpers.log import debug, error, warning, banner, info
 from alibuild_helpers.log import dieOnError
-from alibuild_helpers.workarea import cleanup_git_log, updateReferenceRepoSpec
+from alibuild_helpers.workarea import updateReferenceRepoSpec
 
 from os.path import join
 import os.path as path
-import os, sys
+import os
+import sys
 
 def parsePackagesDefinition(pkgname):
   return [ dict(zip(["name","ver"], y.split("@")[0:2]))

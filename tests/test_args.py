@@ -1,10 +1,10 @@
 from __future__ import print_function
 # Assuming you are using the mock library to ... mock things
 from unittest import mock
-from unittest.mock import patch, call
+from unittest.mock import patch
 
 import alibuild_helpers.args
-from alibuild_helpers.args import doParseArgs, matchValidArch, finaliseArgs, DEFAULT_WORK_DIR, DEFAULT_CHDIR, ARCHITECTURE_TABLE
+from alibuild_helpers.args import doParseArgs, matchValidArch
 import sys
 import os
 import os.path

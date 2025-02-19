@@ -11,7 +11,6 @@ from alibuild_helpers.utilities import parseDefaults, readDefaults
 from alibuild_helpers.utilities import getPackageList, asList
 from alibuild_helpers.utilities import validateDefaults
 from alibuild_helpers.utilities import Hasher
-from alibuild_helpers.utilities import yamlDump
 from alibuild_helpers.utilities import resolve_tag, resolve_version, short_commit_hash
 from alibuild_helpers.git import Git, git
 from alibuild_helpers.sl import Sapling
@@ -31,7 +30,6 @@ import socket
 import os
 import re
 import shutil
-import sys
 import time
 
 
@@ -476,7 +474,7 @@ def doBuild(args, parser):
     checkedOutCommitName = scm.checkedOutCommitName(directory=args.configDir)
   except SCMError:
     dieOnError(True, "Cannot find SCM directory in %s." % args.configDir)
-  os.environ["ALIBUILD_ALIDIST_HASH"] = checkedOutCommitName # type: ignore
+  os.environ["ALIBUILD_ALIDIST_HASH"] = checkedOutCommitName
 
   debug("Building for architecture %s", args.architecture)
   debug("Number of parallel builds: %d", args.jobs)
@@ -512,9 +510,9 @@ def doBuild(args, parser):
              ("\n- ".join(sorted(failed)), args.defaults, " ".join(args.pkgname)))
 
   for x in specs.values():
-    x["requires"] = [r for r in x["requires"] if not r in args.disable]
-    x["build_requires"] = [r for r in x["build_requires"] if not r in args.disable]
-    x["runtime_requires"] = [r for r in x["runtime_requires"] if not r in args.disable]
+    x["requires"] = [r for r in x["requires"] if r not in args.disable]
+    x["build_requires"] = [r for r in x["build_requires"] if r not in args.disable]
+    x["runtime_requires"] = [r for r in x["runtime_requires"] if r not in args.disable]
 
   if systemPackages:
     banner("aliBuild can take the following packages from the system and will not build them:\n  %s",
