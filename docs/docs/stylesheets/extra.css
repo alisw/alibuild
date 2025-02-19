@@ -2,6 +2,8 @@
   height: 1.5rem;
 }
 
-.md-header {
-  background-color: #111;
+:root  > * {
+  --md-primary-fg-color:        #111;
+  --md-primary-fg-color--light: #111;
+  --md-primary-fg-color--dark:  #111;
 }
