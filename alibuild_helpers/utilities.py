@@ -490,6 +490,18 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
       log("Overrides for package %s: %s", spec["package"], overrides[override])
       spec.update(overrides.get(override, {}) or {})
 
+    # Architecture is used to determine for which architecture we
+    # should build a given package. By default everything matches
+    # The architecture string should NOT go in the has, because in
+    # any case wether or not a package is build the hash will be different.
+    architectureRE = spec.get("architecture", ".*")
+    try:
+      architectureREMatches = re.match(architectureRE, architecture)
+    except:
+      dieOnError(True, "Malformed entry architecture: %s in %s" % (architecture, spec["package"]))
+    if not architectureREMatches:
+      disable.append(spec["package"])
+
     # If --always-prefer-system is passed or if prefer_system is set to true
     # inside the recipe, use the script specified in the prefer_system_check
     # stanza to see if we can use the system version of the package.
@@ -549,10 +561,10 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
             warning(f"Could not find named replacement spec for {spec['package']}: {key}, "
                     "falling back to building the package ourselves.")
 
-    dieOnError(("system_requirement" in spec) and recipe.strip("\n\t "),
-               "System requirements %s cannot have a recipe" % spec["package"])
     if re.match(spec.get("system_requirement", "(?!.*)"), architecture):
-      cmd = spec.get("system_requirement_check", "false")
+      # system_requirement fallsback to the prefer_system_check rule
+      # if the system_requirement_check does not exist.
+      cmd = spec.get("system_requirement_check", spec.get("prefer_system_check", "false"))
       if not spec["package"] in requirementsCache:
         requirementsCache[spec["package"]] = performRequirementCheck(spec, cmd.strip())
 
