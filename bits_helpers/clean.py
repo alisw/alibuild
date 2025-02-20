@@ -47,14 +47,14 @@ def decideClean(workDir, architecture, aggressiveCleanup):
                  "%s/SOURCES" % (workDir)]
   allBuildStuff = glob.glob("%s/BUILD/*" % workDir)
   toDelete += [x for x in allBuildStuff
-               if not path.islink(x) and not basename(x) in symlinksBuild]
+               if not path.islink(x) and basename(x) not in symlinksBuild]
   installGlob ="%s/%s/*/" % (workDir, architecture)
   installedPackages = set([dirname(x) for x in glob.glob(installGlob)])
   symlinksInstall = []
   for x in installedPackages:
     symlinksInstall += [path.realpath(y) for y in glob.glob(x + "/latest*")]
   toDelete += [x for x in glob.glob(installGlob+ "*")
-               if not path.islink(x) and not path.realpath(x) in symlinksInstall]
+               if not path.islink(x) and path.realpath(x) not in symlinksInstall]
   toDelete = [x for x in toDelete if path.exists(x)]
   return toDelete
 

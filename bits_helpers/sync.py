@@ -364,7 +364,6 @@ class CVMFSRemoteSync:
     done
     """.format(
       workDir=self.workdir,
-      b=self.remoteStore,
       architecture=self.architecture,
       cvmfs_architecture=cvmfs_architecture,
       package=spec["package"],

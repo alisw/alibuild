@@ -203,7 +203,6 @@ class BuildTestCase(unittest.TestCase):
     @patch("bits_helpers.git.git")
     @patch("bits_helpers.build.exists", new=MagicMock(side_effect=dummy_exists))
     @patch("os.path.exists", new=MagicMock(side_effect=dummy_exists))
-    @patch("bits_helpers.build.sys")
     @patch("bits_helpers.build.dieOnError", new=MagicMock())
     @patch("bits_helpers.utilities.dieOnError", new=MagicMock())
     @patch("bits_helpers.utilities.warning")
@@ -240,7 +239,7 @@ class BuildTestCase(unittest.TestCase):
     @patch("bits_helpers.workarea.is_writeable", new=MagicMock(return_value=True))
     @patch("bits_helpers.build.basename", new=MagicMock(return_value="aliBuild"))
     @patch("bits_helpers.build.install_wrapper_script", new=MagicMock())
-    def test_coverDoBuild(self, mock_debug, mock_listdir, mock_warning, mock_sys, mock_git_git) -> None:
+    def test_coverDoBuild(self, mock_debug, mock_listdir, mock_warning, mock_git_git) -> None:
         mock_git_git.side_effect = dummy_git
         mock_debug.side_effect = lambda *args: None
         mock_warning.side_effect = lambda *args: None
@@ -281,7 +280,6 @@ class BuildTestCase(unittest.TestCase):
             forceTracked=False,
             plugin="legacy"
         )
-        mock_sys.version_info = sys.version_info
 
         def mkcall(args):
             cmd, directory, check = args

@@ -211,7 +211,7 @@ class TestUtilities(unittest.TestCase):
     }
     with patch.object(os, "environ", fake_env):
       prunePaths("/sw")
-      self.assertTrue(not "ROOT_VERSION" in fake_env)
+      self.assertTrue("ROOT_VERSION" not in fake_env)
       self.assertTrue(fake_env["PATH"] == "/usr/local/bin")
       self.assertTrue(fake_env["LD_LIBRARY_PATH"] == "")
       self.assertTrue(fake_env["DYLD_LIBRARY_PATH"] == "")
@@ -219,7 +219,7 @@ class TestUtilities(unittest.TestCase):
 
     with patch.object(os, "environ", fake_env_copy):
       prunePaths("/foo")
-      self.assertTrue(not "ROOT_VERSION" in fake_env_copy)
+      self.assertTrue("ROOT_VERSION" not in fake_env_copy)
       self.assertTrue(fake_env_copy["PATH"] == "/sw/bin:/usr/local/bin")
       self.assertTrue(fake_env_copy["LD_LIBRARY_PATH"] == "/sw/lib")
       self.assertTrue(fake_env_copy["DYLD_LIBRARY_PATH"] == "/sw/lib")

@@ -2,11 +2,12 @@ from bits_helpers.git import git, Git
 from bits_helpers.utilities import getPackageList, parseDefaults, readDefaults, validateDefaults
 from bits_helpers.log import debug, error, warning, banner, info
 from bits_helpers.log import dieOnError
-from bits_helpers.workarea import cleanup_git_log, updateReferenceRepoSpec
+from bits_helpers.workarea import updateReferenceRepoSpec
 
 from os.path import join
 import os.path as path
-import os, sys
+import os
+import sys
 
 def parsePackagesDefinition(pkgname):
   return [ dict(zip(["name","ver"], y.split("@")[0:2]))

@@ -149,7 +149,7 @@ def normalise_multiple_options(option, sep=","):
 
 def prunePaths(workDir):
   for x in ["PATH", "LD_LIBRARY_PATH", "DYLD_LIBRARY_PATH"]:
-    if not x in os.environ:
+    if x not in os.environ:
       continue
     workDirEscaped = re.escape("%s" % workDir) + "[^:]*:?"
     os.environ[x] = re.sub(workDirEscaped, "", os.environ[x])
@@ -162,12 +162,12 @@ def validateSpec(spec):
     raise SpecError("Empty recipe.")
   if type(spec) != OrderedDict:
     raise SpecError("Not a YAML key / value.")
-  if not "package" in spec:
+  if "package" not in spec:
     raise SpecError("Missing package field in header.")
 
 # Use this to check if a given spec is compatible with the given default
 def validateDefaults(finalPkgSpec, defaults):
-  if not "valid_defaults" in finalPkgSpec:
+  if "valid_defaults" not in finalPkgSpec:
     return (True, "", [])
   validDefaults = asList(finalPkgSpec["valid_defaults"])
   nonStringDefaults = [x for x in validDefaults if not type(x) == str]
@@ -381,7 +381,7 @@ def parseRecipe(reader):
     err = "Unable to parse %s\n%s" % (reader.url, str(e))
   except yaml.parser.ParserError as e:
     err = "Unable to parse %s\n%s" % (reader.url, str(e))
-  except ValueError as e:
+  except ValueError:
     err = "Unable to parse %s. Header missing." % reader.url
   return err, spec, recipe
 
@@ -521,7 +521,7 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
     systemRE = spec.get("prefer_system", "(?!.*)")
     try:
       systemREMatches = re.match(systemRE, architecture)
-    except TypeError as e:
+    except TypeError:
       dieOnError(True, "Malformed entry prefer_system: %s in %s" % (systemRE, spec["package"]))
     if not noSystem and (preferSystem or systemREMatches):
       requested_version = resolve_version(spec, defaults, "unavailable", "unavailable")
@@ -578,7 +578,7 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
                "System requirements %s cannot have a recipe" % spec["package"])
     if re.match(spec.get("system_requirement", "(?!.*)"), architecture):
       cmd = spec.get("system_requirement_check", "false")
-      if not spec["package"] in requirementsCache:
+      if spec["package"] not in requirementsCache:
         requirementsCache[spec["package"]] = performRequirementCheck(spec, cmd.strip())
 
       err, output = requirementsCache[spec["package"]]
@@ -605,8 +605,8 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
     spec["disabled"] += [x for x in fn("requires")]
     spec["disabled"] += [x for x in fn("build_requires")]
     fn = lambda what: filterByArchitectureDefaults(architecture, defaults, spec.get(what, []))
-    spec["requires"] = [x for x in fn("requires") if not x in disable]
-    spec["build_requires"] = [x for x in fn("build_requires") if not x in disable]
+    spec["requires"] = [x for x in fn("requires") if x not in disable]
+    spec["build_requires"] = [x for x in fn("build_requires") if x not in disable]
     if spec["package"] != "defaults-release":
       spec["build_requires"].append("defaults-release")
     spec["runtime_requires"] = spec["requires"]

@@ -11,7 +11,6 @@ from bits_helpers.utilities import parseDefaults, readDefaults
 from bits_helpers.utilities import getPackageList, asList
 from bits_helpers.utilities import validateDefaults
 from bits_helpers.utilities import Hasher
-from bits_helpers.utilities import yamlDump
 from bits_helpers.utilities import resolve_tag, resolve_version, short_commit_hash
 from bits_helpers.git import Git, git
 from bits_helpers.sl import Sapling
@@ -31,7 +30,6 @@ import socket
 import os
 import re
 import shutil
-import sys
 import time
 import subprocess
 
@@ -481,7 +479,7 @@ def doBuild(args, parser):
     checkedOutCommitName = scm.checkedOutCommitName(directory=args.configDir)
   except SCMError:
     dieOnError(True, "Cannot find SCM directory in %s." % args.configDir)
-  os.environ["BITS_DIST_HASH"] = checkedOutCommitName # type: ignore
+  os.environ["BITS_DIST_HASH"] = checkedOutCommitName
 
   debug("Building for architecture %s", args.architecture)
   debug("Number of parallel builds: %d", args.jobs)
@@ -517,9 +515,9 @@ def doBuild(args, parser):
              ("\n- ".join(sorted(failed)), args.defaults, " ".join(args.pkgname)))
 
   for x in specs.values():
-    x["requires"] = [r for r in x["requires"] if not r in args.disable]
-    x["build_requires"] = [r for r in x["build_requires"] if not r in args.disable]
-    x["runtime_requires"] = [r for r in x["runtime_requires"] if not r in args.disable]
+    x["requires"] = [r for r in x["requires"] if r not in args.disable]
+    x["build_requires"] = [r for r in x["build_requires"] if r not in args.disable]
+    x["runtime_requires"] = [r for r in x["runtime_requires"] if r not in args.disable]
 
   if systemPackages:
     banner("bits can take the following packages from the system and will not build them:\n  %s",
