@@ -89,10 +89,10 @@ def getPackageListWithDefaults(packages, force_rebuild=()):
         specs=specs,
         configDir="CONFIG_DIR",
         # Make sure getPackageList considers prefer_system_check.
-        # (Even with preferSystem=False + noSystem=False, it is sufficient
+        # (Even with preferSystem=False + noSystem=None, it is sufficient
         # if the prefer_system regex matches the architecture.)
         preferSystem=True,
-        noSystem=False,
+        noSystem=None,
         architecture="ARCH",
         disable=[],
         defaults="release",

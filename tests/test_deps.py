@@ -57,7 +57,7 @@ class DepsTestCase(unittest.TestCase):
                          dockerImage=None,
                          docker_extra_args=["--network=host"],
                          preferSystem=[],
-                         noSystem=True,
+                         noSystem="*",
                          architecture="slc7_x86-64",
                          disable=[],
                          neat=True,
