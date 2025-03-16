@@ -268,7 +268,7 @@ class BuildTestCase(unittest.TestCase):
             jobs=2,
             annotate={},
             preferSystem=[],
-            noSystem=False,
+            noSystem=None,
             debug=True,
             dryRun=False,
             aggressiveCleanup=False,

@@ -50,7 +50,7 @@ def doInit(args):
                                          specs=specs,
                                          configDir=args.configDir,
                                          preferSystem=False,
-                                         noSystem=True,
+                                         noSystem="*",
                                          architecture="",
                                          disable=[],
                                          defaults=args.defaults,
