@@ -498,7 +498,14 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
       systemREMatches = re.match(systemRE, architecture)
     except TypeError:
       dieOnError(True, "Malformed entry prefer_system: %s in %s" % (systemRE, spec["package"]))
-    if not noSystem and (preferSystem or systemREMatches):
+
+    noSystemList = []
+    if noSystem == "*":
+      noSystemList = [spec["package"]]
+    elif noSystem is not None:
+      noSystemList = noSystem.split(",")
+
+    if (spec["package"] not in noSystemList) and (preferSystem or systemREMatches):
       requested_version = resolve_version(spec, defaults, "unavailable", "unavailable")
       cmd = "REQUESTED_VERSION={version}\n{check}".format(
         version=quote(requested_version),
