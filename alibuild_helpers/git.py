@@ -74,7 +74,7 @@ class Git(SCM):
     return ["remote", "set-url", "--push", "origin", url]
 
   def diffCmd(self, directory):
-    return "cd %s && git diff -r HEAD && git status --porcelain" % directory
+    return "cd %s && git diff HEAD && git status --porcelain" % directory
 
   def checkUntracked(self, line):
     return line.startswith("?? ")
