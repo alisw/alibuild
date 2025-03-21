@@ -115,8 +115,8 @@ if __name__ == "__main__":
     os.environ["BITS_ANALYTICS_USER_UUID"] = open(expanduser("~/.config/bits/analytics-uuid")).read().strip()
   '''
   try:
-    profiler = "--profile" in sys.argv
-    if profiler:
+    useProfiler = "--profile" in sys.argv
+    if useProfiler:
       print("profiler started")
       import cProfile, pstats
       from io import StringIO
