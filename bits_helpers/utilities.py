@@ -310,7 +310,7 @@ def readDefaults(configDir, defaults, error, architecture):
   return (defaultsMeta, defaultsBody)
 
 
-def getRecipeReader(url, dist=None):
+def getRecipeReader(url:str , dist=None):
   m = re.search(r'^dist:(.*)@([^@]+)$', url)
   if m and dist:
     return GitReader(url, dist)
@@ -478,6 +478,9 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
     pkg_filename = ("defaults-" + defaults) if p == "defaults-release" else p.lower()
 
     filename,pkgdir = resolveFilename(taps, pkg_filename, configDir)
+
+    dieOnError(not filename, "Package %s not found in %s" % (p, configDir))
+    assert(filename is not None)
 
     err, spec, recipe = parseRecipe(getRecipeReader(filename, configDir))
     dieOnError(err, err)
