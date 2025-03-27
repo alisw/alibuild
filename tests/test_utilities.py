@@ -12,6 +12,7 @@ from alibuild_helpers.utilities import prunePaths
 from alibuild_helpers.utilities import resolve_version
 from alibuild_helpers.utilities import topological_sort
 from alibuild_helpers.utilities import resolveFilename, resolveDefaultsFilename
+import alibuild_helpers
 import os
 import string
 
@@ -344,5 +345,18 @@ class TestTopologicalSort(unittest.TestCase):
         self.assertEqual(frozenset(specs.keys()),
                          frozenset(topological_sort(specs)))
 
+    def test_cycle(self) -> None:
+        """Test that dependency cycles are detected and reported."""
+        specs = {
+            "A": {"package": "A", "requires": ["B"]},
+            "B": {"package": "B", "requires": ["C"]},
+            "C": {"package": "C", "requires": ["D"]},
+            "D": {"package": "D", "requires": ["A"]}
+        }
+        with patch.object(alibuild_helpers.log, 'error') as mock_error:
+          with self.assertRaises(SystemExit) as cm:
+            list(topological_sort(specs))
+          self.assertEqual(cm.exception.code, 1)
+          mock_error.assert_called_once_with("%s", "Dependency cycle detected: A -> B -> C -> D -> A")
 if __name__ == '__main__':
     unittest.main()
