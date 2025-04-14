@@ -532,8 +532,8 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
       noSystemList = [spec["package"]]
     elif noSystem is not None:
       noSystemList = noSystem.split(",")
-
-    if (spec["package"] not in noSystemList) and (preferSystem or systemREMatches):
+    systemExcluded = (spec["package"] in noSystemList)
+    if (preferSystem or systemREMatches):
       requested_version = resolve_version(spec, defaults, "unavailable", "unavailable")
       cmd = "REQUESTED_VERSION={version}\n{check}".format(
         version=quote(requested_version),
@@ -548,12 +548,16 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
       else:
         # prefer_system_check succeeded; this means we should use the system package.
         match = re.search(r"^bits_system_replace:(?P<key>.*)$", output, re.MULTILINE)
-        if not match:
+        if not match and systemExcluded:
+          # No replacement spec name given. Fall back to old system package
+          # behaviour and just disable the package.
+          ownPackages.add(spec["package"])
+        elif not match and not systemExcluded:
           # No replacement spec name given. Fall back to old system package
           # behaviour and just disable the package.
           systemPackages.add(spec["package"])
           disable.append(spec["package"])
-        else:
+        elif match:
           # The check printed the name of a replacement; use it.
           key = match.group("key").strip()
           replacement = None
