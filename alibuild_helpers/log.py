@@ -4,8 +4,6 @@ import re
 import time
 import datetime
 
-debug, error, warning, info, success = (None, None, None, None, None)
-
 def dieOnError(err, msg) -> None:
   if err:
     error("%s", msg)

@@ -111,8 +111,8 @@ if __name__ == "__main__":
   else:
     os.environ["ALIBUILD_ANALYTICS_USER_UUID"] = open(expanduser("~/.config/alibuild/analytics-uuid")).read().strip()
   try:
-    profiler = "--profile" in sys.argv
-    if profiler:
+    useProfiler = "--profile" in sys.argv
+    if useProfiler:
       print("profiler started")
       import cProfile, pstats
       from io import StringIO
