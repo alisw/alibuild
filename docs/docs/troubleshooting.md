@@ -146,7 +146,7 @@ bits had troubles with it. Upgrading to the latest version via:
 or by doing `git pull` should fix the issue.
 
 
-### bits does not pick up tool X from the sytem
+### bits does not pick up tool X from the system
 
 By default bits prefers using tools from the system whenever
 possible. Examples of those tools are CMake, the GCC compiler or the
@@ -206,7 +206,7 @@ subsequent rebuild will ignore the changes. This can be worked around in two way
 What 1. does is to make bits aware of the changes of the new file, so you
 will get a new build for each change to the file. What 2. does is to always
 execute the incremental recipe to refresh the installation folder on each bits
-invokation, possibly updating untracked files if so specified in the recipe itself.
+invocation, possibly updating untracked files if so specified in the recipe itself.
 
 ### How do I set compilation options for AliRoot and / or AliPhysics?
 
@@ -266,7 +266,7 @@ third party does the work and provides a pull request.
 
 ### Can I build on an unsupported architecture?
 
-You can try, but of course your milage might vary. In case the architecture is similar to one of the supported ones (e.g. Ubuntu and Kubuntu) this should be recognized automatically and the build should proceed, attempting to use the supported one. This will still not guarantee things will not break for some packages.
+You can try, but of course your mileage might vary. In case the architecture is similar to one of the supported ones (e.g. Ubuntu and Kubuntu) this should be recognized automatically and the build should proceed, attempting to use the supported one. This will still not guarantee things will not break for some packages.
 
 In case the architecture is completely unknown to us, you will get a message:
 

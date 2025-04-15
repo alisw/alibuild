@@ -26,7 +26,7 @@ def askForAnalytics():
          "  https://github.com/bitsorg/bits/blob/master/ANALYTICS.md\n")
   a = input("Is that ok for you [YES/no]? ")
   if a.strip() and a.strip().lower().startswith("n"):
-    debug("User requsted disabling analytics.")
+    debug("User requested disabling analytics.")
     return disable_analytics()
   return generate_analytics_id()
 
