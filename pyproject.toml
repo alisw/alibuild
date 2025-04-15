@@ -3,29 +3,23 @@ requires = ["setuptools>=45", "setuptools_scm[toml]>=6.2"]
 build-backend = "setuptools.build_meta"
 
 [project]
+requires-python = ">= 3.6"
 name = 'bits'
 dynamic = ['readme', 'version']
 description = 'Build Tool'
-keywords = ['HEP', 'CERN']
-license = {text = 'GPL'}
+keywords = ['HEP', 'ALICE']
+license = { file = 'LICENSE' }
 authors = [
   {name = 'Giulio Eulisse', email = 'giulio.eulisse@cern.ch'},
   {name = 'Timo Wilken', email = 'timo.wilken@cern.ch'},
   {name = 'Predrag Buncic', email = 'predrag.buncic@cern.ch'},
+  {name = 'Sergio Garcia', email = 'sergio.garcia@cern.ch'},
 ]
 
 classifiers = [
     'Development Status :: 5 - Production/Stable',
     'Intended Audience :: Developers',
     'Topic :: Software Development :: Build Tools',
-    'License :: OSI Approved :: GNU General Public License v3 (GPLv3)',
-    'Programming Language :: Python :: 3.6',   # slc7, slc8, cs8
-    'Programming Language :: Python :: 3.8',   # ubuntu2004
-    'Programming Language :: Python :: 3.9',   # slc9
-    'Programming Language :: Python :: 3.10',  # ubuntu2204
-    'Programming Language :: Python :: 3.11',  # MacOS
-    'Programming Language :: Python :: 3.12',  # MacOS
-    'Programming Language :: Python :: 3.13',  # MacOS
 ]
 
 dependencies = [
@@ -39,15 +33,18 @@ dependencies = [
 [project.urls]
 homepage = 'https://github.com/bitsorg/bits'
 
-[scripts]
-alienv = {path = "bits"}
-bitsBuild = {path = "bitsBuild"}
-bitsDoctor = {path = "bitsDoctor"}
-bitsDeps = {path = "bitsDeps"}
-pb = {path = "pb"}
+[tool.setuptools]
+script-files = ["bits", "bitsBuild", "bitsDoctor", "bitsDeps", "pb"]
 
 [tool.setuptools_scm]
 write_to = "bits_helpers/_version.py"
 
 [tool.setuptools.package-data]
 bits_helpers = ['build_template.sh']
+
+[tool.setuptools.packages.find]
+where = ["."]
+exclude = ["yaml"]
+
+[tool.setuptools.dynamic]
+readme = {file = ["README.rst"]}
