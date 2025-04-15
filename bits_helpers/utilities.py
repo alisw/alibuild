@@ -533,7 +533,8 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
     elif noSystem is not None:
       noSystemList = noSystem.split(",")
     systemExcluded = (spec["package"] in noSystemList)
-    if (preferSystem or systemREMatches):
+    allowSystemPackageUpload = spec.get("allow_system_package_upload", False)
+    if (not systemExcluded or allowSystemPackageUpload) and  (preferSystem or systemREMatches):
       requested_version = resolve_version(spec, defaults, "unavailable", "unavailable")
       cmd = "REQUESTED_VERSION={version}\n{check}".format(
         version=quote(requested_version),
