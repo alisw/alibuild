@@ -872,8 +872,18 @@ def doBuild(args, parser):
       spec["hash"] = spec["local_revision_hash"]
     else:
       spec["hash"] = spec["remote_revision_hash"]
+
+    # We do not use the override for devel packages, because we
+    # want to avoid having to rebuild things when the /tmp gets cleaned.
+    if spec["is_devel_pkg"]:
+        buildWorkDir = args.workDir
+    else:
+        buildWorkDir = os.environ.get("ALIBUILD_BUILD_WORK_DIR", args.workDir)
+
+    buildRoot = join(buildWorkDir, "BUILD", spec["hash"])
+
     spec["old_devel_hash"] = readHashFile(join(
-      workDir, "BUILD", spec["hash"], spec["package"], ".build_succeeded"))
+      buildRoot, spec["package"], ".build_succeeded"))
 
     # Recreate symlinks to this development package builds.
     if spec["is_devel_pkg"]:
@@ -881,9 +891,9 @@ def doBuild(args, parser):
       # Ignore errors here, because the path we're linking to might not exist
       # (if this is the first run through the loop). On the second run
       # through, the path should have been created by the build process.
-      call_ignoring_oserrors(symlink, spec["hash"], join(workDir, "BUILD", spec["package"] + "-latest"))
+      call_ignoring_oserrors(symlink, spec["hash"], join(buildWorkDir, "BUILD", spec["package"] + "-latest"))
       if develPrefix:
-        call_ignoring_oserrors(symlink, spec["hash"], join(workDir, "BUILD", spec["package"] + "-latest-" + develPrefix))
+        call_ignoring_oserrors(symlink, spec["hash"], join(buildWorkDir, "BUILD", spec["package"] + "-latest-" + develPrefix))
       # Last package built gets a "latest" mark.
       call_ignoring_oserrors(symlink, "{version}-{revision}".format(**spec),
                              join(workDir, args.architecture, spec["package"], "latest"))
@@ -933,7 +943,7 @@ def doBuild(args, parser):
       # assuming the package is not a development one. We also can
       # delete the SOURCES in case we have aggressive-cleanup enabled.
       if not spec["is_devel_pkg"] and args.autoCleanup:
-        cleanupDirs = [join(workDir, "BUILD", spec["hash"]),
+        cleanupDirs = [buildRoot,
                        join(workDir, "INSTALLROOT", spec["hash"])]
         if args.aggressiveCleanup:
           cleanupDirs.append(join(workDir, "SOURCES", spec["package"]))
@@ -942,13 +952,13 @@ def doBuild(args, parser):
         for d in cleanupDirs:
           shutil.rmtree(d.encode("utf8"), True)
         try:
-          unlink(join(workDir, "BUILD", spec["package"] + "-latest"))
+          unlink(join(buildWorkDir, "BUILD", spec["package"] + "-latest"))
           if "develPrefix" in args:
-            unlink(join(workDir, "BUILD", spec["package"] + "-latest-" + args.develPrefix))
+            unlink(join(buildWorkDir, "BUILD", spec["package"] + "-latest-" + args.develPrefix))
         except:
           pass
         try:
-          rmdir(join(workDir, "BUILD"))
+          rmdir(join(buildWorkDir, "BUILD"))
           rmdir(join(workDir, "INSTALLROOT"))
         except:
           pass
@@ -1095,7 +1105,7 @@ def doBuild(args, parser):
     """).format(
       h=socket.gethostname(),
       sd=scriptDir,
-      w=abspath(args.workDir),
+      w=buildWorkDir,
       p=spec["package"],
       devSuffix="-" + args.develPrefix
       if "develPrefix" in args and spec["is_devel_pkg"]
@@ -1163,7 +1173,7 @@ def doBuild(args, parser):
   for spec in specs.values():
     if spec["is_devel_pkg"]:
       banner("Build directory for devel package %s:\n%s/BUILD/%s-latest%s/%s",
-             spec["package"], abspath(args.workDir), spec["package"],
+             spec["package"], abspath(buildWorkDir), spec["package"],
              ("-" + args.develPrefix) if "develPrefix" in args else "",
              spec["package"])
   if untrackedFilesDirectories:
