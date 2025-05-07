@@ -24,7 +24,6 @@ jobs:
       fail-fast: false   # continue executing other checks if one fails
       matrix:
         python-version:
-          - '3.6.8'   # slc7, slc8 and cs8 containers
           - '3.8.18'  # ubuntu2004 container
           - '3.9.16'  # slc9 container
           - '3.10.6'  # ubuntu2204 container
