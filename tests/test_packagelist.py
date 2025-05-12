@@ -1,10 +1,7 @@
 from __future__ import print_function
 from textwrap import dedent
 import unittest
-try:                  # Python 3
-    from unittest import mock
-except ImportError:   # Python 2
-    import mock
+from unittest import mock
 
 from bits_helpers.cmd import getstatusoutput
 from bits_helpers.utilities import getPackageList
@@ -89,10 +86,10 @@ def getPackageListWithDefaults(packages, force_rebuild=()):
         specs=specs,
         configDir="CONFIG_DIR",
         # Make sure getPackageList considers prefer_system_check.
-        # (Even with preferSystem=False + noSystem=False, it is sufficient
+        # (Even with preferSystem=False + noSystem=None, it is sufficient
         # if the prefer_system regex matches the architecture.)
         preferSystem=True,
-        noSystem=False,
+        noSystem=None,
         architecture="ARCH",
         disable=[],
         defaults="release",
@@ -141,7 +138,7 @@ class ReplacementTestCase(unittest.TestCase):
         self.assertIn("with-replacement", systemPkgs)
         self.assertNotIn("with-replacement", ownPkgs)
 
-    def test_replacement_recipe_given(self):
+    def test_replacement_recipe_given(self) -> None:
         """Check that specifying a replacement recipe means it is used.
 
         Also check that we report to the user that a package will be compiled
@@ -157,26 +154,33 @@ class ReplacementTestCase(unittest.TestCase):
         self.assertNotIn("with-replacement-recipe", systemPkgs)
         self.assertIn("with-replacement-recipe", ownPkgs)
 
-    @mock.patch("bits_helpers.utilities.dieOnError")
-    def test_missing_replacement_spec(self, mock_dieOnError):
-        """Check an error is thrown when the replacement spec is not found."""
+    @mock.patch("bits_helpers.utilities.warning")
+    def test_missing_replacement_spec(self, mock_warning) -> None:
+        """Check a warning is displayed when the replacement spec is not found."""
+        warning_msg = "falling back to building the package ourselves"
+        warning_exists = False
+        def side_effect(msg, *args, **kwargs):
+            nonlocal warning_exists
+            if warning_msg in str(msg):
+              warning_exists = True
+        mock_warning.side_effect = side_effect
         specs, systemPkgs, ownPkgs, failedReqs, validDefaults = \
             getPackageListWithDefaults(["missing-spec"])
-        mock_dieOnError.assert_any_call(True, "Could not find named replacement "
-                                        "spec for missing-spec: missing_tag")
+        self.assertTrue(warning_exists)
+
 
 
 @mock.patch("bits_helpers.utilities.getRecipeReader", new=MockReader)
 class ForceRebuildTestCase(unittest.TestCase):
     """Test that force_rebuild keys are applied properly."""
 
-    def test_force_rebuild_recipe(self):
+    def test_force_rebuild_recipe(self) -> None:
         """If the recipe specifies force_rebuild, it must be applied."""
         specs, _, _, _, _ = getPackageListWithDefaults(["force-rebuild"])
         self.assertTrue(specs["force-rebuild"]["force_rebuild"])
         self.assertFalse(specs["defaults-release"]["force_rebuild"])
 
-    def test_force_rebuild_command_line(self):
+    def test_force_rebuild_command_line(self) -> None:
         """The --force-rebuild option must take precedence, if given."""
         specs, _, _, _, _ = getPackageListWithDefaults(
             ["force-rebuild"], force_rebuild=["defaults-release", "force-rebuild"],

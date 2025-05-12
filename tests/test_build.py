@@ -6,16 +6,9 @@ import re
 import sys
 import unittest
 # Assuming you are using the mock library to ... mock things
-try:
-    from unittest.mock import call, patch, MagicMock, DEFAULT  # In Python 3, mock is built-in
-    from io import StringIO
-except ImportError:
-    from mock import call, patch, MagicMock, DEFAULT  # Python 2
-    from StringIO import StringIO
-try:
-    from collections import OrderedDict
-except ImportError:
-    from ordereddict import OrderedDict
+from unittest.mock import call, patch, MagicMock, DEFAULT
+from io import StringIO
+from collections import OrderedDict
 
 from bits_helpers.utilities import parseRecipe, resolve_tag
 from bits_helpers.build import doBuild, storeHashes, generate_initdotsh
@@ -32,7 +25,7 @@ TEST_DEFAULT_RELEASE_BUILD_HASH = "27ce49698e818e8efb56b6eff6dd785e503df341"
 TEST_ZLIB_RECIPE = """\
 package: zlib
 version: v1.2.3
-source: https://github.com/star-externals/zlib
+source: https://github.com/madler/zlib
 tag: master
 ---
 ./configure
@@ -79,8 +72,7 @@ TEST_ROOT_GIT_REFS = """\
 87b87c4322d2a3fad315c919cb2e2dd73f2154dc\trefs/heads/master
 f7b336611753f1f4aaa94222b0d620748ae230c0\trefs/heads/v6-08-00-patches
 f7b336611753f1f4aaa94222b0d620748ae230c0\trefs/tags/test-tag"""
-TEST_ROOT_BUILD_HASH = ("96cf657d1a5e2d41f16dfe42ced8c3522ab4e413" if sys.version_info.major < 3 else
-                        "8ec3f41b6b585ef86a02e9c595eed67f34d63f08")
+TEST_ROOT_BUILD_HASH = ("8ec3f41b6b585ef86a02e9c595eed67f34d63f08")
 
 
 TEST_EXTRA_RECIPE = """\
@@ -97,16 +89,15 @@ f000\trefs/heads/master
 ba22\trefs/tags/v1
 ba22\trefs/tags/v2
 baad\trefs/tags/v3"""
-TEST_EXTRA_BUILD_HASH = ("9f9eb8696b7722df52c4703f5fe7acc4b8000ba2" if sys.version_info.major < 3 else
-                         "5afae57bfc6a374e74c1c4427698ab5edebce0bc")
+TEST_EXTRA_BUILD_HASH = ("5afae57bfc6a374e74c1c4427698ab5edebce0bc")
 
 
-GIT_CLONE_REF_ZLIB_ARGS = ("clone", "--bare", "https://github.com/star-externals/zlib",
+GIT_CLONE_REF_ZLIB_ARGS = ("clone", "--bare", "https://github.com/madler/zlib",
                            "/sw/MIRROR/zlib", "--filter=blob:none"), ".", False
-GIT_CLONE_SRC_ZLIB_ARGS = ("clone", "-n", "https://github.com/star-externals/zlib",
+GIT_CLONE_SRC_ZLIB_ARGS = ("clone", "-n", "https://github.com/madler/zlib",
                            "/sw/SOURCES/zlib/v1.2.3/8822efa61f",
                            "--dissociate", "--reference", "/sw/MIRROR/zlib", "--filter=blob:none"), ".", False
-GIT_SET_URL_ZLIB_ARGS = ("remote", "set-url", "--push", "origin", "https://github.com/star-externals/zlib"), \
+GIT_SET_URL_ZLIB_ARGS = ("remote", "set-url", "--push", "origin", "https://github.com/madler/zlib"), \
     "/sw/SOURCES/zlib/v1.2.3/8822efa61f", False
 GIT_CHECKOUT_ZLIB_ARGS = ("checkout", "-f", "master"), \
     "/sw/SOURCES/zlib/v1.2.3/8822efa61f", False
@@ -212,7 +203,6 @@ class BuildTestCase(unittest.TestCase):
     @patch("bits_helpers.git.git")
     @patch("bits_helpers.build.exists", new=MagicMock(side_effect=dummy_exists))
     @patch("os.path.exists", new=MagicMock(side_effect=dummy_exists))
-    @patch("bits_helpers.build.sys")
     @patch("bits_helpers.build.dieOnError", new=MagicMock())
     @patch("bits_helpers.utilities.dieOnError", new=MagicMock())
     @patch("bits_helpers.utilities.warning")
@@ -249,7 +239,7 @@ class BuildTestCase(unittest.TestCase):
     @patch("bits_helpers.workarea.is_writeable", new=MagicMock(return_value=True))
     @patch("bits_helpers.build.basename", new=MagicMock(return_value="aliBuild"))
     @patch("bits_helpers.build.install_wrapper_script", new=MagicMock())
-    def test_coverDoBuild(self, mock_debug, mock_listdir, mock_warning, mock_sys, mock_git_git):
+    def test_coverDoBuild(self, mock_debug, mock_listdir, mock_warning, mock_git_git) -> None:
         mock_git_git.side_effect = dummy_git
         mock_debug.side_effect = lambda *args: None
         mock_warning.side_effect = lambda *args: None
@@ -278,18 +268,18 @@ class BuildTestCase(unittest.TestCase):
             jobs=2,
             annotate={},
             preferSystem=[],
-            noSystem=False,
+            noSystem=None,
             debug=True,
             dryRun=False,
             aggressiveCleanup=False,
             environment={},
             autoCleanup=False,
             noDevel=[],
+            onlyDeps=False,
             fetchRepos=False,
             forceTracked=False,
             plugin="legacy"
         )
-        mock_sys.version_info = sys.version_info
 
         def mkcall(args):
             cmd, directory, check = args
@@ -347,7 +337,7 @@ class BuildTestCase(unittest.TestCase):
         spec["tag"] = resolve_tag(spec)
         return spec
 
-    def test_hashing(self):
+    def test_hashing(self) -> None:
         """Check that the hashes assigned to packages remain constant."""
         default = self.setup_spec(TEST_DEFAULT_RELEASE)
         zlib = self.setup_spec(TEST_ZLIB_RECIPE)
@@ -395,7 +385,7 @@ class BuildTestCase(unittest.TestCase):
         self.assertEqual(len(extra["remote_hashes"]), 3)
         self.assertEqual(extra["local_hashes"][0], TEST_EXTRA_BUILD_HASH)
 
-    def test_initdotsh(self):
+    def test_initdotsh(self) -> None:
         """Sanity-check the generated init.sh for a few variables."""
         specs = {
             # Add some attributes that are normally set by doBuild(), but

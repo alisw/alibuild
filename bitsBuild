@@ -15,7 +15,7 @@ from bits_helpers.init import doInit
 from bits_helpers.clean import doClean
 from bits_helpers.doctor import doDoctor
 from bits_helpers.deps import doDeps
-from bits_helpers.log import info, warning, debug, logger, error
+from bits_helpers.log import info, debug, logger, error
 from bits_helpers.utilities import detectArch
 from bits_helpers.build import doBuild
 
@@ -40,7 +40,6 @@ def doMain(args, parser):
     "LC_MONETARY": "C",
     "LC_NUMERIC": "C",
     "LC_TIME": "C",
-    "LC_ALL": "C",
     "GREP_OPTIONS": "",
     "BASH_ENV": "",
     "BITS_ARCHITECTURE": args.architecture
@@ -58,7 +57,7 @@ def doMain(args, parser):
       error(e.message)
       exit(1)
 
-  if args.action == "version":
+  if args.action == "version" or args.action is None:
     print("aliBuild version: {version} ({arch})".format(
       version=__version__ or "unknown", arch=args.architecture or "unknown"))
     sys.exit(0)
@@ -116,14 +115,11 @@ if __name__ == "__main__":
     os.environ["BITS_ANALYTICS_USER_UUID"] = open(expanduser("~/.config/bits/analytics-uuid")).read().strip()
   '''
   try:
-    profiler = "--profile" in sys.argv
-    if profiler:
+    useProfiler = "--profile" in sys.argv
+    if useProfiler:
       print("profiler started")
       import cProfile, pstats
-      try:
-        from StringIO import StringIO
-      except ImportError:
-        from io import StringIO
+      from io import StringIO
       pr = cProfile.Profile()
       pr.enable()
       def profiler():

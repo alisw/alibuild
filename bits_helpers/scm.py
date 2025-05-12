@@ -21,7 +21,7 @@ class SCM(object):
     raise NotImplementedError
   def cloneReferenceCmd(self, spec, referenceRepo, usePartialClone):
     raise NotImplementedError
-  def cloneSourceCmd(self, spec, referenceRepo, usePartialClone):
+  def cloneSourceCmd(self, source, destination, referenceRepo, usePartialClone):
     raise NotImplementedError
   def setWriteUrlCmd(self, url):
     raise NotImplementedError

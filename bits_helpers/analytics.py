@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-import os, subprocess, sys
+import os
+import subprocess
+import sys
 from os.path import exists, expanduser
 from os import unlink
 
@@ -21,11 +23,8 @@ def generate_analytics_id():
 def askForAnalytics():
   banner("In order to improve user experience, Bits would like to gather "
          "analytics about your builds.\nYou can find all the details at:\n\n"
-         "  https://github.com/bitsorg/bits/blob/main/ANALYTICS.md\n")
-  # raw_input and input are different between python 2 and 3
-  try: _input = raw_input
-  except NameError: _input = input
-  a = _input("Is that ok for you [YES/no]? ")
+         "  https://github.com/bitsorg/bits/blob/master/ANALYTICS.md\n")
+  a = input("Is that ok for you [YES/no]? ")
   if a.strip() and a.strip().lower().startswith("n"):
     debug("User requsted disabling analytics.")
     return disable_analytics()
@@ -107,7 +106,7 @@ def report_exception(e):
     exd = e.__class__.__name__,
     exf = "1")
 
-def enable_analytics():
+def enable_analytics() -> None:
   if exists(expanduser("~/.config/bits/disable-analytics")):
     unlink(expanduser("~/.config/bits/disable-analytics"))
   if not exists(expanduser("~/.config/bits/analytics-uuid")):

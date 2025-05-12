@@ -15,11 +15,7 @@ here = os.path.abspath(os.path.dirname(__file__))
 with open(os.path.join(here, 'README.rst'), encoding='utf-8') as f:
     long_description = f.read()
 
-install_requires = ['pyyaml', 'requests', 'distro', 'jinja2']
-# Old setuptools versions (which pip2 uses) don't support range comparisons
-# (like :python_version >= "3.6") in extras_require, so do this ourselves here.
-if sys.version_info >= (3, 6):
-    install_requires.append('boto3')
+install_requires = ['pyyaml', 'requests', 'distro', 'jinja2', 'boto3<1.36.0']
 
 setup(
     name='bits',
@@ -76,12 +72,10 @@ setup(
     # bits was built from.
     use_scm_version={'write_to': 'bits_helpers/_version.py'},
     setup_requires=[
-        # The 6.* series removed support for Python 2.7.
-        'setuptools_scm<6.0.0' if sys.version_info < (3, 0) else
         # The 7.* series removed support for Python 3.6.
         'setuptools_scm<7.0.0' if sys.version_info < (3, 7) else
         'setuptools_scm'
-    ],
+    ] + (['packaging<=23'] if sys.version_info <(3, 7) else []),
 
     # List run-time dependencies here.  These will be installed by pip when
     # your project is installed. For an analysis of "install_requires" vs pip's

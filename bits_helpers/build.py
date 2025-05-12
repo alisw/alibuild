@@ -4,32 +4,24 @@ from bits_helpers import __version__
 from bits_helpers.analytics import report_event
 from bits_helpers.log import debug, info, banner, warning
 from bits_helpers.log import dieOnError
-from bits_helpers.cmd import execute, DockerRunner, BASH, install_wrapper_script
-from bits_helpers.utilities import prunePaths, symlink, call_ignoring_oserrors, topological_sort
+from bits_helpers.cmd import execute, DockerRunner, BASH, install_wrapper_script, getstatusoutput
+from bits_helpers.utilities import prunePaths, symlink, call_ignoring_oserrors, topological_sort, detectArch
 from bits_helpers.utilities import resolve_store_path
 from bits_helpers.utilities import parseDefaults, readDefaults
 from bits_helpers.utilities import getPackageList, asList
 from bits_helpers.utilities import validateDefaults
 from bits_helpers.utilities import Hasher
-from bits_helpers.utilities import yamlDump
 from bits_helpers.utilities import resolve_tag, resolve_version, short_commit_hash
 from bits_helpers.git import Git, git
 from bits_helpers.sl import Sapling
 from bits_helpers.scm import SCMError
 from bits_helpers.sync import remote_from_url
-import yaml
 from bits_helpers.workarea import logged_scm, updateReferenceRepoSpec, checkout_sources
 from bits_helpers.log import ProgressPrint, log_current_package
 from glob import glob
 from textwrap import dedent
-try:
-  from collections import OrderedDict
-except ImportError:
-  from ordereddict import OrderedDict
-try:
-  from shlex import quote  # Python 3.3+
-except ImportError:
-  from pipes import quote  # Python 2.7
+from collections import OrderedDict
+from shlex import quote
 
 import concurrent.futures
 import importlib
@@ -38,14 +30,12 @@ import socket
 import os
 import re
 import shutil
-import sys
 import time
 import subprocess
 
 from jinja2.sandbox import SandboxedEnvironment
 
-    
-def writeAll(fn, txt):
+def writeAll(fn, txt) -> None:
   f = open(fn, "w")
   f.write(txt)
   f.close()
@@ -196,10 +186,7 @@ def storeHashes(package, specs, considerRelocation):
       hasher(data)
 
   for key in ("env", "append_path", "prepend_path"):
-    if sys.version_info[0] < 3 and key in spec and isinstance(spec[key], OrderedDict):
-      # Python 2: use YAML dict order to prevent changing hashes
-      h_all(str(yaml.safe_load(yamlDump(spec[key]))))
-    elif key not in spec:
+    if key not in spec:
       h_all("none")
     else:
       # spec["env"] is of type OrderedDict[str, str].
@@ -528,9 +515,9 @@ def doBuild(args, parser):
              ("\n- ".join(sorted(failed)), args.defaults, " ".join(args.pkgname)))
 
   for x in specs.values():
-    x["requires"] = [r for r in x["requires"] if not r in args.disable]
-    x["build_requires"] = [r for r in x["build_requires"] if not r in args.disable]
-    x["runtime_requires"] = [r for r in x["runtime_requires"] if not r in args.disable]
+    x["requires"] = [r for r in x["requires"] if r not in args.disable]
+    x["build_requires"] = [r for r in x["build_requires"] if r not in args.disable]
+    x["runtime_requires"] = [r for r in x["runtime_requires"] if r not in args.disable]
 
   if systemPackages:
     banner("bits can take the following packages from the system and will not build them:\n  %s",
@@ -559,17 +546,26 @@ def doBuild(args, parser):
     del develCandidates, develCandidatesUpper, develPkgsUpper
 
   if buildOrder:
-    banner("Packages will be built in the following order:\n - %s",
-           "\n - ".join(x+" (development package)" if x in develPkgs else "%s@%s" % (x, specs[x]["tag"])
-                        for x in buildOrder if x != "defaults-release"))
+    if args.onlyDeps: 
+      builtPackages = buildOrder[:-1]
+    else:
+      builtPackages = buildOrder
+    if len(builtPackages) > 1:
+      banner("Packages will be built in the following order:\n - %s",
+             "\n - ".join(x+" (development package)" if x in develPkgs else "%s@%s" % (x, specs[x]["tag"])
+                          for x in builtPackages if x != "defaults-release"))
+    else:
+      banner("No dependencies of package %s to build.", buildOrder[-1])
+
 
   if develPkgs:
-    banner("You have packages in development mode.\n"
+    banner("You have packages in development mode (%s).\n"
            "This means their source code can be freely modified under:\n\n"
            "  %s/<package_name>\n\n"
            "bits does not automatically update such packages to avoid work loss.\n"
            "In most cases this is achieved by doing in the package source directory:\n\n"
            "  git pull --rebase\n",
+           ", ".join(develPkgs),
            os.getcwd())
 
   for pkg, spec in specs.items():
@@ -712,6 +708,11 @@ def doBuild(args, parser):
   ), args.architecture)
 
   buildList=[]
+  # If we are building only the dependencies, the last package in
+  # the build order can be considered done.
+  if args.onlyDeps and len(buildOrder) > 1:
+    mainPackage = buildOrder.pop()
+    warning("Not rebuilding %s because --only-deps option provided.", mainPackage)
 
   while buildOrder:
     p = buildOrder[0]
@@ -911,12 +912,18 @@ def doBuild(args, parser):
 
     # Now that we have all the information about the package we want to build, let's
     # check if it wasn't built / unpacked already.
-    hashFile = "%s/%s/%s/%s-%s/.build-hash" % (workDir,
-                                               args.architecture,
-                                               spec["package"],
-                                               spec["version"],
-                                               spec["revision"])
-    fileHash = readHashFile(hashFile)
+    hashPath= "%s/%s/%s/%s-%s" % (workDir,
+                                  args.architecture,
+                                  spec["package"],
+                                  spec["version"],
+                                  spec["revision"])
+    hashFile = hashPath + "/.build-hash"
+    # If the folder is a symlink, we consider it to be to CVMFS and
+    # take the hash for good.
+    if os.path.islink(hashPath):
+      fileHash = spec["hash"]
+    else:
+      fileHash = readHashFile(hashFile)
     # Development packages have their own rebuild-detection logic above.
     # spec["hash"] is only useful here for regular packages.
     if fileHash == spec["hash"] and not spec["is_devel_pkg"]:
@@ -1171,6 +1178,30 @@ def doBuild(args, parser):
         To update all development packages required for this build it is usually sufficient to do:
         """)
         buildErrMsg += "".join("\n  ( cd %s && git pull --rebase )" % dp for dp in updatablePkgs)
+
+      # Gather build info for the error message
+      try:
+        safe_args = {
+          "pkgname", "defaults", "architecture", "forceUnknownArch",
+          "develPrefix", "jobs", "noSystem", "noDevel", "forceTracked", "plugin",
+          "disable", "annotate", "onlyDeps", "docker"
+            }
+        args_str = " ".join(f"--{k}={v}" for k, v in vars(args).items() if v and k in safe_args)
+        detected_arch = detectArch()
+        buildErrMsg += dedent(f"""
+        Build info:
+        OS: {detected_arch}
+        Using aliBuild from alibuild@{__version__ or "unknown"} recipes in alidist@{os.environ["ALIBUILD_ALIDIST_HASH"][:10]}
+        Build arguments: {args_str}
+        """)
+
+        if detected_arch.startswith("osx"):
+          buildErrMsg += f'XCode version: {getstatusoutput("xcodebuild -version")[1]}'
+
+      except Exception as exc:
+        warning("Failed to gather build info", exc_info=exc)
+
+
       dieOnError(err, buildErrMsg.strip())
 
     # We need to create 2 sets of links, once with the full requires,
@@ -1185,14 +1216,19 @@ def doBuild(args, parser):
     if not spec["revision"].startswith("local"):
       syncHelper.upload_symlinks_and_tarball(spec)
 
-  banner("Build of %s successfully completed on `%s'.\n"
-         "Your software installation is at:"
-         "\n\n  %s\n\n"
-         "You can use this package by loading the environment:"
-         "\n\n  alienv enter %s/latest-%s",
-         mainPackage, socket.gethostname(),
-         abspath(join(args.workDir, args.architecture)),
-         mainPackage, mainBuildFamily)
+  if not args.onlyDeps:
+      banner("Build of %s successfully completed on `%s'.\n"
+             "Your software installation is at:"
+             "\n\n  %s\n\n"
+             "You can use this package by loading the environment:"
+             "\n\n  alienv enter %s/latest-%s",
+             mainPackage, socket.gethostname(),
+             abspath(join(args.workDir, args.architecture)),
+             mainPackage, mainBuildFamily)
+  else:
+      banner("Successfully built dependencies for package %s on `%s'.\n",
+             mainPackage, socket.gethostname()
+            )
   for spec in specs.values():
     if spec["is_devel_pkg"]:
       banner("Build directory for devel package %s:\n%s/BUILD/%s-latest%s/%s",

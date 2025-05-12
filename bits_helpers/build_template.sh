@@ -147,7 +147,9 @@ else
   rm -rf $INSTALLROOT
   mv $WORK_DIR/TMP/$PKGHASH/$ARCHITECTURE/$PKGNAME/$PKGVERSION-* $INSTALLROOT
   pushd $WORK_DIR/INSTALLROOT/$PKGHASH
-    WORK_DIR=$WORK_DIR/INSTALLROOT/$PKGHASH bash -ex $INSTALLROOT/relocate-me.sh
+    if [ -w "$INSTALLROOT" ]; then
+      WORK_DIR=$WORK_DIR/INSTALLROOT/$PKGHASH bash -ex $INSTALLROOT/relocate-me.sh
+    fi
   popd
   find $INSTALLROOT -name "*.unrelocated" -delete
   rm -rf $WORK_DIR/TMP/$PKGHASH
@@ -156,6 +158,9 @@ fi
 # Regenerate init.sh, in case the package build clobbered it. This
 # particularly happens in the AliEn-Runtime package, since it copies other
 # packages into its installroot wholesale.
+# Notice how we only do it if $INSTALLROOT is writeable. If it is
+# not, we assume it points to a CVMFS store which should be left untouched.
+if [ -w $INSTALLROOT ]; then
 mkdir -p "$INSTALLROOT/etc/profile.d"
 rm -f "$INSTALLROOT/etc/profile.d/init.sh"
 cat <<\EOF > "$INSTALLROOT/etc/profile.d/init.sh"
@@ -259,6 +264,7 @@ fi
 
 cat "$INSTALLROOT/relocate-me.sh"
 cat "$INSTALLROOT/.original-unrelocated" | xargs -n1 -I{} cp '{}' '{}'.unrelocated
+fi
 cd "$WORK_DIR/INSTALLROOT/$PKGHASH"
 
 # Archive creation
@@ -291,7 +297,9 @@ wait "$rsync_pid"
 
 # We've copied files into their final place; now relocate.
 cd "$WORK_DIR"
-bash -ex "$ARCHITECTURE/$PKGNAME/$PKGVERSION-$PKGREVISION/relocate-me.sh"
+if [ -w "$WORK_DIR/$ARCHITECTURE/$PKGNAME/$PKGVERSION-$PKGREVISION" ]; then
+  bash -ex "$ARCHITECTURE/$PKGNAME/$PKGVERSION-$PKGREVISION/relocate-me.sh"
+fi
 # Last package built gets a "latest" mark.
 ln -snf $PKGVERSION-$PKGREVISION $ARCHITECTURE/$PKGNAME/latest
 
@@ -302,7 +310,9 @@ fi
 
 # When the package is definitely fully installed, install the file that marks
 # the package as successful.
-echo "$PKGHASH" > "$WORK_DIR/$PKGPATH/.build-hash"
+if [ -w "$WORK_DIR/$PKGPATH" ]; then
+  echo "$PKGHASH" > "$WORK_DIR/$PKGPATH/.build-hash"
+fi
 # Mark the build as successful with a placeholder. Allows running incremental
 # recipe in case the package is in development mode.
 echo "${DEVEL_HASH}${DEPS_HASH}" > "$BUILDDIR/.build_succeeded"

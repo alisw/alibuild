@@ -5,3 +5,6 @@ coverage:
 # Disable long, annoying overview comment in PRs; only set statuses with links
 # to codecov.io.
 comment: false
+ignore:
+  - "docs"  # ignore folders and all its contents
+

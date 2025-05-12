@@ -1,10 +1,6 @@
 from __future__ import print_function
-from textwrap import dedent
 # Assuming you are using the mock library to ... mock things
-try:
-    from unittest.mock import patch, call  # In Python 3, mock is built-in
-except ImportError:
-    from mock import patch, call  # Python 2
+from unittest.mock import patch, call
 
 from bits_helpers.clean import decideClean, doClean
 

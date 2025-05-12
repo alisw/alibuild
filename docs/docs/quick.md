@@ -1,5 +1,4 @@
 ---
-title: BITS
 subtitle: Quick Start
 layout: main
 ---
@@ -8,7 +7,7 @@ Bits is a tool to build, install and package large software stacks. It originate
 
 This is a quickstart Guide which will show you how to build
 and use a package, for extended documentation please have a look at the
-[user guide](user.html).
+[user guide](user.md).
 
 ## Setting up
 
@@ -67,7 +66,6 @@ For example, on Centos7:
     sw/slc7_x86-64/AliRoot/v6-16-01-1
 
 ## Using the built package
-{: #loading-the-package-environment}
 
 Environment for packages built using bits is managed by [Environment
 Modules](http://modules.sourceforge.net). Notice you will need the package
@@ -83,4 +81,4 @@ to list the available packages, and:
     bits enter [VO_ALICE@]PackageA::VersionA[,[VO_ALICE@]PackageB::VersionB...]
 
 to enter a shell with the appropriate environment set. To learn more about `bits` you
-can also look at the [user guide](user.html#using-the-packages-you-have-built).
+can also look at the [user guide](user.md#using-the-packages-you-have-built).

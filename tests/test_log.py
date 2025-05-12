@@ -1,8 +1,5 @@
 import unittest
-try:
-    from unittest.mock import MagicMock, patch  # In Python 3, mock is built-in
-except ImportError:
-    from mock import MagicMock, patch  # Python 2
+from unittest.mock import MagicMock, patch
 
 from bits_helpers.log import dieOnError, ProgressPrint
 
@@ -23,7 +20,7 @@ class LogTestCase(unittest.TestCase):
 
     @patch("sys.stdout.isatty", new=MagicMock(return_value=True))
     @patch("sys.stderr", new=MagicMock(return_value=True))
-    def test_ProgressPrint(self):
+    def test_ProgressPrint(self) -> None:
         """Make sure ProgressPrint updates correctly."""
         # ProgressPrint only parses messages every 0.5s. Trick it into thinking
         # the last message was <interval> seconds ago.

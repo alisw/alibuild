@@ -1,5 +1,4 @@
 ---
-title: BITS
 subtitle: Troubleshooting
 layout: main
 ---
@@ -223,8 +222,8 @@ or as a matter of fact any packages you have two options:
   and add the options there.
 
 Finally, for certain common options, e.g. debug flags, we provide a
-precooked configuration using so called [defaults](user.html#defaults).
-Simply add `--defaults debug` to your buits flags and it will add
+precooked configuration using so called [defaults](user.md#defaults).
+Simply add `--defaults debug` to your bits flags and it will add
 debug flags to all your packages.
 
 ### AliPhysics takes very long time to build and builds things like autotools, GCC
@@ -311,7 +310,7 @@ Then, configure git to use SSH to authenticate with CERN GitLab using the follow
 git config --global 'url.ssh://git@gitlab.cern.ch:7999/.insteadof' 'https://gitlab.cern.ch/'
 ```
 
-[gitlab-ssh-key]: https://gitlab.cern.ch/-/profile/keys
+[gitlab-ssh-key]: https://gitlab.cern.ch/-/user_settings/ssh_keys
 
 #### Caching passwords
 
@@ -323,3 +322,17 @@ git config --global credential.helper 'cache --timeout 3600'
 ```
 
 You can adjust the timeout (3600 seconds, above) to your liking, if you would prefer git to remember your passwords for longer.
+
+#### I get an HTTP/2 related error
+
+Some network provider do not support HTTP/2 apparently. If you get:
+
+```bash
+error: RPC failed; curl 92 HTTP/2 stream 5 was not closed cleanly: CANCEL (err 8)
+```
+
+or similar message, try to disable HTTP/2 with something like:
+
+```
+git config --global http.version HTTP/1.1
+```

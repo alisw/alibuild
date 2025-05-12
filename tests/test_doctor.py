@@ -1,14 +1,6 @@
 from __future__ import print_function
-try:
-  from unittest.mock import patch, call, MagicMock  # In Python 3, mock is built-in
-  from io import StringIO
-except ImportError:
-  from mock import patch, call, MagicMock  # Python 2
-  from StringIO import StringIO
-try:
-  from collections import OrderedDict
-except ImportError:
-  from ordereddict import OrderedDict
+from unittest.mock import patch, MagicMock
+from io import StringIO
 
 from bits_helpers.doctor import doDoctor
 from argparse import Namespace
@@ -87,7 +79,7 @@ class DoctorTestCase(unittest.TestCase):
                      docker_extra_args=["--network=host"],
                      debug=False,
                      preferSystem=[],
-                     noSystem=False,
+                     noSystem="*",
                      architecture="osx_x86-64",
                      disable=[],
                      defaults="release")

@@ -7,10 +7,7 @@ import re
 import os
 import shlex
 
-try:
-  import commands
-except ImportError:
-  import subprocess as commands
+import subprocess as commands
 from os.path import abspath, dirname, basename
 import sys
 
@@ -115,6 +112,8 @@ def doParseArgs():
                                   "already exists, this does not happen."))
   build_parser.add_argument("--makeflow", default=False, action="store_true",
                             help=("Use makeflow for paralle workflow execution. "))
+  build_parser.add_argument("--only-deps", dest="onlyDeps", default=False, action="store_true",
+                            help="Only build dependencies, not the main package (e.g. for caching)")
 
   build_docker = build_parser.add_argument_group(title="Build inside a container", description="""\
   Builds can be done inside a Docker container, to make it easier to get a
@@ -182,8 +181,8 @@ def doParseArgs():
   build_system = build_parser.add_mutually_exclusive_group()
   build_system.add_argument("--always-prefer-system", dest="preferSystem", action="store_true",
                             help="Always use system packages when compatible.")
-  build_system.add_argument("--no-system", dest="noSystem", action="store_true",
-                            help="Never use system packages, even if compatible.")
+  build_system.add_argument("--no-system", dest="noSystem", nargs="?", const="*", default=None, metavar="PACKAGES",
+                            help="Never use system packages for the provided, command separated, PACKAGES, even if compatible.")
 
   # Options for clean subcommand
   clean_parser.add_argument("-a", "--architecture", dest="architecture", metavar="ARCH", default=detectedArch,
@@ -243,8 +242,8 @@ def doParseArgs():
   deps_system = deps_parser.add_mutually_exclusive_group()
   deps_system.add_argument("--always-prefer-system", dest="preferSystem", action="store_true",
                            help="Always use system packages when compatible.")
-  deps_system.add_argument("--no-system", dest="noSystem", action="store_true",
-                           help="Never use system packages, even if compatible.")
+  deps_system.add_argument("--no-system", dest="noSystem", nargs="?", const="*", default=None, metavar="PACKAGES",
+                           help="Never use system packages for PACKAGES, even if compatible.")
 
   # Options for the doctor subcommand
   doctor_parser.add_argument("packages", metavar="PACKAGE", nargs="+",
@@ -264,8 +263,8 @@ def doParseArgs():
   doctor_system = doctor_parser.add_mutually_exclusive_group()
   doctor_system.add_argument("--always-prefer-system", dest="preferSystem", action="store_true",
                              help="Always use system packages when compatible.")
-  doctor_system.add_argument("--no-system", dest="noSystem", action="store_true",
-                             help="Never use system packages, even if compatible.")
+  doctor_system.add_argument("--no-system", dest="noSystem", nargs="?", const="*", default=None, metavar="PACKAGES",
+                             help="Never use system packages for the provided, command separated, PACKAGES, even if compatible.")
 
   doctor_docker = doctor_parser.add_argument_group(title="Use a Docker container", description="""\
   If you're planning to build inside a Docker container, e.g. using bits
@@ -383,8 +382,12 @@ On Linux, x86-64:
    RHEL9 / ALMA9 compatible: slc9_x86-64
    Ubuntu 20.04 compatible: ubuntu2004_x86-64
    Ubuntu 22.04 compatible: ubuntu2204_x86-64
+   Ubuntu 24.04 compatible: ubuntu2404_x86-64
    Fedora 33 compatible: fedora33_x86-64
    Fedora 34 compatible: fedora34_x86-64
+
+On Linux, ARM:
+   RHEL9 / ALMA9 compatible: slc9_aarch64
 
 On Linux, POWER8 / PPC64 (little endian):
    RHEL7 / CC7 compatible: slc7_ppc64
@@ -394,8 +397,8 @@ On Mac, 1-2 latest supported OSX versions:
    Apple Silicon: osx_arm64
 """
 
-# When updating this variable, also update docs/user.markdown!
-S3_SUPPORTED_ARCHS = "slc7_x86-64", "slc8_x86-64", "ubuntu2004_x86-64", "ubuntu2204_x86-64", "slc9_x86-64"
+# When updating this variable, also update docs/docs/user.md!
+S3_SUPPORTED_ARCHS = "slc7_x86-64", "slc8_x86-64", "ubuntu2004_x86-64", "ubuntu2204_x86-64", "ubuntu2404_x86-64", "slc9_x86-64", "slc9_aarch64"
 
 def finaliseArgs(args, parser):
   
@@ -461,14 +464,14 @@ def finaliseArgs(args, parser):
 
     # On selected platforms, caching is active by default
     if args.architecture in S3_SUPPORTED_ARCHS and not args.preferSystem and not args.no_remote_store:
-      args.noSystem = True
+      args.noSystem = "*"
       if not args.remoteStore:
         args.remoteStore = "https://s3.cern.ch/swift/v1/alibuild-repo"
     elif args.no_remote_store:
       args.remoteStore = ""
 
     if args.remoteStore or args.writeStore:
-      args.noSystem = True
+      args.noSystem = "*"
 
     if args.remoteStore.endswith("::rw") and args.writeStore:
       parser.error("cannot specify ::rw and --write-store at the same time")
@@ -478,7 +481,7 @@ def finaliseArgs(args, parser):
       args.writeStore = args.remoteStore
 
   if args.action in ["build", "init"]:
-    if "develPrefix" in args and args.develPrefix == None:
+    if "develPrefix" in args and args.develPrefix is None:
       if "chdir" in args:
         args.develPrefix = basename(abspath(args.chdir))
       else:

@@ -1,16 +1,9 @@
 from argparse import Namespace
 import os.path as path
 import unittest
-try:
-    from unittest.mock import MagicMock, call, patch  # In Python 3, mock is built-in
-    from io import StringIO
-except ImportError:
-    from mock import MagicMock, call, patch  # Python 2
-    from StringIO import StringIO
-try:
-    from collections import OrderedDict
-except ImportError:
-    from ordereddict import OrderedDict
+from unittest.mock import call, patch  # In Python 3, mock is built-in
+from io import StringIO
+from collections import OrderedDict
 
 from bits_helpers.init import doInit, parsePackagesDefinition
 
@@ -32,7 +25,7 @@ CLONE_EVERYTHING = [
 
 
 class InitTestCase(unittest.TestCase):
-    def test_packageDefinition(self):
+    def test_packageDefinition(self) -> None:
       self.assertEqual(parsePackagesDefinition("AliRoot@v5-08-16,AliPhysics@v5-08-16-01"),
                        [{'ver': 'v5-08-16', 'name': 'AliRoot'},
                         {'ver': 'v5-08-16-01', 'name': 'AliPhysics'}])
@@ -43,7 +36,7 @@ class InitTestCase(unittest.TestCase):
     @patch("bits_helpers.init.info")
     @patch("bits_helpers.init.path")
     @patch("bits_helpers.init.os")
-    def test_doDryRunInit(self, mock_os, mock_path,  mock_info):
+    def test_doDryRunInit(self, mock_os, mock_path,  mock_info) -> None:
       fake_dist = {"repo": "alisw/alidist", "ver": "master"}
       args = Namespace(
         develPrefix = ".",
@@ -67,7 +60,7 @@ class InitTestCase(unittest.TestCase):
     @patch("bits_helpers.init.updateReferenceRepoSpec")
     @patch("bits_helpers.utilities.open")
     @patch("bits_helpers.init.readDefaults")
-    def test_doRealInit(self, mock_read_defaults, mock_open, mock_update_reference, mock_git, mock_os, mock_path,  mock_info, mock_banner):
+    def test_doRealInit(self, mock_read_defaults, mock_open, mock_update_reference, mock_git, mock_os, mock_path,  mock_info, mock_banner) -> None:
       fake_dist = {"repo": "alisw/alidist", "ver": "master"}
       mock_open.side_effect = lambda x: {
         "/alidist/defaults-release.sh": StringIO("package: defaults-release\nversion: v1\n---"),

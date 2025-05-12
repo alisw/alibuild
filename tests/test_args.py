@@ -1,41 +1,34 @@
 from __future__ import print_function
 # Assuming you are using the mock library to ... mock things
-try:
-    from unittest import mock
-    from unittest.mock import patch, call  # In Python 3, mock is built-in
-except ImportError:
-    import mock
-    from mock import patch, call  # Python 2
+from unittest import mock
+from unittest.mock import patch
 
 import bits_helpers.args
-from bits_helpers.args import doParseArgs, matchValidArch, finaliseArgs, DEFAULT_WORK_DIR, DEFAULT_CHDIR, ARCHITECTURE_TABLE
+from bits_helpers.args import doParseArgs, matchValidArch
 import sys
 import os
 import os.path
+import re
 
 import unittest
 import shlex
 
-if (sys.version_info[0] >= 3):
-  BUILD_MISSING_PKG_ERROR = "the following arguments are required: PACKAGE"
-  ANALYTICS_MISSING_STATE_ERROR = "the following arguments are required: state"
-else:
-  BUILD_MISSING_PKG_ERROR = "too few arguments"
-  ANALYTICS_MISSING_STATE_ERROR = "too few arguments"
+BUILD_MISSING_PKG_ERROR = "the following arguments are required: PACKAGE"
+ANALYTICS_MISSING_STATE_ERROR = "the following arguments are required: state"
 
 # A few errors we should handle, together with the expected result
-ARCHITECTURE_ERROR = [call(u"Unknown / unsupported architecture: foo.\n\n{table}Alternatively, you can use the `--force-unknown-architecture' option.".format(table=ARCHITECTURE_TABLE))]
+ARCHITECTURE_ERROR = u"Unknown / unsupported architecture: foo.\n\n.*"
 PARSER_ERRORS = {
-  "build --force-unknown-architecture": [call(BUILD_MISSING_PKG_ERROR)],
-  "build --force-unknown-architecture zlib --foo": [call('unrecognized arguments: --foo')],
-  "init --docker-image": [call('unrecognized arguments: --docker-image')],
-  "builda --force-unknown-architecture zlib" : [call("argument action: invalid choice: 'builda' (choose from 'analytics', 'architecture', 'build', 'clean', 'deps', 'doctor', 'init', 'version')")],
-  "build --force-unknown-architecture zlib --no-system --always-prefer-system" : [call('argument --always-prefer-system: not allowed with argument --no-system')],
+  "build --force-unknown-architecture": BUILD_MISSING_PKG_ERROR,
+  "build --force-unknown-architecture zlib --foo": 'unrecognized arguments: --foo',
+  "init --docker-image": 'unrecognized arguments: --docker-image',
+  "builda --force-unknown-architecture zlib" : "argument action: invalid choice: 'builda'.*",
+  "build --force-unknown-architecture zlib --no-system --always-prefer-system" : 'argument --always-prefer-system: not allowed with argument --no-system',
   "build zlib --architecture foo": ARCHITECTURE_ERROR,
-  "build --force-unknown-architecture zlib --remote-store rsync://test1.local/::rw --write-store rsync://test2.local/::rw ": [call('cannot specify ::rw and --write-store at the same time')],
-  "build zlib -a osx_x86-64 --docker-image foo": [call('cannot use `-a osx_x86-64` and --docker')],
-  "build zlib -a slc7_x86-64 --annotate foobar": [call("--annotate takes arguments of the form PACKAGE=COMMENT")],
-  "analytics": [call(ANALYTICS_MISSING_STATE_ERROR)]
+  "build --force-unknown-architecture zlib --remote-store rsync://test1.local/::rw --write-store rsync://test2.local/::rw ": 'cannot specify ::rw and --write-store at the same time',
+  "build zlib -a osx_x86-64 --docker-image foo": 'cannot use `-a osx_x86-64` and --docker',
+  "build zlib -a slc7_x86-64 --annotate foobar": "--annotate takes arguments of the form PACKAGE=COMMENT",
+  "analytics": ANALYTICS_MISSING_STATE_ERROR
 }
 
 # A few valid archs
@@ -55,11 +48,11 @@ CORRECT_BEHAVIOR = [
   ((), "build --force-unknown-architecture -j 10 zlib --disable gcc --disable foo,bar" , [("disable", ["gcc", "foo", "bar"])]),
   ((), "init zlib --dist master"                                                       , [("dist", {"repo": "alisw/alidist", "ver": "master"})]),
   ((), "init zlib --dist ktf/alidist@dev"                                              , [("dist", {"repo": "ktf/alidist", "ver": "dev"})]),
-  ((), "build --force-unknown-architecture zlib --remote-store rsync://test.local/"    , [("noSystem", True), ("remoteStore", "rsync://test.local/")]),
-  ((), "build --force-unknown-architecture zlib --remote-store rsync://test.local/::rw", [("noSystem", True), ("remoteStore", "rsync://test.local/"), ("writeStore", "rsync://test.local/")]),
-  ((), "build --force-unknown-architecture zlib --no-remote-store --remote-store rsync://test.local/", [("noSystem", False), ("remoteStore", "")]),
-  ((), "build zlib --architecture slc7_x86-64"                                         , [("noSystem", True), ("preferSystem", False), ("remoteStore", "https://s3.cern.ch/swift/v1/alibuild-repo")]),
-  ((), "build zlib --architecture ubuntu1804_x86-64"                                   , [("noSystem", False), ("preferSystem", False), ("remoteStore", "")]),
+  ((), "build --force-unknown-architecture zlib --remote-store rsync://test.local/"    , [("noSystem", "*"), ("remoteStore", "rsync://test.local/")]),
+  ((), "build --force-unknown-architecture zlib --remote-store rsync://test.local/::rw", [("noSystem", "*"), ("remoteStore", "rsync://test.local/"), ("writeStore", "rsync://test.local/")]),
+  ((), "build --force-unknown-architecture zlib --no-remote-store --remote-store rsync://test.local/", [("noSystem", None), ("remoteStore", "")]),
+  ((), "build zlib --architecture slc7_x86-64"                                         , [("noSystem", "*"), ("preferSystem", False), ("remoteStore", "https://s3.cern.ch/swift/v1/alibuild-repo")]),
+  ((), "build zlib --architecture ubuntu1804_x86-64"                                   , [("noSystem", None), ("preferSystem", False), ("remoteStore", "")]),
   ((), "build zlib -a slc7_x86-64"                                                     , [("docker", False), ("dockerImage", None), ("docker_extra_args", ["--network=host"])]),
   ((), "build zlib -a slc7_x86-64 --docker-image registry.cern.ch/alisw/some-builder"  , [("docker", True), ("dockerImage", "registry.cern.ch/alisw/some-builder")]),
   ((), "build zlib -a slc7_x86-64 --docker"                                            , [("docker", True), ("dockerImage", "registry.cern.ch/alisw/slc7-builder")]),
@@ -105,13 +98,19 @@ class ArgsTestCase(unittest.TestCase):
   @mock.patch('bits_helpers.args.argparse.ArgumentParser.error')
   def test_failingParsing(self, mock_print):
     mock_print.side_effect = FakeExit("raised")
-    for (cmd, calls) in PARSER_ERRORS.items():
+    for (cmd, pattern) in PARSER_ERRORS.items():
       mock_print.mock_calls = []
       with patch.object(sys, "argv", ["alibuild"] + shlex.split(cmd)):
         self.assertRaises(FakeExit, doParseArgs)
-        self.assertEqual(mock_print.mock_calls, calls)
+        for mock_call in mock_print.mock_calls:
+          args = mock_call[1]
+          print(args)
+          self.assertTrue(
+                re.match(pattern, args[0]),
+                f"Expected '{args[0]}' matching '{pattern}' but it's not the case."
+            )
 
-  def test_validArchitectures(self):
+  def test_validArchitectures(self) -> None:
     for arch in VALID_ARCHS:
       self.assertTrue(matchValidArch(arch))
     for arch in INVALID_ARCHS:

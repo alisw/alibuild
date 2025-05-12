@@ -3,10 +3,7 @@ import os.path
 import re
 import unittest
 
-try:
-    from collections import OrderedDict
-except ImportError:
-    from ordereddict import OrderedDict
+from collections import OrderedDict
 
 from bits_helpers.build import storeHashes
 
@@ -31,7 +28,7 @@ class KnownGoodHashesTestCase(unittest.TestCase):
 
     @unittest.skipIf(not os.path.exists(LOGFILE),
                      "Need a reference build log at path " + LOGFILE)
-    def test_hashes_match_build_log(self):
+    def test_hashes_match_build_log(self) -> None:
         checked = set()
         specs = {}
         with codecs.open(LOGFILE, encoding="utf-8") as logf:

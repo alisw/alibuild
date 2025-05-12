@@ -22,6 +22,8 @@ def remote_from_url(read_url, write_url, architecture, work_dir, insecure=False)
     return S3RemoteSync(read_url, write_url, architecture, work_dir)
   if read_url.startswith("b3://"):
     return Boto3RemoteSync(read_url, write_url, architecture, work_dir)
+  if read_url.startswith("cvmfs://"):
+    return CVMFSRemoteSync(read_url, None, architecture, work_dir)
   if read_url:
     return RsyncRemoteSync(read_url, write_url, architecture, work_dir)
   return NoRemoteSync()
@@ -29,15 +31,15 @@ def remote_from_url(read_url, write_url, architecture, work_dir, insecure=False)
 
 class NoRemoteSync:
   """Helper class which does not do anything to sync"""
-  def fetch_symlinks(self, spec):
+  def fetch_symlinks(self, spec) -> None:
     pass
-  def fetch_tarball(self, spec):
+  def fetch_tarball(self, spec) -> None:
     pass
-  def upload_symlinks_and_tarball(self, spec):
+  def upload_symlinks_and_tarball(self, spec) -> None:
     pass
 
 class PartialDownloadError(Exception):
-  def __init__(self, downloaded, size):
+  def __init__(self, downloaded, size) -> None:
     self.downloaded = downloaded
     self.size = size
   def __str__(self):
@@ -45,7 +47,7 @@ class PartialDownloadError(Exception):
 
 
 class HttpRemoteSync:
-  def __init__(self, remoteStore, architecture, workdir, insecure):
+  def __init__(self, remoteStore, architecture, workdir, insecure) -> None:
     self.remoteStore = remoteStore
     self.writeStore = ""
     self.architecture = architecture
@@ -135,7 +137,7 @@ class HttpRemoteSync:
             pass
     return None
 
-  def fetch_tarball(self, spec):
+  def fetch_tarball(self, spec) -> None:
     # Check for any existing tarballs we can use instead of fetching new ones.
     for pkg_hash in spec["remote_hashes"]:
       try:
@@ -182,7 +184,7 @@ class HttpRemoteSync:
                       destPath, session=session, progress=progress)
         progress.end("done")
 
-  def fetch_symlinks(self, spec):
+  def fetch_symlinks(self, spec) -> None:
     links_path = resolve_links_path(self.architecture, spec["package"])
     os.makedirs(os.path.join(self.workdir, links_path), exist_ok=True)
 
@@ -230,20 +232,20 @@ class HttpRemoteSync:
       symlink("../../" + target.lstrip("./"),
               os.path.join(self.workdir, links_path, linkname))
 
-  def upload_symlinks_and_tarball(self, spec):
+  def upload_symlinks_and_tarball(self, spec) -> None:
     pass
 
 
 class RsyncRemoteSync:
   """Helper class to sync package build directory using RSync."""
 
-  def __init__(self, remoteStore, writeStore, architecture, workdir):
+  def __init__(self, remoteStore, writeStore, architecture, workdir) -> None:
     self.remoteStore = re.sub("^ssh://", "", remoteStore)
     self.writeStore = re.sub("^ssh://", "", writeStore)
     self.architecture = architecture
     self.workdir = workdir
 
-  def fetch_tarball(self, spec):
+  def fetch_tarball(self, spec) -> None:
     info("Downloading tarball for %s@%s, if available", spec["package"], spec["version"])
     debug("Updating remote store for package %s with hashes %s", spec["package"],
           ", ".join(spec["remote_hashes"]))
@@ -271,7 +273,7 @@ class RsyncRemoteSync:
                                    for pkg_hash in spec["remote_hashes"])))
     dieOnError(err, "Unable to fetch tarball from specified store.")
 
-  def fetch_symlinks(self, spec):
+  def fetch_symlinks(self, spec) -> None:
     links_path = resolve_links_path(self.architecture, spec["package"])
     os.makedirs(os.path.join(self.workdir, links_path), exist_ok=True)
     err = execute("rsync -rlvW --delete {remote_store}/{links_path}/ {workdir}/{links_path}/".format(
@@ -281,7 +283,7 @@ class RsyncRemoteSync:
     ))
     dieOnError(err, "Unable to fetch symlinks from specified store.")
 
-  def upload_symlinks_and_tarball(self, spec):
+  def upload_symlinks_and_tarball(self, spec) -> None:
     if not self.writeStore:
       return
     dieOnError(execute("""\
@@ -304,6 +306,73 @@ class RsyncRemoteSync:
       revision=spec["revision"],
     )), "Unable to upload tarball.")
 
+class CVMFSRemoteSync:
+  """ Sync packages build directory from CVMFS or similar
+      FS based deployment. The tarball will be created on the fly with a single
+      symlink to the remote store in it, so that unpacking really
+      means unpacking the symlink to the wanted package.
+  """
+
+  def __init__(self, remoteStore, writeStore, architecture, workdir) -> None:
+    self.remoteStore = re.sub("^cvmfs://", "", remoteStore)
+    # We do not support uploading directly to CVMFS, for obvious
+    # reasons.
+    assert(writeStore is None)
+    self.writeStore = None
+    self.architecture = architecture
+    self.workdir = workdir
+
+  def fetch_tarball(self, spec) -> None:
+    info("Downloading tarball for %s@%s-%s, if available", spec["package"], spec["version"], spec["revision"])
+    # If we already have a tarball with any equivalent hash, don't check S3.
+    for pkg_hash in spec["remote_hashes"] + spec["local_hashes"]:
+      store_path = resolve_store_path(self.architecture, pkg_hash)
+      pattern = os.path.join(self.workdir, store_path, "%s-*.tar.gz" % spec["package"])
+      if glob.glob(pattern):
+        info("Reusing existing tarball for %s@%s", spec["package"], pkg_hash)
+        return
+    info("Could not find prebuilt tarball for %s@%s-%s, will be rebuilt",
+         spec["package"], spec["version"], spec["revision"])
+
+  def fetch_symlinks(self, spec) -> None:
+    # When using CVMFS, we create the symlinks grass by reading the .
+    info("Fetching available build hashes for %s, from %s", spec["package"], self.remoteStore)
+    links_path = resolve_links_path(self.architecture, spec["package"])
+    os.makedirs(os.path.join(self.workdir, links_path), exist_ok=True)
+
+    cvmfs_architecture = re.sub(r"slc(\d+)_x86-64", r"el\1-x86_64", self.architecture)
+    err = execute("""\
+    set -x
+    # Exit without error in case we do not have any package published
+    test -d "{remote_store}/{cvmfs_architecture}/Packages/{package}" || exit 0
+    mkdir -p "{workDir}/{links_path}"
+    for install_path in $(find "{remote_store}/{cvmfs_architecture}/Packages/{package}" -type d -mindepth 1 -maxdepth 1); do
+      full_version="${{install_path##*/}}"
+      tarball={package}-$full_version.{architecture}.tar.gz
+      pkg_hash=$(cat "${{install_path}}/.build-hash" || jq -r '.package.hash' <${{install_path}}/.meta.json)
+      if [ "X$pkg_hash" = X ]; then
+        continue
+      fi
+      ln -sf ../../{architecture}/store/${{pkg_hash:0:2}}/$pkg_hash/$tarball "{workDir}/{links_path}/$tarball"
+      # Create the dummy tarball, if it does not exists
+      test -f "{workDir}/{architecture}/store/${{pkg_hash:0:2}}/$pkg_hash/$tarball" && continue
+      mkdir -p "{workDir}/INSTALLROOT/$pkg_hash/{architecture}/{package}"
+      ln -sf "{remote_store}/{cvmfs_architecture}/Packages/{package}/$full_version" "{workDir}/INSTALLROOT/$pkg_hash/{architecture}/{package}"
+      mkdir -p "{workDir}/TARS/{architecture}/store/${{pkg_hash:0:2}}/$pkg_hash"
+      tar -C "{workDir}/INSTALLROOT/$pkg_hash" -czf "{workDir}/TARS/{architecture}/store/${{pkg_hash:0:2}}/$pkg_hash/$tarball" .
+      rm -rf "{workDir}/INSTALLROOT/$pkg_hash"
+    done
+    """.format(
+      workDir=self.workdir,
+      architecture=self.architecture,
+      cvmfs_architecture=cvmfs_architecture,
+      package=spec["package"],
+      remote_store=self.remoteStore,
+      links_path=links_path,
+    ))
+
+  def upload_symlinks_and_tarball(self, spec) -> None:
+    dieOnError(True, "CVMFS backend does not support uploading directly")
 
 class S3RemoteSync:
   """Sync package build directory from and to S3 using s3cmd.
@@ -311,13 +380,13 @@ class S3RemoteSync:
   s3cmd must be installed separately in order for this to work.
   """
 
-  def __init__(self, remoteStore, writeStore, architecture, workdir):
+  def __init__(self, remoteStore, writeStore, architecture, workdir) -> None:
     self.remoteStore = re.sub("^s3://", "", remoteStore)
     self.writeStore = re.sub("^s3://", "", writeStore)
     self.architecture = architecture
     self.workdir = workdir
 
-  def fetch_tarball(self, spec):
+  def fetch_tarball(self, spec) -> None:
     info("Downloading tarball for %s@%s, if available", spec["package"], spec["version"])
     debug("Updating remote store for package %s with hashes %s",
           spec["package"], ", ".join(spec["remote_hashes"]))
@@ -340,7 +409,7 @@ class S3RemoteSync:
     ))
     dieOnError(err, "Unable to fetch tarball from specified store.")
 
-  def fetch_symlinks(self, spec):
+  def fetch_symlinks(self, spec) -> None:
     err = execute("""\
     mkdir -p "{workDir}/{linksPath}"
     find "{workDir}/{linksPath}" -type l -delete
@@ -362,7 +431,7 @@ class S3RemoteSync:
     ))
     dieOnError(err, "Unable to fetch symlinks from specified store.")
 
-  def upload_symlinks_and_tarball(self, spec):
+  def upload_symlinks_and_tarball(self, spec) -> None:
     if not self.writeStore:
       return
     dieOnError(execute("""\
@@ -416,14 +485,14 @@ class Boto3RemoteSync:
   time.
   """
 
-  def __init__(self, remoteStore, writeStore, architecture, workdir):
+  def __init__(self, remoteStore, writeStore, architecture, workdir) -> None:
     self.remoteStore = re.sub("^b3://", "", remoteStore)
     self.writeStore = re.sub("^b3://", "", writeStore)
     self.architecture = architecture
     self.workdir = workdir
     self._s3_init()
 
-  def _s3_init(self):
+  def _s3_init(self) -> None:
     # This is a separate method so that we can patch it out for unit tests.
     # Import boto3 here, so that if we don't use this remote store, we don't
     # have to install it in the first place.
@@ -460,7 +529,7 @@ class Boto3RemoteSync:
       raise
     return True
 
-  def fetch_tarball(self, spec):
+  def fetch_tarball(self, spec) -> None:
     debug("Updating remote store for package %s with hashes %s", spec["package"],
           ", ".join(spec["remote_hashes"]))
 
@@ -498,7 +567,7 @@ class Boto3RemoteSync:
     debug("Remote has no tarballs for %s with hashes %s", spec["package"],
           ", ".join(spec["remote_hashes"]))
 
-  def fetch_symlinks(self, spec):
+  def fetch_symlinks(self, spec) -> None:
     from botocore.exceptions import ClientError
     links_path = resolve_links_path(self.architecture, spec["package"])
     os.makedirs(os.path.join(self.workdir, links_path), exist_ok=True)
@@ -544,7 +613,7 @@ class Boto3RemoteSync:
         target = "../../" + target
       symlink(target, link_path)
 
-  def upload_symlinks_and_tarball(self, spec):
+  def upload_symlinks_and_tarball(self, spec) -> None:
     if not self.writeStore:
       return
 

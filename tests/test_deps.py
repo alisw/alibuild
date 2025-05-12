@@ -1,13 +1,5 @@
-try:
-    from unittest.mock import patch, call, MagicMock  # In Python 3, mock is built-in
-    from io import StringIO
-except ImportError:
-    from mock import patch, call, MagicMock  # Python 2
-    from StringIO import StringIO
-try:
-    from collections import OrderedDict
-except ImportError:
-    from ordereddict import OrderedDict
+from unittest.mock import patch, MagicMock
+from io import StringIO
 
 from bits_helpers.deps import doDeps
 from argparse import Namespace
@@ -64,7 +56,7 @@ class DepsTestCase(unittest.TestCase):
                          dockerImage=None,
                          docker_extra_args=["--network=host"],
                          preferSystem=[],
-                         noSystem=True,
+                         noSystem="*",
                          architecture="slc7_x86-64",
                          disable=[],
                          neat=True,

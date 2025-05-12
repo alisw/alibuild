@@ -10,14 +10,8 @@ import re
 import platform
 
 from datetime import datetime
-try:
-  from collections import OrderedDict
-except ImportError:
-  from ordereddict import OrderedDict
-try:
-  from shlex import quote  # Python 3.3+
-except ImportError:
-  from pipes import quote  # Python 2.7
+from collections import OrderedDict
+from shlex import quote
 
 from bits_helpers.cmd import getoutput
 from bits_helpers.git import git
@@ -155,7 +149,7 @@ def normalise_multiple_options(option, sep=","):
 
 def prunePaths(workDir):
   for x in ["PATH", "LD_LIBRARY_PATH", "DYLD_LIBRARY_PATH"]:
-    if not x in os.environ:
+    if x not in os.environ:
       continue
     workDirEscaped = re.escape("%s" % workDir) + "[^:]*:?"
     os.environ[x] = re.sub(workDirEscaped, "", os.environ[x])
@@ -168,12 +162,12 @@ def validateSpec(spec):
     raise SpecError("Empty recipe.")
   if type(spec) != OrderedDict:
     raise SpecError("Not a YAML key / value.")
-  if not "package" in spec:
+  if "package" not in spec:
     raise SpecError("Missing package field in header.")
 
 # Use this to check if a given spec is compatible with the given default
 def validateDefaults(finalPkgSpec, defaults):
-  if not "valid_defaults" in finalPkgSpec:
+  if "valid_defaults" not in finalPkgSpec:
     return (True, "", [])
   validDefaults = asList(finalPkgSpec["valid_defaults"])
   nonStringDefaults = [x for x in validDefaults if not type(x) == str]
@@ -267,16 +261,24 @@ def detectArch():
   except:
     return doDetectArch(hasOsRelease, osReleaseLines, ["unknown", "", ""], "", "")
 
-def filterByArchitecture(arch, requires):
+def filterByArchitectureDefaults(arch, defaults, requires):
   for r in requires:
     require, matcher = ":" in r and r.split(":", 1) or (r, ".*")
+    if matcher.startswith("defaults="):
+      wanted = matcher[len("defaults="):]
+      if re.match(wanted, defaults):
+        yield require
     if re.match(matcher, arch):
       yield require
 
-def disabledByArchitecture(arch, requires):
+def disabledByArchitectureDefaults(arch, defaults, requires):
   for r in requires:
     require, matcher = ":" in r and r.split(":", 1) or (r, ".*")
-    if not re.match(matcher, arch):
+    if matcher.startswith("defaults="):
+      wanted = matcher[len("defaults="):]
+      if not re.match(wanted, defaults):
+        yield require
+    elif not re.match(matcher, arch):
       yield require
 
 def readDefaults(configDir, defaults, error, architecture):
@@ -308,7 +310,7 @@ def readDefaults(configDir, defaults, error, architecture):
   return (defaultsMeta, defaultsBody)
 
 
-def getRecipeReader(url, dist=None):
+def getRecipeReader(url:str , dist=None):
   m = re.search(r'^dist:(.*)@([^@]+)$', url)
   if m and dist:
     return GitReader(url, dist)
@@ -317,14 +319,14 @@ def getRecipeReader(url, dist=None):
 
 # Read a recipe from a file
 class FileReader(object):
-  def __init__(self, url):
+  def __init__(self, url) -> None:
     self.url = url
   def __call__(self):
     return open(self.url).read()
 
 # Read a recipe from a git repository using git show.
 class GitReader(object):
-  def __init__(self, url, configDir):
+  def __init__(self, url, configDir) -> None:
     self.url, self.configDir = url, configDir
   def __call__(self):
     m = re.search(r'^dist:(.*)@([^@]+)$', self.url)
@@ -379,7 +381,7 @@ def parseRecipe(reader):
     err = "Unable to parse %s\n%s" % (reader.url, str(e))
   except yaml.parser.ParserError as e:
     err = "Unable to parse %s\n%s" % (reader.url, str(e))
-  except ValueError as e:
+  except ValueError:
     err = "Unable to parse %s. Header missing." % reader.url
   return err, spec, recipe
 
@@ -477,8 +479,15 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
 
     filename,pkgdir = resolveFilename(taps, pkg_filename, configDir)
 
+    dieOnError(not filename, "Package %s not found in %s" % (p, configDir))
+    assert(filename is not None)
+
     err, spec, recipe = parseRecipe(getRecipeReader(filename, configDir))
     dieOnError(err, err)
+    # Unless there was an error, both spec and recipe should be valid.
+    # otherwise the error should have been caught above.
+    assert(spec is not None)
+    assert(recipe is not None)
     dieOnError(spec["package"].lower() != pkg_filename,
                "%s.sh has different package field: %s" % (p, spec["package"]))
     spec["pkgdir"] = pkgdir
@@ -515,9 +524,17 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
     systemRE = spec.get("prefer_system", "(?!.*)")
     try:
       systemREMatches = re.match(systemRE, architecture)
-    except TypeError as e:
+    except TypeError:
       dieOnError(True, "Malformed entry prefer_system: %s in %s" % (systemRE, spec["package"]))
-    if not noSystem and (preferSystem or systemREMatches):
+
+    noSystemList = []
+    if noSystem == "*":
+      noSystemList = [spec["package"]]
+    elif noSystem is not None:
+      noSystemList = noSystem.split(",")
+    systemExcluded = (spec["package"] in noSystemList)
+    allowSystemPackageUpload = spec.get("allow_system_package_upload", False)
+    if (not systemExcluded or allowSystemPackageUpload) and  (preferSystem or systemREMatches):
       requested_version = resolve_version(spec, defaults, "unavailable", "unavailable")
       cmd = "REQUESTED_VERSION={version}\n{check}".format(
         version=quote(requested_version),
@@ -532,20 +549,24 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
       else:
         # prefer_system_check succeeded; this means we should use the system package.
         match = re.search(r"^bits_system_replace:(?P<key>.*)$", output, re.MULTILINE)
-        if not match:
+        if not match and systemExcluded:
+          # No replacement spec name given. Fall back to old system package
+          # behaviour and just disable the package.
+          ownPackages.add(spec["package"])
+        elif not match and not systemExcluded:
           # No replacement spec name given. Fall back to old system package
           # behaviour and just disable the package.
           systemPackages.add(spec["package"])
           disable.append(spec["package"])
-        else:
+        elif match:
           # The check printed the name of a replacement; use it.
           key = match.group("key").strip()
-          try:
-            replacement = spec["prefer_system_replacement_specs"][key]
-          except KeyError:
-            dieOnError(True, "Could not find named replacement spec for "
-                       "%s: %s" % (spec["package"], key))
-          else:
+          replacement = None
+          for replacement_matcher in spec["prefer_system_replacement_specs"]:
+            if re.match(replacement_matcher, key):
+              replacement = spec["prefer_system_replacement_specs"][replacement_matcher]
+              break
+          if replacement:
             # We must keep the package name the same, since it is used to
             # specify dependencies.
             replacement["package"] = spec["package"]
@@ -553,21 +574,26 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
             # influence the package's hash, so allow the user to override it.
             replacement.setdefault("version", requested_version)
             spec = replacement
+            # Allows generalising the version based on the actual key provided
+            spec["version"] = spec["version"].replace("%(key)s", key)
             recipe = replacement.get("recipe", "")
             # If there's an explicitly-specified recipe, we're still building
-            # the package. If not, bits will still "build" it, but it's
+            # the package. If not, aliBuild will still "build" it, but it's
             # basically instantaneous, so report to the user that we're taking
             # it from the system.
             if recipe:
               ownPackages.add(spec["package"])
             else:
               systemPackages.add(spec["package"])
+          else:
+            warning(f"Could not find named replacement spec for {spec['package']}: {key}, "
+                    "falling back to building the package ourselves.")
 
     dieOnError(("system_requirement" in spec) and recipe.strip("\n\t "),
                "System requirements %s cannot have a recipe" % spec["package"])
     if re.match(spec.get("system_requirement", "(?!.*)"), architecture):
       cmd = spec.get("system_requirement_check", "false")
-      if not spec["package"] in requirementsCache:
+      if spec["package"] not in requirementsCache:
         requirementsCache[spec["package"]] = performRequirementCheck(spec, cmd.strip())
 
       err, output = requirementsCache[spec["package"]]
@@ -590,12 +616,12 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
           validDefaults = None  # no valid default works for all current packages
 
     # For the moment we treat build_requires just as requires.
-    fn = lambda what: disabledByArchitecture(architecture, spec.get(what, []))
+    fn = lambda what: disabledByArchitectureDefaults(architecture, defaults, spec.get(what, []))
     spec["disabled"] += [x for x in fn("requires")]
     spec["disabled"] += [x for x in fn("build_requires")]
-    fn = lambda what: filterByArchitecture(architecture, spec.get(what, []))
-    spec["requires"] = [x for x in fn("requires") if not x in disable]
-    spec["build_requires"] = [x for x in fn("build_requires") if not x in disable]
+    fn = lambda what: filterByArchitectureDefaults(architecture, defaults, spec.get(what, []))
+    spec["requires"] = [x for x in fn("requires") if x not in disable]
+    spec["build_requires"] = [x for x in fn("build_requires") if x not in disable]
     if spec["package"] != "defaults-release":
       spec["build_requires"].append("defaults-release")
     spec["runtime_requires"] = spec["requires"]
@@ -614,7 +640,7 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
 
 
 class Hasher:
-  def __init__(self):
+  def __init__(self) -> None:
     self.h = hashlib.sha1()
   def __call__(self, txt):
     if not type(txt) == bytes:
