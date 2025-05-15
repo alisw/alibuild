@@ -40,6 +40,7 @@ class DepsTestCase(unittest.TestCase):
     @patch("bits_helpers.deps.open")
     @patch("bits_helpers.deps.execute", new=lambda cmd: True)
     @patch("bits_helpers.utilities.open", new=lambda f: StringIO(RECIPES[f]))
+    @patch("bits_helpers.utilities.exists", new=lambda f: f in RECIPES)
     def test_deps(self, mockDepsOpen):
         """Check doDeps doesn't raise an exception."""
         dot = StringIO()
