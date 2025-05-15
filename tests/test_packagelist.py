@@ -106,6 +106,7 @@ def getPackageListWithDefaults(packages, force_rebuild=()):
 
 
 @mock.patch("bits_helpers.utilities.getRecipeReader", new=MockReader)
+@mock.patch("bits_helpers.utilities.exists", new=lambda f: f in RECIPES)
 class ReplacementTestCase(unittest.TestCase):
     """Test that system package replacements are working."""
 
@@ -171,6 +172,7 @@ class ReplacementTestCase(unittest.TestCase):
 
 
 @mock.patch("bits_helpers.utilities.getRecipeReader", new=MockReader)
+@mock.patch("bits_helpers.utilities.exists", new=lambda f: f in RECIPES)
 class ForceRebuildTestCase(unittest.TestCase):
     """Test that force_rebuild keys are applied properly."""
 
