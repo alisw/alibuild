@@ -278,7 +278,8 @@ class BuildTestCase(unittest.TestCase):
             onlyDeps=False,
             fetchRepos=False,
             forceTracked=False,
-            plugin="legacy"
+            plugin="legacy",
+            makeflow=False
         )
 
         def mkcall(args):
