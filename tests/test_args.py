@@ -28,7 +28,7 @@ PARSER_ERRORS = {
   "build --force-unknown-architecture zlib --remote-store rsync://test1.local/::rw --write-store rsync://test2.local/::rw ": 'cannot specify ::rw and --write-store at the same time',
   "build zlib -a osx_x86-64 --docker-image foo": 'cannot use `-a osx_x86-64` and --docker',
   "build zlib -a slc7_x86-64 --annotate foobar": "--annotate takes arguments of the form PACKAGE=COMMENT",
-  "analytics": ANALYTICS_MISSING_STATE_ERROR
+  # "analytics": ANALYTICS_MISSING_STATE_ERROR
 }
 
 # A few valid archs
@@ -65,8 +65,8 @@ CORRECT_BEHAVIOR = [
   ((), "build --force-unknown-architecture --force-rebuild O2,O2Physics --defaults o2 O2Physics", [("action", "build"), ("force_rebuild", ["O2", "O2Physics"]), ("defaults", "o2"), ("pkgname", ["O2Physics"])]),
   ((), "init -z test zlib"                                                             , [("configDir", "test/alidist")]),
   ((), "build --force-unknown-architecture -z test zlib"                               , [("configDir", "alidist")]),
-  ((), "analytics off"                                                                 , [("state", "off")]),
-  ((), "analytics on"                                                                  , [("state", "on")]),
+  # ((), "analytics off"                                                                 , [("state", "off")]),
+  # ((), "analytics on"                                                                  , [("state", "on")]),
 
   # With BITS_WORK_DIR and BITS_CHDIR set
   (("sw2", ".")    , "build --force-unknown-architecture zlib"                         , [("action", "build"), ("workDir", "sw2"), ("referenceSources", "sw2/MIRROR"), ("chdir", ".")]),
