@@ -15,7 +15,7 @@ from shlex import quote
 
 from bits_helpers.cmd import getoutput
 from bits_helpers.git import git
-from bits_helpers.log import warning, dieOnError
+from bits_helpers.log import warning, dieOnError, error
 
 
 class SpecError(Exception):
