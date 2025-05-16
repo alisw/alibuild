@@ -1,4 +1,3 @@
-from __future__ import print_function
 # Assuming you are using the mock library to ... mock things
 from unittest.mock import patch, call
 
