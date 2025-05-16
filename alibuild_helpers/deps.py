@@ -44,7 +44,7 @@ def doDeps(args, parser):
     s["build_requires"] = [r for r in s["build_requires"] if r not in args.disable and r != "defaults-release"]
     s["runtime_requires"] = [r for r in s["runtime_requires"] if r not in args.disable and r != "defaults-release"]
 
-  # Determine which pacakages are only build/runtime dependencies
+  # Determine which packages are only build/runtime dependencies
   all_build   = set()
   all_runtime = set()
   for k,spec in specs.items():

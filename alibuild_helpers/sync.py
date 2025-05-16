@@ -252,7 +252,7 @@ class RsyncRemoteSync:
     err = execute("""\
     for storePath in {storePaths}; do
       # Only get the first matching tarball. If there are multiple with the
-      # same hash, we only need one and they should be interchangable.
+      # same hash, we only need one and they should be interchangeable.
       if tars=$(rsync -s --list-only "{remoteStore}/$storePath/{pkg}-{ver}-*.{arch}.tar.gz" 2>/dev/null) &&
          # Strip away the metadata in rsync's file listing, leaving only the first filename.
          tar=$(echo "$tars" | sed -rn '1s#[- a-z0-9,/]* [0-9]{{2}}:[0-9]{{2}}:[0-9]{{2}} ##p') &&

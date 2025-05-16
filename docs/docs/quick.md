@@ -23,7 +23,7 @@ use it from there:
 This will provide you the tool itself. 
 
 In order to work you will need a set of recipes from a repository called
-[alidist](https://github.com/alisw/alidist.git). On the first invokation of
+[alidist](https://github.com/alisw/alidist.git). On the first invocation of
 `alibuild` the recipes will be downloaded and put in a `alidist` folder. 
 In case you need to use a special branch / repository you can always `git clone` 
 the repository yourself. By default alibuild will pickup the recipes found
