@@ -3,7 +3,7 @@
 *.swp
 build
 dist
-alibuild.egg-info
+bits.egg-info
 _site
 .rubyversion
 *,cover
@@ -13,4 +13,4 @@ _site
 build.log
 .tox
 # For setuptools_scm
-alibuild_helpers/_version.py
+bits_helpers/_version.py
