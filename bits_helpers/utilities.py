@@ -15,8 +15,8 @@ from shlex import quote
 
 from bits_helpers.cmd import getoutput
 from bits_helpers.git import git
-from bits_helpers.log import error, warning, dieOnError
 
+from bits_helpers.log import error, warning, dieOnError
 
 class SpecError(Exception):
   pass
@@ -412,7 +412,7 @@ def parseDefaults(disable, defaultsGetter, log):
 
 def checkForFilename(taps, pkg, d):
   filename = taps.get(pkg, "%s/%s.sh" % (d, pkg))
-  if not os.path.exists(filename):
+  if not exists(filename):
     if "/" in pkg:
       filename = taps.get(pkg, "%s/%s" % (d, pkg))
     else:
@@ -430,7 +430,7 @@ def resolveFilename(taps, pkg, configDir):
 
   for d in pkgDirs:
     filename = checkForFilename(taps,pkg,d)
-    if os.path.exists(filename):
+    if exists(filename):
       return(filename,os.path.abspath(d))
 
 def resolveDefaultsFilename(defaults, configDir):
@@ -444,7 +444,7 @@ def resolveDefaultsFilename(defaults, configDir):
 
   for d in pkgDirs:
     filename = "%s/defaults-%s.sh" % (d, defaults)
-    if os.path.exists(filename):
+    if exists(filename):
       return(filename)
 
   error("Default `%s' does not exists.\n" % (filename or "<no defaults specified>"))

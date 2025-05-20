@@ -1,8 +1,8 @@
 import os
 import unittest
 
-from alibuild_helpers.git import git
-from alibuild_helpers.scm import SCMError
+from bits_helpers.git import git
+from bits_helpers.scm import SCMError
 
 EXISTING_REPO = "https://github.com/alisw/alibuild"
 MISSING_REPO = "https://github.com/alisw/nonexistent"

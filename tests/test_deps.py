@@ -1,5 +1,6 @@
 from unittest.mock import patch, MagicMock
 from io import StringIO
+import os.path
 
 from bits_helpers.deps import doDeps
 from argparse import Namespace
@@ -39,6 +40,7 @@ class DepsTestCase(unittest.TestCase):
     @patch("bits_helpers.deps.open")
     @patch("bits_helpers.deps.execute", new=lambda cmd: True)
     @patch("bits_helpers.utilities.open", new=lambda f: StringIO(RECIPES[f]))
+    @patch("bits_helpers.utilities.exists", new=lambda f: f in RECIPES)
     def test_deps(self, mockDepsOpen):
         """Check doDeps doesn't raise an exception."""
         dot = StringIO()
@@ -65,11 +67,16 @@ class DepsTestCase(unittest.TestCase):
                          package="AliRoot",
                          defaults="release")
 
-        doDeps(args, MagicMock())
 
-        # Same check without explicit intermediate dotfile
-        args.outdot = None
-        doDeps(args, MagicMock())
+        def fake_exists(n):
+            return True if n in RECIPES else False
+
+        with patch.object(os.path, "exists", fake_exists):
+          doDeps(args, MagicMock())
+
+          # Same check without explicit intermediate dotfile
+          args.outdot = None
+          doDeps(args, MagicMock())
 
 
 if __name__ == '__main__':
