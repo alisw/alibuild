@@ -15,7 +15,7 @@ from shlex import quote
 
 from bits_helpers.cmd import getoutput
 from bits_helpers.git import git
-from bits_helpers.log import warning, dieOnError
+from bits_helpers.log import error, warning, dieOnError
 
 
 class SpecError(Exception):
@@ -447,11 +447,15 @@ def resolveDefaultsFilename(defaults, configDir):
     if os.path.exists(filename):
       return(filename)
 
+  error("Default `%s' does not exists.\n" % (filename or "<no defaults specified>"))
+
+  '''
   error("Default `%s' does not exists. Viable options:\n%s" %
           (defaults or "<no defaults specified>",
            "\n".join("- " + basename(x).replace("defaults-", "").replace(".sh", "")
                      for x in glob(join(configDir, "defaults-*.sh")))))
-    
+  '''
+  
 def getPackageList(packages, specs, configDir, preferSystem, noSystem,
                    architecture, disable, defaults, performPreferCheck, performRequirementCheck,
                    performValidateDefaults, overrides, taps, log, force_rebuild=()):
