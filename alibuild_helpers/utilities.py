@@ -83,6 +83,7 @@ def topological_sort(specs):
         dieOnError(True, "Dependency cycle detected: " + " -> ".join(cycle + [cycle[0]]))
       if current == start:  # We've gone full circle
         raise RuntimeError("Internal error: cycle detection failed")
+    assert False, "Unreachable error: cycle detection failed"
 
 
 def resolve_store_path(architecture, spec_hash):
