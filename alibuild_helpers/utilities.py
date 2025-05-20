@@ -71,7 +71,9 @@ def topological_sort(specs):
     cycle = []
     start = edges[0][0]  # Start with any remaining package
     current = start
-    while True:
+    max_iter = 10000 # Prevent infinite loops
+    while max_iter > 0:
+      max_iter -= 1
       cycle.append(current)
       # Find what current depends on
       for pkg, dep in edges:
