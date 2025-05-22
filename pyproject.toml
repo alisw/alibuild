@@ -29,11 +29,18 @@ dependencies = [
   'boto3<1.36.0',
 ]
 
+[project.scripts]
+aliBuild = "alibuild_helpers.main:main"
+aliDoctor = "alibuild_helpers.main:doctor_main"
+aliDeps = "alibuild_helpers.main:alideps_main"
+pb = "alibuild_helpers.main:pb_main"
+
 [project.urls]
 homepage = 'https://alisw.github.io/alibuild'
 
+
 [tool.setuptools]
-script-files = ["aliBuild", "alienv", "aliDoctor", "aliDeps", "pb"]
+script-files = ["alienv"]
 
 [tool.setuptools_scm]
 write_to = "alibuild_helpers/_version.py"
@@ -47,3 +54,4 @@ exclude = ["yaml"]
 
 [tool.setuptools.dynamic]
 readme = {file = ["README.rst"]}
+

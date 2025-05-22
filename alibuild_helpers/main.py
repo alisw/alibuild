@@ -83,7 +83,11 @@ def doMain(args, parser):
     sys.exit(0)
 
 
-if __name__ == "__main__":
+def main(action = None):
+  if action:
+    sys.argv[0] = "aliBuild"
+    sys.argv.insert(1, action)
+
   args, parser = doParseArgs()
 
   # This is valid for everything
@@ -135,3 +139,15 @@ if __name__ == "__main__":
     traceback.print_exc()
     report_exception(e)
     exit(1)
+
+def doctor_main():
+    main(action="doctor")
+
+def alideps_main():
+    main(action="deps")
+
+def pb_main():
+    main()
+
+if __name__ == "__main__":
+    main()
