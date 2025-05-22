@@ -33,11 +33,12 @@ dependencies = [
 aliBuild = "alibuild_helpers.main:main"
 aliDoctor = "alibuild_helpers.main:doctor_main"
 aliDeps = "alibuild_helpers.main:alideps_main"
-pb = "alibuild_helpers.main:pb_main"
+# Just aliases, for backwards compatibility
+alfaBuild = "alibuild_helpers.main:main"
+pb = "alibuild_helpers.main:main"
 
 [project.urls]
 homepage = 'https://alisw.github.io/alibuild'
-
 
 [tool.setuptools]
 script-files = ["alienv"]
