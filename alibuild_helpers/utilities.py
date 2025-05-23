@@ -65,6 +65,27 @@ def topological_sort(specs):
     edges = [(pkg, dep) for pkg, dep in edges if dep != current_package]
     # ...but keep blocking those that still depend on other stuff!
     leaves.extend(new_leaves - {pkg for pkg, _ in edges})
+  # If we have any edges left, we have a cycle
+  if edges:
+    # Find a cycle by following dependencies
+    cycle = []
+    start = edges[0][0]  # Start with any remaining package
+    current = start
+    max_iter = 10000 # Prevent infinite loops
+    while max_iter > 0:
+      max_iter -= 1
+      cycle.append(current)
+      # Find what current depends on
+      for pkg, dep in edges:
+        if pkg == current:
+          current = dep
+          break
+      if current in cycle:  # We found a cycle
+        cycle = cycle[cycle.index(current):]  # Trim to just the cycle
+        dieOnError(True, "Dependency cycle detected: " + " -> ".join(cycle + [cycle[0]]))
+      if current == start:  # We've gone full circle
+        raise RuntimeError("Internal error: cycle detection failed")
+    assert False, "Unreachable error: cycle detection failed"
 
 
 def resolve_store_path(architecture, spec_hash):
