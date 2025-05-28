@@ -26,7 +26,7 @@ class CmdTestCase(unittest.TestCase):
             mock_getoutput.assert_called_with(["docker", "run", "--detach", "--rm", "--entrypoint=",
                                                "extra arg", "image", "sleep", "inf"])
             getstatusoutput_docker("echo foo")
-            mock_getstatusoutput.assert_called_with("docker container exec container-id bash -c 'echo foo'")
+            mock_getstatusoutput.assert_called_with("docker container exec container-id bash -c 'echo foo'", cwd=None)
         mock_getstatusoutput.assert_called_with("docker container kill container-id")
 
         mock_getoutput.reset_mock()
@@ -34,7 +34,7 @@ class CmdTestCase(unittest.TestCase):
         with DockerRunner("") as getstatusoutput_docker:
             mock_getoutput.assert_not_called()
             getstatusoutput_docker("echo foo")
-            mock_getstatusoutput.assert_called_with("/bin/bash -c 'echo foo'")
+            mock_getstatusoutput.assert_called_with("/bin/bash -c 'echo foo'", cwd=None)
             mock_getstatusoutput.reset_mock()
         mock_getstatusoutput.assert_not_called()
 
