@@ -158,7 +158,8 @@ function existModules() {
 }
 
 function stripDyld() {
-  echo unset $( (typeset | grep ^DYLD | cut -d= -f1 | grep '_modshare$' | xargs echo ) 2> /dev/null; echo ';' )
+  TO_STRIP=$( (typeset | grep ^DYLD | cut -d= -f1 | grep '_modshare$' | xargs echo ) 2> /dev/null )
+  [ ! "X$TO_STRIP" = X ] && echo unset $TO_STRIP && echo ';'
 }
 
 ARCHITECTURE=
