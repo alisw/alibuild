@@ -43,16 +43,19 @@ export PKG_BUILDNUM="$PKGREVISION"
 export PKGPATH=${ARCHITECTURE}/${PKGNAME}/${PKGVERSION}-${PKGREVISION}
 mkdir -p "$WORK_DIR/BUILD" "$WORK_DIR/SOURCES" "$WORK_DIR/TARS" \
          "$WORK_DIR/SPECS" "$WORK_DIR/INSTALLROOT"
-export BUILDROOT="$WORK_DIR/BUILD/$PKGHASH"
-
 # If we are in development mode, then install directly in $WORK_DIR/$PKGPATH,
 # so that we can do "make install" directly into BUILD/$PKGPATH and have
 # changes being propagated.
+# Moreover, devel packages should always go in the official WORK_DIR
 if [ -n "$DEVEL_HASH" ]; then
+  export ALIBUILD_BUILD_WORK_DIR="${WORK_DIR}"
   export INSTALLROOT="$WORK_DIR/$PKGPATH"
 else
   export INSTALLROOT="$WORK_DIR/INSTALLROOT/$PKGHASH/$PKGPATH"
+  export ALIBUILD_BUILD_WORK_DIR="${ALIBUILD_BUILD_WORK_DIR:-$WORK_DIR}"
 fi
+
+export BUILDROOT="$ALIBUILD_BUILD_WORK_DIR/BUILD/$PKGHASH"
 export SOURCEDIR="$WORK_DIR/SOURCES/$PKGNAME/$PKGVERSION/$COMMIT_HASH"
 export BUILDDIR="$BUILDROOT/$PKGNAME"
 
@@ -99,9 +102,9 @@ unset DYLD_LIBRARY_PATH
 EOF
 
 cd "$BUILDROOT"
-ln -snf $PKGHASH $WORK_DIR/BUILD/$PKGNAME-latest
+ln -snf $PKGHASH "${BUILDROOT}-latest"
 if [[ $DEVEL_PREFIX ]]; then
-  ln -snf $PKGHASH $WORK_DIR/BUILD/$PKGNAME-latest-$DEVEL_PREFIX
+  ln -snf $PKGHASH "${BUILDROOT}-latest-$DEVEL_PREFIX"
 fi
 
 cd "$BUILDDIR"

@@ -12,6 +12,7 @@ from alibuild_helpers.utilities import prunePaths
 from alibuild_helpers.utilities import resolve_version
 from alibuild_helpers.utilities import topological_sort
 from alibuild_helpers.utilities import resolveFilename, resolveDefaultsFilename
+import alibuild_helpers
 import os
 import string
 
@@ -137,18 +138,18 @@ macOSArchitecturePayloads = [
 ]
 
 class TestUtilities(unittest.TestCase):
-  def test_osx(self):
+  def test_osx(self) -> None:
     for payload in architecturePayloads:
       result, hasOsRelease, osReleaseLines, platformTuple, platformSystem, platformProcessor = payload
       self.assertEqual(result, doDetectArch(hasOsRelease, osReleaseLines, platformTuple, platformSystem, platformProcessor))
   # Test by mocking platform.processor
-  def test_osx_mock(self):
+  def test_osx_mock(self) -> None:
     for payload in macOSArchitecturePayloads:
       result, hasOsRelease, osReleaseLines, platformTuple, platformSystem, platformProcessor = payload
       with patch('platform.machine', return_value=platformProcessor):
         platformProcessor = None
         self.assertEqual(result, doDetectArch(hasOsRelease, osReleaseLines, platformTuple, platformSystem, None))
-  def test_Hasher(self):
+  def test_Hasher(self) -> None:
     h = Hasher()
     h("foo")
     self.assertEqual("0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33", h.hexdigest())
@@ -158,7 +159,7 @@ class TestUtilities(unittest.TestCase):
     h("bar")
     self.assertEqual("8843d7f92416211de9ebb963ff4ce28125932878", h.hexdigest())
 
-  def test_UTF8_Hasher(self):
+  def test_UTF8_Hasher(self) -> None:
     h1 = Hasher()
     h2 = Hasher()
     h3 = Hasher()
@@ -170,12 +171,12 @@ class TestUtilities(unittest.TestCase):
     self.assertEqual(h3.hexdigest(), "0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33")
     self.assertNotEqual(h1.hexdigest(), h2.hexdigest())
 
-  def test_asList(self):
+  def test_asList(self) -> None:
     self.assertEqual(asList("a"), ["a"])
     self.assertEqual(asList(["a"]), ["a"])
     self.assertEqual(asList(None), [None])
 
-  def test_filterByArchitecture(self):
+  def test_filterByArchitecture(self) -> None:
     self.assertEqual(["AliRoot"], list(filterByArchitectureDefaults("osx_x86-64", "ali", ["AliRoot"])))
     self.assertEqual([], list(filterByArchitectureDefaults("osx_x86-64", "ali", ["AliRoot:(?!osx)"])))
     self.assertEqual(["GCC"], list(filterByArchitectureDefaults("osx_x86-64", "ali", ["AliRoot:(?!osx)", "GCC"])))
@@ -185,7 +186,7 @@ class TestUtilities(unittest.TestCase):
     self.assertEqual(["GCC"], list(filterByArchitectureDefaults("osx_x86-64", "ali", ["AliRoot:slc6", "GCC:defaults=ali"])))
     self.assertEqual([], list(filterByArchitectureDefaults("osx_x86-64", "o2", ["AliRoot:slc6", "GCC:defaults=ali"])))
 
-  def test_disabledByArchitecture(self):
+  def test_disabledByArchitecture(self) -> None:
     self.assertEqual([], list(disabledByArchitectureDefaults("osx_x86-64", "ali", ["AliRoot"])))
     self.assertEqual(["AliRoot"], list(disabledByArchitectureDefaults("osx_x86-64", "ali", ["AliRoot:(?!osx)"])))
     self.assertEqual(["AliRoot"], list(disabledByArchitectureDefaults("osx_x86-64", "ali", ["AliRoot:(?!osx)", "GCC"])))
@@ -195,7 +196,7 @@ class TestUtilities(unittest.TestCase):
     self.assertEqual(["AliRoot"], list(disabledByArchitectureDefaults("osx_x86-64", "ali", ["AliRoot:slc6", "GCC:defaults=ali"])))
     self.assertEqual(["AliRoot", "GCC"], list(disabledByArchitectureDefaults("osx_x86-64", "o2", ["AliRoot:slc6", "GCC:defaults=ali"])))
 
-  def test_prunePaths(self):
+  def test_prunePaths(self) -> None:
     fake_env = {
       "PATH": "/sw/bin:/usr/local/bin",
       "LD_LIBRARY_PATH": "/sw/lib",
@@ -212,7 +213,7 @@ class TestUtilities(unittest.TestCase):
     }
     with patch.object(os, "environ", fake_env):
       prunePaths("/sw")
-      self.assertTrue(not "ROOT_VERSION" in fake_env)
+      self.assertTrue("ROOT_VERSION" not in fake_env)
       self.assertTrue(fake_env["PATH"] == "/usr/local/bin")
       self.assertTrue(fake_env["LD_LIBRARY_PATH"] == "")
       self.assertTrue(fake_env["DYLD_LIBRARY_PATH"] == "")
@@ -220,13 +221,13 @@ class TestUtilities(unittest.TestCase):
 
     with patch.object(os, "environ", fake_env_copy):
       prunePaths("/foo")
-      self.assertTrue(not "ROOT_VERSION" in fake_env_copy)
+      self.assertTrue("ROOT_VERSION" not in fake_env_copy)
       self.assertTrue(fake_env_copy["PATH"] == "/sw/bin:/usr/local/bin")
       self.assertTrue(fake_env_copy["LD_LIBRARY_PATH"] == "/sw/lib")
       self.assertTrue(fake_env_copy["DYLD_LIBRARY_PATH"] == "/sw/lib")
       self.assertTrue(fake_env_copy["ALIBUILD_VERSION"] == "v1.0.0")
 
-  def test_resolver(self):
+  def test_resolver(self) -> None:
     spec = {"package": "test-pkg",
       "version": "%(tag_basename)s",
       "tag": "foo/bar",
@@ -240,7 +241,7 @@ class TestUtilities(unittest.TestCase):
     spec["version"] = "NO%(defaults_upper)s"
     self.assertTrue(resolve_version(spec, "release", "stream/v1", "v1"), "NO")
 
-  def test_get_pkg_dirs(self):
+  def test_get_pkg_dirs(self) -> None:
       self.assertEqual(getPkgDirs("alidist"), ["alidist/"])
       with patch.object(os, "environ", {"BITS_PATH": ""}):
           self.assertEqual(getPkgDirs("alidist"), ["alidist/"])
@@ -253,7 +254,7 @@ class TestUtilities(unittest.TestCase):
       with patch.object(os, "environ", {"BITS_PATH": "foo/bar:/bar"}):
           self.assertEqual(getPkgDirs("alidist"), ["alidist/foo/bar", "/bar", "alidist/"])
 
-  def test_resolveDefaults(self):
+  def test_resolveDefaults(self) -> None:
       def fake_exists(n):
           return {"alidist/defaults-release.sh": True,
                   "/foo/defaults-o2.sh": True,
@@ -281,7 +282,7 @@ class TestUtilities(unittest.TestCase):
           self.assertEqual(resolveDefaultsFilename("release", "alidost"), None)
           self.assertEqual(resolveDefaultsFilename("o2", "alidist"), "alidist/bar/defaults-o2.sh")
 
-  def test_resolveFilename(self):
+  def test_resolveFilename(self) -> None:
       def fake_exists(n):
           return {
                   "alidist/defaults-release.sh": True,
@@ -325,7 +326,7 @@ class TestUtilities(unittest.TestCase):
 class TestTopologicalSort(unittest.TestCase):
     """Check that various properties of topological sorting hold."""
 
-    def test_resolve_dependency_chain(self):
+    def test_resolve_dependency_chain(self) -> None:
         """Test that topological sorting correctly sorts packages in a dependency chain."""
         # Topological sorting only takes "requires" into account, since the
         # build/runtime distinction does not matter for resolving build order.
@@ -335,7 +336,7 @@ class TestTopologicalSort(unittest.TestCase):
             "c": {"package": "c", "requires": []},
         })))
 
-    def test_diamond_dependency(self):
+    def test_diamond_dependency(self) -> None:
         """Test that a diamond dependency relationship is handled correctly."""
         self.assertEqual(["base", "mid2", "mid1", "top"], list(topological_sort({
             "top": {"package": "top", "requires": ["mid1", "mid2"]},
@@ -345,7 +346,7 @@ class TestTopologicalSort(unittest.TestCase):
             "base": {"package": "base", "requires": []},
         })))
 
-    def test_dont_drop_packages(self):
+    def test_dont_drop_packages(self) -> None:
         """Check that topological sorting doesn't drop any packages."""
         # For half the packages, depend on the first package, to make this a
         # little more than trivial.
@@ -353,6 +354,40 @@ class TestTopologicalSort(unittest.TestCase):
                  for pkg in string.ascii_lowercase}
         self.assertEqual(frozenset(specs.keys()),
                          frozenset(topological_sort(specs)))
+
+    def test_cycle(self) -> None:
+        """Test that dependency cycles are detected and reported."""
+        specs = {
+            "A": {"package": "A", "requires": ["B"]},
+            "B": {"package": "B", "requires": ["C"]},
+            "C": {"package": "C", "requires": ["D"]},
+            "D": {"package": "D", "requires": ["A"]}
+        }
+        with patch.object(alibuild_helpers.log, 'error') as mock_error:
+          with self.assertRaises(SystemExit) as cm:
+            list(topological_sort(specs))
+          self.assertEqual(cm.exception.code, 1)
+          mock_error.assert_called_once_with("%s", "Dependency cycle detected: A -> B -> C -> D -> A")
+
+    def test_empty_set(self) -> None:
+        """Test that an empty set of packages is handled correctly."""
+        self.assertEqual([], list(topological_sort({})))
+        
+    def test_single_package(self) -> None:
+        """Test that a single package with no dependencies is handled correctly."""
+        self.assertEqual(["A"], list(topological_sort({
+            "A": {"package": "A", "requires": []}
+        })))
+        
+    def test_independent_packages(self) -> None:
+        """Test that packages with no dependencies between them are handled correctly."""
+        result = list(topological_sort({
+            "A": {"package": "A", "requires": []},
+            "B": {"package": "B", "requires": []},
+            "C": {"package": "C", "requires": []}
+        }))
+        self.assertEqual(set(["A", "B", "C"]), set(result))
+        self.assertEqual(3, len(result))
 
 if __name__ == '__main__':
     unittest.main()

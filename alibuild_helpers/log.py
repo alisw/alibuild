@@ -4,15 +4,13 @@ import re
 import time
 import datetime
 
-debug, error, warning, info, success = (None, None, None, None, None)
-
-def dieOnError(err, msg):
+def dieOnError(err, msg) -> None:
   if err:
     error("%s", msg)
     sys.exit(1)
 
 class LogFormatter(logging.Formatter):
-  def __init__(self, fmtstr):
+  def __init__(self, fmtstr) -> None:
     self.fmtstr = fmtstr
     self.COLOR_RESET = "\033[m" if sys.stdout.isatty() else ""
     self.LEVEL_COLORS = { logging.WARNING:  "\033[4;33m",
@@ -35,7 +33,7 @@ class LogFormatter(logging.Formatter):
     } for x in record.msg.split("\n"))
 
 
-def log_current_package(package, main_package, specs, devel_prefix):
+def log_current_package(package, main_package, specs, devel_prefix) -> None:
   """Show PACKAGE as the one currently being processed in future log messages."""
   if logger_handler.level > logging.DEBUG:
     return
@@ -55,14 +53,14 @@ def log_current_package(package, main_package, specs, devel_prefix):
 
 
 class ProgressPrint:
-  def __init__(self, begin_msg=""):
+  def __init__(self, begin_msg="") -> None:
     self.count = -1
     self.lasttime = 0
     self.STAGES = ".", "..", "...", "....", ".....", "....", "...", ".."
     self.begin_msg = begin_msg
     self.percent = -1
 
-  def __call__(self, txt, *args):
+  def __call__(self, txt, *args) -> None:
     if logger.level <= logging.DEBUG or not sys.stdout.isatty():
       debug(txt, *args)
       return
@@ -88,7 +86,7 @@ class ProgressPrint:
     self.lasttime = time.time()
     sys.stderr.flush()
 
-  def erase(self):
+  def erase(self) -> None:
     nerase = len(self.STAGES[self.count]) if self.count > -1 else 0
     if self.percent > -1:
       nerase = nerase + 7

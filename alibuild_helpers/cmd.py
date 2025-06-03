@@ -78,7 +78,7 @@ class DockerRunner:
   instead.
   """
 
-  def __init__(self, docker_image, docker_run_args=()):
+  def __init__(self, docker_image, docker_run_args=()) -> None:
     self._docker_image = docker_image
     self._docker_run_args = docker_run_args
     self._container = None

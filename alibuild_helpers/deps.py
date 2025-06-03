@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-from __future__ import print_function
 from alibuild_helpers.log import debug, error, info, dieOnError
 from alibuild_helpers.utilities import parseDefaults, readDefaults, getPackageList, validateDefaults
 from alibuild_helpers.cmd import DockerRunner, execute
@@ -41,11 +40,11 @@ def doDeps(args, parser):
 
   for s in specs.values():
     # Remove disabled packages
-    s["requires"] = [r for r in s["requires"] if not r in args.disable and r != "defaults-release"]
-    s["build_requires"] = [r for r in s["build_requires"] if not r in args.disable and r != "defaults-release"]
-    s["runtime_requires"] = [r for r in s["runtime_requires"] if not r in args.disable and r != "defaults-release"]
+    s["requires"] = [r for r in s["requires"] if r not in args.disable and r != "defaults-release"]
+    s["build_requires"] = [r for r in s["build_requires"] if r not in args.disable and r != "defaults-release"]
+    s["runtime_requires"] = [r for r in s["runtime_requires"] if r not in args.disable and r != "defaults-release"]
 
-  # Determine which pacakages are only build/runtime dependencies
+  # Determine which packages are only build/runtime dependencies
   all_build   = set()
   all_runtime = set()
   for k,spec in specs.items():
@@ -97,7 +96,7 @@ def doDeps(args, parser):
   # Check if we have dot in PATH
   try:
     execute(["dot", "-V"])
-  except Exception as e:
+  except Exception:
     dieOnError(True, "Could not find dot in PATH. Please install graphviz and add it to PATH.")
   try:
     if args.neat:

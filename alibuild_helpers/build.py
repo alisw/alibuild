@@ -11,7 +11,6 @@ from alibuild_helpers.utilities import parseDefaults, readDefaults
 from alibuild_helpers.utilities import getPackageList, asList
 from alibuild_helpers.utilities import validateDefaults
 from alibuild_helpers.utilities import Hasher
-from alibuild_helpers.utilities import yamlDump
 from alibuild_helpers.utilities import resolve_tag, resolve_version, short_commit_hash
 from alibuild_helpers.git import Git, git
 from alibuild_helpers.sl import Sapling
@@ -31,11 +30,10 @@ import socket
 import os
 import re
 import shutil
-import sys
 import time
 
 
-def writeAll(fn, txt):
+def writeAll(fn, txt) -> None:
   f = open(fn, "w")
   f.write(txt)
   f.close()
@@ -185,7 +183,11 @@ def storeHashes(package, specs, considerRelocation):
     for _, _, hasher in h_alternatives:
       hasher(data)
 
-  for key in ("env", "append_path", "prepend_path"):
+  modifies_full_hash_dicts = ["env", "append_path", "prepend_path"]
+  if not spec["is_devel_pkg"] and "track_env" in spec:
+    modifies_full_hash_dicts.append("track_env")
+
+  for key in modifies_full_hash_dicts:
     if key not in spec:
       h_all("none")
     else:
@@ -267,6 +269,19 @@ def hash_local_changes(spec):
   class UntrackedChangesError(Exception):
     """Signal that we cannot detect code changes due to untracked files."""
   h = Hasher()
+  if "track_env" in spec:
+    assert isinstance(spec["track_env"], OrderedDict), \
+        "spec[%r] was of type %r" % ("track_env", type(spec["track_env"]))
+
+    # Python 3.12 changed the string representation of OrderedDicts from
+    # OrderedDict([(key, value)]) to OrderedDict({key: value}), so to remain
+    # compatible, we need to emulate the previous string representation.
+    h("OrderedDict([")
+    h(", ".join(
+        # XXX: We still rely on repr("str") being "'str'",
+        # and on repr(["a", "b"]) being "['a', 'b']".
+        "(%r, %r)" % (key, value) for key, value in spec["track_env"].items()))
+    h("])")
   def hash_output(msg, args):
     lines = msg % args
     # `git status --porcelain` indicates untracked files using "??".
@@ -393,7 +408,7 @@ def generate_initdotsh(package, specs, architecture, post_build=False):
                  if key != "DYLD_LIBRARY_PATH")
 
   # Return string without a trailing newline, since we expect call sites to
-  # append that (and the obvious way to inesrt it into the build tempate is by
+  # append that (and the obvious way to inesrt it into the build template is by
   # putting the "%(initdotsh_*)s" on its own line, which has the same effect).
   return "\n".join(lines)
 
@@ -476,7 +491,7 @@ def doBuild(args, parser):
     checkedOutCommitName = scm.checkedOutCommitName(directory=args.configDir)
   except SCMError:
     dieOnError(True, "Cannot find SCM directory in %s." % args.configDir)
-  os.environ["ALIBUILD_ALIDIST_HASH"] = checkedOutCommitName # type: ignore
+  os.environ["ALIBUILD_ALIDIST_HASH"] = checkedOutCommitName
 
   debug("Building for architecture %s", args.architecture)
   debug("Number of parallel builds: %d", args.jobs)
@@ -512,9 +527,9 @@ def doBuild(args, parser):
              ("\n- ".join(sorted(failed)), args.defaults, " ".join(args.pkgname)))
 
   for x in specs.values():
-    x["requires"] = [r for r in x["requires"] if not r in args.disable]
-    x["build_requires"] = [r for r in x["build_requires"] if not r in args.disable]
-    x["runtime_requires"] = [r for r in x["runtime_requires"] if not r in args.disable]
+    x["requires"] = [r for r in x["requires"] if r not in args.disable]
+    x["build_requires"] = [r for r in x["build_requires"] if r not in args.disable]
+    x["runtime_requires"] = [r for r in x["runtime_requires"] if r not in args.disable]
 
   if systemPackages:
     banner("aliBuild can take the following packages from the system and will not build them:\n  %s",
@@ -874,8 +889,18 @@ def doBuild(args, parser):
       spec["hash"] = spec["local_revision_hash"]
     else:
       spec["hash"] = spec["remote_revision_hash"]
+
+    # We do not use the override for devel packages, because we
+    # want to avoid having to rebuild things when the /tmp gets cleaned.
+    if spec["is_devel_pkg"]:
+        buildWorkDir = args.workDir
+    else:
+        buildWorkDir = os.environ.get("ALIBUILD_BUILD_WORK_DIR", args.workDir)
+
+    buildRoot = join(buildWorkDir, "BUILD", spec["hash"])
+
     spec["old_devel_hash"] = readHashFile(join(
-      workDir, "BUILD", spec["hash"], spec["package"], ".build_succeeded"))
+      buildRoot, spec["package"], ".build_succeeded"))
 
     # Recreate symlinks to this development package builds.
     if spec["is_devel_pkg"]:
@@ -883,9 +908,9 @@ def doBuild(args, parser):
       # Ignore errors here, because the path we're linking to might not exist
       # (if this is the first run through the loop). On the second run
       # through, the path should have been created by the build process.
-      call_ignoring_oserrors(symlink, spec["hash"], join(workDir, "BUILD", spec["package"] + "-latest"))
+      call_ignoring_oserrors(symlink, spec["hash"], join(buildWorkDir, "BUILD", spec["package"] + "-latest"))
       if develPrefix:
-        call_ignoring_oserrors(symlink, spec["hash"], join(workDir, "BUILD", spec["package"] + "-latest-" + develPrefix))
+        call_ignoring_oserrors(symlink, spec["hash"], join(buildWorkDir, "BUILD", spec["package"] + "-latest-" + develPrefix))
       # Last package built gets a "latest" mark.
       call_ignoring_oserrors(symlink, "{version}-{revision}".format(**spec),
                              join(workDir, args.architecture, spec["package"], "latest"))
@@ -935,7 +960,7 @@ def doBuild(args, parser):
       # assuming the package is not a development one. We also can
       # delete the SOURCES in case we have aggressive-cleanup enabled.
       if not spec["is_devel_pkg"] and args.autoCleanup:
-        cleanupDirs = [join(workDir, "BUILD", spec["hash"]),
+        cleanupDirs = [buildRoot,
                        join(workDir, "INSTALLROOT", spec["hash"])]
         if args.aggressiveCleanup:
           cleanupDirs.append(join(workDir, "SOURCES", spec["package"]))
@@ -944,13 +969,13 @@ def doBuild(args, parser):
         for d in cleanupDirs:
           shutil.rmtree(d.encode("utf8"), True)
         try:
-          unlink(join(workDir, "BUILD", spec["package"] + "-latest"))
+          unlink(join(buildWorkDir, "BUILD", spec["package"] + "-latest"))
           if "develPrefix" in args:
-            unlink(join(workDir, "BUILD", spec["package"] + "-latest-" + args.develPrefix))
+            unlink(join(buildWorkDir, "BUILD", spec["package"] + "-latest-" + args.develPrefix))
         except:
           pass
         try:
-          rmdir(join(workDir, "BUILD"))
+          rmdir(join(buildWorkDir, "BUILD"))
           rmdir(join(workDir, "INSTALLROOT"))
         except:
           pass
@@ -1041,6 +1066,9 @@ def doBuild(args, parser):
     # Add the extra environment as passed from the command line.
     buildEnvironment += [e.partition('=')[::2] for e in args.environment]
 
+    # Add the computed track_env environment
+    buildEnvironment += [(key, value) for key, value in spec.get("track_env", {}).items()]
+
     # In case the --docker options is passed, we setup a docker container which
     # will perform the actual build. Otherwise build as usual using bash.
     if args.docker:
@@ -1097,7 +1125,7 @@ def doBuild(args, parser):
     """).format(
       h=socket.gethostname(),
       sd=scriptDir,
-      w=abspath(args.workDir),
+      w=buildWorkDir,
       p=spec["package"],
       devSuffix="-" + args.develPrefix
       if "develPrefix" in args and spec["is_devel_pkg"]
@@ -1165,7 +1193,7 @@ def doBuild(args, parser):
   for spec in specs.values():
     if spec["is_devel_pkg"]:
       banner("Build directory for devel package %s:\n%s/BUILD/%s-latest%s/%s",
-             spec["package"], abspath(args.workDir), spec["package"],
+             spec["package"], abspath(buildWorkDir), spec["package"],
              ("-" + args.develPrefix) if "develPrefix" in args else "",
              spec["package"])
   if untrackedFilesDirectories:

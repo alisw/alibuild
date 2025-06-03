@@ -44,7 +44,7 @@ TAR_NAMES = tarball_name(GOOD_SPEC), tarball_name(BAD_SPEC), tarball_name(MISSIN
 
 
 class MockRequest:
-    def __init__(self, j, simulate_err=False):
+    def __init__(self, j, simulate_err=False) -> None:
         self.j = j
         self.simulate_err = simulate_err
         self.status_code = 200 if j else 404
@@ -266,7 +266,7 @@ class Boto3TestCase(unittest.TestCase):
     @patch("os.path.isfile", new=MagicMock(return_value=False))
     @patch("os.path.islink", new=MagicMock(return_value=False))
     @patch("alibuild_helpers.sync.execute", new=MagicMock(return_value=0))
-    def test_tarball_download(self):
+    def test_tarball_download(self) -> None:
         """Test boto3 behaviour when downloading tarballs from the remote."""
         b3sync = sync.Boto3RemoteSync(
             remoteStore="b3://localhost", writeStore="b3://localhost",
@@ -296,7 +296,7 @@ class Boto3TestCase(unittest.TestCase):
     ))
     @patch("os.readlink", new=MagicMock(return_value="dummy path"))
     @patch("os.path.islink", new=MagicMock(return_value=True))
-    def test_tarball_upload(self):
+    def test_tarball_upload(self) -> None:
         """Test boto3 behaviour when building packages for upload locally."""
         b3sync = sync.Boto3RemoteSync(
             remoteStore="b3://localhost", writeStore="b3://localhost",

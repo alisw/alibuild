@@ -1,10 +1,9 @@
-from __future__ import print_function
 # Assuming you are using the mock library to ... mock things
 from unittest import mock
-from unittest.mock import patch, call
+from unittest.mock import patch
 
 import alibuild_helpers.args
-from alibuild_helpers.args import doParseArgs, matchValidArch, finaliseArgs, DEFAULT_WORK_DIR, DEFAULT_CHDIR, ARCHITECTURE_TABLE
+from alibuild_helpers.args import doParseArgs, matchValidArch
 import sys
 import os
 import os.path
@@ -48,11 +47,11 @@ CORRECT_BEHAVIOR = [
   ((), "build --force-unknown-architecture -j 10 zlib --disable gcc --disable foo,bar" , [("disable", ["gcc", "foo", "bar"])]),
   ((), "init zlib --dist master"                                                       , [("dist", {"repo": "alisw/alidist", "ver": "master"})]),
   ((), "init zlib --dist ktf/alidist@dev"                                              , [("dist", {"repo": "ktf/alidist", "ver": "dev"})]),
-  ((), "build --force-unknown-architecture zlib --remote-store rsync://test.local/"    , [("noSystem", True), ("remoteStore", "rsync://test.local/")]),
-  ((), "build --force-unknown-architecture zlib --remote-store rsync://test.local/::rw", [("noSystem", True), ("remoteStore", "rsync://test.local/"), ("writeStore", "rsync://test.local/")]),
-  ((), "build --force-unknown-architecture zlib --no-remote-store --remote-store rsync://test.local/", [("noSystem", False), ("remoteStore", "")]),
-  ((), "build zlib --architecture slc7_x86-64"                                         , [("noSystem", True), ("preferSystem", False), ("remoteStore", "https://s3.cern.ch/swift/v1/alibuild-repo")]),
-  ((), "build zlib --architecture ubuntu1804_x86-64"                                   , [("noSystem", False), ("preferSystem", False), ("remoteStore", "")]),
+  ((), "build --force-unknown-architecture zlib --remote-store rsync://test.local/"    , [("noSystem", "*"), ("remoteStore", "rsync://test.local/")]),
+  ((), "build --force-unknown-architecture zlib --remote-store rsync://test.local/::rw", [("noSystem", "*"), ("remoteStore", "rsync://test.local/"), ("writeStore", "rsync://test.local/")]),
+  ((), "build --force-unknown-architecture zlib --no-remote-store --remote-store rsync://test.local/", [("noSystem", None), ("remoteStore", "")]),
+  ((), "build zlib --architecture slc7_x86-64"                                         , [("noSystem", "*"), ("preferSystem", False), ("remoteStore", "https://s3.cern.ch/swift/v1/alibuild-repo")]),
+  ((), "build zlib --architecture ubuntu1804_x86-64"                                   , [("noSystem", None), ("preferSystem", False), ("remoteStore", "")]),
   ((), "build zlib -a slc7_x86-64"                                                     , [("docker", False), ("dockerImage", None), ("docker_extra_args", ["--network=host"])]),
   ((), "build zlib -a slc7_x86-64 --docker-image registry.cern.ch/alisw/some-builder"  , [("docker", True), ("dockerImage", "registry.cern.ch/alisw/some-builder")]),
   ((), "build zlib -a slc7_x86-64 --docker"                                            , [("docker", True), ("dockerImage", "registry.cern.ch/alisw/slc7-builder")]),
@@ -110,7 +109,7 @@ class ArgsTestCase(unittest.TestCase):
                 f"Expected '{args[0]}' matching '{pattern}' but it's not the case."
             )
 
-  def test_validArchitectures(self):
+  def test_validArchitectures(self) -> None:
     for arch in VALID_ARCHS:
       self.assertTrue(matchValidArch(arch))
     for arch in INVALID_ARCHS:

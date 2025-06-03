@@ -1,4 +1,3 @@
-from __future__ import print_function
 from unittest.mock import patch, MagicMock
 from io import StringIO
 import os.path
@@ -80,7 +79,7 @@ class DoctorTestCase(unittest.TestCase):
                      docker_extra_args=["--network=host"],
                      debug=False,
                      preferSystem=[],
-                     noSystem=False,
+                     noSystem="*",
                      architecture="osx_x86-64",
                      disable=[],
                      defaults="release")

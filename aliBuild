@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-from __future__ import print_function
 import os
 import sys
 import atexit
@@ -57,7 +56,7 @@ def doMain(args, parser):
       error(e.message)
       exit(1)
 
-  if args.action == "version" or args.action == None:
+  if args.action == "version" or args.action is None:
     print("aliBuild version: {version} ({arch})".format(
       version=__version__ or "unknown", arch=args.architecture or "unknown"))
     sys.exit(0)
@@ -111,8 +110,8 @@ if __name__ == "__main__":
   else:
     os.environ["ALIBUILD_ANALYTICS_USER_UUID"] = open(expanduser("~/.config/alibuild/analytics-uuid")).read().strip()
   try:
-    profiler = "--profile" in sys.argv
-    if profiler:
+    useProfiler = "--profile" in sys.argv
+    if useProfiler:
       print("profiler started")
       import cProfile, pstats
       from io import StringIO

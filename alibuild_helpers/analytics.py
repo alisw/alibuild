@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-import os, subprocess, sys
+import os
+import subprocess
+import sys
 from os.path import exists, expanduser
 from os import unlink
 
@@ -24,7 +26,7 @@ def askForAnalytics():
          "  https://github.com/alisw/alibuild/blob/master/ANALYTICS.md\n")
   a = input("Is that ok for you [YES/no]? ")
   if a.strip() and a.strip().lower().startswith("n"):
-    debug("User requsted disabling analytics.")
+    debug("User requested disabling analytics.")
     return disable_analytics()
   return generate_analytics_id()
 
@@ -104,7 +106,7 @@ def report_exception(e):
     exd = e.__class__.__name__,
     exf = "1")
 
-def enable_analytics():
+def enable_analytics() -> None:
   if exists(expanduser("~/.config/alibuild/disable-analytics")):
     unlink(expanduser("~/.config/alibuild/disable-analytics"))
   if not exists(expanduser("~/.config/alibuild/analytics-uuid")):

@@ -65,6 +65,27 @@ def topological_sort(specs):
     edges = [(pkg, dep) for pkg, dep in edges if dep != current_package]
     # ...but keep blocking those that still depend on other stuff!
     leaves.extend(new_leaves - {pkg for pkg, _ in edges})
+  # If we have any edges left, we have a cycle
+  if edges:
+    # Find a cycle by following dependencies
+    cycle = []
+    start = edges[0][0]  # Start with any remaining package
+    current = start
+    max_iter = 10000 # Prevent infinite loops
+    while max_iter > 0:
+      max_iter -= 1
+      cycle.append(current)
+      # Find what current depends on
+      for pkg, dep in edges:
+        if pkg == current:
+          current = dep
+          break
+      if current in cycle:  # We found a cycle
+        cycle = cycle[cycle.index(current):]  # Trim to just the cycle
+        dieOnError(True, "Dependency cycle detected: " + " -> ".join(cycle + [cycle[0]]))
+      if current == start:  # We've gone full circle
+        raise RuntimeError("Internal error: cycle detection failed")
+    assert False, "Unreachable error: cycle detection failed"
 
 
 def resolve_store_path(architecture, spec_hash):
@@ -159,7 +180,7 @@ def normalise_multiple_options(option, sep=","):
 
 def prunePaths(workDir):
   for x in ["PATH", "LD_LIBRARY_PATH", "DYLD_LIBRARY_PATH"]:
-    if not x in os.environ:
+    if x not in os.environ:
       continue
     workDirEscaped = re.escape("%s" % workDir) + "[^:]*:?"
     os.environ[x] = re.sub(workDirEscaped, "", os.environ[x])
@@ -172,12 +193,12 @@ def validateSpec(spec):
     raise SpecError("Empty recipe.")
   if type(spec) != OrderedDict:
     raise SpecError("Not a YAML key / value.")
-  if not "package" in spec:
+  if "package" not in spec:
     raise SpecError("Missing package field in header.")
 
 # Use this to check if a given spec is compatible with the given default
 def validateDefaults(finalPkgSpec, defaults):
-  if not "valid_defaults" in finalPkgSpec:
+  if "valid_defaults" not in finalPkgSpec:
     return (True, "", [])
   validDefaults = asList(finalPkgSpec["valid_defaults"])
   nonStringDefaults = [x for x in validDefaults if not type(x) == str]
@@ -316,7 +337,7 @@ def readDefaults(configDir, defaults, error, architecture):
   return (defaultsMeta, defaultsBody)
 
 
-def getRecipeReader(url, dist=None):
+def getRecipeReader(url:str , dist=None):
   m = re.search(r'^dist:(.*)@([^@]+)$', url)
   if m and dist:
     return GitReader(url, dist)
@@ -325,14 +346,14 @@ def getRecipeReader(url, dist=None):
 
 # Read a recipe from a file
 class FileReader(object):
-  def __init__(self, url):
+  def __init__(self, url) -> None:
     self.url = url
   def __call__(self):
     return open(self.url).read()
 
 # Read a recipe from a git repository using git show.
 class GitReader(object):
-  def __init__(self, url, configDir):
+  def __init__(self, url, configDir) -> None:
     self.url, self.configDir = url, configDir
   def __call__(self):
     m = re.search(r'^dist:(.*)@([^@]+)$', self.url)
@@ -387,7 +408,7 @@ def parseRecipe(reader):
     err = "Unable to parse %s\n%s" % (reader.url, str(e))
   except yaml.parser.ParserError as e:
     err = "Unable to parse %s\n%s" % (reader.url, str(e))
-  except ValueError as e:
+  except ValueError:
     err = "Unable to parse %s. Header missing." % reader.url
   return err, spec, recipe
 
@@ -445,6 +466,7 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
   failedRequirements = set()
   testCache = {}
   requirementsCache = {}
+  trackingEnvCache = {}
   packages = packages[:]
   validDefaults = []  # empty list: all OK; None: no valid default; non-empty list: list of valid ones
   while packages:
@@ -462,6 +484,9 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
     pkg_filename = ("defaults-" + defaults) if p == "defaults-release" else p.lower()
 
     filename, pkgdir = resolveFilename(taps, pkg_filename, configDir)
+
+    dieOnError(not filename, "Package %s not found in %s" % (p, configDir))
+    assert(filename is not None)
 
     err, spec, recipe = parseRecipe(getRecipeReader(filename, configDir))
     dieOnError(err, err)
@@ -505,9 +530,26 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
     systemRE = spec.get("prefer_system", "(?!.*)")
     try:
       systemREMatches = re.match(systemRE, architecture)
-    except TypeError as e:
+    except TypeError:
       dieOnError(True, "Malformed entry prefer_system: %s in %s" % (systemRE, spec["package"]))
-    if not noSystem and (preferSystem or systemREMatches):
+
+    noSystemList = []
+    if noSystem == "*":
+      noSystemList = [spec["package"]]
+    elif noSystem is not None:
+      noSystemList = noSystem.split(",")
+    systemExcluded = (spec["package"] in noSystemList)
+    allowSystemPackageUpload = spec.get("allow_system_package_upload", False)
+    # Fill the track env with the actual result from executing the script.
+    for env, trackingCode in spec.get("track_env", {}).items():
+      key = spec["package"] + env
+      if key not in trackingEnvCache:
+        status, out = performPreferCheck(spec, trackingCode)
+        dieOnError(status, "Error while executing track_env for {}: {} => {}".format(key, trackingCode, out))
+        trackingEnvCache[key] = out
+      spec["track_env"][env] = trackingEnvCache[key]
+
+    if (not systemExcluded or allowSystemPackageUpload) and  (preferSystem or systemREMatches):
       requested_version = resolve_version(spec, defaults, "unavailable", "unavailable")
       cmd = "REQUESTED_VERSION={version}\n{check}".format(
         version=quote(requested_version),
@@ -522,12 +564,16 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
       else:
         # prefer_system_check succeeded; this means we should use the system package.
         match = re.search(r"^alibuild_system_replace:(?P<key>.*)$", output, re.MULTILINE)
-        if not match:
+        if not match and systemExcluded:
+          # No replacement spec name given. Fall back to old system package
+          # behaviour and just disable the package.
+          ownPackages.add(spec["package"])
+        elif not match and not systemExcluded:
           # No replacement spec name given. Fall back to old system package
           # behaviour and just disable the package.
           systemPackages.add(spec["package"])
           disable.append(spec["package"])
-        else:
+        elif match:
           # The check printed the name of a replacement; use it.
           key = match.group("key").strip()
           replacement = None
@@ -562,7 +608,7 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
                "System requirements %s cannot have a recipe" % spec["package"])
     if re.match(spec.get("system_requirement", "(?!.*)"), architecture):
       cmd = spec.get("system_requirement_check", "false")
-      if not spec["package"] in requirementsCache:
+      if spec["package"] not in requirementsCache:
         requirementsCache[spec["package"]] = performRequirementCheck(spec, cmd.strip())
 
       err, output = requirementsCache[spec["package"]]
@@ -589,8 +635,8 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
     spec["disabled"] += [x for x in fn("requires")]
     spec["disabled"] += [x for x in fn("build_requires")]
     fn = lambda what: filterByArchitectureDefaults(architecture, defaults, spec.get(what, []))
-    spec["requires"] = [x for x in fn("requires") if not x in disable]
-    spec["build_requires"] = [x for x in fn("build_requires") if not x in disable]
+    spec["requires"] = [x for x in fn("requires") if x not in disable]
+    spec["build_requires"] = [x for x in fn("build_requires") if x not in disable]
     if spec["package"] != "defaults-release":
       spec["build_requires"].append("defaults-release")
     spec["runtime_requires"] = spec["requires"]
@@ -609,7 +655,7 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
 
 
 class Hasher:
-  def __init__(self):
+  def __init__(self) -> None:
     self.h = hashlib.sha1()
   def __call__(self, txt):
     if not type(txt) == bytes:
