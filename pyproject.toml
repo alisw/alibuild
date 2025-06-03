@@ -29,6 +29,16 @@ dependencies = [
   'boto3<1.36.0',
 ]
 
+[project.optional-dependencies]
+test = [
+'tox',
+]
+docs = [
+'mkdocs',
+'mkdocs-material',
+'mkdocs-redirects',
+]
+
 [project.urls]
 homepage = 'https://alisw.github.io/alibuild'
 
