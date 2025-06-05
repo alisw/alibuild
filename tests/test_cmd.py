@@ -26,7 +26,7 @@ class CmdTestCase(unittest.TestCase):
             mock_getoutput.assert_called_with(["docker", "run", "--detach", "--rm", "--entrypoint=",
                                                "extra arg", "image", "sleep", "inf"])
             getstatusoutput_docker("echo foo")
-            mock_getstatusoutput.assert_called_with("docker container exec container-id bash -c 'echo foo'", cwd=None)
+            mock_getstatusoutput.assert_called_with(["docker", "container", "exec", "container-id", "bash", "-c", "echo foo"], cwd=None)
         mock_getstatusoutput.assert_called_with("docker container kill container-id")
 
         mock_getoutput.reset_mock()
@@ -37,6 +37,36 @@ class CmdTestCase(unittest.TestCase):
             mock_getstatusoutput.assert_called_with("/bin/bash -c 'echo foo'", cwd=None)
             mock_getstatusoutput.reset_mock()
         mock_getstatusoutput.assert_not_called()
+
+    @mock.patch("alibuild_helpers.cmd.getoutput")
+    @mock.patch("alibuild_helpers.cmd.getstatusoutput")
+    def test_DockerRunner_with_env_vars(self, mock_getstatusoutput, mock_getoutput):
+        """Test that environment variables are properly injected into docker exec commands."""
+        mock_getoutput.side_effect = lambda cmd: "container-id\n"
+        
+        # Test with environment variables
+        extra_env = {"TEST_VAR": "test_value", "ANOTHER_VAR": "another_value"}
+        with DockerRunner("image", extra_env=extra_env) as getstatusoutput_docker:
+            # Verify container creation includes environment variables
+            mock_getoutput.assert_called_with(["docker", "run", "--detach", 
+                                               "-e", "TEST_VAR=test_value",
+                                               "-e", "ANOTHER_VAR=another_value",
+                                               "--rm", "--entrypoint=", "image", "sleep", "inf"])
+            
+            # Test that exec command includes environment variables
+            getstatusoutput_docker("echo test")
+            mock_getstatusoutput.assert_called_with(["docker", "container", "exec", 
+                                                     "-e", "TEST_VAR=test_value",
+                                                     "-e", "ANOTHER_VAR=another_value", 
+                                                     "container-id", "bash", "-c", "echo test"], cwd=None)
+
+        # Test host execution with environment variables
+        mock_getoutput.reset_mock()
+        mock_getstatusoutput.reset_mock()
+        with DockerRunner("", extra_env=extra_env) as getstatusoutput_docker:
+            mock_getoutput.assert_not_called()
+            getstatusoutput_docker("echo test")
+            mock_getstatusoutput.assert_called_with("env TEST_VAR=test_value ANOTHER_VAR=another_value /bin/bash -c 'echo test'", cwd=None)
 
 
 if __name__ == '__main__':
