@@ -501,7 +501,7 @@ def doBuild(args, parser):
 
   install_wrapper_script("git", workDir)
 
-  with DockerRunner(args.dockerImage, args.docker_extra_args, extra_env={"ALIBUILD_CONFIG_DIR": args.configDir}) as getstatusoutput_docker:
+  with DockerRunner(args.dockerImage, args.docker_extra_args, extra_env={"ALIBUILD_CONFIG_DIR": os.path.abspath(args.configDir)}) as getstatusoutput_docker:
     def performPreferCheckWithTempDir(pkg, cmd):
       with tempfile.TemporaryDirectory(prefix=f"alibuild_prefer_check_{pkg['package']}_") as temp_dir:
         return getstatusoutput_docker(cmd, cwd=temp_dir)
