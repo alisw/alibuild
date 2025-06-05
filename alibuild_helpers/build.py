@@ -22,6 +22,7 @@ from glob import glob
 from textwrap import dedent
 from collections import OrderedDict
 from shlex import quote
+import tempfile
 
 import concurrent.futures
 import importlib
@@ -501,6 +502,10 @@ def doBuild(args, parser):
   install_wrapper_script("git", workDir)
 
   with DockerRunner(args.dockerImage, args.docker_extra_args) as getstatusoutput_docker:
+    def performPreferCheckWithTempDir(pkg, cmd):
+      with tempfile.TemporaryDirectory(prefix=f"alibuild_prefer_check_{pkg['package']}_") as temp_dir:
+        return getstatusoutput_docker(cmd, cwd=temp_dir)
+
     systemPackages, ownPackages, failed, validDefaults = \
       getPackageList(packages                = packages,
                      specs                   = specs,
@@ -511,8 +516,8 @@ def doBuild(args, parser):
                      disable                 = args.disable,
                      force_rebuild           = args.force_rebuild,
                      defaults                = args.defaults,
-                     performPreferCheck      = lambda pkg, cmd: getstatusoutput_docker(cmd),
-                     performRequirementCheck = lambda pkg, cmd: getstatusoutput_docker(cmd),
+                     performPreferCheck      = performPreferCheckWithTempDir,
+                     performRequirementCheck = performPreferCheckWithTempDir,
                      performValidateDefaults = lambda spec: validateDefaults(spec, args.defaults),
                      overrides               = overrides,
                      taps                    = taps,
