@@ -92,13 +92,10 @@ class DockerRunner:
       volumes = []
       for env in self._extra_env.items():
         envOpts.append("-e")
-        envOpts.append("{}={}" % env)
-      for v in self._extra_volumes():
+        envOpts.append(f"{env[0]}={env[1]}")
+      for v in self._extra_volumes:
         volumes.append("-v")
         volumes.append(v)
-      for env in self._extra_env.items():
-        envOpts.append("-e")
-        envOpts.append("{}={}" % env)
       cmd = ["docker", "run", "--detach"] + envOpts + volumes + ["--rm", "--entrypoint="]
       cmd += self._docker_run_args
       cmd += [self._docker_image, "sleep", "inf"]
@@ -108,12 +105,15 @@ class DockerRunner:
       if self._container is None:
         command_prefix=""
         if self._extra_env:
-          command_prefix="env " + " ".join("{}={}".format(k, v) for (k,v) in self._extra_env) + " "
+          command_prefix="env " + " ".join("{}={}".format(k, v) for (k,v) in self._extra_env.items()) + " "
         return getstatusoutput("{}{} -c {}".format(command_prefix, BASH, quote(cmd))
                              , cwd=cwd)
-      return getstatusoutput("docker container exec {} bash -c {}"
-                             .format(quote(self._container), quote(cmd)),
-                             cwd=cwd)
+      envOpts = []
+      for env in self._extra_env.items():
+        envOpts.append("-e")
+        envOpts.append("{}={}".format(env[0], env[1]))
+      exec_cmd = ["docker", "container", "exec"] + envOpts + [self._container, "bash", "-c", cmd]
+      return getstatusoutput(exec_cmd, cwd=cwd)
 
     return getstatusoutput_docker
 
