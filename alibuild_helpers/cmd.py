@@ -78,22 +78,39 @@ class DockerRunner:
   instead.
   """
 
-  def __init__(self, docker_image, docker_run_args=()) -> None:
+  def __init__(self, docker_image, docker_run_args=(), extra_env={}, extra_volumes=[]) -> None:
     self._docker_image = docker_image
     self._docker_run_args = docker_run_args
     self._container = None
+    self._extra_env = extra_env
+    self._extra_volumes = extra_volumes
 
   def __enter__(self):
     if self._docker_image:
       # "sleep inf" pauses forever, until we kill it.
-      cmd = ["docker", "run", "--detach", "--rm", "--entrypoint="]
+      envOpts = []
+      volumes = []
+      for env in self._extra_env.items():
+        envOpts.append("-e")
+        envOpts.append("{}={}" % env)
+      for v in self._extra_volumes():
+        volumes.append("-v")
+        volumes.append(v)
+      for env in self._extra_env.items():
+        envOpts.append("-e")
+        envOpts.append("{}={}" % env)
+      cmd = ["docker", "run", "--detach"] + envOpts + volumes + ["--rm", "--entrypoint="]
       cmd += self._docker_run_args
       cmd += [self._docker_image, "sleep", "inf"]
       self._container = getoutput(cmd).strip()
 
     def getstatusoutput_docker(cmd, cwd=None):
       if self._container is None:
-        return getstatusoutput("{} -c {}".format(BASH, quote(cmd)), cwd=cwd)
+        command_prefix=""
+        if self._extra_env:
+          command_prefix="env " + " ".join("{}={}".format(k, v) for (k,v) in self._extra_env) + " "
+        return getstatusoutput("{}{} -c {}".format(command_prefix, BASH, quote(cmd))
+                             , cwd=cwd)
       return getstatusoutput("docker container exec {} bash -c {}"
                              .format(quote(self._container), quote(cmd)),
                              cwd=cwd)
