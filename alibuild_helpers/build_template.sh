@@ -11,6 +11,7 @@ set -e
 set +h
 function hash() { true; }
 export WORK_DIR="${WORK_DIR_OVERRIDE:-%(workDir)s}"
+export ALIBUILD_CONFIG_DIR="${ALIBUILD_CONFIG_DIR_OVERRIDE:-%(configDir)s}"
 
 # Insert our own wrapper scripts into $PATH, patched to use the system OpenSSL,
 # instead of the one we build ourselves.
