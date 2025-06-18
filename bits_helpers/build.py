@@ -1221,7 +1221,7 @@ def doBuild(args, parser):
              "Your software installation is at:"
              "\n\n  %s\n\n"
              "You can use this package by loading the environment:"
-             "\n\n  alienv enter %s/latest-%s",
+             "\n\n  bits enter %s/latest-%s",
              mainPackage, socket.gethostname(),
              abspath(join(args.workDir, args.architecture)),
              mainPackage, mainBuildFamily)

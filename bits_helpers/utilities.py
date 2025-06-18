@@ -433,6 +433,8 @@ def resolveFilename(taps, pkg, configDir):
     if exists(filename):
       return(filename,os.path.abspath(d))
 
+  dieOnError(True, "Package %s not found in %s" % (pkg, configDir))
+    
 def resolveDefaultsFilename(defaults, configDir):
   configPath = os.environ.get("BITS_PATH")
   cfgDir = configDir

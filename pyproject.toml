@@ -40,7 +40,7 @@ dependencies = [
 homepage = 'https://github.com/bitsorg/bits'
 
 [scripts]
-alienv = {path = "bits"}
+bits = {path = "bits"}
 bitsBuild = {path = "bitsBuild"}
 bitsDoctor = {path = "bitsDoctor"}
 bitsDeps = {path = "bitsDeps"}
