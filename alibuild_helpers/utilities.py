@@ -582,6 +582,8 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
             spec = replacement
             # Allows generalising the version based on the actual key provided
             spec["version"] = spec["version"].replace("%(key)s", key)
+            # We need the key to inject the version into the replacement recipe later.
+            spec["key"] = key 
             recipe = replacement.get("recipe", "")
             # If there's an explicitly-specified recipe, we're still building
             # the package. If not, aliBuild will still "build" it, but it's
