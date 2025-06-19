@@ -1067,6 +1067,7 @@ def doBuild(args, parser):
       ("FULL_RUNTIME_REQUIRES", " ".join(spec["full_runtime_requires"])),
       ("FULL_BUILD_REQUIRES", " ".join(spec["full_build_requires"])),
       ("FULL_REQUIRES", " ".join(spec["full_requires"])),
+      ("ALIBUILD_PREFER_SYSTEM_KEY", spec.get("key", "")),
     ]
     # Add the extra environment as passed from the command line.
     buildEnvironment += [e.partition('=')[::2] for e in args.environment]
