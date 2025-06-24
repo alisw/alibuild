@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-from __future__ import print_function
 from bits_helpers.log import debug, error, info, dieOnError
 from bits_helpers.utilities import parseDefaults, readDefaults, getPackageList, validateDefaults
 from bits_helpers.cmd import DockerRunner, execute

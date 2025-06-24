@@ -1,4 +1,3 @@
-from __future__ import print_function
 from unittest.mock import patch, MagicMock
 from io import StringIO
 
