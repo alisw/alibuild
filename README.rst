@@ -6,23 +6,26 @@ Bits is a tool to build, install and package large software stacks. It originate
 
 Instant gratification with::
 
-$ git clone git@github.com:bitsorg/bits.git; cd bits; export PATH=$PWD:$PATH; cd ..
-$ git clone git@github.com:bitsorg/alice.bits.git
-$ cd alice.bits
-$ cat bits.rc
-[bits]
-  organisation=ALICE
-[ALICE]
-  pkg_prefix=VO_ALICE
-  sw_dir=../sw
-  repo_dir=.
-  search_path=bits,general,simulation,hepmc,analysis,ml
+ $ git clone git@github.com:bitsorg/bits.git; cd bits; export PATH=$PWD:$PATH; cd ..
+ $ git clone git@github.com:bitsorg/alice.bits.git
+ $ cd alice.bits
 
-Review and customise bits.rc file (in particular, sw_dir location where all output will be stored), then
+Review and customise bits.rc file (in particular, sw_dir location where all output will be stored)::
 
-$ bits build ROOT
-$ bits enter ROOT/latest
-$ root -b
+ $ cat bits.rc
+ [bits]
+ organisation=ALICE
+ [ALICE]
+ pkg_prefix=VO_ALICE
+ sw_dir=../sw
+ repo_dir=.
+ search_path=bits,general,simulation,hepmc,analysis,ml
+
+Then::
+
+ $ bits build ROOT
+ $ bits enter ROOT/latest
+ $ root -b
 
 Full documentation at:
 
