@@ -466,6 +466,7 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
   failedRequirements = set()
   testCache = {}
   requirementsCache = {}
+  trackingEnvCache = {}
   packages = packages[:]
   validDefaults = []  # empty list: all OK; None: no valid default; non-empty list: list of valid ones
 
@@ -540,6 +541,15 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
       noSystemList = noSystem.split(",")
     systemExcluded = (spec["package"] in noSystemList)
     allowSystemPackageUpload = spec.get("allow_system_package_upload", False)
+    # Fill the track env with the actual result from executing the script.
+    for env, trackingCode in spec.get("track_env", {}).items():
+      key = spec["package"] + env
+      if key not in trackingEnvCache:
+        status, out = performPreferCheck(spec, trackingCode)
+        dieOnError(status, "Error while executing track_env for {}: {} => {}".format(key, trackingCode, out))
+        trackingEnvCache[key] = out
+      spec["track_env"][env] = trackingEnvCache[key]
+
     if (not systemExcluded or allowSystemPackageUpload) and  (preferSystem or systemREMatches):
       requested_version = resolve_version(spec, defaults, "unavailable", "unavailable")
       cmd = "REQUESTED_VERSION={version}\n{check}".format(
