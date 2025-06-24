@@ -9,7 +9,7 @@ SL_COMMAND_TIMEOUT_SEC = 120
 
 # Sapling is a novel SCM by Meta (i.e. Facebook) that is fully compatible with
 # git, but has a different command line interface. Among the reasons why it's
-# worth suporting it is the ability to handle unnamed branches, the ability to
+# worth supporting it is the ability to handle unnamed branches, the ability to
 # absorb changes to the correct commit without having to explicitly rebase and
 # the integration with github to allow for pull requests to be created from the
 # command line from each commit of a branch.

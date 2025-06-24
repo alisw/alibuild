@@ -410,7 +410,7 @@ def generate_initdotsh(package, specs, architecture, post_build=False):
                  if key != "DYLD_LIBRARY_PATH")
 
   # Return string without a trailing newline, since we expect call sites to
-  # append that (and the obvious way to inesrt it into the build tempate is by
+  # append that (and the obvious way to inesrt it into the build template is by
   # putting the "%(initdotsh_*)s" on its own line, which has the same effect).
   return "\n".join(lines)
 
