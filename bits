@@ -168,7 +168,7 @@ function configBits() {
     
     cfile=""
 
-    for cfg in  $1 .bitsrc $HOME/.bitsrc 
+    for cfg in  $1 bits.rc .bitsrc $HOME/.bitsrc 
     do
 	  if [ "x$cfg" !=  "x" -a -f $cfg ]
 	  then

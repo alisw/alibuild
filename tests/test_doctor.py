@@ -55,15 +55,24 @@ class DoctorTestCase(unittest.TestCase):
   @patch("bits_helpers.doctor.warning")
   @patch("bits_helpers.doctor.error")
   @patch("bits_helpers.doctor.exists")
+  @patch("bits_helpers.utilities.exists")
   @patch("bits_helpers.utilities.open")
-  def test_doctor(self, mockOpen, mockExists, mockPrintError, mockPrintWarning, mockPrintBanner):
-    mockExists.return_value = True
-    mockOpen.side_effect = lambda f: { "/dist/package1.sh"         : StringIO(RECIPE_PACKAGE1),
+  def test_doctor(self, mockOpen, mockUtilitiesExists, mockDoctorExists, mockPrintError, mockPrintWarning, mockPrintBanner):
+    # If this is not a lambda, `read()` will be called more than once and
+    # return empty strings
+    recipes = lambda : {               "/dist/package1.sh"         : StringIO(RECIPE_PACKAGE1),
                                        "/dist/testdef1.sh"         : StringIO(RECIPE_TESTDEF1),
                                        "/dist/testdef2.sh"         : StringIO(RECIPE_TESTDEF2),
                                        "/dist/sysdep.sh"           : StringIO(RECIPE_SYSDEP),
                                        "/dist/defaults-release.sh" : StringIO(RECIPE_DEFAULTS_RELEASE),
-                                       "/dist/breakdefaults.sh"    : StringIO(RECIPE_BREAKDEFAULTS) }[f]
+                                       "/dist/breakdefaults.sh"    : StringIO(RECIPE_BREAKDEFAULTS) }
+
+    mockOpen.side_effect = lambda f, mode="r": recipes()[f] if f in recipes().keys() else MagicMock()
+    def mockExists(f):
+      return f in recipes().keys()
+
+    mockUtilitiesExists.side_effect = mockExists
+    mockDoctorExists.side_effect = mockExists
 
     # Collect printouts
     def resetOut():

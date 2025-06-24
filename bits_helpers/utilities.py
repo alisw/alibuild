@@ -15,8 +15,8 @@ from shlex import quote
 
 from bits_helpers.cmd import getoutput
 from bits_helpers.git import git
-from bits_helpers.log import warning, dieOnError
 
+from bits_helpers.log import error, warning, dieOnError
 
 class SpecError(Exception):
   pass
@@ -412,7 +412,7 @@ def parseDefaults(disable, defaultsGetter, log):
 
 def checkForFilename(taps, pkg, d):
   filename = taps.get(pkg, "%s/%s.sh" % (d, pkg))
-  if not os.path.exists(filename):
+  if not exists(filename):
     if "/" in pkg:
       filename = taps.get(pkg, "%s/%s" % (d, pkg))
     else:
@@ -430,9 +430,11 @@ def resolveFilename(taps, pkg, configDir):
 
   for d in pkgDirs:
     filename = checkForFilename(taps,pkg,d)
-    if os.path.exists(filename):
+    if exists(filename):
       return(filename,os.path.abspath(d))
 
+  dieOnError(True, "Package %s not found in %s" % (pkg, configDir))
+    
 def resolveDefaultsFilename(defaults, configDir):
   configPath = os.environ.get("BITS_PATH")
   cfgDir = configDir
@@ -444,14 +446,18 @@ def resolveDefaultsFilename(defaults, configDir):
 
   for d in pkgDirs:
     filename = "%s/defaults-%s.sh" % (d, defaults)
-    if os.path.exists(filename):
+    if exists(filename):
       return(filename)
 
+  error("Default `%s' does not exists.\n" % (filename or "<no defaults specified>"))
+
+  '''
   error("Default `%s' does not exists. Viable options:\n%s" %
           (defaults or "<no defaults specified>",
            "\n".join("- " + basename(x).replace("defaults-", "").replace(".sh", "")
                      for x in glob(join(configDir, "defaults-*.sh")))))
-    
+  '''
+  
 def getPackageList(packages, specs, configDir, preferSystem, noSystem,
                    architecture, disable, defaults, performPreferCheck, performRequirementCheck,
                    performValidateDefaults, overrides, taps, log, force_rebuild=()):
@@ -460,6 +466,7 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
   failedRequirements = set()
   testCache = {}
   requirementsCache = {}
+  trackingEnvCache = {}
   packages = packages[:]
   validDefaults = []  # empty list: all OK; None: no valid default; non-empty list: list of valid ones
 
@@ -534,6 +541,15 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
       noSystemList = noSystem.split(",")
     systemExcluded = (spec["package"] in noSystemList)
     allowSystemPackageUpload = spec.get("allow_system_package_upload", False)
+    # Fill the track env with the actual result from executing the script.
+    for env, trackingCode in spec.get("track_env", {}).items():
+      key = spec["package"] + env
+      if key not in trackingEnvCache:
+        status, out = performPreferCheck(spec, trackingCode)
+        dieOnError(status, "Error while executing track_env for {}: {} => {}".format(key, trackingCode, out))
+        trackingEnvCache[key] = out
+      spec["track_env"][env] = trackingEnvCache[key]
+
     if (not systemExcluded or allowSystemPackageUpload) and  (preferSystem or systemREMatches):
       requested_version = resolve_version(spec, defaults, "unavailable", "unavailable")
       cmd = "REQUESTED_VERSION={version}\n{check}".format(

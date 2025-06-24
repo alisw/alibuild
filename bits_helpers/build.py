@@ -185,7 +185,11 @@ def storeHashes(package, specs, considerRelocation):
     for _, _, hasher in h_alternatives:
       hasher(data)
 
-  for key in ("env", "append_path", "prepend_path"):
+  modifies_full_hash_dicts = ["env", "append_path", "prepend_path"]
+  if not spec["is_devel_pkg"] and "track_env" in spec:
+    modifies_full_hash_dicts.append("track_env")
+
+  for key in modifies_full_hash_dicts:
     if key not in spec:
       h_all("none")
     else:
@@ -267,6 +271,19 @@ def hash_local_changes(spec):
   class UntrackedChangesError(Exception):
     """Signal that we cannot detect code changes due to untracked files."""
   h = Hasher()
+  if "track_env" in spec:
+    assert isinstance(spec["track_env"], OrderedDict), \
+        "spec[%r] was of type %r" % ("track_env", type(spec["track_env"]))
+
+    # Python 3.12 changed the string representation of OrderedDicts from
+    # OrderedDict([(key, value)]) to OrderedDict({key: value}), so to remain
+    # compatible, we need to emulate the previous string representation.
+    h("OrderedDict([")
+    h(", ".join(
+        # XXX: We still rely on repr("str") being "'str'",
+        # and on repr(["a", "b"]) being "['a', 'b']".
+        "(%r, %r)" % (key, value) for key, value in spec["track_env"].items()))
+    h("])")
   def hash_output(msg, args):
     lines = msg % args
     # `git status --porcelain` indicates untracked files using "??".
@@ -393,7 +410,7 @@ def generate_initdotsh(package, specs, architecture, post_build=False):
                  if key != "DYLD_LIBRARY_PATH")
 
   # Return string without a trailing newline, since we expect call sites to
-  # append that (and the obvious way to inesrt it into the build tempate is by
+  # append that (and the obvious way to inesrt it into the build template is by
   # putting the "%(initdotsh_*)s" on its own line, which has the same effect).
   return "\n".join(lines)
 
@@ -1051,6 +1068,9 @@ def doBuild(args, parser):
     # Add the extra environment as passed from the command line.
     buildEnvironment += [e.partition('=')[::2] for e in args.environment]
 
+    # Add the computed track_env environment
+    buildEnvironment += [(key, value) for key, value in spec.get("track_env", {}).items()]
+
     # In case the --docker options is passed, we setup a docker container which
     # will perform the actual build. Otherwise build as usual using bash.
     if args.docker:
@@ -1221,7 +1241,7 @@ def doBuild(args, parser):
              "Your software installation is at:"
              "\n\n  %s\n\n"
              "You can use this package by loading the environment:"
-             "\n\n  alienv enter %s/latest-%s",
+             "\n\n  bits enter %s/latest-%s",
              mainPackage, socket.gethostname(),
              abspath(join(args.workDir, args.architecture)),
              mainPackage, mainBuildFamily)

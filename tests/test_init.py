@@ -55,17 +55,23 @@ class InitTestCase(unittest.TestCase):
     @patch("bits_helpers.init.banner")
     @patch("bits_helpers.init.info")
     @patch("bits_helpers.init.path")
+    @patch("bits_helpers.utilities.exists")
     @patch("bits_helpers.init.os")
     @patch("bits_helpers.init.git")
     @patch("bits_helpers.init.updateReferenceRepoSpec")
     @patch("bits_helpers.utilities.open")
     @patch("bits_helpers.init.readDefaults")
-    def test_doRealInit(self, mock_read_defaults, mock_open, mock_update_reference, mock_git, mock_os, mock_path,  mock_info, mock_banner) -> None:
+    def test_doRealInit(self, mock_read_defaults, mock_open, mock_update_reference, mock_git, mock_os, mock_exists, mock_path,  mock_info, mock_banner) -> None:
       fake_dist = {"repo": "alisw/alidist", "ver": "master"}
       mock_open.side_effect = lambda x: {
         "/alidist/defaults-release.sh": StringIO("package: defaults-release\nversion: v1\n---"),
         "/alidist/aliroot.sh": StringIO("package: AliRoot\nversion: master\nsource: https://github.com/alisw/AliRoot\n---")
       }[x]
+      mock_exists.side_effect = lambda x: {
+        "/sw/MIRROR/aliroot": True,
+        "/alidist/defaults-release.sh": True,
+        "/alidist/aliroot.sh": True,
+      }.get(x, False)
       mock_git.return_value = ""
       mock_path.exists.side_effect = dummy_exists
       mock_os.mkdir.return_value = None
