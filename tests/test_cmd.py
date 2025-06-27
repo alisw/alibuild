@@ -41,7 +41,7 @@ class CmdTestCase(unittest.TestCase):
     @mock.patch("alibuild_helpers.cmd.getoutput")
     @mock.patch("alibuild_helpers.cmd.getstatusoutput")
     def test_DockerRunner_with_env_vars(self, mock_getstatusoutput, mock_getoutput):
-        """Test that environment variables are properly injected into docker exec commands."""
+        # Test that environment variables are properly injected into docker exec commands.
         mock_getoutput.side_effect = lambda cmd: "container-id\n"
         
         # Test with environment variables
