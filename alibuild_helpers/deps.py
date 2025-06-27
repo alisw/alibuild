@@ -4,7 +4,7 @@ from alibuild_helpers.log import debug, error, info, dieOnError
 from alibuild_helpers.utilities import parseDefaults, readDefaults, getPackageList, validateDefaults
 from alibuild_helpers.cmd import DockerRunner, execute
 from tempfile import NamedTemporaryFile
-import os
+from os import remove, path
 
 def doDeps(args, parser):
 
@@ -16,7 +16,7 @@ def doDeps(args, parser):
   specs = {}
   defaultsReader = lambda: readDefaults(args.configDir, args.defaults, parser.error, args.architecture)
   (err, overrides, taps) = parseDefaults(args.disable, defaultsReader, debug)
-  with DockerRunner(args.dockerImage, args.docker_extra_args, extra_env={"ALIDIST_PATH": "/alidist" if args.docker else args.configDir}, extra_volumes=[f"{os.path.abspath(args.configDir)}:/alidist:ro"] if args.docker else []) as getstatusoutput_docker:
+  with DockerRunner(args.dockerImage, args.docker_extra_args, extra_env={"ALIDIST_PATH": "/alidist" if args.docker else args.configDir}, extra_volumes=[f"{path.abspath(args.configDir)}:/alidist:ro"] if args.docker else []) as getstatusoutput_docker:
     def performCheck(pkg, cmd):
       return getstatusoutput_docker(cmd)
     
@@ -110,7 +110,7 @@ def doDeps(args, parser):
   else:
     info("Dependencies graph generated: %s" % args.outgraph)
   if fp.name != args.outdot:
-    os.remove(fp.name)
+    remove(fp.name)
   else:
     info("Intermediate dot file for Graphviz saved: %s" % args.outdot)
   return True
