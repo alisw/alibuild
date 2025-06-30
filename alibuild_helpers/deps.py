@@ -16,7 +16,7 @@ def doDeps(args, parser):
   specs = {}
   defaultsReader = lambda: readDefaults(args.configDir, args.defaults, parser.error, args.architecture)
   (err, overrides, taps) = parseDefaults(args.disable, defaultsReader, debug)
-  with DockerRunner(args.dockerImage, args.docker_extra_args, extra_env={"ALIBUILD_CONFIG_DIR": "/alidist" if args.docker else args.configDir}, extra_volumes=[f"{path.abspath(args.configDir)}:/alidist:ro"] if args.docker else []) as getstatusoutput_docker:
+  with DockerRunner(args.dockerImage, args.docker_extra_args, extra_env={"ALIBUILD_CONFIG_DIR": "/alidist" if args.docker else path.abspath(args.configDir)}, extra_volumes=[f"{path.abspath(args.configDir)}:/alidist:ro"] if args.docker else []) as getstatusoutput_docker:
     def performCheck(pkg, cmd):
       return getstatusoutput_docker(cmd)
     
