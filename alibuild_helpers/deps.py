@@ -4,7 +4,7 @@ from alibuild_helpers.log import debug, error, info, dieOnError
 from alibuild_helpers.utilities import parseDefaults, readDefaults, getPackageList, validateDefaults
 from alibuild_helpers.cmd import DockerRunner, execute
 from tempfile import NamedTemporaryFile
-from os import remove
+from os import remove, path
 
 def doDeps(args, parser):
 
@@ -16,7 +16,10 @@ def doDeps(args, parser):
   specs = {}
   defaultsReader = lambda: readDefaults(args.configDir, args.defaults, parser.error, args.architecture)
   (err, overrides, taps) = parseDefaults(args.disable, defaultsReader, debug)
-  with DockerRunner(args.dockerImage, args.docker_extra_args) as getstatusoutput_docker:
+  with DockerRunner(args.dockerImage, args.docker_extra_args, extra_env={"ALIBUILD_CONFIG_DIR": "/alidist" if args.docker else path.abspath(args.configDir)}, extra_volumes=[f"{path.abspath(args.configDir)}:/alidist:ro"] if args.docker else []) as getstatusoutput_docker:
+    def performCheck(pkg, cmd):
+      return getstatusoutput_docker(cmd)
+    
     systemPackages, ownPackages, failed, validDefaults = \
       getPackageList(packages                = [args.package],
                      specs                   = specs,
@@ -26,8 +29,8 @@ def doDeps(args, parser):
                      architecture            = args.architecture,
                      disable                 = args.disable,
                      defaults                = args.defaults,
-                     performPreferCheck      = lambda pkg, cmd: getstatusoutput_docker(cmd),
-                     performRequirementCheck = lambda pkg, cmd: getstatusoutput_docker(cmd),
+                     performPreferCheck      = performCheck,
+                     performRequirementCheck = performCheck,
                      performValidateDefaults = lambda spec: validateDefaults(spec, args.defaults),
                      overrides               = overrides,
                      taps                    = taps,
