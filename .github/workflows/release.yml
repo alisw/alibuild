@@ -1,12 +1,12 @@
 ---
 name: Release
 
-'on':
+"on":
   release:
     types: [published]
 
 permissions:
-  contents: read  # required for github.ref to be set
+  contents: read # required for github.ref to be set
 
 jobs:
   pypi-publish:
@@ -16,17 +16,17 @@ jobs:
       name: release
       url: https://pypi.org/p/alibuild
     permissions:
-      id-token: write  # IMPORTANT: this permission is mandatory for trusted publishing
+      id-token: write # IMPORTANT: this permission is mandatory for trusted publishing
     steps:
-    - uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-    - name: Install build dependencies
-      run: python -m pip install --upgrade setuptools build pip
-    - name: Build the Python distribution
-      run: python -m build
-    - name: Publish package distributions to PyPI
-      uses: pypa/gh-action-pypi-publish@release/v1
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install build dependencies
+        run: python -m pip install --upgrade setuptools build pip
+      - name: Build the Python distribution
+        run: python -m build
+      - name: Publish package distributions to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
 
   brew:
     name: Update Homebrew formula
@@ -41,9 +41,8 @@ jobs:
       - name: Update alibuild formula with new version
         run: |
           set -x
-          json=$(curl -fSsL "https://pypi.org/pypi/alibuild/${GITHUB_REF#refs/tags/}/json")
-          sha=$(echo "$json" | jq -r '.urls[0].digests.sha256')
-          url=$(echo "$json" | jq -r '.urls[0].url')
+          url="https://github.com/alisw/alibuild/archive/refs/tags/${GITHUB_REF#refs/tags/}.tar.gz"
+          sha=$(curl -fSsL "$url" | shasum -a 256 | cut -d' ' -f1)
           # Replace keys with two leading spaces only, so we get the toplevel
           # ones applying to alibuild, not those for dependencies.
           sed -i.bak "
