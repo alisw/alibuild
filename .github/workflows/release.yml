@@ -41,8 +41,9 @@ jobs:
       - name: Update alibuild formula with new version
         run: |
           set -x
-          url="https://github.com/alisw/alibuild/archive/refs/tags/${GITHUB_REF#refs/tags/}.tar.gz"
-          sha=$(curl -fSsL "$url" | shasum -a 256 | cut -d' ' -f1)
+          json=$(curl -fSsL "https://pypi.org/pypi/alibuild/${GITHUB_REF#refs/tags/}/json")
+          sha=$(echo "$json" | jq '.urls.[] | select(.filename | endswith(".tar.gz")) | .digests.sha256')
+          url=$(echo "$json" | jq '.urls.[] | select(.filename | endswith(".tar.gz")) | .url')
           # Replace keys with two leading spaces only, so we get the toplevel
           # ones applying to alibuild, not those for dependencies.
           sed -i.bak "
