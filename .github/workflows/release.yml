@@ -42,8 +42,8 @@ jobs:
         run: |
           set -x
           json=$(curl -fSsL "https://pypi.org/pypi/alibuild/${GITHUB_REF#refs/tags/}/json")
-          sha=$(echo "$json" | jq '.urls.[] | select(.filename | endswith(".tar.gz")) | .digests.sha256')
-          url=$(echo "$json" | jq '.urls.[] | select(.filename | endswith(".tar.gz")) | .url')
+          sha=$(echo "$json" | jq -r '.urls.[] | select(.filename | endswith(".tar.gz")) | .digests.sha256')
+          url=$(echo "$json" | jq -r '.urls.[] | select(.filename | endswith(".tar.gz")) | .url')
           # Replace keys with two leading spaces only, so we get the toplevel
           # ones applying to alibuild, not those for dependencies.
           sed -i.bak "
