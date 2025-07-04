@@ -254,6 +254,8 @@ def doParseArgs():
                              help=("Assume we're not building %(metavar)s and all its (unique) dependencies. "
                                    "You can specify this option multiple times or separate multiple arguments "
                                    "with commas."))
+  doctor_parser.add_argument("-e", dest="environment", action="append", default=[],
+                            help="KEY=VALUE binding to add to the build environment. May be specified multiple times.")
 
   doctor_system = doctor_parser.add_mutually_exclusive_group()
   doctor_system.add_argument("--always-prefer-system", dest="preferSystem", action="store_true",
