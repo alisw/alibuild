@@ -271,7 +271,7 @@ class BuildTestCase(unittest.TestCase):
             debug=True,
             dryRun=False,
             aggressiveCleanup=False,
-            environment={},
+            environment=[],
             autoCleanup=False,
             noDevel=[],
             onlyDeps=False,
