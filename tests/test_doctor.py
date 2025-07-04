@@ -83,7 +83,7 @@ class DoctorTestCase(unittest.TestCase):
                      architecture="osx_x86-64",
                      disable=[],
                      defaults="release",
-                     environment={})
+                     environment=[])
 
     def fake_exists(n):
         return {"/alidist/aliroot.sh": True}
