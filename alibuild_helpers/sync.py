@@ -357,7 +357,7 @@ class CVMFSRemoteSync:
       # Create the dummy tarball, if it does not exists
       test -f "{workDir}/{architecture}/store/${{pkg_hash:0:2}}/$pkg_hash/$tarball" && continue
       mkdir -p "{workDir}/INSTALLROOT/$pkg_hash/{architecture}/{package}"
-      find "{remote_store}/{cvmfs_architecture}/Packages/{package}/$full_version" ! -name etc -maxdepth 1 -mindepth 1 -exec ln -sf {} "{workDir}/INSTALLROOT/$pkg_hash/{architecture}/{package}/" \;
+      find "{remote_store}/{cvmfs_architecture}/Packages/{package}/$full_version" ! -name etc -maxdepth 1 -mindepth 1 -exec ln -sf {} "{workDir}/INSTALLROOT/$pkg_hash/{architecture}/{package}/" \\;
       cp -fr "{remote_store}/{cvmfs_architecture}/Packages/{package}/$full_version/etc" "{workDir}/INSTALLROOT/$pkg_hash/{architecture}/{package}/etc"
       mkdir -p "{workDir}/TARS/{architecture}/store/${{pkg_hash:0:2}}/$pkg_hash"
       tar -C "{workDir}/INSTALLROOT/$pkg_hash" -czf "{workDir}/TARS/{architecture}/store/${{pkg_hash:0:2}}/$pkg_hash/$tarball" .
