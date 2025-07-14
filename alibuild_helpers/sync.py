@@ -178,7 +178,7 @@ class HttpRemoteSync:
       destPath = os.path.join(self.workdir, store_path, use_tarball)
       if not os.path.isfile(destPath):   # do not download twice
         progress = ProgressPrint("Downloading tarball for %s@%s" %
-                                 (spec["package"], spec["version"]))
+                                 (spec["package"], spec["version"]), min_interval=5.0)
         progress("[0%%] Starting download of %s", use_tarball)  # initialise progress bar
         self.getRetry("/".join((self.remoteStore, store_path, use_tarball)),
                       destPath, session=session, progress=progress)
@@ -551,7 +551,7 @@ class Boto3RemoteSync:
       for tarball in self._s3_listdir(store_path):
         debug("Fetching tarball %s", tarball)
         progress = ProgressPrint("Downloading tarball for %s@%s" %
-                                 (spec["package"], spec["version"]))
+                                 (spec["package"], spec["version"]), min_interval=5.0)
         progress("[0%%] Starting download of %s", tarball)   # initialise progress bar
         # Create containing directory locally. (exist_ok= is python3-specific.)
         os.makedirs(os.path.join(self.workdir, store_path), exist_ok=True)

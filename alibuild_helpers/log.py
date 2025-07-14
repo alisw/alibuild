@@ -53,14 +53,21 @@ def log_current_package(package, main_package, specs, devel_prefix) -> None:
 
 
 class ProgressPrint:
-  def __init__(self, begin_msg="") -> None:
+  def __init__(self, begin_msg="", min_interval=0.) -> None:
     self.count = -1
     self.lasttime = 0
     self.STAGES = ".", "..", "...", "....", ".....", "....", "...", ".."
     self.begin_msg = begin_msg
     self.percent = -1
+    self.min_interval = min_interval
+    self.last_update = 0
 
   def __call__(self, txt, *args) -> None:
+    now = time.time()
+    if (now - self.last_update) < self.min_interval:
+      return
+    self.last_update = now
+
     if logger.level <= logging.DEBUG or not sys.stdout.isatty():
       debug(txt, *args)
       return
