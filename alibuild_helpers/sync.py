@@ -679,6 +679,7 @@ class Boto3RemoteSync:
 
     # Second, upload dist symlinks. These should be in place before the main
     # tarball, to avoid races in the publisher.
+    start_time = time.time()
     for link_dir, symlinks in dist_symlinks.items():
       for link_key, hash_path in symlinks:
         self.s3.put_object(Bucket=self.writeStore,
@@ -688,6 +689,10 @@ class Boto3RemoteSync:
                            WebsiteRedirectLocation=hash_path)
       debug("Uploaded %d dist symlinks to S3 from %s",
             len(symlinks), link_dir)
+    end_time = time.time()
+    debug("Uploaded %d dist symlinks in %.2f seconds",
+          sum(len(symlinks) for _, symlinks in dist_symlinks.items()),
+          end_time - start_time)
 
     self.s3.upload_file(Bucket=self.writeStore, Key=tar_path,
                         Filename=os.path.join(self.workdir, tar_path))
