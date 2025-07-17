@@ -8,7 +8,6 @@ import sys
 import time
 import requests
 from requests.exceptions import RequestException
-from urllib.parse import quote
 
 from alibuild_helpers.cmd import execute
 from alibuild_helpers.log import debug, info, error, dieOnError, ProgressPrint
@@ -226,7 +225,7 @@ class HttpRemoteSync:
         # This symlink isn't in the manifest yet, and we don't have it locally,
         # so download it individually.
         symlinks[linkname] = \
-            self.getRetry("/".join((self.remoteStore, links_path, quote(linkname))),
+            self.getRetry("/".join((self.remoteStore, links_path, linkname)),
                           returnResult=True, log=False, session=session) \
                 .decode("utf-8").rstrip("\r\n")
     for linkname, target in symlinks.items():
