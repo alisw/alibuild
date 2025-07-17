@@ -8,6 +8,7 @@ import sys
 import time
 import requests
 from requests.exceptions import RequestException
+from urllib.parse import quote
 
 from alibuild_helpers.cmd import execute
 from alibuild_helpers.log import debug, info, error, dieOnError, ProgressPrint
@@ -59,6 +60,7 @@ class HttpRemoteSync:
 
   def getRetry(self, url, dest=None, returnResult=False, log=True, session=None, progress=debug):
     get = session.get if session is not None else requests.get
+    url = quote(url, safe=":/")
     for i in range(0, self.httpConnRetries):
       if i > 0:
         pauseSec = self.httpBackoff * (2 ** (i - 1))
