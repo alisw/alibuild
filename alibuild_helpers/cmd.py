@@ -105,7 +105,7 @@ class DockerRunner:
       if self._container is None:
         command_prefix=""
         if self._extra_env:
-          command_prefix="env " + " ".join("{}={}".format(k, v) for (k,v) in self._extra_env.items()) + " "
+          command_prefix="env " + " ".join("{}={}".format(k, quote(v)) for (k,v) in self._extra_env.items()) + " "
         return getstatusoutput("{}{} -c {}".format(command_prefix, BASH, quote(cmd))
                              , cwd=cwd)
       envOpts = []
