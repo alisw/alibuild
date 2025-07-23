@@ -829,6 +829,7 @@ def doBuild(args, parser):
     # no writeStore property. See below for explanation of why we need this.
     revisionPrefix = "" if getattr(syncHelper, "writeStore", "") else "local"
     for symlink_path in packages:
+      debug("foo %s" % symlink_path)
       realPath = readlink(symlink_path)
       matcher = "../../{arch}/store/[0-9a-f]{{2}}/([0-9a-f]+)/{package}-{version}-((?:local)?[0-9]+).{arch}.tar.gz$" \
         .format(arch=args.architecture, **spec)
@@ -838,13 +839,13 @@ def doBuild(args, parser):
         continue
       rev_hash, revision = match.groups()
 
-      if not (("local" in revision and rev_hash in spec["local_hashes"]) or
-              ("local" not in revision and rev_hash in spec["remote_hashes"])):
+      if not (("local" in revision and rev_hash in spec["local_hashes"]) or ("local" not in revision and rev_hash in spec["remote_hashes"])):
         # This tarball's hash doesn't match what we need. Remember that its
         # revision number is taken, in case we assign our own later.
         if revision.startswith(revisionPrefix) and revision[len(revisionPrefix):].isdigit():
           # Strip revisionPrefix; the rest is an integer. Convert it to an int
           # so we can get a sensible max() existing revision below.
+          debug("Adding %s: %s to busy revisions", rev_hash, revision)
           busyRevisions.add(int(revision[len(revisionPrefix):]))
         continue
 
@@ -859,6 +860,7 @@ def doBuild(args, parser):
       # revisions, only store a local revision if there is no other candidate
       # for reuse yet.
       candidate = better_tarball(spec, candidate, (revision, rev_hash, symlink_path))
+      debug("candidate %s", candidate)
 
     try:
       revision, rev_hash, symlink_path = candidate
