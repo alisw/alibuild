@@ -68,6 +68,28 @@ class CmdTestCase(unittest.TestCase):
             getstatusoutput_docker("echo test")
             mock_getstatusoutput.assert_called_with("env TEST_VAR=test_value ANOTHER_VAR=another_value /bin/bash -c 'echo test'", cwd=None)
 
+    @mock.patch("alibuild_helpers.cmd.getoutput")
+    @mock.patch("alibuild_helpers.cmd.getstatusoutput")
+    def test_DockerRunner_multiline_env_var(self, mock_getstatusoutput, mock_getoutput):
+        multiline_value = "line1\nline2\nline3"
+        extra_env = {"MULTILINE_VAR": multiline_value}
+        
+        with DockerRunner("", extra_env=extra_env) as getstatusoutput_docker:
+            mock_getoutput.assert_not_called()
+            getstatusoutput_docker("echo test")
+            mock_getstatusoutput.assert_called_with("env MULTILINE_VAR='line1\nline2\nline3' /bin/bash -c 'echo test'", cwd=None)
+
+    @mock.patch("alibuild_helpers.cmd.getoutput")
+    @mock.patch("alibuild_helpers.cmd.getstatusoutput")
+    def test_DockerRunner_env_var_with_semicolon(self, mock_getstatusoutput, mock_getoutput):
+        semicolon_value = "value1;value2;value3"
+        extra_env = {"SEMICOLON_VAR": semicolon_value}
+        
+        with DockerRunner("", extra_env=extra_env) as getstatusoutput_docker:
+            mock_getoutput.assert_not_called()
+            getstatusoutput_docker("echo test")
+            mock_getstatusoutput.assert_called_with("env SEMICOLON_VAR='value1;value2;value3' /bin/bash -c 'echo test'", cwd=None)
+
 
 if __name__ == '__main__':
     unittest.main()
