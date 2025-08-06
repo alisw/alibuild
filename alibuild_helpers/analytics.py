@@ -11,12 +11,12 @@ from alibuild_helpers.log import debug, banner
 
 def generate_analytics_id():
   os.makedirs(os.path.expanduser("~/.config/alibuild"), exist_ok=True)
-  err, output = getstatusoutput("uuidgen >  ~/.config/alibuild/analytics-uuid")
+  err, output = getstatusoutput("uuidgen > $HOME/.config/alibuild/analytics-uuid")
   # If an error is found while generating the unique user ID, we disable
   # the analytics on the machine.
   if err:
     debug("Could not generate unique ID for user. Disabling analytics")
-    getstatusoutput("touch ~/.config/alibuild/disable-analytics")
+    getstatusoutput("touch $HOME/.config/alibuild/disable-analytics")
     return False
   return True
 
@@ -115,6 +115,6 @@ def enable_analytics() -> None:
 # We do it in getstatusoutput because python makedirs can actually fail
 # if one of the intermediate directories is not writeable.
 def disable_analytics():
-  getstatusoutput("mkdir -p ~/.config/alibuild && touch ~/.config/alibuild/disable-analytics")
+  getstatusoutput("mkdir -p $HOME/.config/alibuild && touch $HOME/.config/alibuild/disable-analytics")
   return False
 
