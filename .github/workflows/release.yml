@@ -49,7 +49,6 @@ jobs:
           sed -i.bak "
           s|^  url .*|  url \"$url\"|;
           s|^  sha256 .*|  sha256 \"$sha\"|;
-          s|^  version .*|  version \"${GITHUB_REF#refs/tags/v}\"|
           " "$(brew formula alibuild)"
           rm -f "$(brew formula alibuild).bak"
       - name: Regenerate alibuild formula
