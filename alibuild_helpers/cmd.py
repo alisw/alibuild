@@ -6,7 +6,7 @@ from textwrap import dedent
 from subprocess import TimeoutExpired
 from shlex import quote
 
-from alibuild_helpers.log import debug, warning, dieOnError
+from alibuild_helpers.log import debug, error, dieOnError
 
 def decode_with_fallback(data):
   """Try to decode DATA as utf-8; if that doesn't work, fall back to latin-1.
@@ -29,7 +29,7 @@ def getoutput(command, timeout=None):
   try:
     stdout, stderr = proc.communicate(timeout=timeout)
   except TimeoutExpired:
-    warning("Process %r timed out; terminated", command)
+    error("Process %r timed out; terminated", command)
     proc.terminate()
     stdout, stderr = proc.communicate()
   dieOnError(proc.returncode, "Command %s failed with code %d: %s" %
@@ -43,7 +43,7 @@ def getstatusoutput(command, timeout=None, cwd=None):
   try:
     merged_output, _ = proc.communicate(timeout=timeout)
   except TimeoutExpired:
-    warning("Process %r timed out; terminated", command)
+    error("Process %r timed out; terminated", command)
     proc.terminate()
     merged_output, _ = proc.communicate()
   merged_output = decode_with_fallback(merged_output)
