@@ -22,7 +22,8 @@ def checkPreferSystem(spec, cmd, homebrew_replacement, getstatusoutput_docker):
       debug("Package %s can only be managed via alibuild.", spec["package"])
       return (1, "")
     cmd = homebrew_replacement + cmd
-    err, out = getstatusoutput_docker(cmd)
+    with tempfile.TemporaryDirectory(prefix=f"alibuild_prefer_check_{spec['package']}_") as temp_dir:
+        err, out = getstatusoutput_docker(cmd, cwd=temp_dir)
     if not err:
       success("Package %s will be picked up from the system.", spec["package"])
       for x in out.split("\n"):
@@ -40,7 +41,8 @@ def checkRequirements(spec, cmd, homebrew_replacement, getstatusoutput_docker):
       debug("Package %s is not a system requirement.", spec["package"])
       return (0, "")
     cmd = homebrew_replacement + cmd
-    err, out = getstatusoutput_docker(cmd)
+    with tempfile.TemporaryDirectory(prefix=f"alibuild_prefer_check_{spec['package']}_") as temp_dir:
+        err, out = getstatusoutput_docker(cmd, cwd=temp_dir)
     if not err:
       success("Required package %s will be picked up from the system.", spec["package"])
       debug("%s", cmd)
@@ -148,9 +150,6 @@ def doDoctor(args, parser):
   extra_env.update(dict([e.partition('=')[::2] for e in args.environment]))
   
   with DockerRunner(args.dockerImage, args.docker_extra_args, extra_env=extra_env, extra_volumes=[f"{os.path.abspath(args.configDir)}:/alidist:ro"] if args.docker else []) as getstatusoutput_docker:
-    def performPreferCheckWithTempDir(pkg, cmd):
-      with tempfile.TemporaryDirectory(prefix=f"alibuild_prefer_check_{pkg['package']}_") as temp_dir:
-        return getstatusoutput_docker(cmd, cwd=temp_dir)
     fromSystem, own, failed, validDefaults = \
       getPackageList(packages                = packages,
                      specs                   = specs,
@@ -160,8 +159,8 @@ def doDoctor(args, parser):
                      architecture            = args.architecture,
                      disable                 = args.disable,
                      defaults                = args.defaults,
-                     performPreferCheck      = performPreferCheckWithTempDir,
-                     performRequirementCheck = performPreferCheckWithTempDir,
+                     performPreferCheck      = lambda pkg, cmd: checkPreferSystem(pkg, cmd, homebrew_replacement, getstatusoutput_docker),
+                     performRequirementCheck = lambda pkg, cmd: checkRequirements(pkg, cmd, homebrew_replacement, getstatusoutput_docker),
                      performValidateDefaults = performValidateDefaults,
                      overrides               = overrides,
                      taps                    = taps,
