@@ -8,8 +8,7 @@ name = 'alibuild'
 dynamic = ['readme', 'version']
 description = 'ALICE Build Tool'
 keywords = ['HEP', 'ALICE']
-license = "GPL-3.0-only"
-license-files = ["LICENSE[.]md"]
+license = { file = 'LICENSE' }
 authors = [
   {name = 'Giulio Eulisse', email = 'giulio.eulisse@cern.ch'},
   {name = 'Timo Wilken', email = 'timo.wilken@cern.ch'},
