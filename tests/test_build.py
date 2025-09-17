@@ -101,7 +101,7 @@ GIT_SET_URL_ZLIB_ARGS = ("remote", "set-url", "--push", "origin", "https://githu
 GIT_CHECKOUT_ZLIB_ARGS = ("checkout", "-f", "master"), \
     "/sw/SOURCES/zlib/v1.2.3/8822efa61f", False
 
-GIT_FETCH_REF_ROOT_ARGS = ("fetch", "-f", "--filter=blob:none", "https://github.com/root-mirror/root", "+refs/tags/*:refs/tags/*",
+GIT_FETCH_REF_ROOT_ARGS = ("fetch", "-f", "--prune", "--filter=blob:none", "https://github.com/root-mirror/root", "+refs/tags/*:refs/tags/*",
                            "+refs/heads/*:refs/heads/*"), "/sw/MIRROR/root", False
 GIT_CLONE_SRC_ROOT_ARGS = ("clone", "-n", "https://github.com/root-mirror/root",
                            "/sw/SOURCES/ROOT/v6-08-30/f7b3366117",

@@ -57,7 +57,7 @@ class WorkareaTestCase(unittest.TestCase):
         mock_exists.assert_has_calls([])
         mock_makedirs.assert_called_with("%s/sw/MIRROR" % getcwd(), exist_ok=True)
         mock_git.assert_called_once_with([
-            "fetch", "-f", "--filter=blob:none", spec["source"], "+refs/tags/*:refs/tags/*", "+refs/heads/*:refs/heads/*",
+            "fetch", "-f", "--prune", "--filter=blob:none", spec["source"], "+refs/tags/*:refs/tags/*", "+refs/heads/*:refs/heads/*",
         ], directory="%s/sw/MIRROR/aliroot" % getcwd(), check=False, prompt=True)
         self.assertEqual(spec.get("reference"), "%s/sw/MIRROR/aliroot" % getcwd())
 
