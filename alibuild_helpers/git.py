@@ -59,7 +59,7 @@ class Git(SCM):
       # mirror repo directly, since Git uses an absolute path. With
       # "--dissociate", we still copy the objects locally, but we don't refer
       # to them by path.
-      cmd.extend(["--dissociate", "--reference", referenceRepo])
+      cmd.extend(["--reference", referenceRepo])
     if usePartialClone:
       cmd.extend(clone_speedup_options())
     return cmd
