@@ -58,7 +58,7 @@ def update_git_repos(args, specs, buildOrder):
         specs[package]["scm"] = Git()
         if specs[package]["is_devel_pkg"]:
             specs[package]["source"] = os.path.join(os.getcwd(), specs[package]["package"])
-            if exists(os.path.join(specs[package]["source"], ".sl")):
+            if exists(os.path.join(specs[package]["source"], ".sl")) or exists(os.path.join(specs[package]["source"], ".git/sl")):
                 specs[package]["scm"] = Sapling()
         updateReferenceRepoSpec(args.referenceSources, package, specs[package],
                                 fetch=args.fetchRepos, allowGitPrompt=git_prompt)
