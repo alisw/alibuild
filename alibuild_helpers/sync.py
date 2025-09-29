@@ -7,6 +7,7 @@ import re
 import sys
 import time
 import requests
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from requests.exceptions import RequestException
 from urllib.parse import quote
 
@@ -682,19 +683,44 @@ class Boto3RemoteSync:
     # Second, upload dist symlinks. These should be in place before the main
     # tarball, to avoid races in the publisher.
     start_time = time.time()
-    for link_dir, symlinks in dist_symlinks.items():
-      for link_key, hash_path in symlinks:
-        self.s3.put_object(Bucket=self.writeStore,
-                           Key=link_key,
-                           Body=os.fsencode(hash_path),
-                           ACL="public-read",
-                           WebsiteRedirectLocation=hash_path)
-      debug("Uploaded %d dist symlinks to S3 from %s",
-            len(symlinks), link_dir)
+    total_symlinks = 0
+
+    # Limit concurrency to avoid overwhelming S3 with too many simultaneous requests
+    max_workers = min(32, (len(dist_symlinks) * 10) or 1)
+
+    def _upload_single_symlink(link_key, hash_path):
+      self.s3.put_object(Bucket=self.writeStore,
+                         Key=link_key,
+                         Body=os.fsencode(hash_path),
+                         ACL="public-read",
+                         WebsiteRedirectLocation=hash_path)
+      return link_key
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+      future_to_info = {}
+      for link_dir, symlinks in dist_symlinks.items():
+        for link_key, hash_path in symlinks:
+          future = executor.submit(_upload_single_symlink, link_key, hash_path)
+          future_to_info[future] = (link_dir, link_key)
+          total_symlinks += 1
+
+      dir_counts = {link_dir: 0 for link_dir in dist_symlinks.keys()}
+      for future in as_completed(future_to_info):
+        link_dir, link_key = future_to_info[future]
+        try:
+          future.result()
+          dir_counts[link_dir] += 1
+        except Exception as e:
+          error("Failed to upload symlink %s: %s", link_key, e)
+          raise
+
+      for link_dir, count in dir_counts.items():
+        if count > 0:
+          debug("Uploaded %d dist symlinks to S3 from %s", count, link_dir)
+
     end_time = time.time()
     debug("Uploaded %d dist symlinks in %.2f seconds",
-          sum(len(symlinks) for _, symlinks in dist_symlinks.items()),
-          end_time - start_time)
+          total_symlinks, end_time - start_time)
 
     self.s3.upload_file(Bucket=self.writeStore, Key=tar_path,
                         Filename=os.path.join(self.workdir, tar_path))
