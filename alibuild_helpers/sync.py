@@ -502,12 +502,23 @@ class Boto3RemoteSync:
     # have to install it in the first place.
     try:
       import boto3
+      from botocore.config import Config
     except ImportError:
       error("boto3 must be installed to use %s", Boto3RemoteSync)
       sys.exit(1)
 
     try:
-      self.s3 = boto3.client("s3", endpoint_url="https://s3.cern.ch",
+      try:
+        config = Config(
+          request_checksum_calculation='WHEN_REQUIRED',
+          response_checksum_validation='WHEN_REQUIRED',
+        )
+      except TypeError:
+        # Older boto3 versions don't support these parameters (<1.36.0)
+        config = None
+      self.s3 = boto3.client("s3",
+                             **({"config": config} if config else {}),
+                             endpoint_url="https://s3.cern.ch",
                              aws_access_key_id=os.environ["AWS_ACCESS_KEY_ID"],
                              aws_secret_access_key=os.environ["AWS_SECRET_ACCESS_KEY"])
     except KeyError:
