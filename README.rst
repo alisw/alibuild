@@ -26,13 +26,21 @@ Pre-requisites
 If you are using aliBuild directly from git clone, you should make sure
 you have the dependencies installed. The easiest way to do this is to run::
 
+    # Optional, make a venv so the dependencies are not installed globally
+    python -m venv .venv
+    source .venv/bin/activate
     pip install -e .
 
 
-For developers
-==============
+Contributing
+============
+
 
 If you want to contribute to aliBuild, you can run the tests with::
+
+    # Optional, make a venv so the dependencies are not installed globally
+    python -m venv .venv
+    source .venv/bin/activate
 
     pip install -e .[test] # Only needed once
     tox
@@ -47,6 +55,13 @@ You can also run only the unit tests (it's a lot faster than the full suite) wit
 
 To run the documentation locally, you can use::
 
+    # Optional, make a venv so the dependencies are not installed globally
+    python -m venv .venv
+    source .venv/bin/activate
+
+    # Install dependencies for the docs, check pyproject.toml for more info
     pip install -e .[docs]
+
+    # Run the docs
     cd docs
     mkdocs serve
