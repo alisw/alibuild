@@ -79,13 +79,16 @@ The following entries are optional in the header:
   - `source`: URL of a Git repository from which the source is downloaded.
     It's good practice to make sure that they are already patched, so that you
     can easily point to the actual sources used by the software.
+
   - `write_repo`: in case the repository URL to be used for developing is
     different from the `source`, set this key. It is used by `aliBuild init`,
     which will initialise your local repository with the `upstream` remote
     pointing at this URL instead of the one in `source`.
+
   - `tag`: git reference in the above mentioned repository which points to the
     software to be built. This can be a tag name, a branch name or a commit
     hash.
+
   - `env`: dictionary whose key-value pairs are environment variables to be set
     after the recipe is built. The values are interpreted as the contents of a
     double-quoted shell string, so you can reference other environment variables
@@ -101,6 +104,7 @@ The following entries are optional in the header:
     intended to be used to point to build products of the current recipe. If you
     need to set an environment variable for use in the recipe, use
     `export VARIABLE=value` in the recipe body.
+
   - `prepend_path`: dictionary whose key-value pairs are an environment variable
     name and a path to be prepended to it, as it happens in `LD_LIBRARY_PATH`.
     This happens only after the package declaring the `prepend_path` in question
@@ -116,9 +120,11 @@ The following entries are optional in the header:
 
     will result in prepending `$FOO_ROOT/binexec/foobar` to `$PATH`, and both
     `$FOO_ROOT/sub/lib` and `lib64` to `LD_LIBRARY_PATH`.
+
   - `append_path`: same as `prepend_path` but paths are appended rather than
     prepended. Like `append_path` and `env`, this **does not** affect the
     environment of the current recipe.
+
   - `requires`: a list of run-time dependencies for the package, *e.g.*:
 
     ```yaml
@@ -145,6 +151,7 @@ The following entries are optional in the header:
 
     will make sure that `IgProf` is only built on platforms whose name does not
     begin with `osx`.
+
   - `build_requires`: a list of build-time dependencies for the package. Like
     `requires`, these packages will be built before the current package is
     built.
@@ -154,8 +161,10 @@ The following entries are optional in the header:
     `requires`: for instance, RPMs produced for a package won't depend on its
     `build_requires`, and `alibuild-generate-module` won't pull in build
     requirements' modulefiles.
+
   - `force_rebuild`: set it to `true` to force re-running the build recipe every
     time you invoke alibuild on it.
+
   - `prefer_system_check`: a script which is used to determine whether
     or not the system equivalent of the package can be used. See also
     `prefer_system`. If the `--no-system` option is specified, this key is not
@@ -170,6 +179,7 @@ The following entries are optional in the header:
     does not match, the check is skipped and the recipe is run. Using the switch
     `--always-prefer-system` runs the check always (even when the regular
     expression for the architecture does not match).
+
   - `relocate_paths`: a list of toplevel paths scanned recursively to perform
     relocation of executables and dynamic libraries **on macOS only**. If not
     specified, defaults to `bin`, `lib` and `lib64`.
