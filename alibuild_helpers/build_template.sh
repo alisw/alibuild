@@ -1,7 +1,18 @@
 #!/bin/bash
-
+ALIBUILD_START_TIMESTAMP=$(date +%%s)
 # Automatically generated build script
 unset DYLD_LIBRARY_PATH
+echo "aliBuild: start building $PKGNAME-$PKGVERSION-$PKGREVISION at $ALIBUILD_START_TIMESTAMP"
+
+cleanup() {
+  local exit_code=$?
+  ALIBUILD_END_TIMESTAMP=$(date +%%s)
+  ALIBUILD_DELTA_TIME=$(($ALIBUILD_END_TIMESTAMP - $ALIBUILD_START_TIMESTAMP))
+  echo "aliBuild: done building $PKGNAME-$PKGVERSION-$PKGREVISION at $ALIBUILD_START_TIMESTAMP (${ALIBUILD_DELTA_TIME} s)"
+  exit $exit_code
+}
+
+trap cleanup EXIT
 
 # Cleanup variables which should not be exposed to user code
 unset AWS_ACCESS_KEY_ID
