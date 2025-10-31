@@ -17,6 +17,7 @@ from alibuild_helpers.deps import doDeps
 from alibuild_helpers.log import info, debug, logger, error
 from alibuild_helpers.utilities import detectArch
 from alibuild_helpers.build import doBuild
+from alibuild_helpers.version import UpdateChecker
 
 
 def doMain(args, parser):
@@ -59,6 +60,7 @@ def doMain(args, parser):
   if args.action == "version" or args.action is None:
     print("aliBuild version: {version} ({arch})".format(
       version=__version__ or "unknown", arch=args.architecture or "unknown"))
+    UpdateChecker("alibuild", __version__).check_for_updates()
     sys.exit(0)
 
   if args.action == "doctor":
@@ -75,10 +77,12 @@ def doMain(args, parser):
 
   # Setup build environment.
   if args.action == "init":
+    UpdateChecker("alibuild", __version__).check_for_updates()
     doInit(args)
     exit(0)
 
   if args.action == "build":
+    UpdateChecker("alibuild", __version__).check_for_updates()
     doBuild(args, parser)
     sys.exit(0)
 
