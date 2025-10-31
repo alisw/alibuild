@@ -15,7 +15,7 @@ here = os.path.abspath(os.path.dirname(__file__))
 with open(os.path.join(here, 'README.rst'), encoding='utf-8') as f:
     long_description = f.read()
 
-install_requires = ['pyyaml', 'requests', 'distro', 'jinja2', 'boto3<1.36.0']
+install_requires = ['pyyaml', 'requests', 'distro', 'jinja2', 'boto3']
 
 setup(
     name='alibuild',
