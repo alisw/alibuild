@@ -49,7 +49,7 @@ jobs:
           sed -i.bak "
           s|^  url .*|  url \"$url\"|;
           s|^  sha256 .*|  sha256 \"$sha\"|;
-          " "$(brew formula alibuild)"
+          " "$(brew formula alibuild -q)"
           rm -f "$(brew formula alibuild).bak"
       - name: Regenerate alibuild formula
         run: |
