@@ -20,7 +20,6 @@ from alibuild_helpers.sync import remote_from_url
 from alibuild_helpers.workarea import logged_scm, updateReferenceRepoSpec, checkout_sources
 from alibuild_helpers.log import ProgressPrint, log_current_package
 from glob import glob
-from textwrap import dedent
 from collections import OrderedDict
 from shlex import quote
 import tempfile
@@ -32,6 +31,7 @@ import socket
 import os
 import re
 import shutil
+import sys
 import time
 
 
@@ -567,7 +567,7 @@ def doBuild(args, parser):
     del develCandidates, develCandidatesUpper, develPkgsUpper
 
   if buildOrder:
-    if args.onlyDeps: 
+    if args.onlyDeps:
       builtPackages = buildOrder[:-1]
     else:
       builtPackages = buildOrder
@@ -1119,9 +1119,11 @@ def doBuild(args, parser):
       build_command = "%s -e -x %s/build.sh 2>&1" % (BASH, quote(scriptDir))
 
     debug("Build command: %s", build_command)
+    progress_msg = "Unpacking %s@%s" if cachedTarball else "Compiling %s@%s"
+    if not cachedTarball and not args.debug:
+      progress_msg += " (use --debug for full output)"
     progress = ProgressPrint(
-      ("Unpacking %s@%s" if cachedTarball else
-       "Compiling %s@%s (use --debug for full output)") %
+      progress_msg %
       (spec["package"],
        args.develPrefix if "develPrefix" in args and spec["is_devel_pkg"] else spec["version"])
     )
@@ -1138,50 +1140,99 @@ def doBuild(args, parser):
     if spec["is_devel_pkg"]:
       updatablePkgs.append(spec["package"])
 
-    buildErrMsg = dedent("""\
-    Error while executing {sd}/build.sh on `{h}'.
-    Log can be found in {w}/BUILD/{p}-latest{devSuffix}/log
-    Please upload it to CERNBox/Dropbox if you intend to request support.
-    Build directory is {w}/BUILD/{p}-latest{devSuffix}/{p}.
-    """).format(
-      h=socket.gethostname(),
-      sd=scriptDir,
-      w=buildWorkDir,
-      p=spec["package"],
-      devSuffix="-" + args.develPrefix
-      if "develPrefix" in args and spec["is_devel_pkg"]
-      else "",
-    )
-    if updatablePkgs:
-      buildErrMsg += dedent("""
-      Note that you have packages in development mode.
-      Devel sources are not updated automatically, you must do it by hand.\n
-      This problem might be due to one or more outdated devel sources.
-      To update all development packages required for this build it is usually sufficient to do:
-      """)
-      buildErrMsg += "".join("\n  ( cd %s && git pull --rebase )" % dp for dp in updatablePkgs)
+    # Determine paths
+    devSuffix = "-" + args.develPrefix if "develPrefix" in args and spec["is_devel_pkg"] else ""
+    log_path = f"{buildWorkDir}/BUILD/{spec['package']}-latest{devSuffix}/log"
+    build_dir = f"{buildWorkDir}/BUILD/{spec['package']}-latest{devSuffix}/{spec['package']}"
+
+    # Use relative paths if we're inside the work directory
+    try:
+      from os.path import relpath
+      log_path = relpath(log_path, os.getcwd())
+      build_dir = relpath(build_dir, os.getcwd())
+    except (ValueError, OSError):
+      pass  # Keep absolute paths if relpath fails
+
+    # Color codes for error message (if TTY)
+    bold = "\033[1m" if sys.stderr.isatty() else ""
+    red = "\033[31m" if sys.stderr.isatty() else ""
+    reset = "\033[0m" if sys.stderr.isatty() else ""
+
+    # Build the error message
+    devel_note = " (development package)" if spec["is_devel_pkg"] else ""
+    buildErrMsg = f"{red}{bold}BUILD FAILED:{reset} {spec['package']}@{spec['version']}{devel_note}\n"
+    buildErrMsg += "=" * 70 + "\n\n"
+
+    buildErrMsg += f"{bold}Log File:{reset}\n"
+    buildErrMsg += f"  {log_path}\n\n"
+
+    buildErrMsg += f"{bold}Build Directory:{reset}\n"
+    buildErrMsg += f"  {build_dir}\n"
 
     # Gather build info for the error message
     try:
+      detected_arch = detectArch()
+
+      # Only show safe arguments (no tokens/secrets) in CLI-usable format
       safe_args = {
         "pkgname", "defaults", "architecture", "forceUnknownArch",
         "develPrefix", "jobs", "noSystem", "noDevel", "forceTracked", "plugin",
         "disable", "annotate", "onlyDeps", "docker"
-          }
-      args_str = " ".join(f"--{k}={v}" for k, v in vars(args).items() if v and k in safe_args)
-      detected_arch = detectArch()
-      buildErrMsg += dedent(f"""
-      Build info:
-      OS: {detected_arch}
-      Using aliBuild from alibuild@{__version__ or "unknown"} recipes in alidist@{os.environ["ALIBUILD_ALIDIST_HASH"][:10]}
-      Build arguments: {args_str}
-      """)
+      }
+      
+      cli_args = []
+      for k, v in vars(args).items():
+        if not v or k not in safe_args:
+          continue
+        
+        # Format based on type for CLI usage
+        if isinstance(v, bool):
+          if v:  # Only show if True
+            cli_args.append(f"--{k}")
+        elif isinstance(v, list):
+          if v:  # Only show non-empty lists
+            # For lists, use multiple --flag value or --flag=val1,val2
+            for item in v:
+              cli_args.append(f"--{k}={quote(str(item))}")
+        else:
+          # Quote if needed
+          cli_args.append(f"--{k}={quote(str(v))}")
+      
+      args_str = " ".join(cli_args)
+
+      buildErrMsg += f"\n{bold}Environment:{reset}\n"
+      buildErrMsg += f"  OS: {detected_arch}\n"
+      buildErrMsg += f"  aliBuild: {__version__ or 'unknown'} (alidist@{os.environ['ALIBUILD_ALIDIST_HASH'][:10]})\n"
 
       if detected_arch.startswith("osx"):
-        buildErrMsg += f'XCode version: {getstatusoutput("xcodebuild -version")[1]}'
+        xcode_info = getstatusoutput("xcodebuild -version")[1]
+        # Combine XCode version lines into one
+        xcode_lines = xcode_info.strip().split('\n')
+        if len(xcode_lines) >= 2:
+          xcode_str = f"{xcode_lines[0]} ({xcode_lines[1]})"
+        else:
+          xcode_str = xcode_lines[0] if xcode_lines else "Unknown"
+        buildErrMsg += f"  XCode: {xcode_str}\n"
+
+      buildErrMsg += f"  Arguments: {args_str}\n"
 
     except Exception as exc:
       warning("Failed to gather build info", exc_info=exc)
+
+    # Add note about development packages if applicable
+    if updatablePkgs:
+      buildErrMsg += f"\n{bold}Development Packages:{reset}\n"
+      buildErrMsg += "  Development sources are not updated automatically.\n"
+      buildErrMsg += "  This may be due to outdated sources. To update:\n"
+      buildErrMsg += "".join(f"\n    ( cd {dp} && git pull --rebase )" for dp in updatablePkgs)
+      buildErrMsg += "\n"
+
+    # Add Next Steps section
+    buildErrMsg += f"\n{bold}Next Steps:{reset}\n"
+    buildErrMsg += f"  • View error log:          cat {log_path}\n"
+    if not args.debug:
+      buildErrMsg += f"  • Rebuild with debug:      aliBuild build {spec['package']} --debug\n"
+    buildErrMsg += f"  • Please upload the full log to CERNBox/Dropbox if you intend to request support.\n"
 
 
     dieOnError(err, buildErrMsg.strip())
