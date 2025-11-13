@@ -41,27 +41,15 @@ jobs:
       - name: Update alibuild formula with new version
         run: |
           set -x
-          json=$(curl -fSsL "https://pypi.org/pypi/alibuild/${GITHUB_REF#refs/tags/}/json")
+
+          # Remove the trailing 'v' if present in the tag name
+          version="${GITHUB_REF#refs/tags/}"
+          version="${version#v}"
+
+          json=$(curl -fSsL "https://pypi.org/pypi/alibuild/${version}/json")
           sha=$(echo "$json" | jq -r '.urls.[] | select(.filename | endswith(".tar.gz")) | .digests.sha256')
           url=$(echo "$json" | jq -r '.urls.[] | select(.filename | endswith(".tar.gz")) | .url')
-          # Replace keys with two leading spaces only, so we get the toplevel
-          # ones applying to alibuild, not those for dependencies.
-          sed -i.bak "
-          s|^  url .*|  url \"$url\"|;
-          s|^  sha256 .*|  sha256 \"$sha\"|;
-          " "$(brew formula alibuild -q)"
-          rm -f "$(brew formula alibuild).bak"
-      - name: Regenerate alibuild formula
-        run: |
-          set -x
-          # Sometimes, brew update-python-resources apparently randomly fails,
-          # blaming pipgrip. Retries should hopefully solve this.
-          attempt=0
-          while [ $((attempt++)) -lt 5 ]; do
-            echo "Attempt $attempt/5..." >&2
-            brew update-python-resources alibuild && break
-            sleep 300
-          done
+          brew bump-formula-pr --write-only alibuild --url https://pypi.org/project/alibuild --version "${version}" --sha256 "${sha}"
       - name: Push updated formula
         run: |
           set -x
