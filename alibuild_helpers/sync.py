@@ -136,7 +136,7 @@ class HttpRemoteSync:
         if dest:
           try:
             os.unlink(dest+".tmp")
-          except:
+          except Exception:
             pass
     return None
 
