@@ -191,17 +191,22 @@ def dummy_readlink(x):
 
 
 def dummy_exists(x):
-    if x.endswith("alibuild_helpers/.git"):
+    # Convert Path objects to strings for comparison
+    path_str = str(x) if hasattr(x, '__fspath__') else x
+    if path_str.endswith("alibuild_helpers/.git"):
+        return False
+    # Return False for any sapling-related paths
+    if ".sl" in path_str or path_str.endswith("/sl"):
         return False
     return {
         "/alidist": True,
         "/alidist/.git": True,
-        "/alidist/.sl": False,
         "/sw": True,
         "/sw/SPECS": False,
         "/sw/MIRROR/root": True,
+        "/sw/MIRROR/root/.git": True,
         "/sw/MIRROR/zlib": False,
-    }.get(x, DEFAULT)
+    }.get(path_str, DEFAULT)
 
 
 # A few errors we should handle, together with the expected result

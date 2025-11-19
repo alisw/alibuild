@@ -1,5 +1,6 @@
 from os.path import abspath, exists, basename, dirname, join, realpath
 from os import makedirs, unlink, readlink, rmdir
+from pathlib import Path
 from alibuild_helpers import __version__
 from alibuild_helpers.analytics import report_event
 from alibuild_helpers.log import debug, info, banner, warning
@@ -55,11 +56,9 @@ def update_git_repos(args, specs, buildOrder):
     """
 
     def update_repo(package, git_prompt):
-        specs[package]["scm"] = Git()
-        if specs[package]["is_devel_pkg"]:
-            specs[package]["source"] = os.path.join(os.getcwd(), specs[package]["package"])
-            if exists(os.path.join(specs[package]["source"], ".sl")) or exists(os.path.join(specs[package]["source"], ".git/sl")):
-                specs[package]["scm"] = Sapling()
+        # Note: spec["scm"] should already be initialized before this is called
+        # This function just updates the repository and fetches refs
+        assert "scm" in specs[package], f"specs[{package!r}] has no scm key"
         updateReferenceRepoSpec(args.referenceSources, package, specs[package],
                                 fetch=args.fetchRepos, allowGitPrompt=git_prompt)
 
@@ -482,12 +481,17 @@ def doBuild(args, parser):
 
   makedirs(join(workDir, "SPECS"), exist_ok=True)
 
-  # If the alidist workdir contains a .sl directory, we use Sapling as SCM.
-  # Otherwise, we default to git (without checking for the actual presence of
-  # .git). We mustn't check for a .git directory, because some tests use a
-  # subdirectory of the alibuild source tree as the "alidist" checkout, and
-  # that won't have a .git directory.
-  scm = exists("%s/.sl" % args.configDir) and Sapling() or Git()
+  # If the alidist workdir contains a .sl directory (or .git/sl for git repos
+  # with Sapling enabled), we use Sapling as SCM. Otherwise, we default to git
+  # (without checking for the actual presence of .git). We mustn't check for a
+  # .git directory, because some tests use a subdirectory of the alibuild source
+  # tree as the "alidist" checkout, and that won't have a .git directory.
+  config_path = Path(args.configDir)
+  has_sapling = (config_path / ".sl").exists() or (config_path / ".git" / "sl").exists()
+  if has_sapling and shutil.which("sl"):
+    scm = Sapling()
+  else:
+    scm = Git()
   try:
     checkedOutCommitName = scm.checkedOutCommitName(directory=args.configDir)
   except SCMError:
@@ -587,11 +591,18 @@ def doBuild(args, parser):
 
   for pkg, spec in specs.items():
     spec["is_devel_pkg"] = pkg in develPkgs
-    spec["scm"] = Git()
     if spec["is_devel_pkg"]:
-      spec["source"] = os.path.join(os.getcwd(), pkg)
-    if "source" in spec and exists(os.path.join(spec["source"], ".sl")):
-      spec["scm"] = Sapling()
+      spec["source"] = str(Path.cwd() / pkg)
+
+    # Only initialize Sapling if it's in PATH and the repo uses it
+    use_sapling = False
+    if "source" in spec:
+        source_path = Path(spec["source"])
+        has_sapling = ( (source_path / ".sl").exists() or (source_path / ".git" / "sl").exists() )
+        if has_sapling and shutil.which("sl"):
+            use_sapling = True
+    spec["scm"] = Sapling() if use_sapling else Git()
+
     reference_repo = join(os.path.abspath(args.referenceSources), pkg.lower())
     if exists(reference_repo):
       spec["reference"] = reference_repo
