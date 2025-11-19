@@ -270,7 +270,7 @@ def detectArch():
         return "osx_x86-64"
       else:
         return "osx_arm64"
-  except:
+  except Exception:
     pass
   try:
     import distro
@@ -280,7 +280,7 @@ def detectArch():
     if not platformProcessor or " " in platformProcessor:
       platformProcessor = platform.machine()
     return doDetectArch(hasOsRelease, osReleaseLines, platformTuple, platformSystem, platformProcessor)
-  except:
+  except Exception:
     return doDetectArch(hasOsRelease, osReleaseLines, ["unknown", "", ""], "", "")
 
 def filterByArchitectureDefaults(arch, defaults, requires):

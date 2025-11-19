@@ -89,7 +89,7 @@ def report(eventType, **metadata):
            "https://www.google-analytics.com/collect"]
   try:
     subprocess.Popen(args)
-  except:
+  except Exception:
     pass
 
 def report_event(category, action, label = "", value = None):
