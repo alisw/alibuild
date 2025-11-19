@@ -264,6 +264,7 @@ class BuildTestCase(unittest.TestCase):
         args = Namespace(
             remoteStore="",
             writeStore="",
+            no_remote_store=True,
             referenceSources="/sw/MIRROR",
             docker=False,
             dockerImage=None,
