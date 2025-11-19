@@ -980,12 +980,12 @@ def doBuild(args, parser):
           unlink(join(buildWorkDir, "BUILD", spec["package"] + "-latest"))
           if "develPrefix" in args:
             unlink(join(buildWorkDir, "BUILD", spec["package"] + "-latest-" + args.develPrefix))
-        except:
+        except Exception:
           pass
         try:
           rmdir(join(buildWorkDir, "BUILD"))
           rmdir(join(workDir, "INSTALLROOT"))
-        except:
+        except Exception:
           pass
       continue
 
@@ -1014,7 +1014,7 @@ def doBuild(args, parser):
       fp = open(dirname(realpath(__file__))+'/build_template.sh', 'r')
       cmd_raw = fp.read()
       fp.close()
-    except:
+    except Exception:
       from pkg_resources import resource_string
       cmd_raw = resource_string("alibuild_helpers", 'build_template.sh')
 
