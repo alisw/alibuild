@@ -18,7 +18,7 @@ from alibuild_helpers.sl import Sapling
 from alibuild_helpers.scm import SCMError
 from alibuild_helpers.sync import remote_from_url
 from alibuild_helpers.workarea import logged_scm, updateReferenceRepoSpec, checkout_sources
-from alibuild_helpers.log import ProgressPrint, log_current_package
+from alibuild_helpers.log import ProgressPrint, log_current_package, BuildProgress
 from glob import glob
 from textwrap import dedent
 from collections import OrderedDict
@@ -68,7 +68,7 @@ def update_git_repos(args, specs, buildOrder):
                             ".", prompt=git_prompt, logOutput=False)
         specs[package]["scm_refs"] = specs[package]["scm"].parseRefs(output)
 
-    progress = ProgressPrint("Updating repositories")
+    progress = ProgressPrint(begin_msg="Updating repositories")
     requires_auth = set()
     with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
         future_to_download = {
@@ -741,6 +741,20 @@ def doBuild(args, parser):
     mainPackage = buildOrder.pop()
     warning("Not rebuilding %s because --only-deps option provided.", mainPackage)
 
+  # Initialize the pretty build progress output (enabled by default for TTY, disabled in debug mode)
+  buildProgress = None
+  import sys
+  if sys.stdout.isatty() and not args.debug:
+    buildProgress = BuildProgress(
+      total_packages=len(buildOrder),
+      max_log_lines=5
+    )
+    # Pre-populate the package list
+    for pkg in buildOrder:
+      pkg_spec = specs[pkg]
+      version = (getattr(args, "develPrefix", None) if pkg_spec.get("is_devel_pkg") else pkg_spec.get("version", "")) or "UNKNOWN"
+      buildProgress.add_package(pkg, version)
+
   while buildOrder:
     p = buildOrder[0]
     spec = specs[p]
@@ -1119,12 +1133,12 @@ def doBuild(args, parser):
       build_command = "%s -e -x %s/build.sh 2>&1" % (BASH, quote(scriptDir))
 
     debug("Build command: %s", build_command)
-    progress = ProgressPrint(
-      ("Unpacking %s@%s" if cachedTarball else
-       "Compiling %s@%s (use --debug for full output)") %
-      (spec["package"],
-       args.develPrefix if "develPrefix" in args and spec["is_devel_pkg"] else spec["version"])
-    )
+    begin_msg = ("Unpacking %s@%s" if cachedTarball else
+                 "Compiling %s@%s (use --debug for full output)") % \
+                (spec["package"],
+                 args.develPrefix if "develPrefix" in args and spec["is_devel_pkg"] else spec["version"])
+
+    progress = ProgressPrint(buildProgress, begin_msg)
     err = execute(build_command, printer=progress)
     progress.end("failed" if err else "done", err)
     report_event("BuildError" if err else "BuildSuccess", spec["package"], " ".join((
@@ -1183,6 +1197,9 @@ def doBuild(args, parser):
     except Exception as exc:
       warning("Failed to gather build info", exc_info=exc)
 
+    # Clean up progress display before showing error
+    if buildProgress and err:
+      buildProgress.cleanup()
 
     dieOnError(err, buildErrMsg.strip())
 
@@ -1220,4 +1237,9 @@ def doBuild(args, parser):
   if untrackedFilesDirectories:
     banner("Untracked files in the following directories resulted in a rebuild of "
            "the associated package and its dependencies:\n%s\n\nPlease commit or remove them to avoid useless rebuilds.", "\n".join(untrackedFilesDirectories))
+
+  # Cleanup build progress output
+  if buildProgress:
+    buildProgress.cleanup()
+
   debug("Everything done")
