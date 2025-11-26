@@ -9,7 +9,7 @@ SL_COMMAND_TIMEOUT_SEC = 120
 
 # Sapling is a novel SCM by Meta (i.e. Facebook) that is fully compatible with
 # git, but has a different command line interface. Among the reasons why it's
-# worth suporting it is the ability to handle unnamed branches, the ability to
+# worth supporting it is the ability to handle unnamed branches, the ability to
 # absorb changes to the correct commit without having to explicitly rebase and
 # the integration with github to allow for pull requests to be created from the
 # command line from each commit of a branch.
@@ -20,9 +20,22 @@ class Sapling(SCM):
     return sapling(("whereami", ), directory)
 
   def branchOrRef(self, directory):
-    # Format is <hash>[+] <branch>
-    identity = sapling(("identify", ), directory)
-    return identity.split(" ")[-1]
+    # Format is * branch     ref or nothing
+    err, output = getstatusoutput("""\
+    set -e +x
+    sl -R {directory} bookmark -r . 2>/dev/null | grep -- "*"
+    """.format(
+        directory=quote(directory),
+    ), timeout=SL_COMMAND_TIMEOUT_SEC)
+    if err > 1:
+        raise SCMError("Error {} from sl bookmark -r . : {}".format(err, output))
+    # We use "none" to indicate there are no bookmarks. This means
+    # that a devel package will act as a single branch, regardless of where we are.
+    if not output.strip():
+      return "none"
+    # If a bookmark is there, we use it to determine that we should rebuild
+    # when we move to it
+    return output.split(" ")[2]
 
   def exec(self, *args, **kwargs):
     return sapling(*args, **kwargs)

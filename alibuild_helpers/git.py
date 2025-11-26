@@ -68,13 +68,13 @@ class Git(SCM):
     return ["checkout", "-f", tag]
 
   def fetchCmd(self, remote, *refs):
-    return ["fetch", "-f"] + clone_speedup_options() + [remote, *refs]
+    return ["fetch", "-f", "--prune"] + clone_speedup_options() + [remote, *refs]
 
   def setWriteUrlCmd(self, url):
     return ["remote", "set-url", "--push", "origin", url]
 
   def diffCmd(self, directory):
-    return "cd %s && git diff -r HEAD && git status --porcelain" % directory
+    return "cd %s && git diff HEAD && git status --porcelain" % directory
 
   def checkUntracked(self, line):
     return line.startswith("?? ")
@@ -96,7 +96,7 @@ def git(args, directory=".", check=True, prompt=True):
     directory=quote(directory),
     args=" ".join(map(quote, args)),
     # GIT_TERMINAL_PROMPT is only supported in git 2.3+.
-    prompt_var=f"GIT_TERMINAL_PROMPT=0" if not prompt else "",
+    prompt_var="GIT_TERMINAL_PROMPT=0" if not prompt else "",
     directory_safe_var=f"GIT_CONFIG_COUNT={lastGitOverride+2} GIT_CONFIG_KEY_{lastGitOverride}=safe.directory GIT_CONFIG_VALUE_{lastGitOverride}=$PWD GIT_CONFIG_KEY_{lastGitOverride+1}=gc.auto GIT_CONFIG_VALUE_{lastGitOverride+1}=0" if directory else "",
   ), timeout=GIT_CMD_TIMEOUTS.get(args[0] if len(args) else "*", GIT_COMMAND_TIMEOUT_SEC))
   if check and err != 0:

@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-import os, subprocess, sys
+import os
+import subprocess
+import sys
 from os.path import exists, expanduser
 from os import unlink
 
@@ -24,7 +26,7 @@ def askForAnalytics():
          "  https://github.com/alisw/alibuild/blob/master/ANALYTICS.md\n")
   a = input("Is that ok for you [YES/no]? ")
   if a.strip() and a.strip().lower().startswith("n"):
-    debug("User requsted disabling analytics.")
+    debug("User requested disabling analytics.")
     return disable_analytics()
   return generate_analytics_id()
 
@@ -87,7 +89,7 @@ def report(eventType, **metadata):
            "https://www.google-analytics.com/collect"]
   try:
     subprocess.Popen(args)
-  except:
+  except Exception:
     pass
 
 def report_event(category, action, label = "", value = None):

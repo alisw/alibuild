@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
-import os, re, sys
+import os
+import re
+import sys
 from os.path import exists, abspath, expanduser
 import logging
 from alibuild_helpers.log import debug, error, banner, info, success, warning
 from alibuild_helpers.log import logger
 from alibuild_helpers.utilities import getPackageList, parseDefaults, readDefaults, validateDefaults
 from alibuild_helpers.cmd import getstatusoutput, DockerRunner
+import tempfile
 
 def prunePaths(workDir) -> None:
   for x in ["PATH", "LD_LIBRARY_PATH", "DYLD_LIBRARY_PATH"]:
-    if not x in os.environ:
+    if x not in os.environ:
       continue
     workDirEscaped = re.escape("%s" % workDir) + "[^:]*:?"
     os.environ[x] = re.sub(workDirEscaped, "", os.environ[x])
@@ -19,7 +22,8 @@ def checkPreferSystem(spec, cmd, homebrew_replacement, getstatusoutput_docker):
       debug("Package %s can only be managed via alibuild.", spec["package"])
       return (1, "")
     cmd = homebrew_replacement + cmd
-    err, out = getstatusoutput_docker(cmd)
+    with tempfile.TemporaryDirectory(prefix=f"alibuild_prefer_check_{spec['package']}_") as temp_dir:
+        err, out = getstatusoutput_docker(cmd, cwd=temp_dir)
     if not err:
       success("Package %s will be picked up from the system.", spec["package"])
       for x in out.split("\n"):
@@ -37,7 +41,8 @@ def checkRequirements(spec, cmd, homebrew_replacement, getstatusoutput_docker):
       debug("Package %s is not a system requirement.", spec["package"])
       return (0, "")
     cmd = homebrew_replacement + cmd
-    err, out = getstatusoutput_docker(cmd)
+    with tempfile.TemporaryDirectory(prefix=f"alibuild_prefer_check_{spec['package']}_") as temp_dir:
+        err, out = getstatusoutput_docker(cmd, cwd=temp_dir)
     if not err:
       success("Required package %s will be picked up from the system.", spec["package"])
       debug("%s", cmd)
@@ -80,7 +85,11 @@ def doDoctor(args, parser):
   # Decide if we can use homebrew. If not, we replace it with "true" so
   # that we do not get spurious messages on linux
   homebrew_replacement = ""
-  with DockerRunner(args.dockerImage, args.docker_extra_args) as getstatusoutput_docker:
+
+  extra_env = {"ALIBUILD_CONFIG_DIR": "/alidist" if args.docker else os.path.abspath(args.configDir)}
+  extra_env.update(dict([e.partition('=')[::2] for e in args.environment]))
+
+  with DockerRunner(args.dockerImage, args.docker_extra_args, extra_env=extra_env, extra_volumes=[f"{os.path.abspath(args.configDir)}:/alidist:ro"] if args.docker else []) as getstatusoutput_docker:
     err, output = getstatusoutput_docker("type c++")
   if err:
     warning("Unable to find system compiler.\n"
@@ -137,7 +146,10 @@ def doDoctor(args, parser):
       error("%s", msg)
     return (ok,msg,valid)
 
-  with DockerRunner(args.dockerImage, args.docker_extra_args) as getstatusoutput_docker:
+  extra_env = {"ALIBUILD_CONFIG_DIR": "/alidist" if args.docker else os.path.abspath(args.configDir)}
+  extra_env.update(dict([e.partition('=')[::2] for e in args.environment]))
+  
+  with DockerRunner(args.dockerImage, args.docker_extra_args, extra_env=extra_env, extra_volumes=[f"{os.path.abspath(args.configDir)}:/alidist:ro"] if args.docker else []) as getstatusoutput_docker:
     fromSystem, own, failed, validDefaults = \
       getPackageList(packages                = packages,
                      specs                   = specs,

@@ -1,4 +1,3 @@
-from __future__ import print_function
 from unittest.mock import patch, MagicMock
 from io import StringIO
 import os.path
@@ -80,10 +79,11 @@ class DoctorTestCase(unittest.TestCase):
                      docker_extra_args=["--network=host"],
                      debug=False,
                      preferSystem=[],
-                     noSystem=False,
+                     noSystem="*",
                      architecture="osx_x86-64",
                      disable=[],
-                     defaults="release")
+                     defaults="release",
+                     environment=[])
 
     def fake_exists(n):
         return {"/alidist/aliroot.sh": True}

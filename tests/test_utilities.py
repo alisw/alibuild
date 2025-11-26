@@ -12,6 +12,7 @@ from alibuild_helpers.utilities import prunePaths
 from alibuild_helpers.utilities import resolve_version
 from alibuild_helpers.utilities import topological_sort
 from alibuild_helpers.utilities import resolveFilename, resolveDefaultsFilename
+import alibuild_helpers
 import os
 import string
 
@@ -112,12 +113,102 @@ SUPPORT_URL="http://forum.sabayon.org/"
 BUG_REPORT_URL="https://bugs.sabayon.org/"
 """
 
+ALMA_8_OS_RELEASE = """
+NAME="AlmaLinux"
+VERSION="8.10 (Cerulean Leopard)"
+ID="almalinux"
+ID_LIKE="rhel centos fedora"
+VERSION_ID="8.10"
+PLATFORM_ID="platform:el8"
+PRETTY_NAME="AlmaLinux 8.10 (Cerulean Leopard)"
+ANSI_COLOR="0;34"
+LOGO="fedora-logo-icon"
+CPE_NAME="cpe:/o:almalinux:almalinux:8::baseos"
+HOME_URL="https://almalinux.org/"
+DOCUMENTATION_URL="https://wiki.almalinux.org/"
+BUG_REPORT_URL="https://bugs.almalinux.org/"
+
+ALMALINUX_MANTISBT_PROJECT="AlmaLinux-8"
+ALMALINUX_MANTISBT_PROJECT_VERSION="8.10"
+REDHAT_SUPPORT_PRODUCT="AlmaLinux"
+REDHAT_SUPPORT_PRODUCT_VERSION="8.10"
+SUPPORT_END=2029-06-01
+"""
+
+ALMA_9_OS_RELEASE = """
+NAME="AlmaLinux"
+VERSION="9.6 (Sage Margay)"
+ID="almalinux"
+ID_LIKE="rhel centos fedora"
+VERSION_ID="9.6"
+PLATFORM_ID="platform:el9"
+PRETTY_NAME="AlmaLinux 9.6 (Sage Margay)"
+ANSI_COLOR="0;34"
+LOGO="fedora-logo-icon"
+CPE_NAME="cpe:/o:almalinux:almalinux:9::baseos"
+HOME_URL="https://almalinux.org/"
+DOCUMENTATION_URL="https://wiki.almalinux.org/"
+BUG_REPORT_URL="https://bugs.almalinux.org/"
+
+ALMALINUX_MANTISBT_PROJECT="AlmaLinux-9"
+ALMALINUX_MANTISBT_PROJECT_VERSION="9.6"
+REDHAT_SUPPORT_PRODUCT="AlmaLinux"
+REDHAT_SUPPORT_PRODUCT_VERSION="9.6"
+SUPPORT_END=2032-06-01
+"""
+
+ROCKY_8_OS_RELEASE = """
+NAME="Rocky Linux"
+VERSION="8.10 (Green Obsidian)"
+ID="rocky"
+ID_LIKE="rhel centos fedora"
+VERSION_ID="8.10"
+PLATFORM_ID="platform:el8"
+PRETTY_NAME="Rocky Linux 8.10 (Green Obsidian)"
+ANSI_COLOR="0;32"
+LOGO="fedora-logo-icon"
+CPE_NAME="cpe:/o:rocky:rocky:8:GA"
+HOME_URL="https://rockylinux.org/"
+BUG_REPORT_URL="https://bugs.rockylinux.org/"
+SUPPORT_END="2029-05-31"
+ROCKY_SUPPORT_PRODUCT="Rocky-Linux-8"
+ROCKY_SUPPORT_PRODUCT_VERSION="8.10"
+REDHAT_SUPPORT_PRODUCT="Rocky Linux"
+REDHAT_SUPPORT_PRODUCT_VERSION="8.10"
+"""
+
+ROCKY_9_OS_RELEASE = """
+NAME="Rocky Linux"
+VERSION="9.6 (Blue Onyx)"
+ID="rocky"
+ID_LIKE="rhel centos fedora"
+VERSION_ID="9.6"
+PLATFORM_ID="platform:el9"
+PRETTY_NAME="Rocky Linux 9.6 (Blue Onyx)"
+ANSI_COLOR="0;32"
+LOGO="fedora-logo-icon"
+CPE_NAME="cpe:/o:rocky:rocky:9::baseos"
+HOME_URL="https://rockylinux.org/"
+VENDOR_NAME="RESF"
+VENDOR_URL="https://resf.org/"
+BUG_REPORT_URL="https://bugs.rockylinux.org/"
+SUPPORT_END="2032-05-31"
+ROCKY_SUPPORT_PRODUCT="Rocky-Linux-9"
+ROCKY_SUPPORT_PRODUCT_VERSION="9.6"
+REDHAT_SUPPORT_PRODUCT="Rocky Linux"
+REDHAT_SUPPORT_PRODUCT_VERSION="9.6"
+"""
+
 architecturePayloads = [
   ['osx_x86-64', False, [], ('','',''), 'Darwin', 'x86-64'],
   ['osx_arm64', False, [], ('','',''), 'Darwin', 'arm64'],
   ['slc5_x86-64', False, [], ('redhat', '5.XX', 'Boron'), 'Linux', 'x86-64'],
   ['slc6_x86-64', False, [], ('centos', '6.X', 'Carbon'), 'Linux', 'x86-64'],
   ['slc7_x86-64', False, [], ('centos', '7.X', 'Ptor'), 'Linux', 'x86-64'],
+  ['slc8_x86-64', True, ALMA_8_OS_RELEASE.split("\n"), ('AlmaLinux', '8.10', 'Cerulean Leopard'), 'Linux', 'x86_64'],
+  ['slc8_x86-64', True, ROCKY_8_OS_RELEASE.split("\n"), ('Rocky Linux', '8.10', 'Green Obsidian'), 'Linux', 'x86_64'],
+  ['slc9_x86-64', True, ALMA_9_OS_RELEASE.split("\n"), ('AlmaLinux', '9.6', 'Sage Margay'), 'Linux', 'x86_64'],
+  ['slc9_x86-64', True, ROCKY_9_OS_RELEASE.split("\n"), ('Rocky Linux', '9.6', 'Blue Onyx'), 'Linux', 'x86_64'],
   ['ubuntu1804_x86-64', True, UBUNTU_1804_OS_RELEASE.split("\n"), ('Ubuntu', '18.04', 'bionic'), 'Linux', 'x86-64'],
   ['ubuntu1604_x86-64', True, UBUNTU_1604_OS_RELEASE.split("\n"), ('Ubuntu', '16.04', 'xenial'), 'Linux', 'x86-64'],
   ['ubuntu1510_x86-64', False, [], ('Ubuntu', '15.10', 'wily'), 'Linux', 'x86-64'],
@@ -212,7 +303,7 @@ class TestUtilities(unittest.TestCase):
     }
     with patch.object(os, "environ", fake_env):
       prunePaths("/sw")
-      self.assertTrue(not "ROOT_VERSION" in fake_env)
+      self.assertTrue("ROOT_VERSION" not in fake_env)
       self.assertTrue(fake_env["PATH"] == "/usr/local/bin")
       self.assertTrue(fake_env["LD_LIBRARY_PATH"] == "")
       self.assertTrue(fake_env["DYLD_LIBRARY_PATH"] == "")
@@ -220,7 +311,7 @@ class TestUtilities(unittest.TestCase):
 
     with patch.object(os, "environ", fake_env_copy):
       prunePaths("/foo")
-      self.assertTrue(not "ROOT_VERSION" in fake_env_copy)
+      self.assertTrue("ROOT_VERSION" not in fake_env_copy)
       self.assertTrue(fake_env_copy["PATH"] == "/sw/bin:/usr/local/bin")
       self.assertTrue(fake_env_copy["LD_LIBRARY_PATH"] == "/sw/lib")
       self.assertTrue(fake_env_copy["DYLD_LIBRARY_PATH"] == "/sw/lib")
@@ -343,6 +434,40 @@ class TestTopologicalSort(unittest.TestCase):
                  for pkg in string.ascii_lowercase}
         self.assertEqual(frozenset(specs.keys()),
                          frozenset(topological_sort(specs)))
+
+    def test_cycle(self) -> None:
+        """Test that dependency cycles are detected and reported."""
+        specs = {
+            "A": {"package": "A", "requires": ["B"]},
+            "B": {"package": "B", "requires": ["C"]},
+            "C": {"package": "C", "requires": ["D"]},
+            "D": {"package": "D", "requires": ["A"]}
+        }
+        with patch.object(alibuild_helpers.log, 'error') as mock_error:
+          with self.assertRaises(SystemExit) as cm:
+            list(topological_sort(specs))
+          self.assertEqual(cm.exception.code, 1)
+          mock_error.assert_called_once_with("%s", "Dependency cycle detected: A -> B -> C -> D -> A")
+
+    def test_empty_set(self) -> None:
+        """Test that an empty set of packages is handled correctly."""
+        self.assertEqual([], list(topological_sort({})))
+        
+    def test_single_package(self) -> None:
+        """Test that a single package with no dependencies is handled correctly."""
+        self.assertEqual(["A"], list(topological_sort({
+            "A": {"package": "A", "requires": []}
+        })))
+        
+    def test_independent_packages(self) -> None:
+        """Test that packages with no dependencies between them are handled correctly."""
+        result = list(topological_sort({
+            "A": {"package": "A", "requires": []},
+            "B": {"package": "B", "requires": []},
+            "C": {"package": "C", "requires": []}
+        }))
+        self.assertEqual(set(["A", "B", "C"]), set(result))
+        self.assertEqual(3, len(result))
 
 if __name__ == '__main__':
     unittest.main()

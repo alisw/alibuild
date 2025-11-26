@@ -2,11 +2,13 @@ from alibuild_helpers.git import git, Git
 from alibuild_helpers.utilities import getPackageList, parseDefaults, readDefaults, validateDefaults
 from alibuild_helpers.log import debug, error, warning, banner, info
 from alibuild_helpers.log import dieOnError
-from alibuild_helpers.workarea import cleanup_git_log, updateReferenceRepoSpec
+from alibuild_helpers.workarea import updateReferenceRepoSpec
+from alibuild_helpers.cmd import getstatusoutput
 
 from os.path import join
 import os.path as path
-import os, sys
+import os
+import sys
 
 def parsePackagesDefinition(pkgname):
   return [ dict(zip(["name","ver"], y.split("@")[0:2]))
@@ -49,11 +51,11 @@ def doInit(args):
                                          specs=specs,
                                          configDir=args.configDir,
                                          preferSystem=False,
-                                         noSystem=True,
+                                         noSystem="*",
                                          architecture="",
                                          disable=[],
                                          defaults=args.defaults,
-                                         performPreferCheck=lambda *x, **y: (1, ""),
+                                         performPreferCheck=lambda pkg, cmd: getstatusoutput(["bash", "-c", cmd]),
                                          performRequirementCheck=lambda *x, **y: (0, ""),
                                          performValidateDefaults=lambda spec : validateDefaults(spec, args.defaults),
                                          overrides=overrides,

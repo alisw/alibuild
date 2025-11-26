@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 
-from __future__ import print_function
 from alibuild_helpers.log import debug, error, info, dieOnError
 from alibuild_helpers.utilities import parseDefaults, readDefaults, getPackageList, validateDefaults
 from alibuild_helpers.cmd import DockerRunner, execute
 from tempfile import NamedTemporaryFile
-from os import remove
+from os import remove, path
 
 def doDeps(args, parser):
 
@@ -17,7 +16,14 @@ def doDeps(args, parser):
   specs = {}
   defaultsReader = lambda: readDefaults(args.configDir, args.defaults, parser.error, args.architecture)
   (err, overrides, taps) = parseDefaults(args.disable, defaultsReader, debug)
-  with DockerRunner(args.dockerImage, args.docker_extra_args) as getstatusoutput_docker:
+
+  extra_env = {"ALIBUILD_CONFIG_DIR": "/alidist" if args.docker else path.abspath(args.configDir)}
+  extra_env.update(dict([e.partition('=')[::2] for e in args.environment]))
+  
+  with DockerRunner(args.dockerImage, args.docker_extra_args, extra_env=extra_env, extra_volumes=[f"{path.abspath(args.configDir)}:/alidist:ro"] if args.docker else []) as getstatusoutput_docker:
+    def performCheck(pkg, cmd):
+      return getstatusoutput_docker(cmd)
+    
     systemPackages, ownPackages, failed, validDefaults = \
       getPackageList(packages                = [args.package],
                      specs                   = specs,
@@ -27,8 +33,8 @@ def doDeps(args, parser):
                      architecture            = args.architecture,
                      disable                 = args.disable,
                      defaults                = args.defaults,
-                     performPreferCheck      = lambda pkg, cmd: getstatusoutput_docker(cmd),
-                     performRequirementCheck = lambda pkg, cmd: getstatusoutput_docker(cmd),
+                     performPreferCheck      = performCheck,
+                     performRequirementCheck = performCheck,
                      performValidateDefaults = lambda spec: validateDefaults(spec, args.defaults),
                      overrides               = overrides,
                      taps                    = taps,
@@ -41,11 +47,11 @@ def doDeps(args, parser):
 
   for s in specs.values():
     # Remove disabled packages
-    s["requires"] = [r for r in s["requires"] if not r in args.disable and r != "defaults-release"]
-    s["build_requires"] = [r for r in s["build_requires"] if not r in args.disable and r != "defaults-release"]
-    s["runtime_requires"] = [r for r in s["runtime_requires"] if not r in args.disable and r != "defaults-release"]
+    s["requires"] = [r for r in s["requires"] if r not in args.disable and r != "defaults-release"]
+    s["build_requires"] = [r for r in s["build_requires"] if r not in args.disable and r != "defaults-release"]
+    s["runtime_requires"] = [r for r in s["runtime_requires"] if r not in args.disable and r != "defaults-release"]
 
-  # Determine which pacakages are only build/runtime dependencies
+  # Determine which packages are only build/runtime dependencies
   all_build   = set()
   all_runtime = set()
   for k,spec in specs.items():
@@ -97,7 +103,7 @@ def doDeps(args, parser):
   # Check if we have dot in PATH
   try:
     execute(["dot", "-V"])
-  except Exception as e:
+  except Exception:
     dieOnError(True, "Could not find dot in PATH. Please install graphviz and add it to PATH.")
   try:
     if args.neat:

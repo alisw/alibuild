@@ -1,7 +1,18 @@
 #!/bin/bash
-
+ALIBUILD_START_TIMESTAMP=$(date +%%s)
 # Automatically generated build script
 unset DYLD_LIBRARY_PATH
+echo "aliBuild: start building $PKGNAME-$PKGVERSION-$PKGREVISION at $ALIBUILD_START_TIMESTAMP"
+
+cleanup() {
+  local exit_code=$?
+  ALIBUILD_END_TIMESTAMP=$(date +%%s)
+  ALIBUILD_DELTA_TIME=$(($ALIBUILD_END_TIMESTAMP - $ALIBUILD_START_TIMESTAMP))
+  echo "aliBuild: done building $PKGNAME-$PKGVERSION-$PKGREVISION at $ALIBUILD_START_TIMESTAMP (${ALIBUILD_DELTA_TIME} s)"
+  exit $exit_code
+}
+
+trap cleanup EXIT
 
 # Cleanup variables which should not be exposed to user code
 unset AWS_ACCESS_KEY_ID
@@ -11,6 +22,7 @@ set -e
 set +h
 function hash() { true; }
 export WORK_DIR="${WORK_DIR_OVERRIDE:-%(workDir)s}"
+export ALIBUILD_CONFIG_DIR="${ALIBUILD_CONFIG_DIR_OVERRIDE:-%(configDir)s}"
 
 # Insert our own wrapper scripts into $PATH, patched to use the system OpenSSL,
 # instead of the one we build ourselves.
@@ -43,16 +55,19 @@ export PKG_BUILDNUM="$PKGREVISION"
 export PKGPATH=${ARCHITECTURE}/${PKGNAME}/${PKGVERSION}-${PKGREVISION}
 mkdir -p "$WORK_DIR/BUILD" "$WORK_DIR/SOURCES" "$WORK_DIR/TARS" \
          "$WORK_DIR/SPECS" "$WORK_DIR/INSTALLROOT"
-export BUILDROOT="$WORK_DIR/BUILD/$PKGHASH"
-
 # If we are in development mode, then install directly in $WORK_DIR/$PKGPATH,
 # so that we can do "make install" directly into BUILD/$PKGPATH and have
 # changes being propagated.
+# Moreover, devel packages should always go in the official WORK_DIR
 if [ -n "$DEVEL_HASH" ]; then
+  export ALIBUILD_BUILD_WORK_DIR="${WORK_DIR}"
   export INSTALLROOT="$WORK_DIR/$PKGPATH"
 else
   export INSTALLROOT="$WORK_DIR/INSTALLROOT/$PKGHASH/$PKGPATH"
+  export ALIBUILD_BUILD_WORK_DIR="${ALIBUILD_BUILD_WORK_DIR:-$WORK_DIR}"
 fi
+
+export BUILDROOT="$ALIBUILD_BUILD_WORK_DIR/BUILD/$PKGHASH"
 export SOURCEDIR="$WORK_DIR/SOURCES/$PKGNAME/$PKGVERSION/$COMMIT_HASH"
 export BUILDDIR="$BUILDROOT/$PKGNAME"
 
@@ -99,9 +114,9 @@ unset DYLD_LIBRARY_PATH
 EOF
 
 cd "$BUILDROOT"
-ln -snf $PKGHASH $WORK_DIR/BUILD/$PKGNAME-latest
+ln -snf "$PKGHASH" "$ALIBUILD_BUILD_WORK_DIR/BUILD/$PKGNAME-latest"
 if [[ $DEVEL_PREFIX ]]; then
-  ln -snf $PKGHASH $WORK_DIR/BUILD/$PKGNAME-latest-$DEVEL_PREFIX
+  ln -snf "$PKGHASH" "$ALIBUILD_BUILD_WORK_DIR/BUILD/$PKGNAME-latest-$DEVEL_PREFIX"
 fi
 
 cd "$BUILDDIR"

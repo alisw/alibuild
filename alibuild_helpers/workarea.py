@@ -123,7 +123,7 @@ def is_writeable(dirpath):
   try:
     with tempfile.NamedTemporaryFile(dir=dirpath):
       return True
-  except:
+  except Exception:
     return False
 
 

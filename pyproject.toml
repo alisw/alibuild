@@ -3,28 +3,22 @@ requires = ["setuptools>=45", "setuptools_scm[toml]>=6.2"]
 build-backend = "setuptools.build_meta"
 
 [project]
+requires-python = ">= 3.6"
 name = 'alibuild'
 dynamic = ['readme', 'version']
 description = 'ALICE Build Tool'
 keywords = ['HEP', 'ALICE']
-license = {text = 'GPL'}
+license = { file = 'LICENSE' }
 authors = [
   {name = 'Giulio Eulisse', email = 'giulio.eulisse@cern.ch'},
   {name = 'Timo Wilken', email = 'timo.wilken@cern.ch'},
+  {name = 'Sergio Garcia', email = 'sergio.garcia@cern.ch'},
 ]
 
 classifiers = [
     'Development Status :: 5 - Production/Stable',
     'Intended Audience :: Developers',
     'Topic :: Software Development :: Build Tools',
-    'License :: OSI Approved :: GNU General Public License v3 (GPLv3)',
-    'Programming Language :: Python :: 3.6',   # slc7, slc8, cs8
-    'Programming Language :: Python :: 3.8',   # ubuntu2004
-    'Programming Language :: Python :: 3.9',   # slc9
-    'Programming Language :: Python :: 3.10',  # ubuntu2204
-    'Programming Language :: Python :: 3.11',  # MacOS
-    'Programming Language :: Python :: 3.12',  # MacOS
-    'Programming Language :: Python :: 3.13',  # MacOS
 ]
 
 dependencies = [
@@ -32,21 +26,34 @@ dependencies = [
   'requests',
   'distro',
   'jinja2',
-  'boto3==1.23.10',
+  'boto3',
+]
+
+[project.optional-dependencies]
+test = [
+'tox',
+]
+docs = [
+'mkdocs',
+'mkdocs-material',
+'mkdocs-redirects',
 ]
 
 [project.urls]
 homepage = 'https://alisw.github.io/alibuild'
 
-[scripts]
-aliBuild = {path = "aliBuild"}
-alienv = {path = "alienv"}
-aliDoctor = {path = "aliDoctor"}
-aliDeps = {path = "aliDeps"}
-pb = {path = "pb"}
+[tool.setuptools]
+script-files = ["aliBuild", "alienv", "aliDoctor", "aliDeps", "pb"]
 
 [tool.setuptools_scm]
 write_to = "alibuild_helpers/_version.py"
 
 [tool.setuptools.package-data]
 alibuild_helpers = ['build_template.sh']
+
+[tool.setuptools.packages.find]
+where = ["."]
+exclude = ["yaml"]
+
+[tool.setuptools.dynamic]
+readme = {file = ["README.rst"]}

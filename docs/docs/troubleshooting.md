@@ -76,8 +76,9 @@ will tell you something like:
     We will build packages in the following order: defaults-release AliEn-CAs GMP UUID gSOAP ApMon-CPP GEANT4 boost MPFR MonALISA-gSOAP-client cgal XRootD fastjet xalienfs AliEn-Runtime ROOT vgm GEANT3 GEANT4_VMC AliRoot
 
 If you have a system package which you think should be used but it's not, you
-can run `aliDoctor <package-name>` to try to understand why that was the case
-(or you can [open a bug report](https://github.com/alisw/alidist/issues) with its output and we will look at it).
+can run `aliBuild doctor <package-name>` to try to understand why that was the
+case (or you can [open a bug report](https://github.com/alisw/alidist/issues)
+with its output and we will look at it).
 
 ### What is PIP ? How do I install it?
 
@@ -146,7 +147,7 @@ aliBuild had troubles with it. Upgrading to the latest version via:
 or by doing `git pull` should fix the issue.
 
 
-### aliBuild does not pick up tool X from the sytem
+### aliBuild does not pick up tool X from the system
 
 By default aliBuild prefers using tools from the system whenever
 possible. Examples of those tools are CMake, the GCC compiler or the
@@ -155,7 +156,7 @@ it means that aliBuild does not consider you system tool good enough to
 be compatible with the one provided by the recipe. You can verify what
 happens during the system tool detection by running:
 
-    aliDoctor <package name>
+    aliBuild doctor <package name>
 
 
 ### AliBuild fails with `cannot open file "AvailabilityMacros.h`
@@ -206,7 +207,7 @@ subsequent rebuild will ignore the changes. This can be worked around in two way
 What 1. does is to make alibuild aware of the changes of the new file, so you
 will get a new build for each change to the file. What 2. does is to always
 execute the incremental recipe to refresh the installation folder on each aliBuild
-invokation, possibly updating untracked files if so specified in the recipe itself.
+invocation, possibly updating untracked files if so specified in the recipe itself.
 
 ### How do I set compilation options for AliRoot and / or AliPhysics?
 
@@ -236,7 +237,7 @@ building unless one of the system dependencies is absolutely required
 tool, where simply installing them might be a better option. For this
 reason we suggest that users run:
 
-    aliDoctor AliPhysics
+    aliBuild doctor AliPhysics
 
 in the same path where their `alidist` folder is, before actually
 starting to build, so that they can get an overview of what will be
@@ -274,7 +275,7 @@ third party does the work and provides a pull request.
 
 ### Can I build on an unsupported architecture?
 
-You can try, but of course your milage might vary. In case the architecture is similar to one of the supported ones (e.g. Ubuntu and Kubuntu) this should be recognized automatically and the build should proceed, attempting to use the supported one. This will still not guarantee things will not break for some packages.
+You can try, but of course your mileage might vary. In case the architecture is similar to one of the supported ones (e.g. Ubuntu and Kubuntu) this should be recognized automatically and the build should proceed, attempting to use the supported one. This will still not guarantee things will not break for some packages.
 
 In case the architecture is completely unknown to us, you will get a message:
 

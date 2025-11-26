@@ -11,7 +11,9 @@ For a quick start introduction, please look [here](quick.md).
 aliBuild build [-h] [--defaults DEFAULT]
                [-a ARCH] [--force-unknown-architecture]
                [-z [DEVELPREFIX]] [-e ENVIRONMENT] [-j JOBS] [-u]
-               [--no-local PKGLIST] [--disable PACKAGE]
+               [--no-local PKGLIST] [--force-tracked] [--disable PACKAGE]
+               [--force-rebuild PACKAGE] [--annotate PACKAGE=COMMENT]
+               [--only-deps] [--plugin PLUGIN]
                [--always-prefer-system | --no-system]
                [--docker] [--docker-image IMAGE] [--docker-extra-args ARGLIST] [-v VOLUMES]
                [--no-remote-store] [--remote-store STORE] [--write-store STORE] [--insecure] 
@@ -39,7 +41,18 @@ aliBuild build [-h] [--defaults DEFAULT]
   given.
 - `--no-local PKGLIST`: Do not pick up the following packages from a local
   checkout. `PKGLIST` is a comma-separated list.
+- `--force-tracked`: Do not pick up any packages from a local checkout.
 - `--disable PACKAGE`: Do not build `PACKAGE` and all its (unique) dependencies.
+- `--force-rebuild PACKAGE`: Always rebuild the specified packages from scratch,
+  even if they were built before. Has the same effect as adding
+  `force_rebuild: true` to the recipe. May be specified multiple times or
+  separate multiple arguments with commas.
+- `--annotate PACKAGE=COMMENT`: Store `COMMENT` in the build metadata for
+  `PACKAGE`. The comment will only be stored if the package is compiled or
+  downloaded during this run. May be specified multiple times.
+- `--only-deps`: Only build dependencies, not the main package. Useful for
+  populating a build cache.
+- `--plugin PLUGIN`: Plugin to use for the build. Default is `legacy`.
 - `--always-prefer-system`: Always use system packages when compatible.
 - `--no-system`: Never use system packages, even if compatible.
 
@@ -102,8 +115,8 @@ provides tarballs for the most common supported architectures.
 
 ## Using precompiled packages
 
-By running aliBuild with no special option on CentOS/Alma 7, 8 or 9, or on
-Ubuntu 20.04, 22.04 or 24.04, it will automatically try to
+By running aliBuild with no special option on CentOS/Alma 7, 8 or 9 (x86-64 or ARM),
+or on Ubuntu 20.04, 22.04 or 24.04 (x86-64), it will automatically try to
 use as many precompiled packages as possible by downloading them from a default
 central server. By using precompiled packages you lose the ability to pick some
 of them from your system. If you do not want to use precompiled packages and you
@@ -199,16 +212,30 @@ case the incremental recipe will always be executed.
 
 While alibuild does its best to find out which OS / distribution you are
 using, sometimes it might fail to do so, for example in the case you
-start using a new *buntu flavour or a bleeding edge version of Centos.
-In order to force the the correct architecture for the build you can use
+start using a new *buntu flavour or a bleeding edge version of a distribution.
+In order to force the correct architecture for the build you can use
 the `--architecture` (`-a`) flag with one of the supported options:
 
-- `slc5_x86-64`: Scientific Linux 5 and compatibles, on Intel / AMD x86-64.
-- `slc6_x86-64`: Scientific Linux 6 and compatibles, on Intel / AMD x86-64.
-- `slc7_x86-64`: CERN Centos 7 and compatibles, on Intel / AMD x86-64.
-- `ubuntu1404_x86-64`: Ubuntu 1404 and compatibles, on Intel / AMD x86-64.
-- `osx_x86-64`: OSX, on Intel / AMD x86-64.
-- `slc7_ppc64`: RHEL7 on POWER8 (LE only for now).
+On Linux, x86-64:
+- `slc6_x86-64`: RHEL6 / SLC6 compatible
+- `slc7_x86-64`: RHEL7 / CC7 compatible
+- `slc8_x86-64`: RHEL8 / CC8 compatible
+- `slc9_x86-64`: RHEL9 / ALMA9 compatible
+- `ubuntu2004_x86-64`: Ubuntu 20.04 compatible
+- `ubuntu2204_x86-64`: Ubuntu 22.04 compatible
+- `ubuntu2404_x86-64`: Ubuntu 24.04 compatible
+- `fedora33_x86-64`: Fedora 33 compatible
+- `fedora34_x86-64`: Fedora 34 compatible
+
+On Linux, ARM:
+- `slc9_aarch64`: RHEL9 / ALMA9 compatible
+
+On Linux, POWER8 / PPC64 (little endian):
+- `slc7_ppc64`: RHEL7 / CC7 compatible
+
+On Mac:
+- `osx_x86-64`: Intel
+- `osx_arm64`: Apple Silicon
 
 ### Running in Docker
 
@@ -234,27 +261,33 @@ option using the same syntax used by Docker.
 
 ## Defaults
 
-By default `aliBuild` is tuned to build the production version of ALICE
-Offline software, as deployed on the Grid, so some of the choices in
-terms of version of the packages and compilation flags are tweaked for
-that. For example, ROOT5 is used because that's what is what has been
-validated for datataking and the choice will not change until the end of
-RUN2 of LHC. In order to change that and use, for example, a more recent
-version of ROOT you can use the `--default root6` option which will
-enable ROOT6 based builds. For a more complete description of how defaults
-works please look at [the reference manual](reference.md#defaults).
+By default, `aliBuild` uses the `o2` defaults (`--defaults o2`), which are
+optimized for building the ALICE O2 software stack. The defaults system
+allows you to specify different sets of build configurations, compiler
+flags, and package versions through the `--defaults` option.
+
+Different defaults can be used to:
+- Use different package versions (e.g., different ROOT versions)
+- Apply specific compiler flags (e.g., debug builds, optimization levels)
+- Enable or disable certain features or packages
+
+To use a different set of defaults, use the `--defaults <name>` option,
+which will load settings from `CONFIGDIR/defaults-<name>.sh`. For example,
+`--defaults o2-epn` would use the `defaults-o2-epn.sh` file.
+
+For a more complete description of how the defaults system works and how to
+create custom defaults, please look at [the reference manual](reference.md#defaults).
 
 ## Disabling packages
 
 You can optionally disable certain packages by specifying them as a comma
 separated list with the `--disable` option.
 
-Moreover, starting from aliBuild 1.4.0, it will also be
-possible to disable packages by adding them to the `disable`
-keyword of your defaults file (see previous paragraph). See the
+It's also possible to disable packages by adding them to the `disable` keyword
+of your defaults file (see previous paragraph). See the
 [defaults-o2.sh](https://github.com/alisw/alidist/blob/master/defaults-o2.sh)
-file for an example of how to disable `AliEn-Runtime` and `AliRoot`
-when passing `--defaults o2`.
+file for an example of how to disable `mesos` and `MySQL` when
+passing `--defaults o2`.
 
 ## Controlling which system packages are picked up
 
@@ -294,15 +327,12 @@ installation area.
 
 ## Upgrading aliBuild
 
-aliBuild is installed via `pip`. In order to upgrade it on most laptops (in
-particular Macs) do:
+aliBuild can be installed either via `pip`, or by your OS package manager (more info [here](https://alice-doc.github.io/alice-analysis-tutorial/building/custom.html). 
+
+The way to upgrade it depends on your installation method. If you installed it
+via `pip`, you can upgrade it by running:
 
     pip install --upgrade alibuild
-
-or in case you need to be root (_e.g._ on Ubuntu and most Linux distributions
-for convenience):
-
-    sudo pip install --upgrade alibuild
 
 In general updating aliBuild is safe and it should never trigger a rebuild or
 break compilation of older versions of alidist (i.e. we do try to guarantee
@@ -315,10 +345,8 @@ when running the command.
 You can also upgrade / install a specific version of alibuild by specifying it on the 
 command line. E.g.:
 
-    pip install alibuild=1.5.5.rc1
+    pip install alibuild=1.17.23
     
-this is in particular required when you want to try out release candidates (rc) builds which
-are masked out by default.
 
 ## Rebuilding packages from branches instead of tags
 
@@ -339,11 +367,11 @@ server-side pull request checks).
 
 ## Generating a dependency graph
 
-It is possible to generating a PDF with a dependency graph using the `aliDeps`
+It is possible to generating a PDF with a dependency graph using the `aliBuild deps`
 tool. Assuming you run it from a directory containing `alidist`, and you have
 Graphviz installed on your system, you can simply run:
 
-    aliDeps O2 --outgraph graph.pdf
+    aliBuild deps O2 --outgraph graph.pdf
 
 The example above generates a dependency graph for the package `O2`, and saving
 the results to a PDF file named `graph.pdf`. This is what the graph looks like:
@@ -357,13 +385,25 @@ others (this can indicate an error in the recipes).
 Connections are color-coded as well: blue connections indicate a runtime
 dependency whereas a grey connection indicate a build dependency.
 
-By default, `aliDeps` runs the usual system checks to exclude packages that can
+By default, `aliBuild deps` runs the usual system checks to exclude packages that can
 be taken from the system. If you want to display the full list of dependencies,
 you may want to use:
 
-    aliDeps O2 --no-system --outgraph graph.pdf
+    aliBuild deps O2 --no-system --outgraph graph.pdf
 
-Please run `aliDeps --help` for further information.
+Additional useful options for `aliBuild deps` include:
+
+- `--neat`: Produce a graph with transitive reduction, removing edges that are
+  implied by other paths in the graph. This can make complex dependency graphs
+  easier to read.
+- `--outdot FILE`: Keep the intermediate Graphviz dot file in `FILE`. Useful if
+  you want to manually modify the graph or generate output in different formats.
+
+For example, to generate a simplified graph and keep the dot file:
+
+    aliBuild deps O2 --neat --outdot graph.dot --outgraph graph.pdf
+
+Please run `aliBuild deps --help` for further information.
 
 ## Using the packages you have built
 

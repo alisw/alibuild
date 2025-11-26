@@ -6,7 +6,7 @@ from textwrap import dedent
 from subprocess import TimeoutExpired
 from shlex import quote
 
-from alibuild_helpers.log import debug, warning, dieOnError
+from alibuild_helpers.log import debug, error, dieOnError
 
 def decode_with_fallback(data):
   """Try to decode DATA as utf-8; if that doesn't work, fall back to latin-1.
@@ -29,7 +29,7 @@ def getoutput(command, timeout=None):
   try:
     stdout, stderr = proc.communicate(timeout=timeout)
   except TimeoutExpired:
-    warning("Process %r timed out; terminated", command)
+    error("Process %r timed out; terminated", command)
     proc.terminate()
     stdout, stderr = proc.communicate()
   dieOnError(proc.returncode, "Command %s failed with code %d: %s" %
@@ -37,13 +37,13 @@ def getoutput(command, timeout=None):
   return decode_with_fallback(stdout)
 
 
-def getstatusoutput(command, timeout=None):
+def getstatusoutput(command, timeout=None, cwd=None):
   """Run command and return its return code and output (stdout and stderr)."""
-  proc = Popen(command, shell=isinstance(command, str), stdout=PIPE, stderr=STDOUT)
+  proc = Popen(command, shell=isinstance(command, str), stdout=PIPE, stderr=STDOUT, cwd=cwd)
   try:
     merged_output, _ = proc.communicate(timeout=timeout)
   except TimeoutExpired:
-    warning("Process %r timed out; terminated", command)
+    error("Process %r timed out; terminated", command)
     proc.terminate()
     merged_output, _ = proc.communicate()
   merged_output = decode_with_fallback(merged_output)
@@ -78,24 +78,42 @@ class DockerRunner:
   instead.
   """
 
-  def __init__(self, docker_image, docker_run_args=()) -> None:
+  def __init__(self, docker_image, docker_run_args=(), extra_env={}, extra_volumes=[]) -> None:
     self._docker_image = docker_image
     self._docker_run_args = docker_run_args
     self._container = None
+    self._extra_env = extra_env
+    self._extra_volumes = extra_volumes
 
   def __enter__(self):
     if self._docker_image:
       # "sleep inf" pauses forever, until we kill it.
-      cmd = ["docker", "run", "--detach", "--rm", "--entrypoint="]
+      envOpts = []
+      volumes = []
+      for env in self._extra_env.items():
+        envOpts.append("-e")
+        envOpts.append(f"{env[0]}={env[1]}")
+      for v in self._extra_volumes:
+        volumes.append("-v")
+        volumes.append(v)
+      cmd = ["docker", "run", "--detach"] + envOpts + volumes + ["--rm", "--entrypoint="]
       cmd += self._docker_run_args
       cmd += [self._docker_image, "sleep", "inf"]
       self._container = getoutput(cmd).strip()
 
-    def getstatusoutput_docker(cmd):
+    def getstatusoutput_docker(cmd, cwd=None):
       if self._container is None:
-        return getstatusoutput("{} -c {}".format(BASH, quote(cmd)))
-      return getstatusoutput("docker container exec {} bash -c {}"
-                             .format(quote(self._container), quote(cmd)))
+        command_prefix=""
+        if self._extra_env:
+          command_prefix="env " + " ".join("{}={}".format(k, quote(v)) for (k,v) in self._extra_env.items()) + " "
+        return getstatusoutput("{}{} -c {}".format(command_prefix, BASH, quote(cmd))
+                             , cwd=cwd)
+      envOpts = []
+      for env in self._extra_env.items():
+        envOpts.append("-e")
+        envOpts.append("{}={}".format(env[0], env[1]))
+      exec_cmd = ["docker", "container", "exec"] + envOpts + [self._container, "bash", "-c", cmd]
+      return getstatusoutput(exec_cmd, cwd=cwd)
 
     return getstatusoutput_docker
 

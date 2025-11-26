@@ -15,11 +15,7 @@ here = os.path.abspath(os.path.dirname(__file__))
 with open(os.path.join(here, 'README.rst'), encoding='utf-8') as f:
     long_description = f.read()
 
-install_requires = ['pyyaml', 'requests', 'distro', 'jinja2']
-# Old setuptools versions (which pip2 uses) don't support range comparisons
-# (like :python_version >= "3.6") in extras_require, so do this ourselves here.
-if sys.version_info >= (3, 6):
-    install_requires.append('boto3==1.23.10')
+install_requires = ['pyyaml', 'requests', 'distro', 'jinja2', 'boto3']
 
 setup(
     name='alibuild',
