@@ -1019,15 +1019,10 @@ def doBuild(args, parser):
 
     # The actual build script.
     debug("spec = %r", spec)
-
-    cmd_raw = ""
-    try:
-      fp = open(dirname(realpath(__file__))+'/build_template.sh', 'r')
-      cmd_raw = fp.read()
-      fp.close()
-    except Exception:
-      from pkg_resources import resource_string
-      cmd_raw = resource_string("alibuild_helpers", 'build_template.sh')
+    
+    fp = open(dirname(realpath(__file__))+'/build_template.sh', 'r')
+    cmd_raw = fp.read()
+    fp.close()
 
     if args.docker:
       cachedTarball = re.sub("^" + workDir, "/sw", spec["cachedTarball"])
