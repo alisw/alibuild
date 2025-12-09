@@ -261,7 +261,7 @@ def detectArch():
     with open("/etc/os-release") as osr:
       osReleaseLines = osr.readlines()
     hasOsRelease = True
-  except (IOError,OSError):
+  except OSError:
     osReleaseLines = []
     hasOsRelease = False
   try:
@@ -314,7 +314,7 @@ def readDefaults(configDir, defaults, error, architecture):
   if err:
     error(err)
     sys.exit(1)
-  archDefaults = "%s/defaults-%s.sh" % (configDir, architecture)
+  archDefaults = f"{configDir}/defaults-{architecture}.sh"
   archMeta = {}
   archBody = ""
   if exists(archDefaults):
@@ -336,20 +336,20 @@ def getRecipeReader(url:str , dist=None):
     return FileReader(url)
 
 # Read a recipe from a file
-class FileReader(object):
+class FileReader:
   def __init__(self, url) -> None:
     self.url = url
   def __call__(self):
     return open(self.url).read()
 
 # Read a recipe from a git repository using git show.
-class GitReader(object):
+class GitReader:
   def __init__(self, url, configDir) -> None:
     self.url, self.configDir = url, configDir
   def __call__(self):
     m = re.search(r'^dist:(.*)@([^@]+)$', self.url)
     fn, gh = m.groups()
-    err, d = git(("show", "{gh}:{fn}.sh".format(gh=gh, fn=fn.lower())),
+    err, d = git(("show", f"{gh}:{fn.lower()}.sh"),
                  directory=self.configDir)
     if err:
       raise RuntimeError("Cannot read recipe {fn} from reference {gh}.\n"
@@ -377,7 +377,7 @@ def yamlDump(s):
       k = dumper.represent_data(k)
       v = dumper.represent_data(v)
       rep.append((k, v))
-    return yaml.nodes.MappingNode(u'tag:yaml.org,2002:map', rep)
+    return yaml.nodes.MappingNode('tag:yaml.org,2002:map', rep)
   YamlOrderedDumper.add_representer(OrderedDict, represent_ordereddict)
   return yaml.dump(s, Dumper=YamlOrderedDumper)
 
@@ -391,14 +391,14 @@ def parseRecipe(reader):
     validateSpec(spec)
   except RuntimeError as e:
     err = str(e)
-  except IOError as e:
+  except OSError as e:
     err = str(e)
   except SpecError as e:
-    err = "Malformed header for %s\n%s" % (reader.url, str(e))
+    err = f"Malformed header for {reader.url}\n{str(e)}"
   except yaml.scanner.ScannerError as e:
-    err = "Unable to parse %s\n%s" % (reader.url, str(e))
+    err = f"Unable to parse {reader.url}\n{str(e)}"
   except yaml.parser.ParserError as e:
-    err = "Unable to parse %s\n%s" % (reader.url, str(e))
+    err = f"Unable to parse {reader.url}\n{str(e)}"
   except ValueError:
     err = "Unable to parse %s. Header missing." % reader.url
   return err, spec, recipe
@@ -476,7 +476,7 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
 
     filename, pkgdir = resolveFilename(taps, pkg_filename, configDir)
 
-    dieOnError(not filename, "Package %s not found in %s" % (p, configDir))
+    dieOnError(not filename, f"Package {p} not found in {configDir}")
     assert(filename is not None)
 
     err, spec, recipe = parseRecipe(getRecipeReader(filename, configDir))
@@ -486,7 +486,7 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
     assert(spec is not None)
     assert(recipe is not None)
     dieOnError(spec["package"].lower() != pkg_filename,
-               "%s.sh has different package field: %s" % (p, spec["package"]))
+               "{}.sh has different package field: {}".format(p, spec["package"]))
     spec["pkgdir"] = pkgdir
 
     if p == "defaults-release":
@@ -502,7 +502,7 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
       recipe = ""
 
     dieOnError(spec["package"] != p,
-               "%s should be spelt %s." % (p, spec["package"]))
+               "{} should be spelt {}.".format(p, spec["package"]))
 
     # If an override fully matches a package, we apply it. This means
     # you can have multiple overrides being applied for a given package.
@@ -522,7 +522,7 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
     try:
       systemREMatches = re.match(systemRE, architecture)
     except TypeError:
-      dieOnError(True, "Malformed entry prefer_system: %s in %s" % (systemRE, spec["package"]))
+      dieOnError(True, "Malformed entry prefer_system: {} in {}".format(systemRE, spec["package"]))
 
     noSystemList = []
     if noSystem == "*":
@@ -536,7 +536,7 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
       key = spec["package"] + env
       if key not in trackingEnvCache:
         status, out = performPreferCheck(spec, trackingCode)
-        dieOnError(status, "Error while executing track_env for {}: {} => {}".format(key, trackingCode, out))
+        dieOnError(status, f"Error while executing track_env for {key}: {trackingCode} => {out}")
         trackingEnvCache[key] = out
       spec["track_env"][env] = trackingEnvCache[key]
 

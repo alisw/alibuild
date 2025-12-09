@@ -1,5 +1,3 @@
-# vim: set fileencoding=utf-8 :
-
 import unittest
 
 # Assuming you are using the mock library to ... mock things
@@ -253,8 +251,8 @@ class TestUtilities(unittest.TestCase):
     h1 = Hasher()
     h2 = Hasher()
     h3 = Hasher()
-    h1(u'\ua000')
-    h2(u'\ua001')
+    h1('\ua000')
+    h2('\ua001')
     h3(b'foo')
     self.assertEqual(h1.hexdigest(), "2af8e41129115eb231a0af76ec5465d3a9184fc4")
     self.assertEqual(h2.hexdigest(), "1619bcdbeff6828138ad9b6e43cc17e856457603")
@@ -466,7 +464,7 @@ class TestTopologicalSort(unittest.TestCase):
             "B": {"package": "B", "requires": []},
             "C": {"package": "C", "requires": []}
         }))
-        self.assertEqual(set(["A", "B", "C"]), set(result))
+        self.assertEqual({"A", "B", "C"}, set(result))
         self.assertEqual(3, len(result))
 
 if __name__ == '__main__':

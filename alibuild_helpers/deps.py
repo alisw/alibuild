@@ -83,18 +83,18 @@ def doDeps(args, parser):
       assert color, "This should not happen (happened for %s)" % k
 
     # Node definition
-    dot += '"%s" [shape=box, style="rounded,filled", fontname="helvetica", fillcolor=%s]\n' % (k,color)
+    dot += f'"{k}" [shape=box, style="rounded,filled", fontname="helvetica", fillcolor={color}]\n'
 
     # Connections (different whether it's a build dependency or a runtime one)
     for dep in spec["build_requires"]:
-     dot += '"%s" -> "%s" [color=grey70]\n' % (k, dep)
+     dot += f'"{k}" -> "{dep}" [color=grey70]\n'
     for dep in spec["runtime_requires"]:
-     dot += '"%s" -> "%s" [color=dodgerblue3]\n' % (k, dep)
+     dot += f'"{k}" -> "{dep}" [color=dodgerblue3]\n'
 
   dot += "}\n"
 
   if args.outdot:
-    fp = open(args.outdot, "wt")
+    fp = open(args.outdot, "w")
   else:
     fp = NamedTemporaryFile(delete=False, mode="wt")
   fp.write(dot)

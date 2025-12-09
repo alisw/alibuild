@@ -28,7 +28,7 @@ class Sapling(SCM):
         directory=quote(directory),
     ), timeout=SL_COMMAND_TIMEOUT_SEC)
     if err > 1:
-        raise SCMError("Error {} from sl bookmark -r . : {}".format(err, output))
+        raise SCMError(f"Error {err} from sl bookmark -r . : {output}")
     # We use "none" to indicate there are no bookmarks. This means
     # that a devel package will act as a single branch, regardless of where we are.
     if not output.strip():
