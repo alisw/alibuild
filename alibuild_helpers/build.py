@@ -1122,7 +1122,8 @@ def doBuild(args, parser):
       (spec["package"],
        args.develPrefix if "develPrefix" in args and spec["is_devel_pkg"] else spec["version"])
     )
-    err = execute(build_command, printer=progress)
+    # 8 hour timeout per package to prevent builds from hanging forever
+    err = execute(build_command, printer=progress, timeout=8*60*60)
     progress.end("failed" if err else "done", err)
     report_event("BuildError" if err else "BuildSuccess", spec["package"], " ".join((
       args.architecture,
