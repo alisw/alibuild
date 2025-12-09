@@ -105,7 +105,7 @@ class ProgressPrint:
       return
     self.erase()
     if msg:
-      sys.stderr.write(": %s%s\033[m" % ("\033[31m" if error else "\033[32m", msg))
+      sys.stderr.write(": {}{}\033[m".format("\033[31m" if error else "\033[32m", msg))
     sys.stderr.write("\n")
     sys.stderr.flush()
 

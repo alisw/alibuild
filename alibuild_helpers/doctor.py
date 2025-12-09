@@ -33,7 +33,7 @@ def checkPreferSystem(spec, cmd, homebrew_replacement, getstatusoutput_docker):
     warning("Package %s cannot be picked up from the system and will be built by aliBuild.\n"
             "This is due to the fact the following script fails:\n\n%s\n\n"
             "with the following output:\n\n%s\n",
-            spec["package"], cmd, "\n".join("%s: %s" % (spec["package"], x) for x in out.split("\n")))
+            spec["package"], cmd, "\n".join("{}: {}".format(spec["package"], x) for x in out.split("\n")))
     return (err, "")
 
 def checkRequirements(spec, cmd, homebrew_replacement, getstatusoutput_docker):
@@ -53,7 +53,7 @@ def checkRequirements(spec, cmd, homebrew_replacement, getstatusoutput_docker):
           "This is due to the fact that the following script fails:\n\n%s\n"
           "with the following output:\n\n%s\n%s\n",
           spec["package"], cmd,
-          "\n".join("%s: %s" % (spec["package"], x) for x in out.split("\n")),
+          "\n".join("{}: {}".format(spec["package"], x) for x in out.split("\n")),
           spec.get("system_requirement_missing"))
     return (err, "")
 
@@ -125,7 +125,7 @@ def doDoctor(args, parser):
   packages = []
   exitcode = 0
   for p in args.packages:
-    path = "%s/%s.sh" % (args.configDir, p.lower())
+    path = f"{args.configDir}/{p.lower()}.sh"
     if not exists(path):
       error("Cannot find recipe %s for package %s.", path, p)
       exitcode = 1
@@ -166,7 +166,7 @@ def doDoctor(args, parser):
                      taps                    = taps,
                      log                     = info)
 
-  alwaysBuilt = set(x for x in specs) - fromSystem - own - failed
+  alwaysBuilt = {x for x in specs} - fromSystem - own - failed
   if alwaysBuilt:
     banner("The following packages will be built by aliBuild because\n"
            " usage of a system version of it is not allowed or supported, by policy:\n\n- %s",

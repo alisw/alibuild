@@ -482,7 +482,7 @@ def finaliseArgs(args, parser):
       else:
         args.develPrefix = basename(dirname(abspath(args.configDir)))
     if getattr(args, "docker", False):
-      args.develPrefix = "%s-%s" % (args.develPrefix, args.architecture) if "develPrefix" in args else args.architecture
+      args.develPrefix = f"{args.develPrefix}-{args.architecture}" if "develPrefix" in args else args.architecture
 
   if args.action == "init":
     args.configDir = args.configDir % {"prefix": args.develPrefix + "/"}

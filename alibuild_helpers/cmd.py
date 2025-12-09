@@ -105,13 +105,13 @@ class DockerRunner:
       if self._container is None:
         command_prefix=""
         if self._extra_env:
-          command_prefix="env " + " ".join("{}={}".format(k, quote(v)) for (k,v) in self._extra_env.items()) + " "
-        return getstatusoutput("{}{} -c {}".format(command_prefix, BASH, quote(cmd))
+          command_prefix="env " + " ".join(f"{k}={quote(v)}" for (k,v) in self._extra_env.items()) + " "
+        return getstatusoutput(f"{command_prefix}{BASH} -c {quote(cmd)}"
                              , cwd=cwd)
       envOpts = []
       for env in self._extra_env.items():
         envOpts.append("-e")
-        envOpts.append("{}={}".format(env[0], env[1]))
+        envOpts.append(f"{env[0]}={env[1]}")
       exec_cmd = ["docker", "container", "exec"] + envOpts + [self._container, "bash", "-c", cmd]
       return getstatusoutput(exec_cmd, cwd=cwd)
 

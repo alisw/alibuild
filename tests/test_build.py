@@ -167,7 +167,7 @@ def dummy_open(x, mode="r", encoding=None, errors=None):
             result = None
         TIMES_ASKED[x] = TIMES_ASKED.get(x, 0) + 1
         if not result:
-            raise IOError
+            raise OSError
         return result
     return DEFAULT
 

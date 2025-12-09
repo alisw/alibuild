@@ -16,7 +16,7 @@ BUILD_MISSING_PKG_ERROR = "the following arguments are required: PACKAGE"
 ANALYTICS_MISSING_STATE_ERROR = "the following arguments are required: state"
 
 # A few errors we should handle, together with the expected result
-ARCHITECTURE_ERROR = u"Unknown / unsupported architecture: foo.\n\n.*"
+ARCHITECTURE_ERROR = "Unknown / unsupported architecture: foo.\n\n.*"
 PARSER_ERRORS = {
   "build --force-unknown-architecture": BUILD_MISSING_PKG_ERROR,
   "build --force-unknown-architecture zlib --foo": 'unrecognized arguments: --foo',

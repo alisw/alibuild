@@ -44,7 +44,7 @@ def writeAll(fn, txt) -> None:
 def readHashFile(fn):
   try:
     return open(fn).read().strip("\n")
-  except IOError:
+  except OSError:
     return "0"
 
 
@@ -194,7 +194,7 @@ def storeHashes(package, specs, considerRelocation):
       # spec["env"] is of type OrderedDict[str, str].
       # spec["*_path"] are of type OrderedDict[str, list[str]].
       assert isinstance(spec[key], OrderedDict), \
-        "spec[%r] was of type %r" % (key, type(spec[key]))
+        f"spec[{key!r}] was of type {type(spec[key])!r}"
 
       # Python 3.12 changed the string representation of OrderedDicts from
       # OrderedDict([(key, value)]) to OrderedDict({key: value}), so to remain
@@ -203,7 +203,7 @@ def storeHashes(package, specs, considerRelocation):
       h_all(", ".join(
         # XXX: We still rely on repr("str") being "'str'",
         # and on repr(["a", "b"]) being "['a', 'b']".
-        "(%r, %r)" % (key, value)
+        f"({key!r}, {value!r})"
         for key, value in spec[key].items()
       ))
       h_all("])")
@@ -271,7 +271,7 @@ def hash_local_changes(spec):
   h = Hasher()
   if "track_env" in spec:
     assert isinstance(spec["track_env"], OrderedDict), \
-        "spec[%r] was of type %r" % ("track_env", type(spec["track_env"]))
+        "spec[{!r}] was of type {!r}".format("track_env", type(spec["track_env"]))
 
     # Python 3.12 changed the string representation of OrderedDicts from
     # OrderedDict([(key, value)]) to OrderedDict({key: value}), so to remain
@@ -280,7 +280,7 @@ def hash_local_changes(spec):
     h(", ".join(
         # XXX: We still rely on repr("str") being "'str'",
         # and on repr(["a", "b"]) being "['a', 'b']".
-        "(%r, %r)" % (key, value) for key, value in spec["track_env"].items()))
+        f"({key!r}, {value!r})" for key, value in spec["track_env"].items()))
     h("])")
   def hash_output(msg, args):
     lines = msg % args
@@ -379,12 +379,12 @@ def generate_initdotsh(package, specs, architecture, post_build=False):
     # First, output a sensible error message if types are wrong.
     for key in ("env", "append_path", "prepend_path"):
       dieOnError(not isinstance(spec.get(key, {}), dict),
-                 "Tag `%s' in %s should be a dict." % (key, package))
+                 f"Tag `{key}' in {package} should be a dict.")
 
     # Set "env" variables.
     # We only put the values in double-quotes, so that they can refer to other
     # shell variables or do command substitution (e.g. $(brew --prefix ...)).
-    lines.extend('export {}="{}"'.format(key, value)
+    lines.extend(f'export {key}="{value}"'
                  for key, value in spec.get("env", {}).items()
                  if key != "DYLD_LIBRARY_PATH")
 
@@ -401,7 +401,7 @@ def generate_initdotsh(package, specs, architecture, post_build=False):
     # By default we add the .../bin directory to PATH and .../lib to LD_LIBRARY_PATH.
     # Prepend to these paths, so that our packages win against system ones.
     for key, value in (("PATH", "bin"), ("LD_LIBRARY_PATH", "lib")):
-      prepend_path.setdefault(key, []).insert(0, "${}_ROOT/{}".format(bigpackage, value))
+      prepend_path.setdefault(key, []).insert(0, f"${bigpackage}_ROOT/{value}")
     lines.extend('export {key}="{value}${{{key}+:${key}}}"'
                  .format(key=key, value=":".join(value))
                  for key, value in prepend_path.items()
@@ -573,7 +573,7 @@ def doBuild(args, parser):
       builtPackages = buildOrder
     if len(builtPackages) > 1:
       banner("Packages will be built in the following order:\n - %s",
-             "\n - ".join(x+" (development package)" if x in develPkgs else "%s@%s" % (x, specs[x]["tag"])
+             "\n - ".join(x+" (development package)" if x in develPkgs else "{}@{}".format(x, specs[x]["tag"])
                           for x in builtPackages if x != "defaults-release"))
     else:
       banner("No dependencies of package %s to build.", buildOrder[-1])
@@ -828,7 +828,7 @@ def doBuild(args, parser):
       develPrefix = possibleDevelPrefix
 
     if possibleDevelPrefix:
-      spec["build_family"] = "%s-%s" % (possibleDevelPrefix, args.defaults)
+      spec["build_family"] = f"{possibleDevelPrefix}-{args.defaults}"
     else:
       spec["build_family"] = args.defaults
     if spec["package"] == mainPackage:
@@ -948,7 +948,7 @@ def doBuild(args, parser):
 
     # Now that we have all the information about the package we want to build, let's
     # check if it wasn't built / unpacked already.
-    hashPath= "%s/%s/%s/%s-%s" % (workDir,
+    hashPath= "{}/{}/{}/{}-{}".format(workDir,
                                   args.architecture,
                                   spec["package"],
                                   spec["version"],
@@ -1020,7 +1020,7 @@ def doBuild(args, parser):
     # The actual build script.
     debug("spec = %r", spec)
     
-    fp = open(dirname(realpath(__file__))+'/build_template.sh', 'r')
+    fp = open(dirname(realpath(__file__))+'/build_template.sh')
     cmd_raw = fp.read()
     fp.close()
 
@@ -1036,7 +1036,7 @@ def doBuild(args, parser):
                      spec["version"] + "-" + spec["revision"])
 
     makedirs(scriptDir, exist_ok=True)
-    writeAll("%s/%s.sh" % (scriptDir, spec["package"]), spec["recipe"])
+    writeAll("{}/{}.sh".format(scriptDir, spec["package"]), spec["recipe"])
     writeAll("%s/build.sh" % scriptDir, cmd_raw % {
       "provenance": create_provenance_info(spec["package"], specs, args),
       "initdotsh_deps": generate_initdotsh(p, specs, args.architecture, post_build=False),
@@ -1099,7 +1099,7 @@ def doBuild(args, parser):
         scriptDir=quote(scriptDir),
         extraArgs=" ".join(map(quote, args.docker_extra_args)),
         additionalEnv=" ".join(
-          "-e {}={}".format(var, quote(value)) for var, value in buildEnvironment),
+          f"-e {var}={quote(value)}" for var, value in buildEnvironment),
         # Used e.g. by O2DPG-sim-tests to find the O2DPG repository.
         develVolumes=" ".join(
           '-v "$PWD/$(readlink {pkg} || echo {pkg})":/{pkg}:rw'.format(pkg=quote(spec["package"]))
@@ -1111,7 +1111,7 @@ def doBuild(args, parser):
       )
     else:
       os.environ.update(buildEnvironment)
-      build_command = "%s -e -x %s/build.sh 2>&1" % (BASH, quote(scriptDir))
+      build_command = f"{BASH} -e -x {quote(scriptDir)}/build.sh 2>&1"
 
     debug("Build command: %s", build_command)
     progress_msg = "Unpacking %s@%s" if cachedTarball else "Compiling %s@%s"
