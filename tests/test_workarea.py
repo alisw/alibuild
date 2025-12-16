@@ -63,6 +63,29 @@ class WorkareaTestCase(unittest.TestCase):
 
     @patch("os.path.exists")
     @patch("os.makedirs")
+    @patch("codecs.open")
+    @patch("alibuild_helpers.git.git")
+    @patch("alibuild_helpers.workarea.is_writeable", new=MagicMock(return_value=True))
+    def test_reference_sources_updated_custom_refspec(self, mock_git, mock_open, mock_makedirs, mock_exists):
+        """Check mirrors are updated with custom refspec when provided."""
+        mock_exists.return_value = True
+        mock_git.return_value = 0, "sentinel output"
+        mock_open.return_value = MagicMock(
+            __enter__=lambda *args, **kw: MagicMock(
+                write=lambda output: self.assertEqual(output, "sentinel output")))
+        spec = MOCK_SPEC.copy()
+        spec["ref_match_rule"] = ["+refs/heads/master:refs/heads/master"]
+        updateReferenceRepoSpec(referenceSources="sw/MIRROR", p="AliRoot",
+                                spec=spec, fetch=True)
+        mock_exists.assert_called_with("%s/sw/MIRROR/aliroot" % getcwd())
+        mock_makedirs.assert_called_with("%s/sw/MIRROR" % getcwd(), exist_ok=True)
+        mock_git.assert_called_once_with([
+            "fetch", "-f", "--prune", "--filter=blob:none", spec["source"], "+refs/heads/master:refs/heads/master",
+        ], directory="%s/sw/MIRROR/aliroot" % getcwd(), check=False, prompt=True)
+        self.assertEqual(spec.get("reference"), "%s/sw/MIRROR/aliroot" % getcwd())
+
+    @patch("os.path.exists")
+    @patch("os.makedirs")
     @patch("alibuild_helpers.git")
     @patch("alibuild_helpers.workarea.is_writeable", new=MagicMock(return_value=False))
     def test_reference_sources_not_writable(self, mock_git, mock_makedirs, mock_exists):
