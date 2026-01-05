@@ -88,14 +88,8 @@ class DockerRunner:
   def __enter__(self):
     if self._docker_image:
       # "sleep inf" pauses forever, until we kill it.
-      envOpts = []
-      volumes = []
-      for env in self._extra_env.items():
-        envOpts.append("-e")
-        envOpts.append(f"{env[0]}={env[1]}")
-      for v in self._extra_volumes:
-        volumes.append("-v")
-        volumes.append(v)
+      envOpts = [opt for k, v in self._extra_env.items() for opt in ("-e", f"{k}={v}")]
+      volumes = [opt for v in self._extra_volumes for opt in ("-v", v)]
       cmd = ["docker", "run", "--detach"] + envOpts + volumes + ["--rm", "--entrypoint="]
       cmd += self._docker_run_args
       cmd += [self._docker_image, "sleep", "inf"]
