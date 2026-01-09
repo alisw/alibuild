@@ -206,6 +206,8 @@ def doParseArgs():
                            help=("Assume we're not building %(metavar)s and all its (unique) dependencies. "
                                  "You can specify this option multiple times or separate multiple arguments "
                                  "with commas."))
+  deps_parser.add_argument("-e", dest="environment", action="append", default=[],
+                           help="KEY=VALUE binding to add to the environment. May be specified multiple times.")
 
   deps_graph = deps_parser.add_argument_group(title="Customise graph output")
   deps_graph.add_argument("--neat", dest="neat", action="store_true",
