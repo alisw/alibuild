@@ -71,6 +71,16 @@ export BUILDROOT="$ALIBUILD_BUILD_WORK_DIR/BUILD/$PKGHASH"
 export SOURCEDIR="$WORK_DIR/SOURCES/$PKGNAME/$PKGVERSION/$COMMIT_HASH"
 export BUILDDIR="$BUILDROOT/$PKGNAME"
 
+# All caching for RECC should happen relative to $WORK_DIR
+export RECC_PROJECT_ROOT=$WORK_DIR
+export RECC_WORKING_DIR_PREFIX=$WORK_DIR
+# Moreover we allow caching stuff across different builds of the same
+# package, but not across packages.
+export RECC_PREFIX_MAP=$BUILDDIR=/recc/BUILDDIR-$PKGNAME:$INSTALLROOT=/recc/INSTALLROOT-$PKGNAME:$SOURCEDIR=/recc/SOURCEDIR-$PKGNAME
+#export RECC_PREFIX_MAP=$RECC_PREFIX_MAP:$(readlink $BUILDDIR)=/recc/BUILDDIR-$PKGNAME:$(readlink $INSTALLROOT)=/recc/INSTALLROOT-$PKGNAME:$(readlink $SOURCEDIR)=/recc/SOURCEDIR-$PKGNAME
+# No point in mixing packages
+export RECC_ACTION_SALT="$PKGNAME"
+
 rm -fr "$WORK_DIR/INSTALLROOT/$PKGHASH"
 # We remove the build directory only if we are not in incremental mode.
 if [[ "$INCREMENTAL_BUILD_HASH" == 0 ]] && ! rm -rf "$BUILDROOT"; then
