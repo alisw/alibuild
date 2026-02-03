@@ -34,8 +34,6 @@ jobs:
     runs-on: macos-latest
     if: startsWith(github.ref, 'refs/tags/') && !github.event.release.prerelease
     steps:
-      - name: Install prerequisites
-        run: brew install pipgrip
       - name: Checkout Homebrew repo
         run: brew tap alisw/system-deps
       - name: Update alibuild formula with new version
@@ -49,7 +47,9 @@ jobs:
           json=$(curl -fSsL "https://pypi.org/pypi/alibuild/${version}/json")
           sha=$(echo "$json" | jq -r '.urls.[] | select(.filename | endswith(".tar.gz")) | .digests.sha256')
           url=$(echo "$json" | jq -r '.urls.[] | select(.filename | endswith(".tar.gz")) | .url')
-          brew bump-formula-pr --no-binaries --write-only alibuild --url "${url}" --sha256 "${sha}"
+
+          export PIP_BREAK_SYSTEM_PACKAGES=1 # brew bump-formula-pr tries to use pip internally
+          brew bump-formula-pr --write-only alibuild --url "${url}" --sha256 "${sha}"
       - name: Push updated formula
         run: |
           set -x
