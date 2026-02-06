@@ -1,0 +1,1285 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="reference.html">
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+    
+    
+      
+        <title>Troubleshooting - aliBuild: ALICE software builder</title>
+      
+    
+    
+      <link rel="stylesheet" href="assets/stylesheets/main.484c7ddc.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="stylesheets/extra.css">
+    
+    <script>__md_scope=new URL(".",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#common-issues" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="index.html" title="aliBuild: ALICE software builder" class="md-header__button md-logo" aria-label="aliBuild: ALICE software builder" data-md-component="logo">
+      
+  <img src="alice_logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            aliBuild: ALICE software builder
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Troubleshooting
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/alisw/alibuild" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    View source code
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="index.html" title="aliBuild: ALICE software builder" class="md-nav__button md-logo" aria-label="aliBuild: ALICE software builder" data-md-component="logo">
+      
+  <img src="alice_logo.png" alt="logo">
+
+    </a>
+    aliBuild: ALICE software builder
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/alisw/alibuild" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    View source code
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="quick.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quickstart
+  
+
+    
+      <br>
+      <small>Quick Start</small>
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="user.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User manual
+  
+
+    
+      <br>
+      <small>User command line reference manual</small>
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="reference.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+      <br>
+      <small>Recipe reference manual</small>
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+      <br>
+      <small>Troubleshooting</small>
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="troubleshooting.html" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+      <br>
+      <small>Troubleshooting</small>
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#common-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Common issues
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Common issues">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#i-have-an-error-while-compiling-aliphysics-aliroot" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        I have an error while compiling AliPhysics / AliRoot.
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-are-the-system-prerequisites-of-alibuild" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What are the system prerequisites of alibuild?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-is-pip-how-do-i-install-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is PIP ? How do I install it?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#package-branch-was-updated-but-alibuild-does-not-rebuild-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Package branch was updated, but aliBuild does not rebuild it
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#alien-broken-after-building-with-alibuild" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AliEn broken after building with aliBuild
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#alibuild-does-not-work-on-osx-with-python-shipped-with-anaconda" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        aliBuild does not work on OSX with Python shipped with ANACONDA
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#alibuild-does-not-pick-up-tool-x-from-the-system" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        aliBuild does not pick up tool X from the system
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#alibuild-fails-with-cannot-open-file-availabilitymacrosh" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AliBuild fails with cannot open file "AvailabilityMacros.h
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#i-do-not-have-privileges-and-i-cannot-install-via-pip" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        I do not have privileges and I cannot install via pip
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#i-am-changing-an-uncommitted-file-in-a-development-package-but-it-is-not-updated-in-the-installation-folder" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        I am changing an uncommitted file in a development package, but it is not updated in the installation folder.
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-do-i-set-compilation-options-for-aliroot-and-or-aliphysics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How do I set compilation options for AliRoot and / or AliPhysics?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#aliphysics-takes-very-long-time-to-build-and-builds-things-like-autotools-gcc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AliPhysics takes very long time to build and builds things like autotools, GCC
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#permission-denied-when-running-alienv-on-shared-farm-installations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Permission denied when running alienv on shared (farm) installations
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#building-on-windows-ubuntu-environment-does-not-work" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Building on Windows Ubuntu environment does not work
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#can-i-build-on-an-unsupported-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Can I build on an unsupported architecture?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-do-i-run-on-a-system-where-i-do-not-have-global-install-rights" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How do I run on a system where I do not have global install rights?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#alibuild-keeps-asking-for-my-password" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        aliBuild keeps asking for my password
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="aliBuild keeps asking for my password">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#ssh-authentication" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SSH authentication
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#caching-passwords" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Caching passwords
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#i-get-an-http2-related-error" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        I get an HTTP/2 related error
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://alice-doc.github.io/alice-analysis-tutorial/building/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ALICE/O2 tutorial
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#common-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Common issues
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Common issues">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#i-have-an-error-while-compiling-aliphysics-aliroot" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        I have an error while compiling AliPhysics / AliRoot.
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-are-the-system-prerequisites-of-alibuild" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What are the system prerequisites of alibuild?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-is-pip-how-do-i-install-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is PIP ? How do I install it?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#package-branch-was-updated-but-alibuild-does-not-rebuild-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Package branch was updated, but aliBuild does not rebuild it
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#alien-broken-after-building-with-alibuild" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AliEn broken after building with aliBuild
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#alibuild-does-not-work-on-osx-with-python-shipped-with-anaconda" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        aliBuild does not work on OSX with Python shipped with ANACONDA
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#alibuild-does-not-pick-up-tool-x-from-the-system" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        aliBuild does not pick up tool X from the system
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#alibuild-fails-with-cannot-open-file-availabilitymacrosh" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AliBuild fails with cannot open file "AvailabilityMacros.h
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#i-do-not-have-privileges-and-i-cannot-install-via-pip" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        I do not have privileges and I cannot install via pip
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#i-am-changing-an-uncommitted-file-in-a-development-package-but-it-is-not-updated-in-the-installation-folder" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        I am changing an uncommitted file in a development package, but it is not updated in the installation folder.
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-do-i-set-compilation-options-for-aliroot-and-or-aliphysics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How do I set compilation options for AliRoot and / or AliPhysics?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#aliphysics-takes-very-long-time-to-build-and-builds-things-like-autotools-gcc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AliPhysics takes very long time to build and builds things like autotools, GCC
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#permission-denied-when-running-alienv-on-shared-farm-installations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Permission denied when running alienv on shared (farm) installations
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#building-on-windows-ubuntu-environment-does-not-work" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Building on Windows Ubuntu environment does not work
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#can-i-build-on-an-unsupported-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Can I build on an unsupported architecture?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-do-i-run-on-a-system-where-i-do-not-have-global-install-rights" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How do I run on a system where I do not have global install rights?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#alibuild-keeps-asking-for-my-password" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        aliBuild keeps asking for my password
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="aliBuild keeps asking for my password">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#ssh-authentication" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SSH authentication
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#caching-passwords" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Caching passwords
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#i-get-an-http2-related-error" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        I get an HTTP/2 related error
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+  <h1>Troubleshooting</h1>
+
+<p>In case build fails you can find per-build log files under the <code>BUILD</code> directory
+located in the working directory.</p>
+<p>Assuming the working directory is <code>sw</code> (the default) and the package whose
+build failed is <code>boost</code>, you will find its log under:</p>
+<div class="language-text highlight"><pre><span></span><code>sw/BUILD/boost-latest/log
+</code></pre></div>
+<p>Note that when running <code>aliBuild --debug</code> the output is also echoed in your
+current terminal.</p>
+<h2 id="common-issues">Common issues<a class="headerlink" href="#common-issues" title="Permanent link">#</a></h2>
+<h3 id="i-have-an-error-while-compiling-aliphysics-aliroot">I have an error while compiling AliPhysics / AliRoot.<a class="headerlink" href="#i-have-an-error-while-compiling-aliphysics-aliroot" title="Permanent link">#</a></h3>
+<p>Notice that in general this kind of errors are not really aliBuild
+related, but they are genuine issues in either AliRoot and AliPhysics.
+To get the accurate and fastest feedback, the "best practice" is to do
+the following:</p>
+<ul>
+<li>Make sure you have the latest version of both AliPhysics <strong>and</strong> AliRoot. If
+  not, update to it and rebuild. Most likely someone else has already noticed
+  your problem and fixed it. aliBuild will actually remind you of doing so if
+  you are using master.</li>
+<li>If you still have a message, read what the error log for your package
+  is saying and try to extract the first error. In general you can simply
+  look for the first occurrence of <code>***</code> or <code>error:</code> and try to read a few
+  lines around there.</li>
+<li>
+<p>Try to find out who modified the files with an error last. This can be done by
+  cd-ing into <code>AliRoot</code> / <code>AliPhysics</code>, issuing:</p>
+<p>git log @{yesterday}.. -- <name-of-the-file-with-error></p>
+</li>
+</ul>
+<p>and reading who was the author of the last few commits.
+- Write a message to <code>alice-project-analysis-task-force@cern.ch</code>
+  explaining the error. Make sure you report the first few lines of it you
+  have identified above, and to include the author of the last changes in
+  the problematic file.
+- Make sure you do <strong>not</strong> attach big log files since they will cause a
+  traffic storm since the list has many participants and each one of them
+  will get a copy of the attachment, even if not interested. A much better
+  approach is to use a service like <a href="https://cernbox.cern.ch">CERNBox</a>,
+  Dropbox or alikes which allow to share files by providing a link to them,
+  rather than by attachment.</p>
+<h3 id="what-are-the-system-prerequisites-of-alibuild">What are the system prerequisites of alibuild?<a class="headerlink" href="#what-are-the-system-prerequisites-of-alibuild" title="Permanent link">#</a></h3>
+<p>In principle aliBuild should now notify you for missing required system
+dependencies and complain with a clear message if that is not the case. For
+example if you lack bz2 it will now tell you with the following message:</p>
+<div class="language-text highlight"><pre><span></span><code>Please install bzip2 development package on your system
+</code></pre></div>
+<p>Moreover it will try to reuse as much as possible from your system, so
+if you have a system CMake which is compatible with the one required by
+AliRoot it will also pick up your version. Failing that it will build it
+for you. You can have a look at what AliRoot will do by adding the <code>--dry-run</code>
+option to your build command, e.g.:</p>
+<div class="language-text highlight"><pre><span></span><code>alibuild --dry-run &lt;additional options you might have&gt; build AliRoot
+</code></pre></div>
+<p>will tell you something like:</p>
+<div class="language-text highlight"><pre><span></span><code>Using package CMake from the system as preferred choice.
+Using package libxml2 from the system as preferred choice.
+Using package SWIG from the system as preferred choice.
+Using package zlib from the system as preferred choice.
+Using package autotools from the system as preferred choice.
+Using package GSL from the system as preferred choice.
+System package boost cannot be used. Building our own copy.
+We will build packages in the following order: defaults-release AliEn-CAs GMP UUID gSOAP ApMon-CPP GEANT4 boost MPFR MonALISA-gSOAP-client cgal XRootD fastjet xalienfs AliEn-Runtime ROOT vgm GEANT3 GEANT4_VMC AliRoot
+</code></pre></div>
+<p>If you have a system package which you think should be used but it's not, you
+can run <code>aliBuild doctor &lt;package-name&gt;</code> to try to understand why that was the
+case (or you can <a href="https://github.com/alisw/alidist/issues">open a bug report</a>
+with its output and we will look at it).</p>
+<h3 id="what-is-pip-how-do-i-install-it">What is PIP ? How do I install it?<a class="headerlink" href="#what-is-pip-how-do-i-install-it" title="Permanent link">#</a></h3>
+<p><a href="https://pip.pypa.io/en/stable/">PIP</a> is the de-facto standard package manager
+for python. While it is usually installed by default on modern distributions,
+it can happen this is not the case. If so, you can usually get it via:</p>
+<div class="language-text highlight"><pre><span></span><code>sudo yum install python-pip     # (Centos / Fedora / SLC derivatives)
+sudo dnf install python-pip     # (Fedora 22+)
+sudo apt-get install python-pip # (Ubuntu / Debian alikes)
+</code></pre></div>
+<p>Alternatively you can try to install it by hand by following the <a href="https://pip.pypa.io/en/stable/installation/#supported-methods">instructions
+here</a>.</p>
+<h3 id="package-branch-was-updated-but-alibuild-does-not-rebuild-it">Package branch was updated, but aliBuild does not rebuild it<a class="headerlink" href="#package-branch-was-updated-but-alibuild-does-not-rebuild-it" title="Permanent link">#</a></h3>
+<p>Some recipes specify branches in the <code>tag:</code> field instead of an actual tag. For
+such recipes, aliBuild must contact remote servers in order to determine what is
+the latest commit for that branch. Since this is a corner case and the operation
+is expensive and slow, it is off by default, and cached information is used
+instead. Try to ask aliBuild to update its cached information by using the <code>-u</code>
+or <code>--fetch-repos</code> switch.</p>
+<h3 id="alien-broken-after-building-with-alibuild">AliEn broken after building with aliBuild<a class="headerlink" href="#alien-broken-after-building-with-alibuild" title="Permanent link">#</a></h3>
+<p>If you are migrating from other ALICE build instructions to use aliBuild
+and you are running on OSX, it could happen that you encounter an error
+of the kind:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>dlopen<span class="w"> </span>error:<span class="w"> </span>dlopen<span class="o">(</span>/Users/me/alice/sw/osx_x86-64/ROOT/v5-34-30-alice-1/lib/libNetx.so,<span class="w"> </span><span class="m">9</span><span class="o">)</span>:<span class="w"> </span>Library<span class="w"> </span>not<span class="w"> </span>loaded:<span class="w"> </span>libXrdUtils.1.dylib
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span>Referenced<span class="w"> </span>from:<span class="w"> </span>/Users/me/alice/sw/osx_x86-64/ROOT/v5-34-30-alice-1/lib/libNetx.so
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span>Reason:<span class="w"> </span>image<span class="w"> </span>not<span class="w"> </span>found
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>Load<span class="w"> </span>Error:<span class="w"> </span>Failed<span class="w"> </span>to<span class="w"> </span>load<span class="w"> </span>Dynamic<span class="w"> </span>link<span class="w"> </span>library<span class="w"> </span>/Users/me/alice/sw/osx_x86-64/ROOT/v5-34-30-alice-1/lib/libNetx.so
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>E-TCint::AutoLoadCallback:<span class="w"> </span>failure<span class="w"> </span>loading<span class="w"> </span>dependent<span class="w"> </span>library<span class="w"> </span>libNetx.so<span class="w"> </span><span class="k">for</span><span class="w"> </span>class<span class="w"> </span>TAlienJDL
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>dlopen<span class="w"> </span>error:<span class="w"> </span>dlopen<span class="o">(</span>/Users/me/alice/sw/osx_x86-64/ROOT/v5-34-30-alice-1/lib/libRAliEn.so,<span class="w"> </span><span class="m">9</span><span class="o">)</span>:<span class="w"> </span>Library<span class="w"> </span>not<span class="w"> </span>loaded:<span class="w"> </span>/Users/jmargutti/alice/sw/INSTALLROOT/ac18e6eaa3ed801ac1cd1e788ac08c82ffd29235/osx_x86-64/xalienfs/v1.0.14r1-1/lib/libgapiUI.4.so
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">  </span>Referenced<span class="w"> </span>from:<span class="w"> </span>/Users/me/alice/sw/osx_x86-64/ROOT/v5-34-30-alice-1/lib/libRAliEn.so
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">  </span>Reason:<span class="w"> </span>image<span class="w"> </span>not<span class="w"> </span>found
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>Load<span class="w"> </span>Error:<span class="w"> </span>Failed<span class="w"> </span>to<span class="w"> </span>load<span class="w"> </span>Dynamic<span class="w"> </span>link<span class="w"> </span>library<span class="w"> </span>/Users/me/alice/sw/osx_x86-64/ROOT/v5-34-30-alice-1/lib/libRAliEn.so
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>E-TCint::AutoLoadCallback:<span class="w"> </span>failure<span class="w"> </span>loading<span class="w"> </span>library<span class="w"> </span>libRAliEn.so<span class="w"> </span><span class="k">for</span><span class="w"> </span>class<span class="w"> </span>TAlienJDL
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>dlopen<span class="w"> </span>error:<span class="w"> </span>dlopen<span class="o">(</span>/Users/me/alice/sw/osx_x86-64/AliEn-Runtime/v2-19-le-1/lib/libgapiUI.so,<span class="w"> </span><span class="m">9</span><span class="o">)</span>:<span class="w"> </span>Library<span class="w"> </span>not<span class="w"> </span>loaded:<span class="w"> </span>libXrdSec.0.dylib
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="w">  </span>Referenced<span class="w"> </span>from:<span class="w"> </span>/Users/me/alice/sw/osx_x86-64/AliEn-Runtime/v2-19-le-1/lib/libgapiUI.so
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="w">  </span>Reason:<span class="w"> </span>image<span class="w"> </span>not<span class="w"> </span>found
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>Load<span class="w"> </span>Error:<span class="w"> </span>Failed<span class="w"> </span>to<span class="w"> </span>load<span class="w"> </span>Dynamic<span class="w"> </span>link<span class="w"> </span>library<span class="w"> </span>/Users/me/alice/sw/osx_x86-64/AliEn-Runtime/v2-19-le-1/lib/libgapiUI.so
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>E-P010_TAlien:<span class="w"> </span>Please<span class="w"> </span>fix<span class="w"> </span>your<span class="w"> </span>loader<span class="w"> </span>path<span class="w"> </span>environment<span class="w"> </span>variable<span class="w"> </span>to<span class="w"> </span>be<span class="w"> </span>able<span class="w"> </span>to<span class="w"> </span>load<span class="w"> </span>libRAliEn.so
+</span></code></pre></div>
+<p>This happens because the new version of AliEn compiled by aliBuild is
+incompatible with the old one. You can fix this issue by doing:</p>
+<ol>
+<li>Remove old alien token stuff from <code>/tmp</code> (e.g. <code>rm /tmp/gclient_env* /tmp/gclient_token* /tmp/x509*</code>)</li>
+<li>Get a new token</li>
+<li>Source <code>/tmp/gclient_env*</code> file</li>
+</ol>
+<p>and trying again.</p>
+<h3 id="alibuild-does-not-work-on-osx-with-python-shipped-with-anaconda">aliBuild does not work on OSX with Python shipped with ANACONDA<a class="headerlink" href="#alibuild-does-not-work-on-osx-with-python-shipped-with-anaconda" title="Permanent link">#</a></h3>
+<p>If you are using ANACONDA (<code>which python</code> to verify), the old version of
+aliBuild had troubles with it. Upgrading to the latest version via:</p>
+<div class="language-text highlight"><pre><span></span><code>pip install --upgrade alibuild
+</code></pre></div>
+<p>or by doing <code>git pull</code> should fix the issue.</p>
+<h3 id="alibuild-does-not-pick-up-tool-x-from-the-system">aliBuild does not pick up tool X from the system<a class="headerlink" href="#alibuild-does-not-pick-up-tool-x-from-the-system" title="Permanent link">#</a></h3>
+<p>By default aliBuild prefers using tools from the system whenever
+possible. Examples of those tools are CMake, the GCC compiler or the
+autotools suite. If this does not happen even if you have it installed
+it means that aliBuild does not consider you system tool good enough to
+be compatible with the one provided by the recipe. You can verify what
+happens during the system tool detection by running:</p>
+<div class="language-text highlight"><pre><span></span><code>aliBuild doctor &lt;package name&gt;
+</code></pre></div>
+<h3 id="alibuild-fails-with-cannot-open-file-availabilitymacrosh">AliBuild fails with <code>cannot open file "AvailabilityMacros.h</code><a class="headerlink" href="#alibuild-fails-with-cannot-open-file-availabilitymacrosh" title="Permanent link">#</a></h3>
+<p>If your build fails with:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>Error: cannot open file &quot;AvailabilityMacros.h&quot; sw/BUILD/.../ROOT/include/RConfig.h:384:
+</span></code></pre></div>
+<p>and you are on macOS, this most likely means you have an incomplete XCode installation,
+e.g. due to an upgrade. You can fix this with:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>xcode-select --install
+</span></code></pre></div>
+<h3 id="i-do-not-have-privileges-and-i-cannot-install-via-pip">I do not have privileges and I cannot install via pip<a class="headerlink" href="#i-do-not-have-privileges-and-i-cannot-install-via-pip" title="Permanent link">#</a></h3>
+<p>If you do not have root privileges on your machine and <code>pip install alibuild</code>
+fails, you have two options:</p>
+<ul>
+<li>
+<p>If your pip supports it, you can add the <code>--user</code> flag and that will install
+  alibuild in <code>~/.local</code>. I.e.:</p>
+<p>pip install --user alibuild</p>
+</li>
+<li>
+<p>If your pip is old or if you do not have pip at all on your system or
+  you do not want to use pip for whatever reasons, you can still simply
+  checkout the sources with:</p>
+<p>git clone https://github.com/alisw/alibuild</p>
+</li>
+</ul>
+<p>and simply run alibuild by invoking <code>alibuild/aliBuild</code>.</p>
+<h3 id="i-am-changing-an-uncommitted-file-in-a-development-package-but-it-is-not-updated-in-the-installation-folder">I am changing an uncommitted file in a development package, but it is not updated in the installation folder.<a class="headerlink" href="#i-am-changing-an-uncommitted-file-in-a-development-package-but-it-is-not-updated-in-the-installation-folder" title="Permanent link">#</a></h3>
+<p>If you add a file to a development package and the build recipe is
+able to handle uncommitted files, it will be copied the first time.</p>
+<p>However alibuild considers any untracked file as the same, and therefore unless
+the file is added or committed to the local clone of the development package any
+subsequent rebuild will ignore the changes. This can be worked around in two ways:</p>
+<ol>
+<li>You add the file to your local clone via git add / git commit</li>
+<li>You add an incremental_recipe which is able to handle uncommitted files</li>
+</ol>
+<p>What 1. does is to make alibuild aware of the changes of the new file, so you
+will get a new build for each change to the file. What 2. does is to always
+execute the incremental recipe to refresh the installation folder on each aliBuild
+invocation, possibly updating untracked files if so specified in the recipe itself.</p>
+<h3 id="how-do-i-set-compilation-options-for-aliroot-and-or-aliphysics">How do I set compilation options for AliRoot and / or AliPhysics?<a class="headerlink" href="#how-do-i-set-compilation-options-for-aliroot-and-or-aliphysics" title="Permanent link">#</a></h3>
+<p>If you want to change the compilation options for AliRoot, AliPhysics,
+or as a matter of fact any packages you have two options:</p>
+<ul>
+<li>If the package itself is one which you are developing locally, i.e.
+  you have the checkout available, you can modify its CMakeFile, add
+  whatever options you like there and then issue again your aliBuild
+  command.</li>
+<li>On contrary, if you do not have a local checkout but you still want to
+  modify it's compiler flags, you can edit the <code>alidist/aliroot.sh</code> recipe
+  and add the options there.</li>
+</ul>
+<p>Finally, for certain common options, e.g. debug flags, we provide a
+precooked configuration using so called <a href="user.html#defaults">defaults</a>.
+Simply add <code>--defaults debug</code> to your aliBuild flags and it will add
+debug flags to all your packages.</p>
+<h3 id="aliphysics-takes-very-long-time-to-build-and-builds-things-like-autotools-gcc">AliPhysics takes very long time to build and builds things like autotools, GCC<a class="headerlink" href="#aliphysics-takes-very-long-time-to-build-and-builds-things-like-autotools-gcc" title="Permanent link">#</a></h3>
+<p>In order to build AliPhysics, a number of externals are required,
+including working autotools, boost, and GCC. While aliBuild tries it
+best to reuse whatever comes from the system, it will not complain when
+building unless one of the system dependencies is absolutely required
+(e.g. X11, perl). This might lead to the fact it will rebuild large
+tool, where simply installing them might be a better option. For this
+reason we suggest that users run:</p>
+<div class="language-text highlight"><pre><span></span><code>aliBuild doctor AliPhysics
+</code></pre></div>
+<p>in the same path where their <code>alidist</code> folder is, before actually
+starting to build, so that they can get an overview of what will be
+picked up from the system and what not.</p>
+<p>Notice that if you change (either add or remove) your set of system
+dependencies, aliBuild will trigger a rebuild of whatever depends on
+them, taking additional time, so make sure you do this when not pressed
+for a deadline.</p>
+<h3 id="permission-denied-when-running-alienv-on-shared-farm-installations">Permission denied when running alienv on shared (farm) installations<a class="headerlink" href="#permission-denied-when-running-alienv-on-shared-farm-installations" title="Permanent link">#</a></h3>
+<p>When attempting to do <code>alienv</code> operations on shared (farm) installations you
+might get a number of <code>Permission denied</code> errors. In order to fix this problem
+you need to make sure that shared builds with <code>aliBuild</code> are always made by the
+same user. In addition after every <code>aliBuild</code> run the person who has run it has
+to run the following command in order to generate all the correct modulefiles
+as seen by the users:</p>
+<div class="language-text highlight"><pre><span></span><code>alienv q
+</code></pre></div>
+<p>Users have to append the <code>--no-refresh</code> option to every <code>alienv</code> operation, for
+instance:</p>
+<div class="language-text highlight"><pre><span></span><code>alienv --no-refresh enter AliPhysics/latest
+</code></pre></div>
+<p>Note that the <code>--no-refresh</code> option is not necessary anymore starting from
+<code>v1.4.0.rc1</code>.</p>
+<h3 id="building-on-windows-ubuntu-environment-does-not-work">Building on Windows Ubuntu environment does not work<a class="headerlink" href="#building-on-windows-ubuntu-environment-does-not-work" title="Permanent link">#</a></h3>
+<p>At the time of writing, neither Windows native nor the Ubuntu environment 
+on Windows are supported and most likely this will stay the same unless some
+third party does the work and provides a pull request.</p>
+<h3 id="can-i-build-on-an-unsupported-architecture">Can I build on an unsupported architecture?<a class="headerlink" href="#can-i-build-on-an-unsupported-architecture" title="Permanent link">#</a></h3>
+<p>You can try, but of course your mileage might vary. In case the architecture is similar to one of the supported ones (e.g. Ubuntu and Kubuntu) this should be recognized automatically and the build should proceed, attempting to use the supported one. This will still not guarantee things will not break for some packages.</p>
+<p>In case the architecture is completely unknown to us, you will get a message:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>ERROR: Cannot autodetect architecture
+</span></code></pre></div>
+<p>if you still want to try, you can use the <code>--force-unknown-architecture</code> option and while we strive our best to help you out also in this case, sometimes priorities force us to simply ignore support requests.</p>
+<h3 id="how-do-i-run-on-a-system-where-i-do-not-have-global-install-rights">How do I run on a system where I do not have global install rights?<a class="headerlink" href="#how-do-i-run-on-a-system-where-i-do-not-have-global-install-rights" title="Permanent link">#</a></h3>
+<p>If you want to run on a system where you do not have global install rights, and
+the PyYAML package is not installed (e.g. lxplus), you can still do so by using
+the <code>--user</code> flag when you install with <code>pip</code>. This will install alibuild under
+<code>~/.local/bin</code>.</p>
+<p>This means that you need to do (only once):</p>
+<div class="language-text highlight"><pre><span></span><code>pip install --user --upgrade alibuild
+</code></pre></div>
+<p>and then adapt you PATH to pickup the local installation, e.g. via:</p>
+<div class="language-text highlight"><pre><span></span><code>export PATH=~/.local/bin:$PATH
+</code></pre></div>
+<h3 id="alibuild-keeps-asking-for-my-password">aliBuild keeps asking for my password<a class="headerlink" href="#alibuild-keeps-asking-for-my-password" title="Permanent link">#</a></h3>
+<p>Some packages you may need to build have their source code in a protected repository on CERN GitLab.
+This means that you may be asked for a username and password when you run <code>aliBuild build</code>.
+See below for ways to avoid being prompted too often.</p>
+<h4 id="ssh-authentication">SSH authentication<a class="headerlink" href="#ssh-authentication" title="Permanent link">#</a></h4>
+<p>You can use an SSH key to authenticate with CERN GitLab.
+This way, you will not be prompted for your GitLab password at all.
+To do this, find your public key (this usually lives in <code>~/.ssh/id_rsa.pub</code>) and copy the contents of the file into <a href="https://gitlab.cern.ch/-/user_settings/ssh_keys">your user settings on CERN GitLab</a>.
+If you have no SSH key, you can generate one using the <code>ssh-keygen</code> command.
+Then, configure git to use SSH to authenticate with CERN GitLab using the following command:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>git<span class="w"> </span>config<span class="w"> </span>--global<span class="w"> </span><span class="s1">&#39;url.ssh://git@gitlab.cern.ch:7999/.insteadof&#39;</span><span class="w"> </span><span class="s1">&#39;https://gitlab.cern.ch/&#39;</span>
+</span></code></pre></div>
+<h4 id="caching-passwords">Caching passwords<a class="headerlink" href="#caching-passwords" title="Permanent link">#</a></h4>
+<p>If you prefer not to use SSH keys as described above, you can alternatively configure git to remember the passwords you input for a short time (such as a few hours).
+In order to do this, run the command below (which remembers your passwords for an hour each time you type them into git).</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>git<span class="w"> </span>config<span class="w"> </span>--global<span class="w"> </span>credential.helper<span class="w"> </span><span class="s1">&#39;cache --timeout 3600&#39;</span>
+</span></code></pre></div>
+<p>You can adjust the timeout (3600 seconds, above) to your liking, if you would prefer git to remember your passwords for longer.</p>
+<h4 id="i-get-an-http2-related-error">I get an HTTP/2 related error<a class="headerlink" href="#i-get-an-http2-related-error" title="Permanent link">#</a></h4>
+<p>Some network provider do not support HTTP/2 apparently. If you get:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>error:<span class="w"> </span>RPC<span class="w"> </span>failed<span class="p">;</span><span class="w"> </span>curl<span class="w"> </span><span class="m">92</span><span class="w"> </span>HTTP/2<span class="w"> </span>stream<span class="w"> </span><span class="m">5</span><span class="w"> </span>was<span class="w"> </span>not<span class="w"> </span>closed<span class="w"> </span>cleanly:<span class="w"> </span>CANCEL<span class="w"> </span><span class="o">(</span>err<span class="w"> </span><span class="m">8</span><span class="o">)</span>
+</span></code></pre></div>
+<p>or similar message, try to disable HTTP/2 with something like:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>git config --global http.version HTTP/1.1
+</span></code></pre></div>
+
+
+
+
+
+
+
+  
+  
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": ".", "features": [], "search": "assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

@@ -1,0 +1,1116 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="user.html">
+      
+      
+        <link rel="next" href="troubleshooting.html">
+      
+      
+        
+      
+      
+      <link rel="icon" href="assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+    
+    
+      
+        <title>Reference - aliBuild: ALICE software builder</title>
+      
+    
+    
+      <link rel="stylesheet" href="assets/stylesheets/main.484c7ddc.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="stylesheets/extra.css">
+    
+    <script>__md_scope=new URL(".",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#recipe-formats" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="index.html" title="aliBuild: ALICE software builder" class="md-header__button md-logo" aria-label="aliBuild: ALICE software builder" data-md-component="logo">
+      
+  <img src="alice_logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            aliBuild: ALICE software builder
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Reference
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/alisw/alibuild" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    View source code
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="index.html" title="aliBuild: ALICE software builder" class="md-nav__button md-logo" aria-label="aliBuild: ALICE software builder" data-md-component="logo">
+      
+  <img src="alice_logo.png" alt="logo">
+
+    </a>
+    aliBuild: ALICE software builder
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/alisw/alibuild" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    View source code
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="quick.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quickstart
+  
+
+    
+      <br>
+      <small>Quick Start</small>
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="user.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User manual
+  
+
+    
+      <br>
+      <small>User command line reference manual</small>
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+      <br>
+      <small>Recipe reference manual</small>
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="reference.html" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+      <br>
+      <small>Recipe reference manual</small>
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#recipe-formats" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recipe formats
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Recipe formats">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-header" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The header
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-body" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The body
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#defaults" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Defaults
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#architecture-defaults" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Architecture defaults
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#relocation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Relocation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#build-environment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Build environment
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#runtime-environment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Runtime environment
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="troubleshooting.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+      <br>
+      <small>Troubleshooting</small>
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://alice-doc.github.io/alice-analysis-tutorial/building/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ALICE/O2 tutorial
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#recipe-formats" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recipe formats
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Recipe formats">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-header" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The header
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-body" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The body
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#defaults" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Defaults
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#architecture-defaults" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Architecture defaults
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#relocation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Relocation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#build-environment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Build environment
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#runtime-environment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Runtime environment
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+  <h1>Reference</h1>
+
+<ol>
+<li><a href="#recipe-formats">Recipe formats</a><ol>
+<li><a href="#the-header">The header</a></li>
+<li><a href="#the-body">The body</a></li>
+<li><a href="#defaults">Defaults, common requirements for builds</a></li>
+</ol>
+</li>
+<li><a href="#relocation">Relocation</a></li>
+</ol>
+<h2 id="recipe-formats">Recipe formats<a class="headerlink" href="#recipe-formats" title="Permanent link">#</a></h2>
+<p>The recipes are found in the a separate repository. The repository can be
+specified via the <code>-c</code> option and defaults to <em>alidist</em>.</p>
+<p>The recipes themselves are called <code>&lt;package&gt;.sh</code> where <code>&lt;package&gt;</code> is the name
+of the package whose build recipe is described. Please note that all recipe
+filenames are lowercase: <em>e.g.</em> the recipe for <code>ROOT</code> will be in <code>root.sh</code>.</p>
+<p>The recipe itself is made up of two parts: an header, and the actual build
+script, separated by three dashes (<code>---</code>) standalone.</p>
+<p>The header is in <a href="https://yaml.org">YAML</a> format and contains metadata about the
+package, like its name, version and where to find the sources.</p>
+<p>The build script is a standard build script which is invoked by the tool to
+perform the build itself. A few environment variable can be expected to be
+defined when the script is invoked.</p>
+<p>An example recipe for <code>zlib</code> is the following:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">package</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">zlib</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v1.2.8</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="nt">source</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://github.com/madler/zlib</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="nt">tag</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v1.2.8</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="nn">---</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="c1">#!/bin/bash -ex</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="l l-Scalar l-Scalar-Plain">./configure --prefix=$INSTALLROOT</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="l l-Scalar l-Scalar-Plain">make ${JOBS+-j $JOBS}</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="l l-Scalar l-Scalar-Plain">make install</span>
+</span></code></pre></div>
+<h3 id="the-header">The header<a class="headerlink" href="#the-header" title="Permanent link">#</a></h3>
+<p>The following entries are mandatory in the header:</p>
+<ul>
+<li><code>package</code>: the name of the package</li>
+<li>
+<p><code>version</code>: a mnemonic for the version which will be used in the name
+    of the package. Notice you can actually use some special formatting
+    substitutions which will be replaced with the associated value on build.
+    Valid substitutions are:</p>
+<ul>
+<li><code>%(branch_basename)s</code>: the name of the current alidist branch, without
+    the leading <code>refs/heads/</code>.</li>
+<li><code>%(branch_stream)s</code>: in case the alidist branch ends in <code>-patches</code>, the
+    name of branch without <code>-patches</code>. If the branch does not end in
+    <code>-patches</code>, the <code>tag</code> field of the recipe is used.</li>
+<li><code>%(commit_hash)s</code>: if the <code>tag</code> field is a git tag, then the tag name.
+    If it is a branch or raw git commit hash instead, then the raw git
+    commit hash pointing to the <code>HEAD</code> of that branch, or said commit hash.</li>
+<li><code>%(short_hash)s</code>: like <code>%(commit_hash)s</code>, but cut off after 10 characters.</li>
+<li><code>%(tag)s</code>: the <code>tag</code> key specified in the recipe.</li>
+<li><code>%(tag_basename)s</code> if the <code>tag</code> resembles a path, <em>e.g.</em>
+    <code>refs/tags/a/b/c</code>, returns the last part of the path, <code>c</code> in this case.</li>
+<li><code>%(defaults_upper)s</code>: if building with <code>release</code> defaults, this is the
+    empty string; else, this is an underscore and then the name defaults,
+    uppercased, with <code>-</code> replaced by <code>_</code>. For example, if building with
+    <code>o2-dataflow</code> defaults, <code>%(default_upper)s</code> would be <code>_O2_DATAFLOW</code>.</li>
+<li><code>%(year)s</code></li>
+<li><code>%(month)s</code></li>
+<li><code>%(day)s</code></li>
+<li><code>%(hour)s</code></li>
+</ul>
+<p>Month, day and hour are zero-padded to two digits.</p>
+</li>
+</ul>
+<p>The following entries are optional in the header:</p>
+<ul>
+<li>
+<p><code>source</code>: URL of a Git repository from which the source is downloaded.
+    It's good practice to make sure that they are already patched, so that you
+    can easily point to the actual sources used by the software.</p>
+</li>
+<li>
+<p><code>write_repo</code>: in case the repository URL to be used for developing is
+    different from the <code>source</code>, set this key. It is used by <code>aliBuild init</code>,
+    which will initialise your local repository with the <code>upstream</code> remote
+    pointing at this URL instead of the one in <code>source</code>.</p>
+</li>
+<li>
+<p><code>tag</code>: git reference in the above mentioned repository which points to the
+    software to be built. This can be a tag name, a branch name or a commit
+    hash.</p>
+</li>
+<li>
+<p><code>env</code>: dictionary whose key-value pairs are environment variables to be set
+    after the recipe is built. The values are interpreted as the contents of a
+    double-quoted shell string, so you can reference other environment variables
+    as <code>$VARIABLE</code>, which will be substituted each time another recipe is built.
+    For example:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">env</span><span class="p">:</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="s">&quot;$ROOTSYS&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">$ROOT_ROOT</span>
+</span></code></pre></div>
+<p>These variables <strong>will not</strong> be available in the recipe itself, as they are
+intended to be used to point to build products of the current recipe. If you
+need to set an environment variable for use in the recipe, use
+<code>export VARIABLE=value</code> in the recipe body.</p>
+</li>
+<li>
+<p><code>prepend_path</code>: dictionary whose key-value pairs are an environment variable
+    name and a path to be prepended to it, as it happens in <code>LD_LIBRARY_PATH</code>.
+    This happens only after the package declaring the <code>prepend_path</code> in question
+    is built, so it is not available in the same recipe (just like variables
+    declared using <code>env</code>). You can append multiple paths to a single variable
+    by specifying a list too, <em>e.g.</em>:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nt">prepend_path</span><span class="p">:</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="s">&quot;PATH&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="s">&quot;$FOO_ROOT/binexec/foobar&quot;</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span><span class="s">&quot;LD_LIBRARY_PATH&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="w"> </span><span class="s">&quot;$FOO_ROOT/sub/lib&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;$FOO_ROOT/sub/lib64&quot;</span><span class="w"> </span><span class="p p-Indicator">]</span>
+</span></code></pre></div>
+<p>will result in prepending <code>$FOO_ROOT/binexec/foobar</code> to <code>$PATH</code>, and both
+<code>$FOO_ROOT/sub/lib</code> and <code>lib64</code> to <code>LD_LIBRARY_PATH</code>.</p>
+</li>
+<li>
+<p><code>append_path</code>: same as <code>prepend_path</code> but paths are appended rather than
+    prepended. Like <code>append_path</code> and <code>env</code>, this <strong>does not</strong> affect the
+    environment of the current recipe.</p>
+</li>
+<li>
+<p><code>requires</code>: a list of run-time dependencies for the package, <em>e.g.</em>:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">package</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">AliRoot</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="nt">requires</span><span class="p">:</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ROOT</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span><span class="l l-Scalar l-Scalar-Plain">...</span>
+</span></code></pre></div>
+<p>The specified dependencies will be built before building the given package.
+You can specify platform-specific dependencies by appending <code>:&lt;regexp&gt;</code> to
+the dependency name. Similarly, you can specify build default specific dependencies
+by appending <code>:defaults=&lt;regex&gt;</code>.</p>
+<p>Such a regular expression will be matched against the
+architecture provided via <code>--architecture</code>, and if it does not match, the
+requirement will not be included. For instance:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nt">package</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">AliRoot-test</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nt">requires</span><span class="p">:</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;igprof:(?!osx).*&quot;</span>
+</span></code></pre></div>
+<p>will make sure that <code>IgProf</code> is only built on platforms whose name does not
+begin with <code>osx</code>.</p>
+</li>
+<li>
+<p><code>build_requires</code>: a list of build-time dependencies for the package. Like
+    <code>requires</code>, these packages will be built before the current package is
+    built.</p>
+<p>Packages in this list are marked specially in the dependency graph
+produced by <code>aliBuild deps</code>. Other tools treat these packages differently from
+<code>requires</code>: for instance, RPMs produced for a package won't depend on its
+<code>build_requires</code>, and <code>alibuild-generate-module</code> won't pull in build
+requirements' modulefiles.</p>
+</li>
+<li>
+<p><code>force_rebuild</code>: set it to <code>true</code> to force re-running the build recipe every
+    time you invoke alibuild on it.</p>
+</li>
+<li>
+<p><code>prefer_system_check</code>: a script which is used to determine whether
+    or not the system equivalent of the package can be used. See also
+    <code>prefer_system</code>. If the <code>--no-system</code> option is specified, this key is not
+    checked. The shell exit code is used to steer the build: if the check
+    returns 0, the system package is used and the recipe is not run. If it
+    returns non-zero, our own version of the package is built through the
+    recipe.</p>
+</li>
+<li>
+<p><code>prefer_system</code>: a regular expression for architectures which should
+    use the <code>prefer_system_check</code> by default to determine if the system version
+    of the tool can be used. When the rule matches, the result of
+    <code>prefer_system_check</code> determines whether to build the recipe. When the rule
+    does not match, the check is skipped and the recipe is run. Using the switch
+    <code>--always-prefer-system</code> runs the check always (even when the regular
+    expression for the architecture does not match).</p>
+</li>
+<li>
+<p><code>relocate_paths</code>: a list of toplevel paths scanned recursively to perform
+    relocation of executables and dynamic libraries <strong>on macOS only</strong>. If not
+    specified, defaults to <code>bin</code>, <code>lib</code> and <code>lib64</code>.</p>
+</li>
+</ul>
+<h3 id="the-body">The body<a class="headerlink" href="#the-body" title="Permanent link">#</a></h3>
+<p>This is the build script executed to effectively build and install your
+software. Being a shell script you can be as flexible as you want in its
+definition.</p>
+<p>Some environment variables are made available to the script.</p>
+<ul>
+<li><code>INSTALLROOT</code>: the installation prefix. This is commonly passed in the form
+   <code>./configure --prefix=$INSTALLROOT</code> or
+   <code>cmake -DCMAKE_INSTALL_PREFIX=$INSTALLROOT</code>. The build tool will create an
+   archive based on the sole content of this directory.</li>
+<li><code>PKGNAME</code>: name of the current package.</li>
+<li><code>PKGVERSION</code>: package version, as defined in the recipe's <code>version:</code> field.</li>
+<li><code>PKGREVISION</code>: the "build iteration", automatically incremented by the build
+   script.</li>
+<li><code>PKGHASH</code>: SHA1 checksum of the recipe.</li>
+<li><code>ARCHITECTURE</code>: an arbitrary string summarizing the current build platform.
+   This is passed using the <code>--architecture</code> (or <code>-a</code>) argument to the build
+   script.</li>
+<li><code>SOURCE0</code>: URL of the source code. Note: if <code>source:</code> is not provided in the
+   recipe, the variable will be empty.</li>
+<li><code>GIT_TAG</code>: the Git reference to checkout.</li>
+<li><code>JOBS</code>: number of parallel jobs to use during compilation. This is passed on
+   the command line to the build script, and should be used in a context like
+   <code>make -j$JOBS</code>.</li>
+<li><code>BUILDDIR</code>: the working directory. This is, <em>e.g.</em>, the "build directory"
+   for CMake, <em>i.e.</em> the directory from where you invoke <code>cmake</code>. You should not
+   write files outside this directory.</li>
+<li><code>BUILDROOT</code>: it contains <code>BUILDDIR</code> and the log file for the build.</li>
+<li><code>SOURCEDIR</code>: where the sources are cloned.</li>
+<li><code>REQUIRES</code>: space-separated list of all dependencies, both runtime and build
+   only.</li>
+<li><code>BUILD_REQUIRES</code>: space-separated list of all build dependencies, not needed
+   at runtime.</li>
+<li><code>RUNTIME_REQUIRES</code>: space-separated list of all runtime dependencies only.</li>
+</ul>
+<p>For each dependency already built, the corresponding environment file is loaded.
+This will include, apart from custom variables and the usual <code>PATH</code> and library
+paths, the following specific variables (<code>&lt;PACKAGE&gt;</code> is the package name,
+uppercased):</p>
+<ul>
+<li><code>&lt;PACKAGE&gt;_ROOT</code>: package installation directory.</li>
+<li><code>&lt;PACKAGE&gt;_VERSION</code>: package version.</li>
+<li><code>&lt;PACKAGE&gt;_REVISION</code>: package build number.</li>
+<li><code>&lt;PACKAGE&gt;_HASH</code>: hash of the recipe used to build the package.</li>
+</ul>
+<h3 id="defaults">Defaults<a class="headerlink" href="#defaults" title="Permanent link">#</a></h3>
+<p>aliBuild uses a special file, called <code>defaults-release.sh</code> which will be
+included as a build requires of any recipe. This is in general handy to
+specify common options like <code>CXXFLAGS</code> or dependencies. It's up to the
+recipe handle correctly the presence of these options.</p>
+<p>It is also possible to specify on the command line a different set of
+defaults, for example if you want to include code coverage. This is
+done via the <code>--defaults &lt;default-name&gt;</code> option which will change the
+defaults included to be <code>defaults-&lt;default-name&gt;.sh</code>.</p>
+<p>An extra variable <code>%(defaults_upper)s</code> can be used to form the version
+string accordingly. For example you could trigger a debug build by
+adding <code>--defaults debug</code>, which will pick up <code>defaults-debug.sh</code>, and
+then have:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="err">%</span><span class="l l-Scalar l-Scalar-Plain">(tag)s%(defaults_upper)s</span>
+</span></code></pre></div>
+<p>in one of your recipes, which will expand to:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">SOME_TAG_DEBUG</span>
+</span></code></pre></div>
+<p>If you want to add your own default, you should at least provide:</p>
+<ul>
+<li><code>CXXFLAGS</code>: the <code>CXXFLAGS</code> to use</li>
+<li><code>CFLAGS</code>: the <code>CFLAGS</code> to use</li>
+<li><code>LDFLAGS</code>: the <code>LDFLAGS</code> to use</li>
+<li><code>CMAKE_BUILD_TYPE</code>: the build type which needs to be used by cmake projects</li>
+</ul>
+<p>Besides specifying extra global variables, starting from aliBuild
+1.4.0, it's also possible to use defaults to override metadata of other
+packages . This is done by specifying the <code>overrides</code> dictionary in the
+metadata of your defaults file. For example to switch between ROOT6 and
+ROOT5 you should do something like:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nn">...</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="nt">overrides</span><span class="p">:</span>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">  </span><span class="nt">ROOT</span><span class="p">:</span>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">    </span><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;v6-06-04&quot;</span>
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">    </span><span class="nt">tag</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;v6-06-04&quot;</span>
+</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="nn">...</span>
+</span></code></pre></div>
+<p>this will replace the <code>version</code> and <code>tag</code> metadata of <code>root.sh</code> with the
+one specified in the override. Notice that is also possible to override
+completely a recipe, picking it up from a given commit hash, branch or
+tag in alidist. You can do so by adding such git reference after the name
+of the external to override. For example:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="nt">overrides</span><span class="p">:</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">  </span><span class="nt">ROOT@abcedf123456</span><span class="p">:</span>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">    </span><span class="l l-Scalar l-Scalar-Plain">...</span>
+</span></code></pre></div>
+<p>will pick <code>root.sh</code> as found in the commit <code>abcedf123456</code>.</p>
+<p>For a more complete example see
+<a href="https://github.com/alisw/alidist/blob/master/defaults-o2.sh">defaults-o2.sh</a>.</p>
+<p>You can limit which defaults can be applied to a given package by using the
+<code>valid_defaults</code> key.</p>
+<h3 id="architecture-defaults">Architecture defaults<a class="headerlink" href="#architecture-defaults" title="Permanent link">#</a></h3>
+<p>Architecture defaults are similar to normal defaults but they are
+always sourced, if available in alidist, and should never be provided on the
+command line.</p>
+<p>Their filename is always:</p>
+<div class="language-text highlight"><pre><span></span><code>defaults-&lt;arch&gt;.sh
+</code></pre></div>
+<p>where <code>&lt;arch&gt;</code> is the current architecture. They have precedence over normal
+defaults.</p>
+<h2 id="relocation">Relocation<a class="headerlink" href="#relocation" title="Permanent link">#</a></h2>
+<p>aliBuild supports relocating binary packages so that the scratch space used for
+builds (<em>e.g.</em> <code>/build</code>) and the actual installation folder (<em>i.e.</em>
+<code>/cvmfs/alice.cern.ch</code>) do not need to be the same. By design this is done
+automatically, and the user should not have to care about it. The procedure
+takes care of relocating scripts and, on macOS, to embed the correct paths for
+the dynamic libraries dependencies, so that SIP does not need to be disabled.
+The internal procedure is roughly as follows:</p>
+<ul>
+<li>The build happens in <code>BUILD/&lt;package&gt;-latest/&lt;package&gt;</code> and installs
+  byproducts in
+  <code>INSTALLROOT=&lt;work-dir&gt;/INSTALLROOT/&lt;package-hash&gt;/&lt;architecture&gt;/&lt;package&gt;/&lt;version&gt;-&lt;revisions&gt;</code>.
+  This way we know that every file which contains <code>&lt;package-hash&gt;</code> needs to be
+  relocated.</li>
+<li>Once the build is completed, aliBuild looks for the above mentioned
+  <code>&lt;package-hash&gt;</code> and generates a script in the <code>$INSTALLROOT/relocate-me.sh</code>
+  which can be used to relocate the binary installation, once it has been
+  unpacked.</li>
+<li>The path under <code>&lt;work-dir&gt;/INSTALLROOT/&lt;package-hash&gt;</code> is tarred up in a
+  binary tarball.</li>
+</ul>
+<p>When a tarball is installed, either because it was downloaded by aliBuild or by
+some other script (<em>e.g.</em> the CVMFS publisher, the following happens:</p>
+<ul>
+<li>The tarball is expanded.</li>
+<li>The relocation script <code>relocate-me.sh</code> is executed with something similar to:</li>
+</ul>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="nv">WORK_DIR</span><span class="o">=</span>&lt;new-installation-workdir&gt;<span class="w"> </span>relocate-me.sh
+</span></code></pre></div>
+<p>which will take the path up to the <code>&lt;package-hash&gt;</code> and re-map it to the newly
+  specified <code>WORK_DIR</code>.</p>
+<p>Notice that the special variable <code>@@PKGREVISION@$PKGHASH@@</code> can be used to have
+the actual revision of the package in the relocated file.</p>
+<h2 id="build-environment">Build environment<a class="headerlink" href="#build-environment" title="Permanent link">#</a></h2>
+<p>Before each package is built, aliBuild will populate the environment with build
+related information. For a complete list of those see
+<a href="#the-body">the body section</a>. After the build is done the user has access to
+the environment of the build by sourcing the
+<code>&lt;work-dir&gt;/&lt;architecture&gt;/&lt;package&gt;/&lt;version&gt;/etc/profile.d/init.sh</code> file.
+For example:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="nv">WORK_DIR</span><span class="o">=</span>&lt;work-dir&gt;<span class="w"> </span><span class="nb">source</span><span class="w"> </span>&lt;work-dir&gt;/&lt;architecture&gt;/&lt;package&gt;/&lt;version&gt;/etc/profile.d/init.sh
+</span></code></pre></div>
+<p>Notice that for development packages, we also generate a <code>.envrc</code> file in
+<code>&lt;work-dir&gt;/BUILD/&lt;package&gt;-&lt;version&gt;/&lt;package&gt;/.envrc</code> which can be used to
+load the build environment via <a href="https://direnv.net">direnv</a>, <em>e.g.</em> for easy
+<a href="https://aliceo2group.github.io/advanced/ides.html">IDE integration</a>.</p>
+<h2 id="runtime-environment">Runtime environment<a class="headerlink" href="#runtime-environment" title="Permanent link">#</a></h2>
+<p>Runtime environment is usually provided via
+<a href="https://modules.readthedocs.io/en/latest/">environment modules</a>.</p>
+<p>While the build environment is automatically generated, it is responsibility of
+the recipe to create a module file in <code>$INSTALLROOT/etc/modulefiles/$PKGNAME</code>.
+For example:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="c1"># ModuleFile</span>
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>mkdir<span class="w"> </span>-p<span class="w"> </span>etc/modulefiles
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>cat<span class="w"> </span>&gt;<span class="w"> </span>etc/modulefiles/<span class="nv">$PKGNAME</span><span class="w"> </span><span class="s">&lt;&lt;EoF</span>
+</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="s">#%Module1.0</span>
+</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="s">proc ModulesHelp { } {</span>
+</span><span id="__span-11-6"><a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="s">   global version</span>
+</span><span id="__span-11-7"><a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a><span class="s">   puts stderr &quot;ALICE Modulefile for $PKGNAME $PKGVERSION-@@PKGREVISION@$PKGHASH@@&quot;</span>
+</span><span id="__span-11-8"><a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a><span class="s">}</span>
+</span><span id="__span-11-9"><a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a><span class="s">set version $PKGVERSION-@@PKGREVISION@$PKGHASH@@</span>
+</span><span id="__span-11-10"><a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a><span class="s">module-whatis &quot;ALICE Modulefile for $PKGNAME $PKGVERSION-@@PKGREVISION@$PKGHASH@@&quot;</span>
+</span><span id="__span-11-11"><a id="__codelineno-11-11" name="__codelineno-11-11" href="#__codelineno-11-11"></a><span class="s"># Dependencies</span>
+</span><span id="__span-11-12"><a id="__codelineno-11-12" name="__codelineno-11-12" href="#__codelineno-11-12"></a><span class="s">module load BASE/1.0                                                                      \\</span>
+</span><span id="__span-11-13"><a id="__codelineno-11-13" name="__codelineno-11-13" href="#__codelineno-11-13"></a><span class="s">             ${BOOST_REVISION:+boost/$BOOST_VERSION-$BOOST_REVISION}                      \\</span>
+</span><span id="__span-11-14"><a id="__codelineno-11-14" name="__codelineno-11-14" href="#__codelineno-11-14"></a><span class="s">             ${FAIRLOGGER_REVISION:+FairLogger/$FAIRLOGGER_VERSION-$FAIRLOGGER_REVISION}  \\</span>
+</span><span id="__span-11-15"><a id="__codelineno-11-15" name="__codelineno-11-15" href="#__codelineno-11-15"></a><span class="s">             ${ZEROMQ_REVISION:+ZeroMQ/$ZEROMQ_VERSION-$ZEROMQ_REVISION}                  \\</span>
+</span><span id="__span-11-16"><a id="__codelineno-11-16" name="__codelineno-11-16" href="#__codelineno-11-16"></a><span class="s">             ${ASIOFI_REVISION:+asiofi/$ASIOFI_VERSION-$ASIOFI_REVISION}                  \\</span>
+</span><span id="__span-11-17"><a id="__codelineno-11-17" name="__codelineno-11-17" href="#__codelineno-11-17"></a><span class="s">             ${DDS_REVISION:+DDS/$DDS_VERSION-$DDS_REVISION}</span>
+</span><span id="__span-11-18"><a id="__codelineno-11-18" name="__codelineno-11-18" href="#__codelineno-11-18"></a><span class="s"># Our environment</span>
+</span><span id="__span-11-19"><a id="__codelineno-11-19" name="__codelineno-11-19" href="#__codelineno-11-19"></a><span class="s">set FAIRMQ_ROOT \$::env(BASEDIR)/$PKGNAME/\$version</span>
+</span><span id="__span-11-20"><a id="__codelineno-11-20" name="__codelineno-11-20" href="#__codelineno-11-20"></a><span class="s">prepend-path PATH \$FAIRMQ_ROOT/bin</span>
+</span><span id="__span-11-21"><a id="__codelineno-11-21" name="__codelineno-11-21" href="#__codelineno-11-21"></a><span class="s">prepend-path LD_LIBRARY_PATH \$FAIRMQ_ROOT/lib</span>
+</span><span id="__span-11-22"><a id="__codelineno-11-22" name="__codelineno-11-22" href="#__codelineno-11-22"></a><span class="s">EoF</span>
+</span><span id="__span-11-23"><a id="__codelineno-11-23" name="__codelineno-11-23" href="#__codelineno-11-23"></a><span class="nv">MODULEDIR</span><span class="o">=</span><span class="s2">&quot;</span><span class="nv">$INSTALLROOT</span><span class="s2">/etc/modulefiles&quot;</span>
+</span><span id="__span-11-24"><a id="__codelineno-11-24" name="__codelineno-11-24" href="#__codelineno-11-24"></a>mkdir<span class="w"> </span>-p<span class="w"> </span><span class="nv">$MODULEDIR</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>rsync<span class="w"> </span>-a<span class="w"> </span>--delete<span class="w"> </span>etc/modulefiles/<span class="w"> </span><span class="nv">$MODULEDIR</span>
+</span></code></pre></div>
+<p>Please keep in mind the following recommendation when writing the modulefile:</p>
+<ul>
+<li>Do not use runtime environment variables which are usually not set by a given
+  tool. For example avoid exposing <code>&lt;package&gt;_ROOT</code>. This is because if we build
+  in a mode where system dependencies are used, we cannot rely on their
+  presence.</li>
+<li>Use <code>&lt;package&gt;_REVISION</code> to guard inclusion of extra dependencies. This will
+  make sure that only dependencies which were actually built via <code>aliBuild</code> will
+  be included in the modulefile.</li>
+</ul>
+<p>It's also now possible to generate automatically the initial part of the
+modulefile, up to the <code># Our environment</code> line, by using the
+<code>alibuild-recipe-tools</code> helper scripts. In order to do this you need to add
+<code>alibuild-recipe-tools</code> as a <code>build_requires</code> of your package and substitute the
+module creation with:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="c1">#ModuleFile</span>
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>mkdir<span class="w"> </span>-p<span class="w"> </span>etc/modulefiles
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>alibuild-generate-module<span class="w"> </span>&gt;<span class="w"> </span>etc/modulefiles/<span class="nv">$PKGNAME</span>
+</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>mkdir<span class="w"> </span>-p<span class="w"> </span><span class="nv">$INSTALLROOT</span>/etc/modulefiles<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>rsync<span class="w"> </span>-a<span class="w"> </span>--delete<span class="w"> </span>etc/modulefiles/<span class="w"> </span><span class="nv">$INSTALLROOT</span>/etc/modulefiles
+</span></code></pre></div>
+<p>One can also make sure that <code>PATH</code> and <code>LD_LIBRARY_PATH</code> are properly amended by
+passing the option <code>--bin</code> and <code>--lib</code> (respectively). Or you can simply append
+extra information via:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>alibuild-generate-module<span class="w"> </span>&gt;<span class="w"> </span>etc/modulefiles/<span class="nv">$PKGNAME</span>
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>cat<span class="w"> </span>&gt;&gt;<span class="w"> </span>etc/modulefiles/<span class="nv">$PKGNAME</span><span class="w"> </span><span class="s">&lt;&lt;EoF</span>
+</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="s">prepend-path ROOT_INCLUDE_PATH \$PKG_ROOT/include</span>
+</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="s">EoF</span>
+</span></code></pre></div>
+
+
+
+
+
+
+
+  
+  
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": ".", "features": [], "search": "assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
