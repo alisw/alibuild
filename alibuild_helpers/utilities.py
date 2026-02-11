@@ -221,7 +221,7 @@ def doDetectArch(hasOsRelease, osReleaseLines, platformTuple, platformSystem, pl
       key, is_prop, val = x.partition("=")
       if not is_prop:
         continue
-      val = val.strip("\n \"")
+      val = val.strip("\n \"'")
       if key == "ID":
         distribution = val.lower()
       if key == "VERSION_ID":
