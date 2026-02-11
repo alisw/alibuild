@@ -6,7 +6,7 @@ from alibuild_helpers.analytics import report_event
 from alibuild_helpers.log import debug, info, banner, warning
 from alibuild_helpers.log import dieOnError
 from alibuild_helpers.cmd import execute, DockerRunner, BASH, install_wrapper_script, getstatusoutput
-from alibuild_helpers.utilities import prunePaths, symlink, call_ignoring_oserrors, topological_sort, detectArch
+from alibuild_helpers.utilities import pruneWorkdirFromPaths, pruneVersionEnvVars, symlink, call_ignoring_oserrors, topological_sort, detectArch
 from alibuild_helpers.utilities import resolve_store_path
 from alibuild_helpers.utilities import parseDefaults, readDefaults
 from alibuild_helpers.utilities import getPackageList, asList
@@ -460,7 +460,7 @@ def doBuild(args, parser):
   specs = {}
   buildOrder = []
   workDir = abspath(args.workDir)
-  prunePaths(workDir)
+  pruneWorkdirFromPaths(workDir)
 
   dieOnError(not exists(args.configDir),
              'Cannot find alidist recipes under directory "%s".\n'
@@ -533,6 +533,8 @@ def doBuild(args, parser):
                      overrides               = overrides,
                      taps                    = taps,
                      log                     = debug)
+
+  pruneVersionEnvVars()
 
   dieOnError(validDefaults and args.defaults not in validDefaults,
              "Specified default `%s' is not compatible with the packages you want to build.\n"
