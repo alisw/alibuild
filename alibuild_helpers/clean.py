@@ -7,6 +7,7 @@ import os
 import glob
 import sys
 import shutil
+import subprocess
 from alibuild_helpers import log
 
 
@@ -72,6 +73,15 @@ def doClean(workDir, architecture, aggressiveCleanup, dryRun):
     log.info("--dry-run / -n specified. Doing nothing.")
     sys.exit(0)
 
+  # Calculate size before deletion
+  try:
+    result = subprocess.run(["du", "-shc"] + toDelete,
+                            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+    total_size = result.stdout.decode().splitlines()[-1].split()[0]
+  except Exception as exc:
+    log.warning("Could not determine size of directories to delete: %s", exc)
+    total_size = None
+
   have_error = False
   for directory in toDelete:
     try:
@@ -79,5 +89,8 @@ def doClean(workDir, architecture, aggressiveCleanup, dryRun):
     except OSError as exc:
       have_error = True
       log.error("Unable to delete %s:", directory, exc_info=exc)
+
+  if not have_error and total_size is not None:
+    log.info("Freed %s", total_size)
 
   sys.exit(1 if have_error else 0)
