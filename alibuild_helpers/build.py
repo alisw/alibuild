@@ -296,10 +296,10 @@ def hash_local_changes(spec):
     dieOnError(err, "Unable to detect source code changes.")
   except UntrackedChangesError:
     untrackedFilesDirectories = [directory]
-    warning("You have untracked changes in %s, so aliBuild cannot detect "
-            "whether it needs to rebuild the package. Therefore, the package "
-            "is being rebuilt unconditionally. Please use 'git add' and/or "
-            "'git commit' to track your changes in git.", directory)
+    dieOnError(1, f"You have untracked changes in {directory}, so aliBuild cannot detect "
+                   "whether it needs to rebuild the package. Therefore, the package "
+                   "is being rebuilt unconditionally. Please use 'git add' and/or "
+                   "'git commit' to track your changes in git.")
     # If there are untracked changes, always rebuild (hopefully incrementally)
     # and let CMake figure out what needs to be rebuilt. Force a rebuild by
     # changing the hash to something basically random.
