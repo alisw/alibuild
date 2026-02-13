@@ -57,6 +57,10 @@ def doParseArgs():
                                       description="Initialise development packages.")
   version_parser = subparsers.add_parser("version", help="display %(prog)s version",
                                          description="Display %(prog)s and architecture.")
+  completion_parser = subparsers.add_parser("completion", help="output shell completion code",
+                                            description="Output shell completion code for bash or zsh.")
+  completion_parser.add_argument("shell", choices=["bash", "zsh"],
+                                 help="Shell type to generate completions for.")
 
   # Options for the analytics command
   analytics_parser.add_argument("state", choices=["on", "off"], help="Whether to report analytics or not")
@@ -359,7 +363,7 @@ def doParseArgs():
   def optionOrder(x):
     if x in ["--debug", "-d", "-n", "--dry-run"]:
       return 0
-    if x in ["build", "init", "clean", "analytics", "doctor", "deps"]:
+    if x in ["build", "init", "clean", "analytics", "doctor", "deps", "completion"]:
       return 1
     return 2
   rest.sort(key=optionOrder)
@@ -400,8 +404,8 @@ S3_SUPPORTED_ARCHS = "slc7_x86-64", "slc8_x86-64", "ubuntu2004_x86-64", "ubuntu2
 
 def finaliseArgs(args, parser):
 
-  # Nothing to finalise for version or analytics
-  if args.action in ["version", "analytics", "architecture"]:
+  # Nothing to finalise for version, analytics, or completion
+  if args.action in ["version", "analytics", "architecture", "completion"]:
     return args
 
   # --architecture can be specified in both clean and build.
