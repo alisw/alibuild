@@ -76,8 +76,10 @@ class CleanTestCase(unittest.TestCase):
     @patch('alibuild_helpers.clean.os')
     @patch('alibuild_helpers.clean.path')
     @patch('alibuild_helpers.clean.shutil')
+    @patch('alibuild_helpers.clean.subprocess')
     @patch('alibuild_helpers.clean.log')
-    def test_doClean(self, mock_log, mock_shutil, mock_path, mock_os, mock_glob):
+    def test_doClean(self, mock_log, mock_subprocess, mock_shutil, mock_path, mock_os, mock_glob):
+        mock_subprocess.run.return_value.stdout = b"0\ttotal\n"
         mock_path.realpath.side_effect = lambda x: REALPATH_WITH_OBSOLETE_FILES[x]
         mock_path.islink.side_effect = lambda x: "latest" in x
         mock_os.readlink.side_effect = lambda x: READLINK_MOCKUP_DB[x]
@@ -128,7 +130,7 @@ class CleanTestCase(unittest.TestCase):
         self.assertEqual(mock_shutil.rmtree.mock_calls, remove_files_calls)
         mock_log.banner.assert_called_with("This %s delete the following directories:\n%s",
                                            "will", files_delete_formatarg)
-        mock_log.info.assert_not_called()
+        mock_log.info.assert_called_with("Freed %s", "0")
 
         mock_log.banner.reset_mock()
         mock_log.info.reset_mock()
