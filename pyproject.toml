@@ -49,7 +49,7 @@ script-files = ["aliBuild", "alienv", "aliDoctor", "aliDeps", "pb"]
 write_to = "alibuild_helpers/_version.py"
 
 [tool.setuptools.package-data]
-alibuild_helpers = ['build_template.sh']
+alibuild_helpers = ['build_template.sh', 'completions/*.sh']
 
 [tool.setuptools.packages.find]
 where = ["."]
