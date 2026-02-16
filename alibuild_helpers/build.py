@@ -3,6 +3,7 @@ from os import makedirs, unlink, readlink, rmdir
 from pathlib import Path
 from alibuild_helpers import __version__
 from alibuild_helpers.analytics import report_event
+from alibuild_helpers.args import DEFAULT_WORK_DIR
 from alibuild_helpers.log import debug, info, banner, warning
 from alibuild_helpers.log import dieOnError
 from alibuild_helpers.cmd import execute, DockerRunner, BASH, install_wrapper_script, getstatusoutput
@@ -1252,13 +1253,16 @@ def doBuild(args, parser):
       syncHelper.upload_symlinks_and_tarball(spec)
 
   if not args.onlyDeps:
+      # Add -w option if workDir is not the default
+      workdir_option = "" if args.workDir == DEFAULT_WORK_DIR else " -w %s" % args.workDir
       banner("Build of %s successfully completed on `%s'.\n"
              "Your software installation is at:"
              "\n\n  %s\n\n"
              "You can use this package by loading the environment:"
-             "\n\n  alienv enter %s/latest-%s",
+             "\n\n  alienv enter%s %s/latest-%s",
              mainPackage, socket.gethostname(),
              abspath(join(args.workDir, args.architecture)),
+             workdir_option,
              mainPackage, mainBuildFamily)
   else:
       banner("Successfully built dependencies for package %s on `%s'.\n",
