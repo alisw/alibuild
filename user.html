@@ -1,0 +1,1385 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="quick.html">
+      
+      
+        <link rel="next" href="reference.html">
+      
+      
+        
+      
+      
+      <link rel="icon" href="assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+    
+    
+      
+        <title>User manual - aliBuild: ALICE software builder</title>
+      
+    
+    
+      <link rel="stylesheet" href="assets/stylesheets/main.484c7ddc.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="stylesheets/extra.css">
+    
+    <script>__md_scope=new URL(".",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#synopsis" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="index.html" title="aliBuild: ALICE software builder" class="md-header__button md-logo" aria-label="aliBuild: ALICE software builder" data-md-component="logo">
+      
+  <img src="alice_logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            aliBuild: ALICE software builder
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              User manual
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/alisw/alibuild" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    View source code
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="index.html" title="aliBuild: ALICE software builder" class="md-nav__button md-logo" aria-label="aliBuild: ALICE software builder" data-md-component="logo">
+      
+  <img src="alice_logo.png" alt="logo">
+
+    </a>
+    aliBuild: ALICE software builder
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/alisw/alibuild" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    View source code
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="quick.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quickstart
+  
+
+    
+      <br>
+      <small>Quick Start</small>
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User manual
+  
+
+    
+      <br>
+      <small>User command line reference manual</small>
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="user.html" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User manual
+  
+
+    
+      <br>
+      <small>User command line reference manual</small>
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#synopsis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SYNOPSIS
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="SYNOPSIS">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#building-inside-a-container" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Building inside a container
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#re-using-prebuilt-tarballs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Re-using prebuilt tarballs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#customise-alibuild-directories" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Customise aliBuild directories
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cleaning-up-after-building" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cleaning up after building
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#using-precompiled-packages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using precompiled packages
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#developing-packages-locally" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Developing packages locally
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Developing packages locally">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#incremental-builds" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Incremental builds
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#forcing-a-different-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Forcing a different architecture
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#running-in-docker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Running in Docker
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#defaults" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Defaults
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#disabling-packages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Disabling packages
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#controlling-which-system-packages-are-picked-up" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Controlling which system packages are picked up
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cleaning-up-the-build-area-new-in-110" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cleaning up the build area (new in 1.1.0)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#upgrading-alibuild" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Upgrading aliBuild
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rebuilding-packages-from-branches-instead-of-tags" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rebuilding packages from branches instead of tags
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#generating-a-dependency-graph" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Generating a dependency graph
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#using-the-packages-you-have-built" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using the packages you have built
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Using the packages you have built">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#loading-the-package-environment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Loading the package environment
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#environment-for-packages-lacking-a-module-definition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Environment for packages lacking a module definition
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="reference.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+      <br>
+      <small>Recipe reference manual</small>
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="troubleshooting.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+      <br>
+      <small>Troubleshooting</small>
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://alice-doc.github.io/alice-analysis-tutorial/building/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ALICE/O2 tutorial
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#synopsis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SYNOPSIS
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="SYNOPSIS">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#building-inside-a-container" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Building inside a container
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#re-using-prebuilt-tarballs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Re-using prebuilt tarballs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#customise-alibuild-directories" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Customise aliBuild directories
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cleaning-up-after-building" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cleaning up after building
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#using-precompiled-packages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using precompiled packages
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#developing-packages-locally" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Developing packages locally
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Developing packages locally">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#incremental-builds" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Incremental builds
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#forcing-a-different-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Forcing a different architecture
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#running-in-docker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Running in Docker
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#defaults" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Defaults
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#disabling-packages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Disabling packages
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#controlling-which-system-packages-are-picked-up" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Controlling which system packages are picked up
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cleaning-up-the-build-area-new-in-110" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cleaning up the build area (new in 1.1.0)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#upgrading-alibuild" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Upgrading aliBuild
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rebuilding-packages-from-branches-instead-of-tags" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rebuilding packages from branches instead of tags
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#generating-a-dependency-graph" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Generating a dependency graph
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#using-the-packages-you-have-built" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using the packages you have built
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Using the packages you have built">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#loading-the-package-environment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Loading the package environment
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#environment-for-packages-lacking-a-module-definition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Environment for packages lacking a module definition
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+  <h1>User manual</h1>
+
+<h2 id="synopsis">SYNOPSIS<a class="headerlink" href="#synopsis" title="Permanent link">#</a></h2>
+<p>For a quick start introduction, please look <a href="quick.html">here</a>.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>aliBuild build [-h] [--defaults DEFAULT]
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>               [-a ARCH] [--force-unknown-architecture]
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>               [-z [DEVELPREFIX]] [-e ENVIRONMENT] [-j JOBS] [-u]
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>               [--no-local PKGLIST] [--force-tracked] [--disable PACKAGE]
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>               [--force-rebuild PACKAGE] [--annotate PACKAGE=COMMENT]
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>               [--only-deps] [--plugin PLUGIN]
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>               [--always-prefer-system | --no-system]
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>               [--docker] [--docker-image IMAGE] [--docker-extra-args ARGLIST] [-v VOLUMES]
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>               [--no-remote-store] [--remote-store STORE] [--write-store STORE] [--insecure] 
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>               [-C DIR] [-w WORKDIR] [-c CONFIGDIR] [--reference-sources MIRRORDIR]
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>               [--aggressive-cleanup] [--no-auto-cleanup]
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>               PACKAGE [PACKAGE ...]
+</span></code></pre></div>
+<ul>
+<li><code>PACKAGE</code>: One of the packages in <code>CONFIGDIR</code>. May be specified multiple
+  times.</li>
+<li><code>-h</code>, <code>--help</code>: show this help message and exit</li>
+<li><code>--defaults DEFAULT</code>: Use defaults from <code>CONFIGDIR/defaults-DEFAULT.sh</code>.</li>
+<li><code>-a ARCH</code>, <code>--architecture ARCH</code>: Build as if on the specified architecture.
+  When used with <code>--docker</code>, build inside a Docker image for the specified
+  architecture. Default is the current system architecture.</li>
+<li><code>--force-unknown-architecture</code>: Build on this system, even if it doesn't have
+  a supported architecture.</li>
+<li><code>-z [DEVELPREFIX]</code>, <code>--devel-prefix [DEVELPREFIX]</code>: Version name to use for
+  development packages. Defaults to branch name.</li>
+<li><code>-e ENVIRONMENT</code>: KEY=VALUE binding to add to the build environment. May be
+  specified multiple times.</li>
+<li><code>-j JOBS</code>, <code>--jobs JOBS</code>: The number of parallel compilation processes to run.</li>
+<li><code>-u</code>, <code>--fetch-repos</code>: Fetch updates to repositories in <code>MIRRORDIR</code>. Required
+  but nonexistent repositories are always cloned, even if this option is not
+  given.</li>
+<li><code>--no-local PKGLIST</code>: Do not pick up the following packages from a local
+  checkout. <code>PKGLIST</code> is a comma-separated list.</li>
+<li><code>--force-tracked</code>: Do not pick up any packages from a local checkout.</li>
+<li><code>--disable PACKAGE</code>: Do not build <code>PACKAGE</code> and all its (unique) dependencies.</li>
+<li><code>--force-rebuild PACKAGE</code>: Always rebuild the specified packages from scratch,
+  even if they were built before. Has the same effect as adding
+  <code>force_rebuild: true</code> to the recipe. May be specified multiple times or
+  separate multiple arguments with commas.</li>
+<li><code>--annotate PACKAGE=COMMENT</code>: Store <code>COMMENT</code> in the build metadata for
+  <code>PACKAGE</code>. The comment will only be stored if the package is compiled or
+  downloaded during this run. May be specified multiple times.</li>
+<li><code>--only-deps</code>: Only build dependencies, not the main package. Useful for
+  populating a build cache.</li>
+<li><code>--plugin PLUGIN</code>: Plugin to use for the build. Default is <code>legacy</code>.</li>
+<li><code>--always-prefer-system</code>: Always use system packages when compatible.</li>
+<li><code>--no-system</code>: Never use system packages, even if compatible.</li>
+</ul>
+<h3 id="building-inside-a-container">Building inside a container<a class="headerlink" href="#building-inside-a-container" title="Permanent link">#</a></h3>
+<p>Builds can be done inside a Docker container, to make it easier to get a common,
+usable environment. The Docker daemon must be installed and running on your
+system. By default, images from <code>alisw/&lt;platform&gt;-builder:latest</code> will be used,
+e.g. <code>alisw/slc8-builder:latest</code>. They will be fetched if unavailable.</p>
+<ul>
+<li><code>--docker</code>: Build inside a Docker container.</li>
+<li><code>--docker-image IMAGE</code>: The Docker image to build inside of. Implies
+  <code>--docker</code>. By default, an image is chosen based on the architecture.</li>
+<li><code>--docker-extra-args ARGLIST</code>: Command-line arguments to pass to <code>docker run</code>.
+  Passed through verbatim -- separate multiple arguments with spaces, and make
+  sure quoting is correct! Implies <code>--docker</code>.</li>
+<li><code>-v VOLUMES</code>: Additional volume to be mounted inside the Docker container, if
+  one is used. May be specified multiple times. Passed verbatim to <code>docker run</code>.</li>
+</ul>
+<h3 id="re-using-prebuilt-tarballs">Re-using prebuilt tarballs<a class="headerlink" href="#re-using-prebuilt-tarballs" title="Permanent link">#</a></h3>
+<p>Reusing prebuilt tarballs saves compilation time, as common packages need not be
+rebuilt from scratch. <code>rsync://</code>, <code>https://</code>, <code>b3://</code> and <code>s3://</code> remote stores
+are recognised. Some of these require credentials: <code>s3://</code> remotes require an
+<code>~/.s3cfg</code>; <code>b3://</code> remotes require <code>AWS_ACCESS_KEY_ID</code> and
+<code>AWS_SECRET_ACCESS_KEY</code> environment variables. A useful remote store is
+<code>https://s3.cern.ch/swift/v1/alibuild-repo</code>. It requires no credentials and
+provides tarballs for the most common supported architectures.</p>
+<ul>
+<li><code>--no-remote-store</code>: Disable the use of the remote store, even if it is
+  enabled by default.</li>
+<li><code>--remote-store STORE</code>: Where to find prebuilt tarballs to reuse. See above
+  for available remote stores. End with <code>::rw</code> if you want to upload (in that
+  case, <code>::rw</code> is stripped and <code>--write-store</code> is set to the same value).
+  Implies <code>--no-system</code>. May be set to a default store on some architectures;
+  use <code>--no-remote-store</code> to disable it in that case.</li>
+<li><code>--write-store STORE</code>: Where to upload newly built packages. Same syntax as
+  <code>--remote-store</code>, except <code>::rw</code> is not recognised. Implies <code>--no-system</code>.</li>
+<li><code>--insecure</code>: Don't validate TLS certificates when connecting to an <code>https://</code>
+  remote store.</li>
+</ul>
+<h3 id="customise-alibuild-directories">Customise aliBuild directories<a class="headerlink" href="#customise-alibuild-directories" title="Permanent link">#</a></h3>
+<ul>
+<li><code>-C DIR</code>, <code>--chdir DIR</code>: Change to the specified directory before building.
+  Alternatively, set <code>ALIBUILD_CHDIR</code>. Default <code>.</code>.</li>
+<li><code>-w WORKDIR</code>, <code>--work-dir WORKDIR</code> The toplevel directory under which builds
+  should be done and build results should be installed. Default <code>sw</code>.</li>
+<li><code>-c CONFIGDIR</code>, <code>--config-dir CONFIGDIR</code>: The directory containing build
+  recipes. Default <code>alidist</code>.</li>
+<li><code>--reference-sources MIRRORDIR</code>: The directory where reference git
+  repositories will be cloned. <code>%(workDir)s</code> will be substituted by <code>WORKDIR</code>.
+  Default <code>%(workDir)s/MIRROR</code>.</li>
+</ul>
+<h3 id="cleaning-up-after-building">Cleaning up after building<a class="headerlink" href="#cleaning-up-after-building" title="Permanent link">#</a></h3>
+<ul>
+<li><code>--aggressive-cleanup</code>: Delete as much build data as possible when cleaning
+  up.</li>
+<li><code>--no-auto-cleanup</code>: Do not clean up build directories automatically after a
+  build.</li>
+</ul>
+<h2 id="using-precompiled-packages">Using precompiled packages<a class="headerlink" href="#using-precompiled-packages" title="Permanent link">#</a></h2>
+<p>By running aliBuild with no special option on CentOS/Alma 7, 8 or 9 (x86-64 or ARM),
+or on Ubuntu 20.04, 22.04 or 24.04 (x86-64), it will automatically try to
+use as many precompiled packages as possible by downloading them from a default
+central server. By using precompiled packages you lose the ability to pick some
+of them from your system. If you do not want to use precompiled packages and you
+want to pick as many packages as possible from your system, you should manually
+specify the <code>--always-prefer-system</code> option.</p>
+<p>It is possible to benefit from precompiled builds on every platform, provided
+that the server caching the builds is maintained by yourself. Since every build
+is stored as a tarball with a unique hash, it is sufficient to provide for a
+server or shared space where cached builds will be stored and made available to
+others.</p>
+<p>In order to specify the cache store, use the option <code>--remote-store &lt;uri&gt;</code>,
+where <code>&lt;uri&gt;</code> can be:</p>
+<ul>
+<li>a local path, for instance <code>/opt/alibuild_cache</code>,</li>
+<li>a remote SSH accessible path, <code>ssh://&lt;host&gt;:&lt;path&gt;</code>,</li>
+<li>an unencrypted rsync path, <code>rsync://&lt;host&gt;/path</code>,</li>
+<li>a CERN S3 bucket, <code>b3://&lt;bucket&gt;</code>,</li>
+<li>a HTTP(s) server, <code>http://&lt;host&gt;/&lt;path&gt;</code>.</li>
+</ul>
+<p>The first four options can also be writable (if you have proper permissions):
+if you specify <code>::rw</code> at the end of the URL, your builds will be cached there.
+This is normally what sysadmins do to precache builds: other users can simply
+use the same URL in read-only mode (no <code>::rw</code> specified) to fetch the builds.</p>
+<p>You need to make sure you have proper filesystem/SSH/rsync permissions of
+course.</p>
+<p>It is also possible to specify a write store different from the read one by
+using the <code>--write-store</code> option.</p>
+<p>aliBuild can reuse precompiled packages if they were built with a different tag,
+if that tag points to the same actual commit that you're building now. (This is
+used for the nightly tags, as they are built from a branch named
+<code>rc/nightly-YYYYMMDD</code>, while alidist is updated to have a tag like
+<code>nightly-YYYYMMDD</code> instead, pointing to the same commit.) However, this reuse
+only works if the precompiled package has the same version as specified in your
+copy of alidist.</p>
+<p>This approach assumes that tags don't move (i.e. don't change which commit they
+are tagging) in the repositories being built. If you administer a cache store,
+make sure to delete cached tarballs built using that tag if a tag is moved!</p>
+<h2 id="developing-packages-locally">Developing packages locally<a class="headerlink" href="#developing-packages-locally" title="Permanent link">#</a></h2>
+<p>One of the use cases we want to cover is the ability to develop external
+packages without having to go through an commit - push - pull cycle.</p>
+<p>In order to do so, you can simply checkout the package you want to
+develop at the same level as alibuild and alidist.</p>
+<p>For example, if you want to build O2 while having the ability to modify
+ROOT, you can do the following:</p>
+<div class="language-text highlight"><pre><span></span><code>git clone https://github.com/alisw/alidist
+git clone https://github.com/root-mirror/root ROOT
+&lt;modify files in ROOT/&gt;
+aliBuild ... build O2
+</code></pre></div>
+<p>The above will make sure the build will pick up your changes in the local
+directory.</p>
+<p>As a cherry on the cake, in case your recipe does not require any environment,
+you can even do:</p>
+<div class="language-text highlight"><pre><span></span><code>cd sw/BUILD/ROOT/latest
+make install
+</code></pre></div>
+<p>and it will correctly install everything in <code>sw/&lt;arch&gt;/ROOT/latest</code>.
+This of course mean that for each development package you might end up
+with one or more build directories which might increase the used disk
+space.</p>
+<p>It's also important to notice that if you use your own checkout of a
+package, you will not be able to write to any store and the generated
+tgz will be empty.</p>
+<p>If you wish to temporary compile with the package as specified by
+alidist, you can use the <code>--no-local &lt;PACKAGE&gt;</code> option.</p>
+<h3 id="incremental-builds">Incremental builds<a class="headerlink" href="#incremental-builds" title="Permanent link">#</a></h3>
+<p>When developing locally using the development mode, if the external
+is well behaved and supports incremental building, it is possible to
+specify an <code>incremental_recipe</code> in the YAML preamble. Such a recipe will
+be used after the second time the build happens (to ensure that the non
+incremental parts of the build are done) and will be executed directly
+in $BUILDDIR, only recompiled what changed. Notice that if this is the
+case the incremental recipe will always be executed.</p>
+<h3 id="forcing-a-different-architecture">Forcing a different architecture<a class="headerlink" href="#forcing-a-different-architecture" title="Permanent link">#</a></h3>
+<p>While alibuild does its best to find out which OS / distribution you are
+using, sometimes it might fail to do so, for example in the case you
+start using a new *buntu flavour or a bleeding edge version of a distribution.
+In order to force the correct architecture for the build you can use
+the <code>--architecture</code> (<code>-a</code>) flag with one of the supported options:</p>
+<p>On Linux, x86-64:
+- <code>slc6_x86-64</code>: RHEL6 / SLC6 compatible
+- <code>slc7_x86-64</code>: RHEL7 / CC7 compatible
+- <code>slc8_x86-64</code>: RHEL8 / CC8 compatible
+- <code>slc9_x86-64</code>: RHEL9 / ALMA9 compatible
+- <code>ubuntu2004_x86-64</code>: Ubuntu 20.04 compatible
+- <code>ubuntu2204_x86-64</code>: Ubuntu 22.04 compatible
+- <code>ubuntu2404_x86-64</code>: Ubuntu 24.04 compatible
+- <code>fedora33_x86-64</code>: Fedora 33 compatible
+- <code>fedora34_x86-64</code>: Fedora 34 compatible</p>
+<p>On Linux, ARM:
+- <code>slc9_aarch64</code>: RHEL9 / ALMA9 compatible</p>
+<p>On Linux, POWER8 / PPC64 (little endian):
+- <code>slc7_ppc64</code>: RHEL7 / CC7 compatible</p>
+<p>On Mac:
+- <code>osx_x86-64</code>: Intel
+- <code>osx_arm64</code>: Apple Silicon</p>
+<h3 id="running-in-docker">Running in Docker<a class="headerlink" href="#running-in-docker" title="Permanent link">#</a></h3>
+<p>Very often one needs to run on a platform which is different from
+the one being used for development. The common use case is that
+development happens on a Mac while production runs on some older Linux
+distribution like SLC5 or SLC6. In order to improve the experience
+of cross platform development aliBuild now offers the ability to run
+in <a href="https://docker.io">Docker</a> via the <code>--docker</code> option. When it is
+specified the first part of the architecture will be used to construct
+the name of the docker container to be used for the build and the build
+itself will be performed inside that container. For example if you
+specify:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>alibuild<span class="w"> </span>--docker<span class="w"> </span>-a<span class="w"> </span>slc7_x86-64<span class="w"> </span>build<span class="w"> </span>ROOT
+</span></code></pre></div>
+<p>the build itself will happen inside the alisw/slc7-builder Docker
+container. Environment variables can be passed to docker by specifying
+them with the <code>-e</code> option. Extra volumes can be specified with the -v
+option using the same syntax used by Docker.</p>
+<h2 id="defaults">Defaults<a class="headerlink" href="#defaults" title="Permanent link">#</a></h2>
+<p>By default, <code>aliBuild</code> uses the <code>o2</code> defaults (<code>--defaults o2</code>), which are
+optimized for building the ALICE O2 software stack. The defaults system
+allows you to specify different sets of build configurations, compiler
+flags, and package versions through the <code>--defaults</code> option.</p>
+<p>Different defaults can be used to:
+- Use different package versions (e.g., different ROOT versions)
+- Apply specific compiler flags (e.g., debug builds, optimization levels)
+- Enable or disable certain features or packages</p>
+<p>To use a different set of defaults, use the <code>--defaults &lt;name&gt;</code> option,
+which will load settings from <code>CONFIGDIR/defaults-&lt;name&gt;.sh</code>. For example,
+<code>--defaults o2-epn</code> would use the <code>defaults-o2-epn.sh</code> file.</p>
+<p>For a more complete description of how the defaults system works and how to
+create custom defaults, please look at <a href="reference.html#defaults">the reference manual</a>.</p>
+<h2 id="disabling-packages">Disabling packages<a class="headerlink" href="#disabling-packages" title="Permanent link">#</a></h2>
+<p>You can optionally disable certain packages by specifying them as a comma
+separated list with the <code>--disable</code> option.</p>
+<p>It's also possible to disable packages by adding them to the <code>disable</code> keyword
+of your defaults file (see previous paragraph). See the
+<a href="https://github.com/alisw/alidist/blob/master/defaults-o2.sh">defaults-o2.sh</a>
+file for an example of how to disable <code>mesos</code> and <code>MySQL</code> when
+passing <code>--defaults o2</code>.</p>
+<h2 id="controlling-which-system-packages-are-picked-up">Controlling which system packages are picked up<a class="headerlink" href="#controlling-which-system-packages-are-picked-up" title="Permanent link">#</a></h2>
+<p>When compiling, there is a number of packages which can be picked up
+from the system, and only if they are not found, do not have their
+devel part installed, or they are not considered good enough they are
+recompiled from scratch. A typical example is things like autotools,
+zlib or cmake which should be available on a standard developer machine
+and we rebuild them as last resort. In certain cases, to ensure full
+compatibility on what is done in production it might be desirable to
+always pick up our own version of the tools. This can be done by passing
+the <code>--no-system</code> option to alibuild. On the other hand, there might
+be cases in which you want to pick up not only basic tools, but also
+advanced ones like ROOT, Geant4, or Pythia from the system, either to
+save time or because you have a pre-existing setup which you do not want
+to touch. In this case you can use <code>--always-prefer-system</code> option which
+will try very hard to reuse as many system packages as possible (always
+checking they are actually compatible with the one used in the recipe).</p>
+<h2 id="cleaning-up-the-build-area-new-in-110">Cleaning up the build area (new in 1.1.0)<a class="headerlink" href="#cleaning-up-the-build-area-new-in-110" title="Permanent link">#</a></h2>
+<p>Whenever you build using a different recipe or set of sources, alibuild
+makes sure that all the dependent packages which might be affected
+by the change are rebuild, and it does so in a different directory.
+This can lead to the profiliferation of many build / installation
+directories, in particular while developing a recipe for a new package
+(e.g. a new generator).</p>
+<p>In order to remove all past builds and only keep the latest one for each
+alidist area you might have used and for each breanch (but not commit)
+ever build for a given development package you can use the</p>
+<div class="language-text highlight"><pre><span></span><code>aliBuild clean
+</code></pre></div>
+<p>subcommand which will do its best to clean up your build and
+installation area.</p>
+<h2 id="upgrading-alibuild">Upgrading aliBuild<a class="headerlink" href="#upgrading-alibuild" title="Permanent link">#</a></h2>
+<p>aliBuild can be installed either via <code>pip</code>, or by your OS package manager (more info <a href="https://alice-doc.github.io/alice-analysis-tutorial/building/custom.html">here</a>. </p>
+<p>The way to upgrade it depends on your installation method. If you installed it
+via <code>pip</code>, you can upgrade it by running:</p>
+<div class="language-text highlight"><pre><span></span><code>pip install --upgrade alibuild
+</code></pre></div>
+<p>In general updating aliBuild is safe and it should never trigger a rebuild or
+break compilation of older versions of alidist (i.e. we do try to guarantee
+backward compatibility). In no case an update of aliBuild will result in the
+update of <code>alidist</code>, which users will have to be done separately.
+In case some yet to appear bug in alibuild will force us to rebuild a
+previously built area, this will be widely publicized and users will get a warning
+when running the command.</p>
+<p>You can also upgrade / install a specific version of alibuild by specifying it on the 
+command line. E.g.:</p>
+<div class="language-text highlight"><pre><span></span><code>pip install alibuild=1.17.23
+</code></pre></div>
+<h2 id="rebuilding-packages-from-branches-instead-of-tags">Rebuilding packages from branches instead of tags<a class="headerlink" href="#rebuilding-packages-from-branches-instead-of-tags" title="Permanent link">#</a></h2>
+<p>Generally, recipes specify a Git <em>tag</em> name in the <code>tag:</code> field. In some cases,
+<em>branch names</em> might be used instead (such as <code>tag: master</code> or <code>tag: dev</code>). In
+such a rare case, aliBuild needs to know what is the last branch commit to
+determine whether a rebuild is necessary.</p>
+<p>Such check by default uses cached information instead of doing very slow queries
+to remote servers. This means that aliBuild is fast in determining which
+packages to build. However, packages using branch names might not get rebuilt as
+expected when new changes are pushed to those branches.</p>
+<p>In this case, you can ask aliBuild to update cached branches information by
+adding the <code>-u</code> or <code>--fetch-repos</code> option. Note that by default this is not
+needed, it's only for very special use cases (such as centralized builds and
+server-side pull request checks).</p>
+<h2 id="generating-a-dependency-graph">Generating a dependency graph<a class="headerlink" href="#generating-a-dependency-graph" title="Permanent link">#</a></h2>
+<p>It is possible to generating a PDF with a dependency graph using the <code>aliBuild deps</code>
+tool. Assuming you run it from a directory containing <code>alidist</code>, and you have
+Graphviz installed on your system, you can simply run:</p>
+<div class="language-text highlight"><pre><span></span><code>aliBuild deps O2 --outgraph graph.pdf
+</code></pre></div>
+<p>The example above generates a dependency graph for the package <code>O2</code>, and saving
+the results to a PDF file named <code>graph.pdf</code>. This is what the graph looks like:</p>
+<p><img alt="drawing" src="deps.png" /></p>
+<p>Packages in green are runtime dependencies, purple are build dependencies, while
+red packages are runtime dependencies in some cases, and build dependencies in
+others (this can indicate an error in the recipes).</p>
+<p>Connections are color-coded as well: blue connections indicate a runtime
+dependency whereas a grey connection indicate a build dependency.</p>
+<p>By default, <code>aliBuild deps</code> runs the usual system checks to exclude packages that can
+be taken from the system. If you want to display the full list of dependencies,
+you may want to use:</p>
+<div class="language-text highlight"><pre><span></span><code>aliBuild deps O2 --no-system --outgraph graph.pdf
+</code></pre></div>
+<p>Additional useful options for <code>aliBuild deps</code> include:</p>
+<ul>
+<li><code>--neat</code>: Produce a graph with transitive reduction, removing edges that are
+  implied by other paths in the graph. This can make complex dependency graphs
+  easier to read.</li>
+<li><code>--outdot FILE</code>: Keep the intermediate Graphviz dot file in <code>FILE</code>. Useful if
+  you want to manually modify the graph or generate output in different formats.</li>
+</ul>
+<p>For example, to generate a simplified graph and keep the dot file:</p>
+<div class="language-text highlight"><pre><span></span><code>aliBuild deps O2 --neat --outdot graph.dot --outgraph graph.pdf
+</code></pre></div>
+<p>Please run <code>aliBuild deps --help</code> for further information.</p>
+<h2 id="using-the-packages-you-have-built">Using the packages you have built<a class="headerlink" href="#using-the-packages-you-have-built" title="Permanent link">#</a></h2>
+<h3 id="loading-the-package-environment">Loading the package environment<a class="headerlink" href="#loading-the-package-environment" title="Permanent link">#</a></h3>
+<p>Environment for packages built using aliBuild is managed by
+<a href="http://modules.sourceforge.net">Environment Modules</a> and the wrapper script
+<code>alienv</code>. To list the available packages you can do:</p>
+<div class="language-text highlight"><pre><span></span><code>alienv q
+</code></pre></div>
+<p>while:</p>
+<div class="language-text highlight"><pre><span></span><code>alienv enter VO_ALICE@PackageA::VersionA[,VO_ALICE@PackageB::VersionB...]
+</code></pre></div>
+<p>will enter a shell with the appropriate environment set. Note that loading a
+toplevel package recursively sets the environment for all its dependencies.</p>
+<p>You can also execute a command with the proper environment without altering the
+current one. For instance:</p>
+<div class="language-text highlight"><pre><span></span><code>alienv setenv VO_ALICE@AliRoot::latest -c aliroot -b
+</code></pre></div>
+<p>To see other commands consult the online manual:</p>
+<div class="language-text highlight"><pre><span></span><code>alienv help
+</code></pre></div>
+<p>Environment Modules is required: the package is usually called
+<code>environment-modules</code> on Linux, or simply <code>modules</code> if using Homebrew on OSX.</p>
+<p>Note that <code>alienv</code> works exactly like the one found on CVMFS, but for local
+packages built with <code>aliBuild</code>.</p>
+<h3 id="environment-for-packages-lacking-a-module-definition">Environment for packages lacking a module definition<a class="headerlink" href="#environment-for-packages-lacking-a-module-definition" title="Permanent link">#</a></h3>
+<p>Some packages do not have a modulefile: this usually occurs for those which are
+not distributed on the Grid. If you think this is wrong feel free to submit a
+<a href="https://github.com/alisw/alidist/pulls">pull request</a> or
+<a href="https://github.com/alisw/alidist/issues">open an issue</a> to the relevant
+packages.</p>
+<p>It is still possible to load the environment by sourcing the <code>init.sh</code> file
+produced for each package under the <code>etc/profile.d</code> subdirectory. For instance:</p>
+<div class="language-text highlight"><pre><span></span><code>WORK_DIR=$PWD/sw source sw/slc7_x86-64/AliRoot/v5-08-02-1/etc/profile.d/init.sh
+</code></pre></div>
+<p>Dependencies are automatically loaded.</p>
+
+
+
+
+
+
+
+  
+  
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": ".", "features": [], "search": "assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
