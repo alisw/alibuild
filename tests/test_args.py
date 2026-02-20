@@ -73,6 +73,8 @@ CORRECT_BEHAVIOR = [
   (("sw", ".")     , "clean --chdir mydir2 --work-dir sw4"                             , [("action", "clean"), ("workDir", "sw4"), ("chdir", "mydir2")]),
   (()              , "doctor zlib -C mydir -w sw2"                                     , [("action", "doctor"), ("workDir", "sw2"), ("chdir", "mydir")]),
   (()              , "deps zlib --outgraph graph.pdf"                                  , [("action", "deps"), ("outgraph", "graph.pdf")]),
+  (()              , "completion bash"                                                  , [("action", "completion"), ("shell", "bash")]),
+  (()              , "completion zsh"                                                   , [("action", "completion"), ("shell", "zsh")]),
 ]
 
 GETSTATUSOUTPUT_MOCKS = {

@@ -78,6 +78,16 @@ RECIPES = {
       exit 0
     ---
     """),
+    # Recipe for issue #880: prefer_system_check relies on _VERSION env var
+    "CONFIG_DIR/version-check.sh": dedent("""\
+    package: version-check
+    version: v1
+    prefer_system: '.*'
+    prefer_system_check: |
+      [ "$GENFIT_VERSION" = "v1.0.0" ] && exit 0
+      exit 1
+    ---
+    """),
 }
 
 class MockReader:
@@ -229,6 +239,26 @@ class ForceRebuildTestCase(unittest.TestCase):
             self.assertTrue(specs["defaults-release"]["force_rebuild"])
 
 
+@mock.patch("alibuild_helpers.utilities.getRecipeReader", new=MockReader)
+class Issue880TestCase(unittest.TestCase):
+    """Test for issue #880: pruneWorkdirFromPaths preserves _VERSION env vars."""
+
+    def test_version_check_uses_env_var(self) -> None:
+        """prefer_system_check can use _VERSION env vars after pruneWorkdirFromPaths."""
+        from alibuild_helpers.utilities import pruneWorkdirFromPaths
+
+        def fake_exists(n):
+            return n in RECIPES.keys()
+
+        os.environ["GENFIT_VERSION"] = "v1.0.0"
+        try:
+            with patch.object(os.path, "exists", fake_exists):
+                pruneWorkdirFromPaths("/fake/workdir")
+                self.assertIn("GENFIT_VERSION", os.environ)
+                _, systemPkgs, ownPkgs, _, _ = getPackageListWithDefaults(["version-check"])
+                self.assertIn("version-check", systemPkgs)
+        finally:
+            os.environ.pop("GENFIT_VERSION", None)
 
 
 if __name__ == '__main__':

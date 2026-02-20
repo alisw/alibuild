@@ -88,7 +88,7 @@ setup(
     # have to be included in MANIFEST.in as well.
     include_package_data=True,
     package_data={
-      'alibuild_helpers': ['build_template.sh'],
+      'alibuild_helpers': ['build_template.sh', 'completions/*.sh'],
     },
 
     # To provide executable scripts, use entry points in preference to the

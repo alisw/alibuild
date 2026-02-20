@@ -169,15 +169,25 @@ def resolve_tag(spec):
 def normalise_multiple_options(option, sep=","):
   return [x for x in ",".join(option).split(sep) if x]
 
-def prunePaths(workDir):
+def pruneWorkdirFromPaths(workDir):
+  """Remove workDir entries from PATH, LD_LIBRARY_PATH, and DYLD_LIBRARY_PATH."""
   for x in ["PATH", "LD_LIBRARY_PATH", "DYLD_LIBRARY_PATH"]:
     if x not in os.environ:
       continue
     workDirEscaped = re.escape("%s" % workDir) + "[^:]*:?"
     os.environ[x] = re.sub(workDirEscaped, "", os.environ[x])
+
+
+def pruneVersionEnvVars():
+  """Remove all *_VERSION environment variables except ALIBUILD_VERSION."""
   for x in list(os.environ.keys()):
     if x.endswith("_VERSION") and x != "ALIBUILD_VERSION":
       os.environ.pop(x)
+
+
+def prunePaths(workDir):
+  pruneWorkdirFromPaths(workDir)
+  pruneVersionEnvVars()
 
 def validateSpec(spec):
   if not spec:
@@ -221,7 +231,7 @@ def doDetectArch(hasOsRelease, osReleaseLines, platformTuple, platformSystem, pl
       key, is_prop, val = x.partition("=")
       if not is_prop:
         continue
-      val = val.strip("\n \"")
+      val = val.strip("\n \"'")
       if key == "ID":
         distribution = val.lower()
       if key == "VERSION_ID":
