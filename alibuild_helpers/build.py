@@ -5,7 +5,7 @@ from alibuild_helpers import __version__
 from alibuild_helpers.analytics import report_event
 from alibuild_helpers.log import debug, info, banner, warning
 from alibuild_helpers.log import dieOnError
-from alibuild_helpers.cmd import execute, DockerRunner, BASH, install_wrapper_script, getstatusoutput
+from alibuild_helpers.cmd import execute, ContainerRunner, container_run_string, BASH, install_wrapper_script, getstatusoutput
 from alibuild_helpers.utilities import prunePaths, symlink, call_ignoring_oserrors, topological_sort, detectArch
 from alibuild_helpers.utilities import resolve_store_path
 from alibuild_helpers.utilities import parseDefaults, readDefaults
@@ -512,10 +512,10 @@ def doBuild(args, parser):
   }
   extra_env.update(dict([e.partition('=')[::2] for e in args.environment]))
 
-  with DockerRunner(args.dockerImage, args.docker_extra_args, extra_env=extra_env, extra_volumes=[f"{os.path.abspath(args.configDir)}:/alidist:ro"] if args.docker else []) as getstatusoutput_docker:
+  with ContainerRunner(args.dockerImage, args.docker_extra_args, extra_env=extra_env, extra_volumes=[f"{os.path.abspath(args.configDir)}:/alidist:ro"] if args.docker else []) as getstatusoutput_container:
     def performPreferCheckWithTempDir(pkg, cmd):
       with tempfile.TemporaryDirectory(prefix=f"alibuild_prefer_check_{pkg['package']}_") as temp_dir:
-        return getstatusoutput_docker(cmd, cwd=temp_dir)
+        return getstatusoutput_container(cmd, cwd=temp_dir)
 
     systemPackages, ownPackages, failed, validDefaults = \
       getPackageList(packages                = packages,
@@ -1091,28 +1091,9 @@ def doBuild(args, parser):
     # In case the --docker options is passed, we setup a docker container which
     # will perform the actual build. Otherwise build as usual using bash.
     if args.docker:
-      build_command = (
-        "docker run --rm --entrypoint= --user $(id -u):$(id -g) "
-        "-v {workdir}:/sw -v{configDir}:/alidist:ro -v {scriptDir}/build.sh:/build.sh:ro "
-        "{mirrorVolume} {develVolumes} {additionalEnv} {additionalVolumes} "
-        "-e WORK_DIR_OVERRIDE=/sw -e ALIBUILD_CONFIG_DIR_OVERRIDE=/alidist {extraArgs} {image} bash -ex /build.sh"
-      ).format(
-        image=quote(args.dockerImage),
-        workdir=quote(abspath(args.workDir)),
-        configDir=quote(abspath(args.configDir)),
-        scriptDir=quote(scriptDir),
-        extraArgs=" ".join(map(quote, args.docker_extra_args)),
-        additionalEnv=" ".join(
-          f"-e {var}={quote(value)}" for var, value in buildEnvironment),
-        # Used e.g. by O2DPG-sim-tests to find the O2DPG repository.
-        develVolumes=" ".join(
-          '-v "$PWD/$(readlink {pkg} || echo {pkg})":/{pkg}:rw'.format(pkg=quote(spec["package"]))
-          for spec in specs.values() if spec["is_devel_pkg"]),
-        additionalVolumes=" ".join(
-          "-v %s" % quote(volume) for volume in args.volumes),
-        mirrorVolume=("-v %s:/mirror" % quote(dirname(spec["reference"]))
-                      if "reference" in spec else ""),
-      )
+      build_command = container_run_string(args.dockerImage, args.workDir, args.configDir, scriptDir,
+                                           args.docker_extra_args, spec, specs, args.volumes, buildEnvironment)
+
     else:
       os.environ.update(buildEnvironment)
       build_command = f"{BASH} -e -x {quote(scriptDir)}/build.sh 2>&1"

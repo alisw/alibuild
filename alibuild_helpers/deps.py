@@ -2,7 +2,7 @@
 
 from alibuild_helpers.log import debug, error, info, dieOnError
 from alibuild_helpers.utilities import parseDefaults, readDefaults, getPackageList, validateDefaults
-from alibuild_helpers.cmd import DockerRunner, execute
+from alibuild_helpers.cmd import ContainerRunner, execute
 from tempfile import NamedTemporaryFile
 from os import remove, path
 
@@ -20,7 +20,7 @@ def doDeps(args, parser):
   extra_env = {"ALIBUILD_CONFIG_DIR": "/alidist" if args.docker else path.abspath(args.configDir)}
   extra_env.update(dict([e.partition('=')[::2] for e in args.environment]))
   
-  with DockerRunner(args.dockerImage, args.docker_extra_args, extra_env=extra_env, extra_volumes=[f"{path.abspath(args.configDir)}:/alidist:ro"] if args.docker else []) as getstatusoutput_docker:
+  with ContainerRunner(args.dockerImage, args.docker_extra_args, extra_env=extra_env, extra_volumes=[f"{path.abspath(args.configDir)}:/alidist:ro"] if args.docker else []) as getstatusoutput_docker:
     def performCheck(pkg, cmd):
       return getstatusoutput_docker(cmd)
     

@@ -5,6 +5,7 @@ from subprocess import Popen, PIPE, STDOUT
 from textwrap import dedent
 from subprocess import TimeoutExpired
 from shlex import quote
+import platform
 
 from alibuild_helpers.log import debug, error, dieOnError
 
@@ -69,6 +70,48 @@ def execute(command, printer=debug, timeout=None):
 
 
 BASH = "bash" if getstatusoutput("/bin/bash --version")[0] else "/bin/bash"
+
+class AppleContainerRunner:
+    """A context manager for running commands inside a Apple Container (see https://github.com/apple/container)
+       If the image given is None or empty, the commands are run on the host instead.
+    """
+    def __init__(self, container_image, container_run_args, extra_env, extra_volumes) -> None:
+        self._container_image = container_image
+        self._container_run_args = container_run_args
+        self._container = None
+        self._extra_env = extra_env
+        self._extra_volumes = extra_volumes
+
+    def __enter__(self):
+        if not self._container_image:
+            return
+        envOpts = [opt for k, v in self._extra_env.items() for opt in ("-e", f"{k}={v}")]
+        volumes = [opt for v in self._extra_volumes for opt in ("-v", v)]
+        # Apple Container is more picky about missing entrypoints, so we always override it
+        # with /bin/sleep.
+        cmd = ["container", "run", "--detach"] + envOpts + volumes + ["--rm", "--entrypoint=/bin/sleep"]
+        cmd += self._container_run_args
+        cmd += [self._container_image, "inf"]
+        self._container = getoutput(cmd).strip()
+
+        def getstatusoutput_container(cmd, cwd=None):
+            if self._container is None:
+                command_prefix=""
+                if self._extra_env:
+                    command_prefix="env " + " ".join("{}={}".format(k, quote(v)) for (k,v) in self._extra_env.items()) + " "
+                return getstatusoutput("{}{} -c {}".format(command_prefix, BASH, quote(cmd))
+                                    , cwd=cwd)
+            envOpts = [opt for k, v in self._extra_env.items() for opt in ("-e", f"{k}={v}")]
+            exec_cmd = ["container", "exec"] + envOpts + [self._container, "bash", "-c", cmd]
+            return getstatusoutput(exec_cmd, cwd=cwd)
+
+        return getstatusoutput_container
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        if self._container is not None:
+            getstatusoutput("container kill " + quote(self._container))
+        self._container = None
+        return False  # propagate any exception that may have occurred
 
 
 class DockerRunner:
@@ -146,3 +189,85 @@ def install_wrapper_script(name, work_dir):
              "rerunning this command inside a login shell (e.g. `bash -l`). "
              "If that doesn't work, run `export PATH` manually.")
   os.environ["PATH"] = script_dir + ":" + os.environ["PATH"]
+
+def to_int(s: str) -> int:
+    try:
+        return int(float(s))
+    except (ValueError, TypeError):
+        return 0
+
+
+def _apple_run_string(dockerImage, workDir, configDir, scriptDir, docker_extra_args, spec, specs, volumes, buildEnvironment):
+    build_command = (
+        "container run --rm --entrypoint=/bin/bash --user $(id -u):$(id -g) "
+        "--mount type=bind,source={workdir},target=/sw "
+        "--mount type=bind,source={configDir},target=/alidist,readonly "
+        "--mount type=bind,source={scriptDir},target=/scripts,readonly "
+        "{mirrorVolume} {develVolumes} {additionalEnv} {additionalVolumes} "
+        "-e WORK_DIR_OVERRIDE=/sw -e ALIBUILD_CONFIG_DIR_OVERRIDE=/alidist {extraArgs} {image} -ex /scripts/build.sh"
+    ).format(
+        image=quote(dockerImage),
+        workdir=quote(os.path.abspath(workDir)),
+        configDir=quote(os.path.abspath(configDir)),
+        scriptDir=quote(scriptDir),
+        extraArgs=" ".join(map(quote, docker_extra_args)),
+        additionalEnv=" ".join(
+            "-e {}={}".format(var, quote(value)) for var, value in buildEnvironment
+        ),
+        # Used e.g. by O2DPG-sim-tests to find the O2DPG repository.
+        develVolumes=" ".join(
+            '--mount type=bind,source="$PWD/$(readlink {pkg} || echo {pkg})",target=/{pkg},readonly'.format(
+                pkg=quote(s["package"])
+            )
+            for s in specs.values()
+            if s["is_devel_pkg"]
+        ),
+        additionalVolumes=" ".join("--mount type=bind,source=%s" % quote(volume) for volume in volumes),
+        mirrorVolume=(
+            "--mount source=%s,target=/mirror" % quote(os.path.dirname(spec["reference"]))
+            if "reference" in spec
+            else ""
+        ),
+    )
+    print(build_command)
+    return build_command
+
+def _docker_run_string( dockerImage, workDir, configDir, scriptDir, docker_extra_args, spec, specs, volumes, buildEnvironment):
+    build_command = (
+        "docker run --rm --entrypoint=/bin/bash --user $(id -u):$(id -g) "
+        "-v {workdir}:/sw -v{configDir}:/alidist:ro -v {scriptDir}/build.sh:/build.sh:ro "
+        "{mirrorVolume} {develVolumes} {additionalEnv} {additionalVolumes} "
+        "-e WORK_DIR_OVERRIDE=/sw -e ALIBUILD_CONFIG_DIR_OVERRIDE=/alidist {extraArgs} --network=host {image} bash -ex /build.sh"
+    ).format(
+        image=quote(dockerImage),
+        workdir=quote(os.path.abspath(workDir)),
+        configDir=quote(os.path.abspath(configDir)),
+        scriptDir=quote(scriptDir),
+        extraArgs=" ".join(map(quote, docker_extra_args)),
+        additionalEnv=" ".join(
+            "-e {}={}".format(var, quote(value)) for var, value in buildEnvironment
+        ),
+        # Used e.g. by O2DPG-sim-tests to find the O2DPG repository.
+        develVolumes=" ".join(
+            '-v "$PWD/$(readlink {pkg} || echo {pkg})":/{pkg}:rw'.format(
+                pkg=quote(spec["package"])
+            )
+            for spec in specs.values()
+            if spec["is_devel_pkg"]
+        ),
+        additionalVolumes=" ".join("-v %s" % quote(volume) for volume in volumes),
+        mirrorVolume=(
+            "-v %s:/mirror" % quote(os.path.dirname(spec["reference"]))
+            if "reference" in spec
+            else ""
+        ),
+    )
+    return build_command
+
+
+if to_int(platform.mac_ver()[0].split(".")[0]) >= 26:
+    ContainerRunner = AppleContainerRunner
+    container_run_string = _apple_run_string
+else:
+    ContainerRunner = DockerRunner
+    container_run_string = _docker_run_string
