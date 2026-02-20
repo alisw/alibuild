@@ -434,9 +434,13 @@ def finaliseArgs(args, parser):
   if args.action in ("build", "doctor", "deps"):
     if args.dockerImage or args.docker_extra_args:
       args.docker = True
+    # In case we build with docker / containers, we add a special
+    # devel prefix (if not already present) so that we do not pollute
+    # the namespace of the current architecture
+    if args.docker and hasattr(args, "develPrefix"):
+      args.develPrefix = args.architecture
 
     args.docker_extra_args = shlex.split(args.docker_extra_args)
-    args.docker_extra_args.append("--network=host")
 
     if args.docker and args.architecture.startswith("osx"):
       parser.error("cannot use `-a %s` and --docker" % args.architecture)
