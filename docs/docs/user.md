@@ -371,7 +371,7 @@ It is possible to generating a PDF with a dependency graph using the `aliBuild d
 tool. Assuming you run it from a directory containing `alidist`, and you have
 Graphviz installed on your system, you can simply run:
 
-    aliBuild deps O2 --outgraph graph.pdf
+    aliBuild deps O2 | dot -Tpdf -o graph.pdf
 
 The example above generates a dependency graph for the package `O2`, and saving
 the results to a PDF file named `graph.pdf`. This is what the graph looks like:
@@ -389,19 +389,12 @@ By default, `aliBuild deps` runs the usual system checks to exclude packages tha
 be taken from the system. If you want to display the full list of dependencies,
 you may want to use:
 
-    aliBuild deps O2 --no-system --outgraph graph.pdf
+    aliBuild deps O2 --no-system | dot -Tpdf -o graph.pdf
 
-Additional useful options for `aliBuild deps` include:
+As usual you can customise the input of dot using `tred` to produce a graph with 
+a transitive reduction:
 
-- `--neat`: Produce a graph with transitive reduction, removing edges that are
-  implied by other paths in the graph. This can make complex dependency graphs
-  easier to read.
-- `--outdot FILE`: Keep the intermediate Graphviz dot file in `FILE`. Useful if
-  you want to manually modify the graph or generate output in different formats.
-
-For example, to generate a simplified graph and keep the dot file:
-
-    aliBuild deps O2 --neat --outdot graph.dot --outgraph graph.pdf
+    aliBuild deps O2 --no-system | tred | dot -Tpdf -o graph.pdf
 
 Please run `aliBuild deps --help` for further information.
 

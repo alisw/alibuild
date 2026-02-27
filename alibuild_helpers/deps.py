@@ -1,17 +1,12 @@
 #!/usr/bin/env python3
 
-from alibuild_helpers.log import debug, error, info, dieOnError
+from alibuild_helpers.log import debug, dieOnError
 from alibuild_helpers.utilities import parseDefaults, readDefaults, getPackageList, validateDefaults
 from alibuild_helpers.cmd import DockerRunner, execute
-from tempfile import NamedTemporaryFile
-from os import remove, path
+from os import path
+import sys
 
 def doDeps(args, parser):
-
-  # Check if we have an output file
-  if not args.outgraph:
-    parser.error("Specify a PDF output file with --outgraph")
-
   # Resolve all the package parsing boilerplate
   specs = {}
   defaultsReader = lambda: readDefaults(args.configDir, args.defaults, parser.error, args.architecture)
@@ -93,28 +88,8 @@ def doDeps(args, parser):
 
   dot += "}\n"
 
-  if args.outdot:
-    fp = open(args.outdot, "w")
+  if getattr(args, "output", None) and args.output != "-":
+    fp = open(args.output, "w")
   else:
-    fp = NamedTemporaryFile(delete=False, mode="wt")
+    fp = sys.stdout
   fp.write(dot)
-  fp.close()
-
-  # Check if we have dot in PATH
-  try:
-    execute(["dot", "-V"])
-  except Exception:
-    dieOnError(True, "Could not find dot in PATH. Please install graphviz and add it to PATH.")
-  try:
-    if args.neat:
-      execute("tred {dotFile} > {dotFile}.0 && mv {dotFile}.0 {dotFile}".format(dotFile=fp.name))
-    execute(["dot", fp.name, "-Tpdf", "-o", args.outgraph])
-  except Exception as e:
-    error("Error generating dependencies with dot: %s: %s", type(e).__name__, e)
-  else:
-    info("Dependencies graph generated: %s" % args.outgraph)
-  if fp.name != args.outdot:
-    remove(fp.name)
-  else:
-    info("Intermediate dot file for Graphviz saved: %s" % args.outdot)
-  return True

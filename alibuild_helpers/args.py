@@ -212,14 +212,8 @@ def doParseArgs():
                                  "with commas."))
   deps_parser.add_argument("-e", dest="environment", action="append", default=[],
                            help="KEY=VALUE binding to add to the environment. May be specified multiple times.")
-
-  deps_graph = deps_parser.add_argument_group(title="Customise graph output")
-  deps_graph.add_argument("--neat", dest="neat", action="store_true",
-                          help="Produce a graph with transitive reduction.")
-  deps_graph.add_argument("--outdot", dest="outdot", metavar="FILE",
-                          help="Keep intermediate Graphviz dot file in %(metavar)s.")
-  deps_graph.add_argument("--outgraph", dest="outgraph", metavar="FILE",
-                          help="Store final output PDF file in %(metavar)s.")
+  deps_parser.add_argument("--output,-o", dest="output", metavar="FILE",
+                           help="Save output to %(metavar)s.")
 
   deps_docker = deps_parser.add_argument_group(title="Use a Docker container", description="""\
   If you're planning to build inside a Docker container, e.g. using aliBuild
