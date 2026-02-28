@@ -8,6 +8,7 @@ from alibuild_helpers.log import debug, error, banner, info, success, warning
 from alibuild_helpers.log import logger
 from alibuild_helpers.utilities import getPackageList, parseDefaults, readDefaults, validateDefaults
 from alibuild_helpers.cmd import getstatusoutput, DockerRunner
+import tempfile
 
 def prunePaths(workDir) -> None:
   for x in ["PATH", "LD_LIBRARY_PATH", "DYLD_LIBRARY_PATH"]:
@@ -21,7 +22,8 @@ def checkPreferSystem(spec, cmd, homebrew_replacement, getstatusoutput_docker):
       debug("Package %s can only be managed via alibuild.", spec["package"])
       return (1, "")
     cmd = homebrew_replacement + cmd
-    err, out = getstatusoutput_docker(cmd)
+    with tempfile.TemporaryDirectory(prefix=f"alibuild_prefer_check_{spec['package']}_") as temp_dir:
+        err, out = getstatusoutput_docker(cmd, cwd=temp_dir)
     if not err:
       success("Package %s will be picked up from the system.", spec["package"])
       for x in out.split("\n"):
@@ -31,7 +33,7 @@ def checkPreferSystem(spec, cmd, homebrew_replacement, getstatusoutput_docker):
     warning("Package %s cannot be picked up from the system and will be built by aliBuild.\n"
             "This is due to the fact the following script fails:\n\n%s\n\n"
             "with the following output:\n\n%s\n",
-            spec["package"], cmd, "\n".join("%s: %s" % (spec["package"], x) for x in out.split("\n")))
+            spec["package"], cmd, "\n".join("{}: {}".format(spec["package"], x) for x in out.split("\n")))
     return (err, "")
 
 def checkRequirements(spec, cmd, homebrew_replacement, getstatusoutput_docker):
@@ -39,7 +41,8 @@ def checkRequirements(spec, cmd, homebrew_replacement, getstatusoutput_docker):
       debug("Package %s is not a system requirement.", spec["package"])
       return (0, "")
     cmd = homebrew_replacement + cmd
-    err, out = getstatusoutput_docker(cmd)
+    with tempfile.TemporaryDirectory(prefix=f"alibuild_prefer_check_{spec['package']}_") as temp_dir:
+        err, out = getstatusoutput_docker(cmd, cwd=temp_dir)
     if not err:
       success("Required package %s will be picked up from the system.", spec["package"])
       debug("%s", cmd)
@@ -50,7 +53,7 @@ def checkRequirements(spec, cmd, homebrew_replacement, getstatusoutput_docker):
           "This is due to the fact that the following script fails:\n\n%s\n"
           "with the following output:\n\n%s\n%s\n",
           spec["package"], cmd,
-          "\n".join("%s: %s" % (spec["package"], x) for x in out.split("\n")),
+          "\n".join("{}: {}".format(spec["package"], x) for x in out.split("\n")),
           spec.get("system_requirement_missing"))
     return (err, "")
 
@@ -82,7 +85,11 @@ def doDoctor(args, parser):
   # Decide if we can use homebrew. If not, we replace it with "true" so
   # that we do not get spurious messages on linux
   homebrew_replacement = ""
-  with DockerRunner(args.dockerImage, args.docker_extra_args) as getstatusoutput_docker:
+
+  extra_env = {"ALIBUILD_CONFIG_DIR": "/alidist" if args.docker else os.path.abspath(args.configDir)}
+  extra_env.update(dict([e.partition('=')[::2] for e in args.environment]))
+
+  with DockerRunner(args.dockerImage, args.docker_extra_args, extra_env=extra_env, extra_volumes=[f"{os.path.abspath(args.configDir)}:/alidist:ro"] if args.docker else []) as getstatusoutput_docker:
     err, output = getstatusoutput_docker("type c++")
   if err:
     warning("Unable to find system compiler.\n"
@@ -118,7 +125,7 @@ def doDoctor(args, parser):
   packages = []
   exitcode = 0
   for p in args.packages:
-    path = "%s/%s.sh" % (args.configDir, p.lower())
+    path = f"{args.configDir}/{p.lower()}.sh"
     if not exists(path):
       error("Cannot find recipe %s for package %s.", path, p)
       exitcode = 1
@@ -139,7 +146,10 @@ def doDoctor(args, parser):
       error("%s", msg)
     return (ok,msg,valid)
 
-  with DockerRunner(args.dockerImage, args.docker_extra_args) as getstatusoutput_docker:
+  extra_env = {"ALIBUILD_CONFIG_DIR": "/alidist" if args.docker else os.path.abspath(args.configDir)}
+  extra_env.update(dict([e.partition('=')[::2] for e in args.environment]))
+  
+  with DockerRunner(args.dockerImage, args.docker_extra_args, extra_env=extra_env, extra_volumes=[f"{os.path.abspath(args.configDir)}:/alidist:ro"] if args.docker else []) as getstatusoutput_docker:
     fromSystem, own, failed, validDefaults = \
       getPackageList(packages                = packages,
                      specs                   = specs,
@@ -156,7 +166,7 @@ def doDoctor(args, parser):
                      taps                    = taps,
                      log                     = info)
 
-  alwaysBuilt = set(x for x in specs) - fromSystem - own - failed
+  alwaysBuilt = {x for x in specs} - fromSystem - own - failed
   if alwaysBuilt:
     banner("The following packages will be built by aliBuild because\n"
            " usage of a system version of it is not allowed or supported, by policy:\n\n- %s",

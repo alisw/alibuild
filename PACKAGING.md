@@ -7,12 +7,5 @@ alibuild is available from PyPi. Package page at:
 In order to publish a new version:
 
 - Test, test, test.
-- Change the tag in setup.py
-- Build the source distribution with:
-
-      python setup.py build sdist
-
-- Publish with:
-
-      twine upload dist/*
-
+- Create a new release in GitHub.
+- The github action should automatically create a new release and upload the package to PyPi (it's a good idea to verify that the release was created and the package uploaded).

@@ -72,7 +72,7 @@ def report(eventType, **metadata):
   ostype = "Macintosh" if architecture.startswith("osx") else "Linux"
   osversion, osprocessor = architecture.split("_", 1)
   args = ["curl", "--max-time", "5",
-          "--user-agent", "aliBuild/%s (%s; %s %s) Python/%s" % (
+          "--user-agent", "aliBuild/{} ({}; {} {}) Python/{}".format(
                                                     os.environ["ALIBUILD_VERSION"],
                                                     ostype,
                                                     osprocessor,
@@ -89,7 +89,7 @@ def report(eventType, **metadata):
            "https://www.google-analytics.com/collect"]
   try:
     subprocess.Popen(args)
-  except:
+  except Exception:
     pass
 
 def report_event(category, action, label = "", value = None):

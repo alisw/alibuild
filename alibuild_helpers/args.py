@@ -57,6 +57,10 @@ def doParseArgs():
                                       description="Initialise development packages.")
   version_parser = subparsers.add_parser("version", help="display %(prog)s version",
                                          description="Display %(prog)s and architecture.")
+  completion_parser = subparsers.add_parser("completion", help="output shell completion code",
+                                            description="Output shell completion code for bash or zsh.")
+  completion_parser.add_argument("shell", choices=["bash", "zsh"],
+                                 help="Shell type to generate completions for.")
 
   # Options for the analytics command
   analytics_parser.add_argument("state", choices=["on", "off"], help="Whether to report analytics or not")
@@ -206,14 +210,10 @@ def doParseArgs():
                            help=("Assume we're not building %(metavar)s and all its (unique) dependencies. "
                                  "You can specify this option multiple times or separate multiple arguments "
                                  "with commas."))
-
-  deps_graph = deps_parser.add_argument_group(title="Customise graph output")
-  deps_graph.add_argument("--neat", dest="neat", action="store_true",
-                          help="Produce a graph with transitive reduction.")
-  deps_graph.add_argument("--outdot", dest="outdot", metavar="FILE",
-                          help="Keep intermediate Graphviz dot file in %(metavar)s.")
-  deps_graph.add_argument("--outgraph", dest="outgraph", metavar="FILE",
-                          help="Store final output PDF file in %(metavar)s.")
+  deps_parser.add_argument("-e", dest="environment", action="append", default=[],
+                           help="KEY=VALUE binding to add to the environment. May be specified multiple times.")
+  deps_parser.add_argument("--output,-o", dest="output", metavar="FILE",
+                           help="Save output to %(metavar)s.")
 
   deps_docker = deps_parser.add_argument_group(title="Use a Docker container", description="""\
   If you're planning to build inside a Docker container, e.g. using aliBuild
@@ -254,6 +254,8 @@ def doParseArgs():
                              help=("Assume we're not building %(metavar)s and all its (unique) dependencies. "
                                    "You can specify this option multiple times or separate multiple arguments "
                                    "with commas."))
+  doctor_parser.add_argument("-e", dest="environment", action="append", default=[],
+                            help="KEY=VALUE binding to add to the build environment. May be specified multiple times.")
 
   doctor_system = doctor_parser.add_mutually_exclusive_group()
   doctor_system.add_argument("--always-prefer-system", dest="preferSystem", action="store_true",
@@ -355,7 +357,7 @@ def doParseArgs():
   def optionOrder(x):
     if x in ["--debug", "-d", "-n", "--dry-run"]:
       return 0
-    if x in ["build", "init", "clean", "analytics", "doctor", "deps"]:
+    if x in ["build", "init", "clean", "analytics", "doctor", "deps", "completion"]:
       return 1
     return 2
   rest.sort(key=optionOrder)
@@ -396,8 +398,8 @@ S3_SUPPORTED_ARCHS = "slc7_x86-64", "slc8_x86-64", "ubuntu2004_x86-64", "ubuntu2
 
 def finaliseArgs(args, parser):
 
-  # Nothing to finalise for version or analytics
-  if args.action in ["version", "analytics", "architecture"]:
+  # Nothing to finalise for version, analytics, or completion
+  if args.action in ["version", "analytics", "architecture", "completion"]:
     return args
 
   # --architecture can be specified in both clean and build.
@@ -480,7 +482,7 @@ def finaliseArgs(args, parser):
       else:
         args.develPrefix = basename(dirname(abspath(args.configDir)))
     if getattr(args, "docker", False):
-      args.develPrefix = "%s-%s" % (args.develPrefix, args.architecture) if "develPrefix" in args else args.architecture
+      args.develPrefix = f"{args.develPrefix}-{args.architecture}" if "develPrefix" in args else args.architecture
 
   if args.action == "init":
     args.configDir = args.configDir % {"prefix": args.develPrefix + "/"}

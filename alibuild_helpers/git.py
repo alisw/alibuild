@@ -68,13 +68,13 @@ class Git(SCM):
     return ["checkout", "-f", tag]
 
   def fetchCmd(self, remote, *refs):
-    return ["fetch", "-f"] + clone_speedup_options() + [remote, *refs]
+    return ["fetch", "-f", "--prune"] + clone_speedup_options() + [remote, *refs]
 
   def setWriteUrlCmd(self, url):
     return ["remote", "set-url", "--push", "origin", url]
 
   def diffCmd(self, directory):
-    return "cd %s && git diff -r HEAD && git status --porcelain" % directory
+    return "cd %s && git diff HEAD && git status --porcelain" % directory
 
   def checkUntracked(self, line):
     return line.startswith("?? ")

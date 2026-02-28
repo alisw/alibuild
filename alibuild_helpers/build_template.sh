@@ -1,7 +1,18 @@
 #!/bin/bash
-
+ALIBUILD_START_TIMESTAMP=$(date +%%s)
 # Automatically generated build script
 unset DYLD_LIBRARY_PATH
+echo "aliBuild: start building $PKGNAME-$PKGVERSION-$PKGREVISION at $ALIBUILD_START_TIMESTAMP"
+
+cleanup() {
+  local exit_code=$?
+  ALIBUILD_END_TIMESTAMP=$(date +%%s)
+  ALIBUILD_DELTA_TIME=$(($ALIBUILD_END_TIMESTAMP - $ALIBUILD_START_TIMESTAMP))
+  echo "aliBuild: done building $PKGNAME-$PKGVERSION-$PKGREVISION at $ALIBUILD_START_TIMESTAMP (${ALIBUILD_DELTA_TIME} s)"
+  exit $exit_code
+}
+
+trap cleanup EXIT
 
 # Cleanup variables which should not be exposed to user code
 unset AWS_ACCESS_KEY_ID
@@ -11,6 +22,7 @@ set -e
 set +h
 function hash() { true; }
 export WORK_DIR="${WORK_DIR_OVERRIDE:-%(workDir)s}"
+export ALIBUILD_CONFIG_DIR="${ALIBUILD_CONFIG_DIR_OVERRIDE:-%(configDir)s}"
 
 # Insert our own wrapper scripts into $PATH, patched to use the system OpenSSL,
 # instead of the one we build ourselves.
@@ -59,6 +71,16 @@ export BUILDROOT="$ALIBUILD_BUILD_WORK_DIR/BUILD/$PKGHASH"
 export SOURCEDIR="$WORK_DIR/SOURCES/$PKGNAME/$PKGVERSION/$COMMIT_HASH"
 export BUILDDIR="$BUILDROOT/$PKGNAME"
 
+# All caching for RECC should happen relative to $WORK_DIR
+export RECC_PROJECT_ROOT=$WORK_DIR
+export RECC_WORKING_DIR_PREFIX=$WORK_DIR
+# Moreover we allow caching stuff across different builds of the same
+# package, but not across packages.
+export RECC_PREFIX_MAP=$BUILDDIR=/recc/BUILDDIR-$PKGNAME:$INSTALLROOT=/recc/INSTALLROOT-$PKGNAME:$SOURCEDIR=/recc/SOURCEDIR-$PKGNAME
+#export RECC_PREFIX_MAP=$RECC_PREFIX_MAP:$(readlink $BUILDDIR)=/recc/BUILDDIR-$PKGNAME:$(readlink $INSTALLROOT)=/recc/INSTALLROOT-$PKGNAME:$(readlink $SOURCEDIR)=/recc/SOURCEDIR-$PKGNAME
+# No point in mixing packages
+export RECC_ACTION_SALT="$PKGNAME"
+
 rm -fr "$WORK_DIR/INSTALLROOT/$PKGHASH"
 # We remove the build directory only if we are not in incremental mode.
 if [[ "$INCREMENTAL_BUILD_HASH" == 0 ]] && ! rm -rf "$BUILDROOT"; then
@@ -102,9 +124,9 @@ unset DYLD_LIBRARY_PATH
 EOF
 
 cd "$BUILDROOT"
-ln -snf $PKGHASH "${BUILDROOT}-latest"
+ln -snf "$PKGHASH" "$ALIBUILD_BUILD_WORK_DIR/BUILD/$PKGNAME-latest"
 if [[ $DEVEL_PREFIX ]]; then
-  ln -snf $PKGHASH "${BUILDROOT}-latest-$DEVEL_PREFIX"
+  ln -snf "$PKGHASH" "$ALIBUILD_BUILD_WORK_DIR/BUILD/$PKGNAME-latest-$DEVEL_PREFIX"
 fi
 
 cd "$BUILDDIR"
@@ -209,7 +231,7 @@ fi
 if [[ ${ARCHITECTURE:0:3} == "osx" ]]; then
   otool_arch=$(echo "${ARCHITECTURE#osx_}" | tr - _)  # otool knows x86_64, not x86-64
 
-  /usr/bin/find ${RELOCATE_PATHS:-bin lib lib64} -type d \( -name '*.dist-info' -o -path '*/pytz/zoneinfo' \) -prune -false -o -type f \
+  /usr/bin/find ${RELOCATE_PATHS:-bin lib lib64 python} -type d \( -name '*.dist-info' -o -path '*/pytz/zoneinfo' \) -prune -false -o -type f \
                 -not -name '*.py' -not -name '*.pyc' -not -name '*.pyi' -not -name '*.pxd' -not -name '*.inc' -not -name '*.js' -not -name '*.json' \
                 -not -name '*.xml' -not -name '*.xsl' -not -name '*.txt' -not -name '*.dat' -not -name '*.mat' -not -name '*.sav' -not -name '*.csv' \
                 -not -name '*.wav' -not -name '*.png' -not -name '*.svg' -not -name '*.css' -not -name '*.html' -not -name '*.woff' -not -name '*.woff2' -not -name '*.ttf' \

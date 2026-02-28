@@ -17,6 +17,7 @@ from alibuild_helpers.deps import doDeps
 from alibuild_helpers.log import info, debug, logger, error
 from alibuild_helpers.utilities import detectArch
 from alibuild_helpers.build import doBuild
+from alibuild_helpers.completion import doCompletion
 
 
 def doMain(args, parser):
@@ -100,6 +101,9 @@ if __name__ == "__main__":
   elif args.action == "architecture":
     arch = detectArch()
     print(arch if arch else "<unknown>")
+    exit(0)
+  elif args.action == "completion":
+    doCompletion(args)
     exit(0)
 
   if not decideAnalytics(exists(expanduser("~/.config/alibuild/disable-analytics")),

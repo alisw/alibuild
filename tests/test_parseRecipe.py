@@ -50,13 +50,13 @@ found unexpected end of stream
     
     ^"""
 
-class Recoder(object):
+class Recoder:
   def __init__(self) -> None:
     self.buffer = ""
   def __call__(self, s, *a) -> None:
     self.buffer += s % a
 
-class BufferReader(object):
+class BufferReader:
   def __init__(self, filename, recipe) -> None:
     self.url = filename
     self.buffer = recipe

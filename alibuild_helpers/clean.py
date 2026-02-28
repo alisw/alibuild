@@ -43,13 +43,13 @@ def decideClean(workDir, architecture, aggressiveCleanup):
   # we do not need the actual tarballs after they have been built.
   toDelete = ["%s/TMP" % workDir, "%s/INSTALLROOT" % workDir]
   if aggressiveCleanup:
-    toDelete += ["%s/TARS/%s/store" % (workDir, architecture),
+    toDelete += [f"{workDir}/TARS/{architecture}/store",
                  "%s/SOURCES" % (workDir)]
   allBuildStuff = glob.glob("%s/BUILD/*" % workDir)
   toDelete += [x for x in allBuildStuff
                if not path.islink(x) and basename(x) not in symlinksBuild]
-  installGlob ="%s/%s/*/" % (workDir, architecture)
-  installedPackages = set([dirname(x) for x in glob.glob(installGlob)])
+  installGlob =f"{workDir}/{architecture}/*/"
+  installedPackages = {dirname(x) for x in glob.glob(installGlob)}
   symlinksInstall = []
   for x in installedPackages:
     symlinksInstall += [path.realpath(y) for y in glob.glob(x + "/latest*")]

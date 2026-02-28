@@ -1,11 +1,12 @@
 from os.path import abspath, exists, basename, dirname, join, realpath
 from os import makedirs, unlink, readlink, rmdir
+from pathlib import Path
 from alibuild_helpers import __version__
 from alibuild_helpers.analytics import report_event
 from alibuild_helpers.log import debug, info, banner, warning
 from alibuild_helpers.log import dieOnError
 from alibuild_helpers.cmd import execute, DockerRunner, BASH, install_wrapper_script, getstatusoutput
-from alibuild_helpers.utilities import prunePaths, symlink, call_ignoring_oserrors, topological_sort, detectArch
+from alibuild_helpers.utilities import pruneWorkdirFromPaths, pruneVersionEnvVars, symlink, call_ignoring_oserrors, topological_sort, detectArch
 from alibuild_helpers.utilities import resolve_store_path
 from alibuild_helpers.utilities import parseDefaults, readDefaults
 from alibuild_helpers.utilities import getPackageList, asList
@@ -19,9 +20,9 @@ from alibuild_helpers.sync import remote_from_url
 from alibuild_helpers.workarea import logged_scm, updateReferenceRepoSpec, checkout_sources
 from alibuild_helpers.log import ProgressPrint, log_current_package
 from glob import glob
-from textwrap import dedent
 from collections import OrderedDict
 from shlex import quote
+import tempfile
 
 import concurrent.futures
 import importlib
@@ -30,6 +31,7 @@ import socket
 import os
 import re
 import shutil
+import sys
 import time
 
 
@@ -42,7 +44,7 @@ def writeAll(fn, txt) -> None:
 def readHashFile(fn):
   try:
     return open(fn).read().strip("\n")
-  except IOError:
+  except OSError:
     return "0"
 
 
@@ -54,11 +56,9 @@ def update_git_repos(args, specs, buildOrder):
     """
 
     def update_repo(package, git_prompt):
-        specs[package]["scm"] = Git()
-        if specs[package]["is_devel_pkg"]:
-            specs[package]["source"] = os.path.join(os.getcwd(), specs[package]["package"])
-            if exists(os.path.join(specs[package]["source"], ".sl")):
-                specs[package]["scm"] = Sapling()
+        # Note: spec["scm"] should already be initialized before this is called
+        # This function just updates the repository and fetches refs
+        assert "scm" in specs[package], f"specs[{package!r}] has no scm key"
         updateReferenceRepoSpec(args.referenceSources, package, specs[package],
                                 fetch=args.fetchRepos, allowGitPrompt=git_prompt)
 
@@ -194,7 +194,7 @@ def storeHashes(package, specs, considerRelocation):
       # spec["env"] is of type OrderedDict[str, str].
       # spec["*_path"] are of type OrderedDict[str, list[str]].
       assert isinstance(spec[key], OrderedDict), \
-        "spec[%r] was of type %r" % (key, type(spec[key]))
+        f"spec[{key!r}] was of type {type(spec[key])!r}"
 
       # Python 3.12 changed the string representation of OrderedDicts from
       # OrderedDict([(key, value)]) to OrderedDict({key: value}), so to remain
@@ -203,7 +203,7 @@ def storeHashes(package, specs, considerRelocation):
       h_all(", ".join(
         # XXX: We still rely on repr("str") being "'str'",
         # and on repr(["a", "b"]) being "['a', 'b']".
-        "(%r, %r)" % (key, value)
+        f"({key!r}, {value!r})"
         for key, value in spec[key].items()
       ))
       h_all("])")
@@ -271,7 +271,7 @@ def hash_local_changes(spec):
   h = Hasher()
   if "track_env" in spec:
     assert isinstance(spec["track_env"], OrderedDict), \
-        "spec[%r] was of type %r" % ("track_env", type(spec["track_env"]))
+        "spec[{!r}] was of type {!r}".format("track_env", type(spec["track_env"]))
 
     # Python 3.12 changed the string representation of OrderedDicts from
     # OrderedDict([(key, value)]) to OrderedDict({key: value}), so to remain
@@ -280,7 +280,7 @@ def hash_local_changes(spec):
     h(", ".join(
         # XXX: We still rely on repr("str") being "'str'",
         # and on repr(["a", "b"]) being "['a', 'b']".
-        "(%r, %r)" % (key, value) for key, value in spec["track_env"].items()))
+        f"({key!r}, {value!r})" for key, value in spec["track_env"].items()))
     h("])")
   def hash_output(msg, args):
     lines = msg % args
@@ -364,6 +364,7 @@ def generate_initdotsh(package, specs, architecture, post_build=False):
       commit_hash=quote(spec["commit_hash"]),
     ) for line in (
       'export {bigpackage}_ROOT="$WORK_DIR/$ALIBUILD_ARCH_PREFIX"/{package}/{version}-{revision}',
+      'export RECC_PREFIX_MAP="${bigpackage}_ROOT=/recc/{bigpackage}_ROOT:$RECC_PREFIX_MAP"',
       "export {bigpackage}_VERSION={version}",
       "export {bigpackage}_REVISION={revision}",
       "export {bigpackage}_HASH={hash}",
@@ -379,12 +380,12 @@ def generate_initdotsh(package, specs, architecture, post_build=False):
     # First, output a sensible error message if types are wrong.
     for key in ("env", "append_path", "prepend_path"):
       dieOnError(not isinstance(spec.get(key, {}), dict),
-                 "Tag `%s' in %s should be a dict." % (key, package))
+                 f"Tag `{key}' in {package} should be a dict.")
 
     # Set "env" variables.
     # We only put the values in double-quotes, so that they can refer to other
     # shell variables or do command substitution (e.g. $(brew --prefix ...)).
-    lines.extend('export {}="{}"'.format(key, value)
+    lines.extend(f'export {key}="{value}"'
                  for key, value in spec.get("env", {}).items()
                  if key != "DYLD_LIBRARY_PATH")
 
@@ -401,7 +402,7 @@ def generate_initdotsh(package, specs, architecture, post_build=False):
     # By default we add the .../bin directory to PATH and .../lib to LD_LIBRARY_PATH.
     # Prepend to these paths, so that our packages win against system ones.
     for key, value in (("PATH", "bin"), ("LD_LIBRARY_PATH", "lib")):
-      prepend_path.setdefault(key, []).insert(0, "${}_ROOT/{}".format(bigpackage, value))
+      prepend_path.setdefault(key, []).insert(0, f"${bigpackage}_ROOT/{value}")
     lines.extend('export {key}="{value}${{{key}+:${key}}}"'
                  .format(key=key, value=":".join(value))
                  for key, value in prepend_path.items()
@@ -459,7 +460,7 @@ def doBuild(args, parser):
   specs = {}
   buildOrder = []
   workDir = abspath(args.workDir)
-  prunePaths(workDir)
+  pruneWorkdirFromPaths(workDir)
 
   dieOnError(not exists(args.configDir),
              'Cannot find alidist recipes under directory "%s".\n'
@@ -481,12 +482,17 @@ def doBuild(args, parser):
 
   makedirs(join(workDir, "SPECS"), exist_ok=True)
 
-  # If the alidist workdir contains a .sl directory, we use Sapling as SCM.
-  # Otherwise, we default to git (without checking for the actual presence of
-  # .git). We mustn't check for a .git directory, because some tests use a
-  # subdirectory of the alibuild source tree as the "alidist" checkout, and
-  # that won't have a .git directory.
-  scm = exists("%s/.sl" % args.configDir) and Sapling() or Git()
+  # If the alidist workdir contains a .sl directory (or .git/sl for git repos
+  # with Sapling enabled), we use Sapling as SCM. Otherwise, we default to git
+  # (without checking for the actual presence of .git). We mustn't check for a
+  # .git directory, because some tests use a subdirectory of the alibuild source
+  # tree as the "alidist" checkout, and that won't have a .git directory.
+  config_path = Path(args.configDir)
+  has_sapling = (config_path / ".sl").exists() or (config_path / ".git" / "sl").exists()
+  if has_sapling and shutil.which("sl"):
+    scm = Sapling()
+  else:
+    scm = Git()
   try:
     checkedOutCommitName = scm.checkedOutCommitName(directory=args.configDir)
   except SCMError:
@@ -500,7 +506,17 @@ def doBuild(args, parser):
 
   install_wrapper_script("git", workDir)
 
-  with DockerRunner(args.dockerImage, args.docker_extra_args) as getstatusoutput_docker:
+  extra_env = {
+    "ALIBUILD_CONFIG_DIR": "/alidist" if args.docker else os.path.abspath(args.configDir),
+    "ALIBUILD_VERSION": __version__ or "unknown"
+  }
+  extra_env.update(dict([e.partition('=')[::2] for e in args.environment]))
+
+  with DockerRunner(args.dockerImage, args.docker_extra_args, extra_env=extra_env, extra_volumes=[f"{os.path.abspath(args.configDir)}:/alidist:ro"] if args.docker else []) as getstatusoutput_docker:
+    def performPreferCheckWithTempDir(pkg, cmd):
+      with tempfile.TemporaryDirectory(prefix=f"alibuild_prefer_check_{pkg['package']}_") as temp_dir:
+        return getstatusoutput_docker(cmd, cwd=temp_dir)
+
     systemPackages, ownPackages, failed, validDefaults = \
       getPackageList(packages                = packages,
                      specs                   = specs,
@@ -511,12 +527,14 @@ def doBuild(args, parser):
                      disable                 = args.disable,
                      force_rebuild           = args.force_rebuild,
                      defaults                = args.defaults,
-                     performPreferCheck      = lambda pkg, cmd: getstatusoutput_docker(cmd),
-                     performRequirementCheck = lambda pkg, cmd: getstatusoutput_docker(cmd),
+                     performPreferCheck      = performPreferCheckWithTempDir,
+                     performRequirementCheck = performPreferCheckWithTempDir,
                      performValidateDefaults = lambda spec: validateDefaults(spec, args.defaults),
                      overrides               = overrides,
                      taps                    = taps,
                      log                     = debug)
+
+  pruneVersionEnvVars()
 
   dieOnError(validDefaults and args.defaults not in validDefaults,
              "Specified default `%s' is not compatible with the packages you want to build.\n"
@@ -555,13 +573,13 @@ def doBuild(args, parser):
     del develCandidates, develCandidatesUpper, develPkgsUpper
 
   if buildOrder:
-    if args.onlyDeps: 
+    if args.onlyDeps:
       builtPackages = buildOrder[:-1]
     else:
       builtPackages = buildOrder
     if len(builtPackages) > 1:
       banner("Packages will be built in the following order:\n - %s",
-             "\n - ".join(x+" (development package)" if x in develPkgs else "%s@%s" % (x, specs[x]["tag"])
+             "\n - ".join(x+" (development package)" if x in develPkgs else "{}@{}".format(x, specs[x]["tag"])
                           for x in builtPackages if x != "defaults-release"))
     else:
       banner("No dependencies of package %s to build.", buildOrder[-1])
@@ -579,11 +597,18 @@ def doBuild(args, parser):
 
   for pkg, spec in specs.items():
     spec["is_devel_pkg"] = pkg in develPkgs
-    spec["scm"] = Git()
     if spec["is_devel_pkg"]:
-      spec["source"] = os.path.join(os.getcwd(), pkg)
-    if "source" in spec and exists(os.path.join(spec["source"], ".sl")):
-      spec["scm"] = Sapling()
+      spec["source"] = str(Path.cwd() / pkg)
+
+    # Only initialize Sapling if it's in PATH and the repo uses it
+    use_sapling = False
+    if "source" in spec:
+        source_path = Path(spec["source"])
+        has_sapling = ( (source_path / ".sl").exists() or (source_path / ".git" / "sl").exists() )
+        if has_sapling and shutil.which("sl"):
+            use_sapling = True
+    spec["scm"] = Sapling() if use_sapling else Git()
+
     reference_repo = join(os.path.abspath(args.referenceSources), pkg.lower())
     if exists(reference_repo):
       spec["reference"] = reference_repo
@@ -809,7 +834,7 @@ def doBuild(args, parser):
       develPrefix = possibleDevelPrefix
 
     if possibleDevelPrefix:
-      spec["build_family"] = "%s-%s" % (possibleDevelPrefix, args.defaults)
+      spec["build_family"] = f"{possibleDevelPrefix}-{args.defaults}"
     else:
       spec["build_family"] = args.defaults
     if spec["package"] == mainPackage:
@@ -929,7 +954,7 @@ def doBuild(args, parser):
 
     # Now that we have all the information about the package we want to build, let's
     # check if it wasn't built / unpacked already.
-    hashPath= "%s/%s/%s/%s-%s" % (workDir,
+    hashPath= "{}/{}/{}/{}-{}".format(workDir,
                                   args.architecture,
                                   spec["package"],
                                   spec["version"],
@@ -972,12 +997,12 @@ def doBuild(args, parser):
           unlink(join(buildWorkDir, "BUILD", spec["package"] + "-latest"))
           if "develPrefix" in args:
             unlink(join(buildWorkDir, "BUILD", spec["package"] + "-latest-" + args.develPrefix))
-        except:
+        except Exception:
           pass
         try:
           rmdir(join(buildWorkDir, "BUILD"))
           rmdir(join(workDir, "INSTALLROOT"))
-        except:
+        except Exception:
           pass
       continue
 
@@ -1000,15 +1025,10 @@ def doBuild(args, parser):
 
     # The actual build script.
     debug("spec = %r", spec)
-
-    cmd_raw = ""
-    try:
-      fp = open(dirname(realpath(__file__))+'/build_template.sh', 'r')
-      cmd_raw = fp.read()
-      fp.close()
-    except:
-      from pkg_resources import resource_string
-      cmd_raw = resource_string("alibuild_helpers", 'build_template.sh')
+    
+    fp = open(dirname(realpath(__file__))+'/build_template.sh')
+    cmd_raw = fp.read()
+    fp.close()
 
     if args.docker:
       cachedTarball = re.sub("^" + workDir, "/sw", spec["cachedTarball"])
@@ -1022,7 +1042,7 @@ def doBuild(args, parser):
                      spec["version"] + "-" + spec["revision"])
 
     makedirs(scriptDir, exist_ok=True)
-    writeAll("%s/%s.sh" % (scriptDir, spec["package"]), spec["recipe"])
+    writeAll("{}/{}.sh".format(scriptDir, spec["package"]), spec["recipe"])
     writeAll("%s/build.sh" % scriptDir, cmd_raw % {
       "provenance": create_provenance_info(spec["package"], specs, args),
       "initdotsh_deps": generate_initdotsh(p, specs, args.architecture, post_build=False),
@@ -1062,6 +1082,7 @@ def doBuild(args, parser):
       ("FULL_RUNTIME_REQUIRES", " ".join(spec["full_runtime_requires"])),
       ("FULL_BUILD_REQUIRES", " ".join(spec["full_build_requires"])),
       ("FULL_REQUIRES", " ".join(spec["full_requires"])),
+      ("ALIBUILD_PREFER_SYSTEM_KEY", spec.get("key", "")),
     ]
     # Add the extra environment as passed from the command line.
     buildEnvironment += [e.partition('=')[::2] for e in args.environment]
@@ -1074,16 +1095,17 @@ def doBuild(args, parser):
     if args.docker:
       build_command = (
         "docker run --rm --entrypoint= --user $(id -u):$(id -g) "
-        "-v {workdir}:/sw -v {scriptDir}/build.sh:/build.sh:ro "
+        "-v {workdir}:/sw -v{configDir}:/alidist:ro -v {scriptDir}/build.sh:/build.sh:ro "
         "{mirrorVolume} {develVolumes} {additionalEnv} {additionalVolumes} "
-        "-e WORK_DIR_OVERRIDE=/sw {extraArgs} {image} bash -ex /build.sh"
+        "-e WORK_DIR_OVERRIDE=/sw -e ALIBUILD_CONFIG_DIR_OVERRIDE=/alidist {extraArgs} {image} bash -ex /build.sh"
       ).format(
         image=quote(args.dockerImage),
         workdir=quote(abspath(args.workDir)),
+        configDir=quote(abspath(args.configDir)),
         scriptDir=quote(scriptDir),
         extraArgs=" ".join(map(quote, args.docker_extra_args)),
         additionalEnv=" ".join(
-          "-e {}={}".format(var, quote(value)) for var, value in buildEnvironment),
+          f"-e {var}={quote(value)}" for var, value in buildEnvironment),
         # Used e.g. by O2DPG-sim-tests to find the O2DPG repository.
         develVolumes=" ".join(
           '-v "$PWD/$(readlink {pkg} || echo {pkg})":/{pkg}:rw'.format(pkg=quote(spec["package"]))
@@ -1095,16 +1117,19 @@ def doBuild(args, parser):
       )
     else:
       os.environ.update(buildEnvironment)
-      build_command = "%s -e -x %s/build.sh 2>&1" % (BASH, quote(scriptDir))
+      build_command = f"{BASH} -e -x {quote(scriptDir)}/build.sh 2>&1"
 
     debug("Build command: %s", build_command)
+    progress_msg = "Unpacking %s@%s" if cachedTarball else "Compiling %s@%s"
+    if not cachedTarball and not args.debug:
+      progress_msg += " (use --debug for full output)"
     progress = ProgressPrint(
-      ("Unpacking %s@%s" if cachedTarball else
-       "Compiling %s@%s (use --debug for full output)") %
+      progress_msg %
       (spec["package"],
        args.develPrefix if "develPrefix" in args and spec["is_devel_pkg"] else spec["version"])
     )
-    err = execute(build_command, printer=progress)
+    # 8 hour timeout per package to prevent builds from hanging forever
+    err = execute(build_command, printer=progress, timeout=8*60*60)
     progress.end("failed" if err else "done", err)
     report_event("BuildError" if err else "BuildSuccess", spec["package"], " ".join((
       args.architecture,
@@ -1117,50 +1142,99 @@ def doBuild(args, parser):
     if spec["is_devel_pkg"]:
       updatablePkgs.append(spec["package"])
 
-    buildErrMsg = dedent("""\
-    Error while executing {sd}/build.sh on `{h}'.
-    Log can be found in {w}/BUILD/{p}-latest{devSuffix}/log
-    Please upload it to CERNBox/Dropbox if you intend to request support.
-    Build directory is {w}/BUILD/{p}-latest{devSuffix}/{p}.
-    """).format(
-      h=socket.gethostname(),
-      sd=scriptDir,
-      w=buildWorkDir,
-      p=spec["package"],
-      devSuffix="-" + args.develPrefix
-      if "develPrefix" in args and spec["is_devel_pkg"]
-      else "",
-    )
-    if updatablePkgs:
-      buildErrMsg += dedent("""
-      Note that you have packages in development mode.
-      Devel sources are not updated automatically, you must do it by hand.\n
-      This problem might be due to one or more outdated devel sources.
-      To update all development packages required for this build it is usually sufficient to do:
-      """)
-      buildErrMsg += "".join("\n  ( cd %s && git pull --rebase )" % dp for dp in updatablePkgs)
+    # Determine paths
+    devSuffix = "-" + args.develPrefix if "develPrefix" in args and spec["is_devel_pkg"] else ""
+    log_path = f"{buildWorkDir}/BUILD/{spec['package']}-latest{devSuffix}/log"
+    build_dir = f"{buildWorkDir}/BUILD/{spec['package']}-latest{devSuffix}/{spec['package']}"
+
+    # Use relative paths if we're inside the work directory
+    try:
+      from os.path import relpath
+      log_path = relpath(log_path, os.getcwd())
+      build_dir = relpath(build_dir, os.getcwd())
+    except (ValueError, OSError):
+      pass  # Keep absolute paths if relpath fails
+
+    # Color codes for error message (if TTY)
+    bold = "\033[1m" if sys.stderr.isatty() else ""
+    red = "\033[31m" if sys.stderr.isatty() else ""
+    reset = "\033[0m" if sys.stderr.isatty() else ""
+
+    # Build the error message
+    devel_note = " (development package)" if spec["is_devel_pkg"] else ""
+    buildErrMsg = f"{red}{bold}BUILD FAILED:{reset} {spec['package']}@{spec['version']}{devel_note}\n"
+    buildErrMsg += "=" * 70 + "\n\n"
+
+    buildErrMsg += f"{bold}Log File:{reset}\n"
+    buildErrMsg += f"  {log_path}\n\n"
+
+    buildErrMsg += f"{bold}Build Directory:{reset}\n"
+    buildErrMsg += f"  {build_dir}\n"
 
     # Gather build info for the error message
     try:
+      detected_arch = detectArch()
+
+      # Only show safe arguments (no tokens/secrets) in CLI-usable format
       safe_args = {
         "pkgname", "defaults", "architecture", "forceUnknownArch",
         "develPrefix", "jobs", "noSystem", "noDevel", "forceTracked", "plugin",
         "disable", "annotate", "onlyDeps", "docker"
-          }
-      args_str = " ".join(f"--{k}={v}" for k, v in vars(args).items() if v and k in safe_args)
-      detected_arch = detectArch()
-      buildErrMsg += dedent(f"""
-      Build info:
-      OS: {detected_arch}
-      Using aliBuild from alibuild@{__version__ or "unknown"} recipes in alidist@{os.environ["ALIBUILD_ALIDIST_HASH"][:10]}
-      Build arguments: {args_str}
-      """)
+      }
+      
+      cli_args = []
+      for k, v in vars(args).items():
+        if not v or k not in safe_args:
+          continue
+        
+        # Format based on type for CLI usage
+        if isinstance(v, bool):
+          if v:  # Only show if True
+            cli_args.append(f"--{k}")
+        elif isinstance(v, list):
+          if v:  # Only show non-empty lists
+            # For lists, use multiple --flag value or --flag=val1,val2
+            for item in v:
+              cli_args.append(f"--{k}={quote(str(item))}")
+        else:
+          # Quote if needed
+          cli_args.append(f"--{k}={quote(str(v))}")
+      
+      args_str = " ".join(cli_args)
+
+      buildErrMsg += f"\n{bold}Environment:{reset}\n"
+      buildErrMsg += f"  OS: {detected_arch}\n"
+      buildErrMsg += f"  aliBuild: {__version__ or 'unknown'} (alidist@{os.environ['ALIBUILD_ALIDIST_HASH'][:10]})\n"
 
       if detected_arch.startswith("osx"):
-        buildErrMsg += f'XCode version: {getstatusoutput("xcodebuild -version")[1]}'
+        xcode_info = getstatusoutput("xcodebuild -version")[1]
+        # Combine XCode version lines into one
+        xcode_lines = xcode_info.strip().split('\n')
+        if len(xcode_lines) >= 2:
+          xcode_str = f"{xcode_lines[0]} ({xcode_lines[1]})"
+        else:
+          xcode_str = xcode_lines[0] if xcode_lines else "Unknown"
+        buildErrMsg += f"  XCode: {xcode_str}\n"
+
+      buildErrMsg += f"  Arguments: {args_str}\n"
 
     except Exception as exc:
       warning("Failed to gather build info", exc_info=exc)
+
+    # Add note about development packages if applicable
+    if updatablePkgs:
+      buildErrMsg += f"\n{bold}Development Packages:{reset}\n"
+      buildErrMsg += "  Development sources are not updated automatically.\n"
+      buildErrMsg += "  This may be due to outdated sources. To update:\n"
+      buildErrMsg += "".join(f"\n    ( cd {dp} && git pull --rebase )" for dp in updatablePkgs)
+      buildErrMsg += "\n"
+
+    # Add Next Steps section
+    buildErrMsg += f"\n{bold}Next Steps:{reset}\n"
+    buildErrMsg += f"  • View error log:          cat {log_path}\n"
+    if not args.debug:
+      buildErrMsg += f"  • Rebuild with debug:      aliBuild build {spec['package']} --debug\n"
+    buildErrMsg += f"  • Please upload the full log to CERNBox/Dropbox if you intend to request support.\n"
 
 
     dieOnError(err, buildErrMsg.strip())

@@ -1,22 +1,24 @@
 #!/usr/bin/env python3
 
-from alibuild_helpers.log import debug, error, info, dieOnError
+from alibuild_helpers.log import debug, dieOnError
 from alibuild_helpers.utilities import parseDefaults, readDefaults, getPackageList, validateDefaults
 from alibuild_helpers.cmd import DockerRunner, execute
-from tempfile import NamedTemporaryFile
-from os import remove
+from os import path
+import sys
 
 def doDeps(args, parser):
-
-  # Check if we have an output file
-  if not args.outgraph:
-    parser.error("Specify a PDF output file with --outgraph")
-
   # Resolve all the package parsing boilerplate
   specs = {}
   defaultsReader = lambda: readDefaults(args.configDir, args.defaults, parser.error, args.architecture)
   (err, overrides, taps) = parseDefaults(args.disable, defaultsReader, debug)
-  with DockerRunner(args.dockerImage, args.docker_extra_args) as getstatusoutput_docker:
+
+  extra_env = {"ALIBUILD_CONFIG_DIR": "/alidist" if args.docker else path.abspath(args.configDir)}
+  extra_env.update(dict([e.partition('=')[::2] for e in args.environment]))
+  
+  with DockerRunner(args.dockerImage, args.docker_extra_args, extra_env=extra_env, extra_volumes=[f"{path.abspath(args.configDir)}:/alidist:ro"] if args.docker else []) as getstatusoutput_docker:
+    def performCheck(pkg, cmd):
+      return getstatusoutput_docker(cmd)
+    
     systemPackages, ownPackages, failed, validDefaults = \
       getPackageList(packages                = [args.package],
                      specs                   = specs,
@@ -26,8 +28,8 @@ def doDeps(args, parser):
                      architecture            = args.architecture,
                      disable                 = args.disable,
                      defaults                = args.defaults,
-                     performPreferCheck      = lambda pkg, cmd: getstatusoutput_docker(cmd),
-                     performRequirementCheck = lambda pkg, cmd: getstatusoutput_docker(cmd),
+                     performPreferCheck      = performCheck,
+                     performRequirementCheck = performCheck,
                      performValidateDefaults = lambda spec: validateDefaults(spec, args.defaults),
                      overrides               = overrides,
                      taps                    = taps,
@@ -76,38 +78,18 @@ def doDeps(args, parser):
       assert color, "This should not happen (happened for %s)" % k
 
     # Node definition
-    dot += '"%s" [shape=box, style="rounded,filled", fontname="helvetica", fillcolor=%s]\n' % (k,color)
+    dot += f'"{k}" [shape=box, style="rounded,filled", fontname="helvetica", fillcolor={color}]\n'
 
     # Connections (different whether it's a build dependency or a runtime one)
     for dep in spec["build_requires"]:
-     dot += '"%s" -> "%s" [color=grey70]\n' % (k, dep)
+     dot += f'"{k}" -> "{dep}" [color=grey70]\n'
     for dep in spec["runtime_requires"]:
-     dot += '"%s" -> "%s" [color=dodgerblue3]\n' % (k, dep)
+     dot += f'"{k}" -> "{dep}" [color=dodgerblue3]\n'
 
   dot += "}\n"
 
-  if args.outdot:
-    fp = open(args.outdot, "wt")
+  if getattr(args, "output", None) and args.output != "-":
+    fp = open(args.output, "w")
   else:
-    fp = NamedTemporaryFile(delete=False, mode="wt")
+    fp = sys.stdout
   fp.write(dot)
-  fp.close()
-
-  # Check if we have dot in PATH
-  try:
-    execute(["dot", "-V"])
-  except Exception:
-    dieOnError(True, "Could not find dot in PATH. Please install graphviz and add it to PATH.")
-  try:
-    if args.neat:
-      execute("tred {dotFile} > {dotFile}.0 && mv {dotFile}.0 {dotFile}".format(dotFile=fp.name))
-    execute(["dot", fp.name, "-Tpdf", "-o", args.outgraph])
-  except Exception as e:
-    error("Error generating dependencies with dot: %s: %s", type(e).__name__, e)
-  else:
-    info("Dependencies graph generated: %s" % args.outgraph)
-  if fp.name != args.outdot:
-    remove(fp.name)
-  else:
-    info("Intermediate dot file for Graphviz saved: %s" % args.outdot)
-  return True

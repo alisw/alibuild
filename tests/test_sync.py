@@ -16,19 +16,19 @@ GOOD_HASH = "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
 BAD_HASH = "baadf00dbaadf00dbaadf00dbaadf00dbaadf00d"
 NONEXISTENT_HASH = "TRIGGERS_A_404"
 GOOD_SPEC = {    # fully present on the remote store
-    "package": PACKAGE, "version": "v1.2.3", "revision": "1",
+    "package": PACKAGE, "version": "v1.3.1", "revision": "1",
     "hash": GOOD_HASH,
     "remote_revision_hash": GOOD_HASH,
     "remote_hashes": [GOOD_HASH],
 }
 BAD_SPEC = {     # partially present on the remote store
-    "package": PACKAGE, "version": "v1.2.3", "revision": "2",
+    "package": PACKAGE, "version": "v1.3.1", "revision": "2",
     "hash": BAD_HASH,
     "remote_revision_hash": BAD_HASH,
     "remote_hashes": [BAD_HASH],
 }
 MISSING_SPEC = {    # completely absent from the remote store
-    "package": PACKAGE, "version": "v1.2.3", "revision": "3",
+    "package": PACKAGE, "version": "v1.3.1", "revision": "3",
     "hash": NONEXISTENT_HASH,
     "remote_revision_hash": NONEXISTENT_HASH,
     "remote_hashes": [NONEXISTENT_HASH],

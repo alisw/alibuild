@@ -16,7 +16,7 @@ BUILD_MISSING_PKG_ERROR = "the following arguments are required: PACKAGE"
 ANALYTICS_MISSING_STATE_ERROR = "the following arguments are required: state"
 
 # A few errors we should handle, together with the expected result
-ARCHITECTURE_ERROR = u"Unknown / unsupported architecture: foo.\n\n.*"
+ARCHITECTURE_ERROR = "Unknown / unsupported architecture: foo.\n\n.*"
 PARSER_ERRORS = {
   "build --force-unknown-architecture": BUILD_MISSING_PKG_ERROR,
   "build --force-unknown-architecture zlib --foo": 'unrecognized arguments: --foo',
@@ -72,7 +72,9 @@ CORRECT_BEHAVIOR = [
   (("sw3", "mydir"), "init"                                                            , [("action", "init"), ("workDir", "sw3"), ("referenceSources", "sw3/MIRROR"), ("chdir", "mydir")]),
   (("sw", ".")     , "clean --chdir mydir2 --work-dir sw4"                             , [("action", "clean"), ("workDir", "sw4"), ("chdir", "mydir2")]),
   (()              , "doctor zlib -C mydir -w sw2"                                     , [("action", "doctor"), ("workDir", "sw2"), ("chdir", "mydir")]),
-  (()              , "deps zlib --outgraph graph.pdf"                                  , [("action", "deps"), ("outgraph", "graph.pdf")]),
+  (()              , "deps zlib --output graph.pdf"                                  , [("action", "deps"), ("output", "graph.pdf")]),
+  (()              , "completion bash"                                                  , [("action", "completion"), ("shell", "bash")]),
+  (()              , "completion zsh"                                                   , [("action", "completion"), ("shell", "zsh")]),
 ]
 
 GETSTATUSOUTPUT_MOCKS = {
