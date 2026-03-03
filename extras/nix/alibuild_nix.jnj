@@ -1,0 +1,62 @@
+{stdenv, pkgs, systemDeps}:
+let
+   properUnpack = ''
+      runHook preUnpack;
+      echo "foo"
+      env
+      runHook postUnpack;
+   '';
+   filterGit = what: pkgs.lib.cleanSourceWith { src=what; filter=path: type: !( (builtins.match ".git" path) != null || (builtins.match ".cache" path) != null); };
+{% for name, spec in specs.items() %}
+  {{name}} = stdenv.mkDerivation {
+    name = "{{name}}";
+    version = "{{spec["version"]}}";
+    {{spec.get("source", None) == None and "dontUnpack=true;" or ""}}
+    {{spec.get("source", None) != None and     "refs/tags/" + spec["tag"] in spec["scm_refs"] and not spec["source"].startswith("/") and "\n    src=(builtins.fetchGit {{\n    rev=\"{}\";\n    url=\"{}\";}});\n".format(spec["scm_refs"]["refs/tags/" + spec["tag"]], spec["source"]) or ""}}
+    {{spec.get("source", None) != None and not "refs/tags/" + spec["tag"] in spec["scm_refs"] and (spec["tag"] | length > 30)  and not spec["source"].startswith("/") and "\n    src=(builtins.fetchGit {{\n    rev=\"{}\";\n    url=\"{}\";}});\n".format(spec["tag"], spec["source"]) or ""}}
+    {{spec.get("source", None) != None and not "refs/tags/" + spec["tag"] in spec["scm_refs"] and (spec["tag"] | length < 30)  and not spec["source"].startswith("/") and "\n    src=(builtins.fetchGit {{\n    ref=\"{}\";\n    url=\"{}\";}});\n".format("refs/tags/" + spec["tag"], spec["source"]) or ""}}
+    {{spec.get("source", None) != None and spec["source"].startswith("/") and "\n    src=(filterGit {});\n".format(spec["source"]) or ""}}
+    buildInputs = [{% for build_requires in spec["build_requires"] %}
+      {{build_requires}}{% endfor %}
+      pkgs.apple-sdk_15
+    ] ++ systemDeps;
+    propagateBuildInputs = [{% for requires in spec["requires"] %}
+      {{requires}}{% endfor %}
+    ] ++ systemDeps;
+
+    unpackPhase = properUnpack;
+
+    dontConfigure = true;
+    dontBuild = true;
+    installPhase = ''
+      runHook preInstall
+      set -x
+      PKGNAME={{name}}
+      PKGVERSION={{spec["version"]}}
+      PKGREVISION=1
+      PKGHASH=1
+      INSTALLROOT=$out
+      mkdir -p $INSTALLROOT
+      ARCHITECTURE={{args.architecture}}
+      JOBS=10
+      SOURCEDIR=$src
+      BUILDDIR=$PWD
+      {% for build_requires in spec["build_requires"] %}
+      export {{build_requires.upper().replace("-", "_") + "_ROOT"}}=${ {{build_requires}}.out }
+      {{build_requires.upper().replace("-", "_") + "_REVISION"}}=1
+      {% endfor %}
+      {% for requires in spec["requires"] %}
+      export {{requires.upper().replace("-", "_") + "_ROOT"}}=${ {{requires}}.out }
+      {{requires.upper().replace("-", "_") + "_VERSION"}}=${ {{requires}}.version }
+      {{requires.upper().replace("-", "_") + "_REVISION"}}=1
+      {% endfor %}
+      mkdir -p $BUILDDIR
+      {{spec["recipe"].replace("\n", "\n      ").replace("\n      \n", "\n\n").replace("''", "'''").replace("${", "''${")}}
+      runHook postInstall
+    '';
+  };
+{% endfor %}
+in
+{
+  inherit{% for name, spec in specs.items() %} {{name}}{% endfor %};
+}
