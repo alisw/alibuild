@@ -1,0 +1,54 @@
+# Attempt to generate a nix expression from an aliBuild package instanciation
+#
+# Run with:
+#
+#     cat alibuild_nix.jnj | python3 alibuild/aliBuild build O2 --defaults o2 --debug --no-system --plugin templating
+#
+
+{stdenv, pkgs}:
+let
+   properUnpack = ''
+      runHook preUnpack;
+      echo "foo"
+      env
+      runHook postUnpack;
+   '';
+{% for name, spec in specs.items() %}
+  {{name}} = stdenv.mkDerivation {
+    name = "{{name}}";
+    version = "{{spec["version"]}}";
+    {{spec.get("source", None) and "\n    src=(builtins.fetchGit {{\n    ref=\"refs/tags/{}\";\n    url=\"{}\";}});\n".format(spec["tag"], spec["source"]) or "dontUnpack=true;"}}
+    buildInputs = [{% for build_requires in spec["build_requires"] %}
+      pkgs.rsync
+      {{build_requires}}{% endfor %}
+    ];
+    propagateBuildInputs = [{% for requires in spec["requires"] %}
+      {{requires}}{% endfor %}
+    ];
+
+    unpackPhase = properUnpack;
+
+    dontConfigure = true;
+    dontBuild = true;
+    installPhase = ''
+      runHook preInstall
+      set -x
+      PKGNAME={{name}}
+      PKGVERSION={{spec["version"]}}
+      PKGREVISION=1
+      PKGHASH=1
+      INSTALLROOT=$out
+      mkdir -p $INSTALLROOT
+      ARCHITECTURE={{args.architecture}}
+      JOBS=10
+      SOURCEDIR=$src
+      mkdir -p $PWD
+      {{spec["recipe"].replace("\n", "\n      ").replace("\n      \n", "\n\n").replace("${", "''${")}}
+      runHook postInstall
+    '';
+  };
+{% endfor %}
+in
+{
+  inherit{% for name, spec in specs.items() %} {{name}}{% endfor %};
+}
