@@ -19,6 +19,7 @@ from alibuild_helpers.scm import SCMError
 from alibuild_helpers.sync import remote_from_url
 from alibuild_helpers.workarea import logged_scm, updateReferenceRepoSpec, checkout_sources
 from alibuild_helpers.log import ProgressPrint, log_current_package
+from alibuild_helpers.args import S3_SUPPORTED_ARCHS
 from glob import glob
 from collections import OrderedDict
 from shlex import quote
@@ -466,6 +467,11 @@ def doBuild(args, parser):
              'Cannot find alidist recipes under directory "%s".\n'
              'Maybe you need to "cd" to the right directory or '
              'you forgot to run "aliBuild init"?' % args.configDir)
+
+  if (not args.no_remote_store and
+      not args.remoteStore and
+      args.architecture not in S3_SUPPORTED_ARCHS):
+    warning(f"Not using remote store cache because architecture {args.architecture} doesn't have a nightly build")
 
   _, value = git(("symbolic-ref", "-q", "HEAD"), directory=args.configDir, check=False)
   branch_basename = re.sub("refs/heads/", "", value)
