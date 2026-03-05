@@ -1060,6 +1060,7 @@ def doBuild(args, parser):
     # actual build script
     buildEnvironment = [
       ("ARCHITECTURE", args.architecture),
+      ("ALIBUILD_DEFAULTS", args.defaults),      
       ("BUILD_REQUIRES", " ".join(spec["build_requires"])),
       ("CACHED_TARBALL", cachedTarball),
       ("CAN_DELETE", args.aggressiveCleanup and "1" or ""),
