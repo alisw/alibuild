@@ -352,7 +352,8 @@ class CVMFSRemoteSync:
     for install_path in $(find "{remote_store}/{cvmfs_architecture}/Packages/{package}" -type d -mindepth 1 -maxdepth 1); do
       full_version="${{install_path##*/}}"
       tarball={package}-$full_version.{architecture}.tar.gz
-      pkg_hash=$(cat "${{install_path}}/.build-hash" || jq -r '.package.hash' <${{install_path}}/.meta.json)
+      # Apparently .build-hash and .meta.json track two different things
+      pkg_hash=$(jq -r '.package.hash' <${{install_path}}/.meta.json || cat "${{install_path}}/.build-hash")
       if [ "X$pkg_hash" = X ]; then
         continue
       fi
