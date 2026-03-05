@@ -405,9 +405,7 @@ def parseRecipe(reader):
     err = str(e)
   except SpecError as e:
     err = f"Malformed header for {reader.url}\n{str(e)}"
-  except yaml.scanner.ScannerError as e:
-    err = f"Unable to parse {reader.url}\n{str(e)}"
-  except yaml.parser.ParserError as e:
+  except (yaml.YAMLError, TypeError, OverflowError) as e:
     err = f"Unable to parse {reader.url}\n{str(e)}"
   except ValueError:
     err = "Unable to parse %s. Header missing." % reader.url
