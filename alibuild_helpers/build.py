@@ -1188,6 +1188,8 @@ def doBuild(args, parser):
       buildErrMsg += f"  aliBuild: {__version__ or 'unknown'} (alidist@{os.environ['ALIBUILD_ALIDIST_HASH'][:10]})\n"
 
       if detected_arch.startswith("osx"):
+        macos_version = getstatusoutput("sw_vers --productVersion")[1].strip()
+        buildErrMsg += f"  macOS: {macos_version or 'unknown'}\n"
         xcode_info = getstatusoutput("xcodebuild -version")[1]
         # Combine XCode version lines into one
         xcode_lines = xcode_info.strip().split('\n')

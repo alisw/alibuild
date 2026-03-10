@@ -168,10 +168,18 @@ The following entries are optional in the header:
   - `prefer_system_check`: a script which is used to determine whether
     or not the system equivalent of the package can be used. See also
     `prefer_system`. If the `--no-system` option is specified, this key is not
-    checked. The shell exit code is used to steer the build: if the check
-    returns 0, the system package is used and the recipe is not run. If it
-    returns non-zero, our own version of the package is built through the
-    recipe.
+    checked.
+
+    The shell exit code steers the build:
+
+      - exit `0` and no replacement requested: use system package, do not run
+        the recipe;
+      - non-zero: build our own version through the recipe.
+
+    If the check exits successfully, it can also print
+    `alibuild_system_replace: <key>` to request a replacement spec (see
+    `prefer_system_replacement_specs`).
+
   - `prefer_system`: a regular expression for architectures which should
     use the `prefer_system_check` by default to determine if the system version
     of the tool can be used. When the rule matches, the result of
@@ -179,6 +187,43 @@ The following entries are optional in the header:
     does not match, the check is skipped and the recipe is run. Using the switch
     `--always-prefer-system` runs the check always (even when the regular
     expression for the architecture does not match).
+  - `prefer_system_replacement_specs`: a dictionary of replacement specs keyed
+    by regular expressions. This is consulted only when `prefer_system_check`
+    exits with code 0 and prints `alibuild_system_replace: <key>`.
+
+    aliBuild handles this in order:
+
+      1. evaluate `prefer_system` (or force-check with `--always-prefer-system`);
+      2. run `prefer_system_check` and require exit code 0;
+      3. parse `alibuild_system_replace: <key>` from check output;
+      4. find the first regex in `prefer_system_replacement_specs` matching
+         `<key>`.
+
+    If a replacement matches, aliBuild merges that spec into the package:
+
+      - if the replacement has no `recipe`, the package is treated as a system
+        package;
+      - if the replacement has a `recipe`, aliBuild runs that recipe.
+
+    If `<key>` is provided but no replacement entry matches it, aliBuild prints
+    a warning and falls back to building the package itself.
+
+    `%(key)s` can be used in the replacement `version` and will be replaced by
+    the matched `<key>`.
+
+    Example:
+
+    ```yaml
+    prefer_system_check: |
+      python3 -m pip --help >/dev/null || exit 1
+      echo 'alibuild_system_replace: python-brew3.12'
+      exit 0
+    prefer_system_replacement_specs:
+      "python-brew3.*":
+        version: "%(key)s"
+        env:
+          PYTHON_ROOT: $(python3 -c 'import sysconfig; print(sysconfig.get_config_var("exec_prefix"))')
+    ```
 
   - `relocate_paths`: a list of toplevel paths scanned recursively to perform
     relocation of executables and dynamic libraries **on macOS only**. If not
