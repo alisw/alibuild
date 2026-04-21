@@ -7,7 +7,7 @@ import logging
 from alibuild_helpers.log import debug, error, banner, info, success, warning
 from alibuild_helpers.log import logger
 from alibuild_helpers.utilities import getPackageList, parseDefaults, readDefaults, validateDefaults
-from alibuild_helpers.cmd import getstatusoutput, DockerRunner
+from alibuild_helpers.cmd import getstatusoutput, ContainerRunner
 import tempfile
 
 def prunePaths(workDir) -> None:
@@ -89,7 +89,7 @@ def doDoctor(args, parser):
   extra_env = {"ALIBUILD_CONFIG_DIR": "/alidist" if args.docker else os.path.abspath(args.configDir)}
   extra_env.update(dict([e.partition('=')[::2] for e in args.environment]))
 
-  with DockerRunner(args.dockerImage, args.docker_extra_args, extra_env=extra_env, extra_volumes=[f"{os.path.abspath(args.configDir)}:/alidist:ro"] if args.docker else []) as getstatusoutput_docker:
+  with ContainerRunner(args.dockerImage, args.docker_extra_args, extra_env=extra_env, extra_volumes=[f"{os.path.abspath(args.configDir)}:/alidist:ro"] if args.docker else []) as getstatusoutput_docker:
     err, output = getstatusoutput_docker("type c++")
   if err:
     warning("Unable to find system compiler.\n"
@@ -149,7 +149,7 @@ def doDoctor(args, parser):
   extra_env = {"ALIBUILD_CONFIG_DIR": "/alidist" if args.docker else os.path.abspath(args.configDir)}
   extra_env.update(dict([e.partition('=')[::2] for e in args.environment]))
   
-  with DockerRunner(args.dockerImage, args.docker_extra_args, extra_env=extra_env, extra_volumes=[f"{os.path.abspath(args.configDir)}:/alidist:ro"] if args.docker else []) as getstatusoutput_docker:
+  with ContainerRunner(args.dockerImage, args.docker_extra_args, extra_env=extra_env, extra_volumes=[f"{os.path.abspath(args.configDir)}:/alidist:ro"] if args.docker else []) as getstatusoutput_docker:
     fromSystem, own, failed, validDefaults = \
       getPackageList(packages                = packages,
                      specs                   = specs,
