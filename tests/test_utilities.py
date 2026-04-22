@@ -197,6 +197,26 @@ REDHAT_SUPPORT_PRODUCT="Rocky Linux"
 REDHAT_SUPPORT_PRODUCT_VERSION="9.6"
 """
 
+RHEL_10_OS_RELEASE = """
+NAME="Red Hat Enterprise Linux"
+VERSION="10.0 (Coughlan)"
+ID="rhel"
+ID_LIKE="fedora"
+VERSION_ID="10.0"
+PLATFORM_ID="platform:el10"
+PRETTY_NAME="Red Hat Enterprise Linux 10.0 (Coughlan)"
+ANSI_COLOR="0;31"
+LOGO="fedora-logo-icon"
+CPE_NAME="cpe:/o:redhat:enterprise_linux:10::baseos"
+HOME_URL="https://www.redhat.com/"
+DOCUMENTATION_URL="https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/10"
+BUG_REPORT_URL="https://bugzilla.redhat.com/"
+REDHAT_BUGZILLA_PRODUCT="Red Hat Enterprise Linux 10"
+REDHAT_BUGZILLA_PRODUCT_VERSION="10.0"
+REDHAT_SUPPORT_PRODUCT="Red Hat Enterprise Linux"
+REDHAT_SUPPORT_PRODUCT_VERSION="10.0"
+"""
+
 architecturePayloads = [
   ['osx_x86-64', False, [], ('','',''), 'Darwin', 'x86-64'],
   ['osx_arm64', False, [], ('','',''), 'Darwin', 'arm64'],
@@ -207,6 +227,7 @@ architecturePayloads = [
   ['slc8_x86-64', True, ROCKY_8_OS_RELEASE.split("\n"), ('Rocky Linux', '8.10', 'Green Obsidian'), 'Linux', 'x86_64'],
   ['slc9_x86-64', True, ALMA_9_OS_RELEASE.split("\n"), ('AlmaLinux', '9.6', 'Sage Margay'), 'Linux', 'x86_64'],
   ['slc9_x86-64', True, ROCKY_9_OS_RELEASE.split("\n"), ('Rocky Linux', '9.6', 'Blue Onyx'), 'Linux', 'x86_64'],
+  ['slc10_x86-64', True, RHEL_10_OS_RELEASE.split("\n"), ('Red Hat Enterprise Linux', '10.0', 'Coughlan'), 'Linux', 'x86_64'],
   ['ubuntu1804_x86-64', True, UBUNTU_1804_OS_RELEASE.split("\n"), ('Ubuntu', '18.04', 'bionic'), 'Linux', 'x86-64'],
   ['ubuntu1604_x86-64', True, UBUNTU_1604_OS_RELEASE.split("\n"), ('Ubuntu', '16.04', 'xenial'), 'Linux', 'x86-64'],
   ['ubuntu1510_x86-64', False, [], ('Ubuntu', '15.10', 'wily'), 'Linux', 'x86-64'],
