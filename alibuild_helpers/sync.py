@@ -85,6 +85,7 @@ class HttpRemoteSync:
           reportTime = time.time()
           result = []
 
+          destFp = None
           try:
             destFp = open(dest+".tmp", "wb") if dest else None
             for chunk in filter(bool, resp.iter_content(chunk_size=32768)):
