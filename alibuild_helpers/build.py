@@ -566,10 +566,17 @@ def doBuild(args, parser):
     develCandidatesUpper = {d.upper() for d in develCandidates}
     develPkgs = frozenset(buildOrder) & develCandidates
     develPkgsUpper = {p for p in buildOrder if p.upper() in develCandidatesUpper}
-    dieOnError(develPkgs != develPkgsUpper,
-               "The following development packages have the wrong spelling: %s.\n"
-               "Please check your local checkout and adapt to the correct one indicated." %
-               ", ".join(develPkgsUpper - develPkgs))
+    misspelled = develPkgsUpper - develPkgs
+    corrections = {
+        next(d for d in develCandidates if d.upper() == p.upper()): p
+        for p in misspelled
+    }
+    dieOnError(misspelled,
+               "Local checkout directories do not match expected package names:\n"
+               f'{os.linesep.join(f"  {wrong} -> {correct}" for wrong, correct in sorted(corrections.items()))}\n'
+               "Please rename them as shown above."
+               )
+               
     del develCandidates, develCandidatesUpper, develPkgsUpper
 
   if buildOrder:
