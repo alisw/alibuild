@@ -13,12 +13,21 @@ GIT_CMD_TIMEOUTS = {
 }
 """Customised timeout for some commands."""
 
+# Don't recalculate this every time we need it.
+_clone_speedup_cache = None
 def clone_speedup_options():
   """Return a list of options supported by the system git which speed up cloning."""
-  for filter_option in ("--filter=tree:0", "--filter=blob:none"):
+  valid_options = ("--filter=tree:0", "--filter=blob:none")
+  global _clone_speedup_cache
+  if _clone_speedup_cache is not None:
+    return _clone_speedup_cache
+  for filter_option in valid_options:
     _, out = getstatusoutput("LANG=C git clone " + filter_option)
     if "unknown option" not in out and "invalid filter-spec" not in out:
+      _clone_speedup_cache = [filter_option]
       return [filter_option]
+  debug("Git: no speedup_options filters supported. Tried using (%s)", ", ".join(valid_options))
+  _clone_speedup_cache = []
   return []
 
 
