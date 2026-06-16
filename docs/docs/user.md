@@ -75,12 +75,15 @@ e.g. `alisw/slc8-builder:latest`. They will be fetched if unavailable.
 ### Re-using prebuilt tarballs
 
 Reusing prebuilt tarballs saves compilation time, as common packages need not be
-rebuilt from scratch. `rsync://`, `https://`, `b3://` and `s3://` remote stores
-are recognised. Some of these require credentials: `s3://` remotes require an
-`~/.s3cfg`; `b3://` remotes require `AWS_ACCESS_KEY_ID` and
+rebuilt from scratch. `rsync://`, `https://`, `b3://`, `s3://` and `cvmfs://`
+remote stores are recognised. Some of these require credentials: `s3://` remotes
+require an `~/.s3cfg`; `b3://` remotes require `AWS_ACCESS_KEY_ID` and
 `AWS_SECRET_ACCESS_KEY` environment variables. A useful remote store is
 `https://s3.cern.ch/swift/v1/alibuild-repo`. It requires no credentials and
-provides tarballs for the most common supported architectures.
+provides tarballs for the most common supported architectures. See
+[Reusing builds from CVMFS](#reusing-builds-from-cvmfs) for the `cvmfs://`
+store, which reuses packages already deployed on CVMFS without downloading
+anything.
 
 - `--no-remote-store`: Disable the use of the remote store, even if it is
   enabled by default.
@@ -136,7 +139,8 @@ where `<uri>` can be:
 * a remote SSH accessible path, `ssh://<host>:<path>`,
 * an unencrypted rsync path, `rsync://<host>/path`,
 * a CERN S3 bucket, `b3://<bucket>`,
-* a HTTP(s) server, `http://<host>/<path>`.
+* a HTTP(s) server, `http://<host>/<path>`,
+* a CVMFS deployment, `cvmfs://<path>` (read-only, see below).
 
 The first four options can also be writable (if you have proper permissions):
 if you specify `::rw` at the end of the URL, your builds will be cached there.
@@ -160,6 +164,36 @@ copy of alidist.
 This approach assumes that tags don't move (i.e. don't change which commit they
 are tagging) in the repositories being built. If you administer a cache store,
 make sure to delete cached tarballs built using that tag if a tag is moved!
+
+### Reusing builds from CVMFS (experimental)
+
+If the packages you need are already deployed on [CVMFS](https://cernvm.cern.ch/fs/)
+(for instance under `/cvmfs/alice.cern.ch`), aliBuild can reuse them directly,
+without downloading or repacking any tarball. Instead of copying data, it
+creates symlinks pointing into the CVMFS tree, so reuse is essentially
+instantaneous and takes no extra disk space.
+
+To enable this, point `--remote-store` at the CVMFS path using the `cvmfs://`
+prefix:
+
+```bash
+aliBuild build O2 --remote-store cvmfs:///cvmfs/alice.cern.ch
+```
+
+Note the triple slash: `cvmfs://` is the scheme and `/cvmfs/alice.cern.ch` is
+the absolute filesystem path to the deployment. aliBuild looks for packages
+under `<path>/<architecture>/Packages/<package>/<version>`, mapping
+architectures such as `slc8_x86-64` to their CVMFS equivalent (`el8-x86_64`)
+automatically.
+
+A few things to keep in mind:
+
+* The CVMFS store is **read-only**: it cannot be used as a write store, and
+  appending `::rw` or passing it to `--write-store` is not supported. Packages
+  that are not found on CVMFS are simply rebuilt locally as usual.
+* As with any remote store, a build is reused only if its hash (or an
+  equivalent remote hash) matches what your copy of alidist would produce, so
+  keep alidist in sync with the version deployed on CVMFS.
 
 ## Developing packages locally
 
