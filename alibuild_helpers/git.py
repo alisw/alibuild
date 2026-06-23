@@ -81,8 +81,19 @@ class Git(SCM):
 
 
 def git(args, directory=".", check=True, prompt=True):
-  lastGitOverride = int(os.environ.get("GIT_CONFIG_COUNT", "0"))
+  baseGitOverride = int(os.environ.get("GIT_CONFIG_COUNT", "0"))
   debug("Executing git %s (in directory %s)", " ".join(args), directory)
+  # Force core.fsmonitor off: a global core.fsmonitor=true hangs git on a
+  # per-repo fsmonitor--daemon under aliBuild's workload. Stacks on any existing
+  # GIT_CONFIG_COUNT.
+  gitConfigOverrides = [("core.fsmonitor", "false")]
+  if directory:
+    gitConfigOverrides += [("safe.directory", "$PWD"), ("gc.auto", "0")]
+  gitConfigVars = " ".join(
+    "GIT_CONFIG_KEY_{i}={key} GIT_CONFIG_VALUE_{i}={value}".format(
+      i=baseGitOverride + offset, key=key, value=value)
+    for offset, (key, value) in enumerate(gitConfigOverrides)
+  )
   # We can't use git --git-dir=%s/.git or git -C %s here as the former requires
   # that the directory we're inspecting to be the root of a git directory, not
   # just contained in one (and that breaks CI tests), and the latter isn't
@@ -91,13 +102,14 @@ def git(args, directory=".", check=True, prompt=True):
   err, output = getstatusoutput("""\
   set -e +x
   cd {directory} >/dev/null 2>&1
-  {prompt_var} {directory_safe_var} git {args}
+  {prompt_var} GIT_CONFIG_COUNT={config_count} {config_vars} git {args}
   """.format(
     directory=quote(directory),
     args=" ".join(map(quote, args)),
     # GIT_TERMINAL_PROMPT is only supported in git 2.3+.
     prompt_var="GIT_TERMINAL_PROMPT=0" if not prompt else "",
-    directory_safe_var=f"GIT_CONFIG_COUNT={lastGitOverride+2} GIT_CONFIG_KEY_{lastGitOverride}=safe.directory GIT_CONFIG_VALUE_{lastGitOverride}=$PWD GIT_CONFIG_KEY_{lastGitOverride+1}=gc.auto GIT_CONFIG_VALUE_{lastGitOverride+1}=0" if directory else "",
+    config_count=baseGitOverride + len(gitConfigOverrides),
+    config_vars=gitConfigVars,
   ), timeout=GIT_CMD_TIMEOUTS.get(args[0] if len(args) else "*", GIT_COMMAND_TIMEOUT_SEC))
   if check and err != 0:
     raise SCMError("Error {} from git {}: {}".format(err, " ".join(args), output))

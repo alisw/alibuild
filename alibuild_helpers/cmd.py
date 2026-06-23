@@ -175,6 +175,16 @@ def install_wrapper_script(name, work_dir):
     # Errno 17 means the directory already exists.
     if exc.errno != 17:
       raise
+  # Force core.fsmonitor off for git (see git.py): a global core.fsmonitor=true
+  # hangs git on a per-repo fsmonitor--daemon. Stacks on any existing
+  # GIT_CONFIG_COUNT.
+  git_config = ""
+  if name == "git":
+    git_config = (
+      'GIT_CONFIG_COUNT="$((${GIT_CONFIG_COUNT:-0}+1))" '
+      'GIT_CONFIG_KEY_"${GIT_CONFIG_COUNT:-0}"=core.fsmonitor '
+      'GIT_CONFIG_VALUE_"${GIT_CONFIG_COUNT:-0}"=false '
+    )
   # Create a wrapper script that cleans up the environment, so we don't see the
   # OpenSSL built by aliBuild.
   with open(os.path.join(script_dir, name), "w") as scriptf:
@@ -182,9 +192,9 @@ def install_wrapper_script(name, work_dir):
     # be called on the host or in a container.
     scriptf.write(dedent("""\
     #!/bin/sh
-    exec env -u LD_LIBRARY_PATH -u DYLD_LIBRARY_PATH \\
+    exec env -u LD_LIBRARY_PATH -u DYLD_LIBRARY_PATH {git_config}\\
          "$(which -a "$(basename "$0")" | grep -Fxv "$0" | head -1)" "$@"
-    """))
+    """).format(git_config=git_config))
     os.fchmod(scriptf.fileno(), 0o755)  # make the wrapper script executable
   # If $PATH is empty, this is bad, because we need to fall back to the "real"
   # executable that our script is wrapping.
