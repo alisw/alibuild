@@ -25,6 +25,7 @@ from shlex import quote
 import tempfile
 
 import concurrent.futures
+import hashlib
 import importlib
 import json
 import socket
@@ -110,6 +111,65 @@ def update_git_repos(args, specs, buildOrder):
 
 # Creates a directory in the store which contains symlinks to the package
 # and its direct / indirect dependencies
+def build_ac_entry(spec, specs, architecture):
+  """Assemble the Action Cache (AC) entry for a freshly built package.
+
+  The entry records what produced the tarball -- recipe, git commit, dependency
+  action hashes and build environment -- so that the content-addressed store
+  (CAS) can later be reconstructed from the (small) action cache, and so that a
+  package can be installed from its runtime closure without a build. See
+  REMOTE_STORE_CAS_AC.md.
+
+  The action hash is spec["remote_revision_hash"]; this entry is keyed by it.
+  Dependencies are referenced by their *action* hash (specs[dep]["hash"]), which
+  is what the action hash itself folds in (see storeHashes()), so the recorded
+  DAG matches the hash and is independent of whether builds are byte-reproducible.
+
+  result.outputDigest / result.size are filled in by the remote backend at
+  upload time, once the tarball bytes exist and have been hashed.
+  """
+  # Resolve the real git commit and the tag aliases pointing at it, mirroring
+  # storeHashes() so the recorded provenance matches the computed action hash.
+  scm_refs = spec.get("scm_refs", {})
+  real_commit_hash = scm_refs.get("refs/tags/" + spec["commit_hash"],
+                                  spec["commit_hash"])
+  alt_refs = {ref[len("refs/tags/"):]: git_hash
+              for ref, git_hash in scm_refs.items()
+              if ref.startswith("refs/tags/") and git_hash == real_commit_hash}
+
+  def dep_refs(dep_names):
+    return [{"package": dep, "actionHash": specs[dep]["hash"]}
+            for dep in sorted(dep_names)]
+
+  recipe_text = spec.get("recipe", "") or ""
+  recipe_digest = hashlib.sha256(recipe_text.encode("utf-8", "ignore")).hexdigest()
+
+  return {
+    "schemaVersion": 1,
+    "action": {
+      "package": spec["package"],
+      "version": spec["version"],
+      "revision": spec["revision"],
+      "architecture": architecture,
+      "actionHash": spec["remote_revision_hash"],
+      "commit": {
+        "ref": spec["commit_hash"],
+        "commitHash": real_commit_hash,
+        "altRefs": alt_refs,
+      },
+      "recipeDigest": "sha256:" + recipe_digest,
+      "env": dict(spec.get("env") or {}),
+      "append_path": dict(spec.get("append_path") or {}),
+      "prepend_path": dict(spec.get("prepend_path") or {}),
+      "track_env": dict(spec.get("track_env") or {}),
+      "relocatePaths": sorted(spec.get("relocate_paths", [])),
+      "deps": dep_refs(spec.get("full_requires", [])),
+      "runtimeDeps": dep_refs(spec.get("full_runtime_requires", [])),
+      "depsHash": spec.get("deps_hash", ""),
+    },
+  }
+
+
 def createDistLinks(spec, specs, args, syncHelper, repoType, requiresType):
   # At the point we call this function, spec has a single, definitive hash.
   target_dir = "{work_dir}/TARS/{arch}/{repo}/{package}/{package}-{version}-{revision}" \
@@ -1072,6 +1132,11 @@ def doBuild(args, parser):
       ("GIT_COMMITTER_EMAIL", "unknown"),
       ("INCREMENTAL_BUILD_HASH", spec.get("incremental_hash", "0")),
       ("JOBS", str(args.jobs)),
+      # Produce reproducible, content-stable tarballs for packages that may be
+      # uploaded to the remote store. Devel packages are never uploaded, so we
+      # leave their install trees untouched to avoid perturbing mtimes that
+      # incremental rebuilds might care about.
+      ("NORMALIZE_TARBALL", "" if spec["is_devel_pkg"] else "1"),
       ("PKGHASH", spec["hash"]),
       ("PKGNAME", spec["package"]),
       ("PKGREVISION", spec["revision"]),
@@ -1232,6 +1297,9 @@ def doBuild(args, parser):
     # Make sure not to upload local-only packages! These might have been
     # produced in a previous run with a read-only remote store.
     if not spec["revision"].startswith("local"):
+      # Assemble the Action Cache entry so AC/CAS-aware backends can record what
+      # produced this tarball. Backends that don't understand it ignore it.
+      spec["ac_entry"] = build_ac_entry(spec, specs, args.architecture)
       syncHelper.upload_symlinks_and_tarball(spec)
 
   if not args.onlyDeps:

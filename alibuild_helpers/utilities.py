@@ -106,6 +106,44 @@ def resolve_links_path(architecture, package):
   return "/".join(("TARS", architecture, package))
 
 
+def resolve_cas_path(content_hash, algo="sha256"):
+  """Return the store path for a content-addressed blob (REAPI-style CAS).
+
+  Unlike resolve_store_path(), which is keyed by the *action* hash (a hash of
+  the recipe and its inputs), this is keyed by a hash of the blob's actual
+  bytes. The path is sharded on the first two hex characters of the hash, like
+  the action store, to keep directory fan-out manageable on local mirrors.
+
+  The returned path is relative to the working directory or the root of the
+  remote store.
+  """
+  return "/".join(("cas", algo, content_hash[:2], content_hash))
+
+
+def resolve_ac_path(architecture, action_hash):
+  """Return the store path for an Action Cache entry (REAPI-style AC).
+
+  The entry is keyed by the action hash (spec["remote_revision_hash"]) and
+  records what produced the artifact, so the CAS can be reconstructed from it.
+
+  The returned path is relative to the working directory or the root of the
+  remote store.
+  """
+  return "/".join(("ac", architecture, action_hash[:2], action_hash + ".json"))
+
+
+def file_digest(path, algo="sha256", _chunk_size=1 << 20):
+  """Return the hex digest of the bytes of the file at the given path.
+
+  Used to content-address tarballs and recipe blobs for the CAS.
+  """
+  hasher = hashlib.new(algo)
+  with open(path, "rb") as fileobj:
+    for chunk in iter(lambda: fileobj.read(_chunk_size), b""):
+      hasher.update(chunk)
+  return hasher.hexdigest()
+
+
 def short_commit_hash(spec):
   """Shorten the spec's commit hash to make it more human-readable.
 

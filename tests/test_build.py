@@ -11,7 +11,7 @@ from io import StringIO
 from collections import OrderedDict
 
 from alibuild_helpers.utilities import parseRecipe, resolve_tag
-from alibuild_helpers.build import doBuild, storeHashes, generate_initdotsh
+from alibuild_helpers.build import doBuild, storeHashes, generate_initdotsh, build_ac_entry
 
 # Determine architecture based on platform
 def get_test_architecture():
@@ -400,6 +400,55 @@ class BuildTestCase(unittest.TestCase):
         self.assertEqual(len(extra["remote_hashes"]), 3)
         self.assertEqual(extra["local_hashes"][0], TEST_EXTRA_BUILD_HASH)
 
+    def test_build_ac_entry(self) -> None:
+        """build_ac_entry records the provenance needed to rebuild/install."""
+        import hashlib
+        default = self.setup_spec(TEST_DEFAULT_RELEASE)
+        zlib = self.setup_spec(TEST_ZLIB_RECIPE)
+        default["commit_hash"] = "0"
+        zlib.setdefault("requires", []).append(default["package"])
+        zlib["scm_refs"] = {ref: githash for githash, _, ref in (
+            line.partition("\t") for line in TEST_ZLIB_GIT_REFS.splitlines())}
+        try:
+            zlib["commit_hash"] = zlib["scm_refs"]["refs/tags/" + zlib["tag"]]
+        except KeyError:
+            zlib["commit_hash"] = zlib["scm_refs"]["refs/heads/" + zlib["tag"]]
+        specs = {pkg["package"]: pkg for pkg in (default, zlib)}
+        for spec in specs.values():
+            spec["is_devel_pkg"] = False
+
+        storeHashes("defaults-release", specs, considerRelocation=False)
+        default["hash"] = default["remote_revision_hash"]
+        storeHashes("zlib", specs, considerRelocation=False)
+        zlib["hash"] = zlib["remote_revision_hash"]
+        zlib["revision"] = "1"
+        # These closures are normally computed in doBuild() before upload.
+        zlib["full_requires"] = {"defaults-release"}
+        zlib["full_runtime_requires"] = set()
+        zlib["relocate_paths"] = ["lib", "bin"]
+
+        entry = build_ac_entry(zlib, specs, "slc7_x86-64")
+        self.assertEqual(entry["schemaVersion"], 1)
+        action = entry["action"]
+        self.assertEqual(action["package"], "zlib")
+        self.assertEqual(action["version"], zlib["version"])
+        self.assertEqual(action["revision"], "1")
+        self.assertEqual(action["architecture"], "slc7_x86-64")
+        # The entry is keyed by the action hash, and deps are referenced by
+        # *their* action hash, so the recorded DAG matches storeHashes().
+        self.assertEqual(action["actionHash"], zlib["remote_revision_hash"])
+        self.assertEqual(action["deps"],
+                         [{"package": "defaults-release", "actionHash": default["hash"]}])
+        self.assertEqual(action["runtimeDeps"], [])
+        self.assertEqual(action["depsHash"], zlib["deps_hash"])
+        # The recipe digest is the sha256 of the recipe body (a CAS blob).
+        self.assertEqual(action["recipeDigest"], "sha256:" +
+                         hashlib.sha256(zlib["recipe"].encode("utf-8")).hexdigest())
+        self.assertEqual(action["relocatePaths"], ["bin", "lib"])  # sorted
+        self.assertEqual(action["commit"]["ref"], zlib["commit_hash"])
+        # The output digest/size are filled in by the backend at upload time.
+        self.assertNotIn("result", entry)
+
     def test_initdotsh(self) -> None:
         """Sanity-check the generated init.sh for a few variables."""
         specs = {
@@ -436,6 +485,26 @@ class BuildTestCase(unittest.TestCase):
         self.assertIn('export ROOT_TEST_1="root test 1"', complete_initdotsh)
         self.assertIn("export APPEND_ROOT_1=", complete_initdotsh)
         self.assertIn("export PREPEND_ROOT_1=", complete_initdotsh)
+
+    def test_build_template_percent_format(self) -> None:
+        """build_template.sh is interpolated via printf-style % formatting in
+        doBuild(), so every literal '%' in it must be doubled. A stray '%'
+        raises at build time but is not covered by the unit tests that mock the
+        build out, so check the real template formats cleanly here."""
+        template_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "alibuild_helpers", "build_template.sh")
+        with open(template_path) as templatef:
+            template = templatef.read()
+        # These are exactly the keys doBuild() substitutes (see build.py).
+        keys = ("provenance", "initdotsh_deps", "initdotsh_full", "develPrefix",
+                "workDir", "configDir", "incremental_recipe", "requires",
+                "build_requires", "runtime_requires")
+        try:
+            template % {key: "" for key in keys}
+        except (TypeError, ValueError, KeyError) as exc:
+            self.fail("build_template.sh does not %%-format cleanly (likely an "
+                      "unescaped '%%' that should be '%%%%'): %s" % exc)
 
 
 if __name__ == '__main__':
