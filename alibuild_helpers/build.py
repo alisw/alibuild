@@ -1072,6 +1072,11 @@ def doBuild(args, parser):
       ("GIT_COMMITTER_EMAIL", "unknown"),
       ("INCREMENTAL_BUILD_HASH", spec.get("incremental_hash", "0")),
       ("JOBS", str(args.jobs)),
+      # Produce reproducible, content-stable tarballs for packages that may be
+      # uploaded to the remote store. Devel packages are never uploaded, so we
+      # leave their install trees untouched to avoid perturbing mtimes that
+      # incremental rebuilds might care about.
+      ("NORMALIZE_TARBALL", "" if spec["is_devel_pkg"] else "1"),
       ("PKGHASH", spec["hash"]),
       ("PKGNAME", spec["package"]),
       ("PKGREVISION", spec["revision"]),

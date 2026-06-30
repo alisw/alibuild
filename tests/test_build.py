@@ -437,6 +437,26 @@ class BuildTestCase(unittest.TestCase):
         self.assertIn("export APPEND_ROOT_1=", complete_initdotsh)
         self.assertIn("export PREPEND_ROOT_1=", complete_initdotsh)
 
+    def test_build_template_percent_format(self) -> None:
+        """build_template.sh is interpolated via printf-style % formatting in
+        doBuild(), so every literal '%' in it must be doubled. A stray '%'
+        raises at build time but is not covered by the unit tests that mock the
+        build out, so check the real template formats cleanly here."""
+        template_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "alibuild_helpers", "build_template.sh")
+        with open(template_path) as templatef:
+            template = templatef.read()
+        # These are exactly the keys doBuild() substitutes (see build.py).
+        keys = ("provenance", "initdotsh_deps", "initdotsh_full", "develPrefix",
+                "workDir", "configDir", "incremental_recipe", "requires",
+                "build_requires", "runtime_requires")
+        try:
+            template % {key: "" for key in keys}
+        except (TypeError, ValueError, KeyError) as exc:
+            self.fail("build_template.sh does not %%-format cleanly (likely an "
+                      "unescaped '%%' that should be '%%%%'): %s" % exc)
+
 
 if __name__ == '__main__':
     unittest.main()
