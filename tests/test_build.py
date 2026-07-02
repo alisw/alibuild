@@ -427,9 +427,16 @@ class BuildTestCase(unittest.TestCase):
         zlib["full_runtime_requires"] = set()
         zlib["relocate_paths"] = ["lib", "bin"]
 
-        entry = build_ac_entry(zlib, specs, "slc7_x86-64")
-        self.assertEqual(entry["schemaVersion"], 1)
+        container = {"runtime": "docker", "image": "alisw/slc7-builder:latest",
+                     "digest": "sha256:abc"}
+        refs_artifact = {"type": "git-refs", "source": "u", "digest": "r" * 64}
+        entry = build_ac_entry(zlib, specs, "slc7_x86-64", container=container,
+                               refs_artifact=refs_artifact)
+        self.assertEqual(entry["schemaVersion"], 2)
         action = entry["action"]
+        # Container + refs provenance are recorded verbatim for a reproducible env.
+        self.assertEqual(action["container"], container)
+        self.assertEqual(action["refsArtifact"], refs_artifact)
         self.assertEqual(action["package"], "zlib")
         self.assertEqual(action["version"], zlib["version"])
         self.assertEqual(action["revision"], "1")
@@ -441,13 +448,44 @@ class BuildTestCase(unittest.TestCase):
                          [{"package": "defaults-release", "actionHash": default["hash"]}])
         self.assertEqual(action["runtimeDeps"], [])
         self.assertEqual(action["depsHash"], zlib["deps_hash"])
-        # The recipe digest is the sha256 of the recipe body (a CAS blob).
+        # The recipe digest is the sha256 of the *full* recipe (a CAS blob),
+        # so the build can be reconstructed without an alidist checkout.
         self.assertEqual(action["recipeDigest"], "sha256:" +
-                         hashlib.sha256(zlib["recipe"].encode("utf-8")).hexdigest())
+                         hashlib.sha256(zlib["fullRecipe"].encode("utf-8")).hexdigest())
+        self.assertEqual(action["source"], zlib.get("source"))
         self.assertEqual(action["relocatePaths"], ["bin", "lib"])  # sorted
         self.assertEqual(action["commit"]["ref"], zlib["commit_hash"])
         # The output digest/size are filled in by the backend at upload time.
         self.assertNotIn("result", entry)
+
+    def test_snapshot_source_gating(self) -> None:
+        """snapshot_source only archives for git, non-devel packages going to a
+        reapi store; everything else is a no-op (and never touches git)."""
+        from alibuild_helpers.build import snapshot_source
+        from alibuild_helpers import sync
+        # Not a reapi store -> never snapshots.
+        self.assertIsNone(snapshot_source({"package": "x"}, sync.NoRemoteSync()))
+        # reapi store, but devel / source-less packages are skipped before git.
+        with patch.object(sync.REAPIRemoteSync, "_s3_init", lambda self: None):
+            reapi = sync.REAPIRemoteSync("reapi://h/b", "reapi://h/b",
+                                         "slc7_x86-64", "/sw")
+        self.assertIsNone(snapshot_source(
+            {"package": "x", "is_devel_pkg": True, "source": "u", "reference": "r"}, reapi))
+        self.assertIsNone(snapshot_source(
+            {"package": "x", "is_devel_pkg": False}, reapi))  # no source
+
+    def test_snapshot_refs_gating(self) -> None:
+        """snapshot_refs only archives scm_refs for non-devel packages going to
+        a reapi store."""
+        from alibuild_helpers.build import snapshot_refs
+        from alibuild_helpers import sync
+        self.assertIsNone(snapshot_refs({"package": "x"}, sync.NoRemoteSync()))
+        with patch.object(sync.REAPIRemoteSync, "_s3_init", lambda self: None):
+            reapi = sync.REAPIRemoteSync("reapi://h/b", "reapi://h/b",
+                                         "slc7_x86-64", "/sw")
+        self.assertIsNone(snapshot_refs(
+            {"package": "x", "is_devel_pkg": True, "scm_refs": {"a": "b"}}, reapi))
+        self.assertIsNone(snapshot_refs({"package": "x"}, reapi))  # no scm_refs
 
     def test_initdotsh(self) -> None:
         """Sanity-check the generated init.sh for a few variables."""

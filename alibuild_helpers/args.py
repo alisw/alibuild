@@ -1,5 +1,5 @@
 import argparse
-from alibuild_helpers.utilities import detectArch, normalise_multiple_options
+from alibuild_helpers.utilities import detectArch, normalise_multiple_options, default_builder_image
 from alibuild_helpers.workarea import cleanup_git_log
 import multiprocessing
 
@@ -55,6 +55,20 @@ def doParseArgs():
                                         description="Verify the status of your system.")
   init_parser = subparsers.add_parser("init", help="initialise local packages",
                                       description="Initialise development packages.")
+  install_parser = subparsers.add_parser(
+    "install", help="install a prebuilt package from a reapi:// store",
+    description="Install a prebuilt package and its runtime closure straight "
+                "from a reapi:// Action Cache + CAS, without recipes or a build.")
+  reconstruct_parser = subparsers.add_parser(
+    "reconstruct", help="reconstruct missing CAS tarballs from the Action Cache",
+    description="Walk the build closure of a package in a reapi:// Action Cache, "
+                "find tarballs missing from the CAS, and materialise the archived "
+                "recipes so they can be rebuilt and the CAS repopulated.")
+  migrate_parser = subparsers.add_parser(
+    "migrate", help="migrate legacy tarballs into a reapi:// store",
+    description="Migrate legacy (action-addressed) release tarballs into a "
+                "reapi:// CAS + Action Cache, using each tarball's embedded "
+                ".meta.json provenance and the recorded alidist commit.")
   version_parser = subparsers.add_parser("version", help="display %(prog)s version",
                                          description="Display %(prog)s and architecture.")
   completion_parser = subparsers.add_parser("completion", help="output shell completion code",
@@ -64,6 +78,105 @@ def doParseArgs():
 
   # Options for the analytics command
   analytics_parser.add_argument("state", choices=["on", "off"], help="Whether to report analytics or not")
+
+  # Options for the install command
+  install_parser.add_argument("package", metavar="PACKAGE", help="Package to install.")
+  install_parser.add_argument("--version", required=True, metavar="VERSION",
+                              help="Version of the package to install.")
+  install_parser.add_argument("--revision", default=None, metavar="REVISION",
+                              help="Revision to install. Defaults to the highest "
+                                   "available for the version.")
+  install_parser.add_argument("-a", "--architecture", dest="architecture", metavar="ARCH",
+                              default=detectedArch,
+                              help="Architecture to install for. Default '%(default)s'.")
+  install_parser.add_argument("--remote-store", dest="remoteStore", metavar="STORE",
+                              default="", required=True,
+                              help="reapi:// store to install from.")
+  install_parser.add_argument("--insecure", dest="insecure", action="store_true",
+                              help="Use http instead of https for the reapi:// endpoint.")
+  install_parser.add_argument("--ac-store", dest="acStore", default="", metavar="STORE",
+                              help="Separate reapi:// ledger store for the Action Cache "
+                                   "+ reconstruction inputs. Defaults to --remote-store.")
+  install_parser.add_argument("-w", "--work-dir", dest="workDir", default=DEFAULT_WORK_DIR,
+                              help="Default install prefix if --prefix is not given. "
+                                   "Default '%(default)s'.")
+  install_parser.add_argument("--prefix", dest="prefix", default=None, metavar="DIR",
+                              help="Directory to install into. Defaults to the work dir.")
+
+  # Options for the reconstruct command
+  reconstruct_parser.add_argument("package", metavar="PACKAGE", help="Package to reconstruct.")
+  reconstruct_parser.add_argument("--version", required=True, metavar="VERSION",
+                                  help="Version of the package to reconstruct.")
+  reconstruct_parser.add_argument("--revision", default=None, metavar="REVISION",
+                                  help="Revision to reconstruct. Defaults to the highest "
+                                       "available for the version.")
+  reconstruct_parser.add_argument("-a", "--architecture", dest="architecture", metavar="ARCH",
+                                  default=detectedArch,
+                                  help="Architecture to reconstruct for. Default '%(default)s'.")
+  reconstruct_parser.add_argument("--remote-store", dest="remoteStore", metavar="STORE",
+                                  default="", required=True,
+                                  help="reapi:// store to reconstruct from / into.")
+  reconstruct_parser.add_argument("--insecure", dest="insecure", action="store_true",
+                                  help="Use http instead of https for the reapi:// endpoint.")
+  reconstruct_parser.add_argument("--ac-store", dest="acStore", default="", metavar="STORE",
+                                  help="Separate reapi:// ledger store (Action Cache + "
+                                       "reconstruction inputs). Defaults to --remote-store.")
+  reconstruct_parser.add_argument("-w", "--work-dir", dest="workDir", default=DEFAULT_WORK_DIR,
+                                  help="Work directory. Default '%(default)s'.")
+  reconstruct_parser.add_argument("--output-config", dest="outputConfig", default=None, metavar="DIR",
+                                  help="Where to materialise the recipes. Defaults to "
+                                       "WORKDIR/reconstruct-PACKAGE.")
+
+  # Options for the migrate command
+  migrate_parser.add_argument("tarballs", metavar="TARBALL", nargs="+",
+                              help="Legacy tarball(s) to migrate: local paths, or "
+                                   "PACKAGE/VERSION-REVISION specs when --read-store "
+                                   "is given.")
+  migrate_parser.add_argument("--read-store", dest="read_store", default=None, metavar="URL",
+                              help="Read-only http(s) old store to fetch tarballs from "
+                                   "(e.g. https://s3.cern.ch/swift/v1/alibuild-repo). "
+                                   "The old store is never written to.")
+  migrate_parser.add_argument("--alidist", required=True, metavar="DIR",
+                              help="Path to an alidist git checkout/mirror from which "
+                                   "to recover recipes at the recorded commits.")
+  migrate_parser.add_argument("-a", "--architecture", dest="architecture", metavar="ARCH",
+                              default=detectedArch,
+                              help="Architecture being migrated. Default '%(default)s'.")
+  migrate_parser.add_argument("--remote-store", dest="remoteStore", metavar="STORE",
+                              default="", required=True,
+                              help="reapi:// store to migrate into.")
+  migrate_parser.add_argument("--insecure", dest="insecure", action="store_true",
+                              help="Use http instead of https for the reapi:// endpoint.")
+  migrate_parser.add_argument("--ac-store", dest="acStore", default="", metavar="STORE",
+                              help="Separate reapi:// ledger store (Action Cache + "
+                                   "reconstruction inputs). Defaults to --remote-store.")
+  migrate_parser.add_argument("-w", "--work-dir", dest="workDir", default=DEFAULT_WORK_DIR,
+                              help="Work directory. Default '%(default)s'.")
+  migrate_parser.add_argument("--container", dest="container", default=None, metavar="IMAGE",
+                              help="Container image to record for the migrated builds "
+                                   "(marked as assumed). Defaults to the architecture's "
+                                   "default builder.")
+  migrate_parser.add_argument("--storage", dest="storage", choices=("ephemeral", "permanent"),
+                              default="ephemeral",
+                              help="Retention for migrated tarball blobs: 'ephemeral' (default) "
+                                   "or 'permanent' (pinned; use for real production releases).")
+  migrate_parser.add_argument("--no-verify", dest="no_verify", action="store_true",
+                              help="Skip the structural self-check of recovered recipes.")
+  migrate_parser.add_argument("--closure", dest="closure", action="store_true",
+                              help="Treat each TARBALL as a top package (PACKAGE/VERSION-"
+                                   "REVISION) and migrate its whole build closure, read "
+                                   "from the old store's dist tree. Requires --read-store.")
+  migrate_parser.add_argument("-j", "--jobs", dest="jobs", type=int, default=1,
+                              help="Migrate this many packages in parallel (overlaps the "
+                                   "downloads/uploads). Peak disk scales with the number of "
+                                   "jobs. Default %(default)d.")
+  migrate_parser.add_argument("--snapshot-sources", dest="snapshot_sources", action="store_true",
+                              help="Also archive each release's git source into the CAS "
+                                   "(clones upstream once per package), so migrated releases "
+                                   "become offline-reconstructible.")
+  migrate_parser.add_argument("--source-mirror", dest="source_mirror", default=None, metavar="DIR",
+                              help="Where to cache source clones for --snapshot-sources. "
+                                   "Defaults to WORKDIR/MIRROR-migrate.")
 
   # Options for the build command
   build_parser.add_argument("pkgname", metavar="PACKAGE", nargs="+",
@@ -156,6 +269,17 @@ def doParseArgs():
                                   "except ::rw is not recognised. Implies --no-system."))
   build_remote.add_argument("--insecure", dest="insecure", action="store_true",
                             help="Don't validate TLS certificates when connecting to an https:// remote store.")
+  build_remote.add_argument("--ac-store", dest="acStore", metavar="STORE", default="",
+                            help=("For reapi:// stores, a separate ledger store for the "
+                                  "Action Cache and reconstruction inputs (recipe/source/refs), "
+                                  "which are kept while the artifact tarballs are deletable. "
+                                  "Same ::rw syntax as --remote-store. Defaults to --remote-store."))
+  build_remote.add_argument("--storage", dest="storage", choices=("ephemeral", "permanent"),
+                            default="ephemeral",
+                            help=("Retention for uploaded reapi:// tarball blobs: 'ephemeral' "
+                                  "(default; LRU-expired by the bucket lifecycle, refreshed on "
+                                  "use) or 'permanent' (pinned; also promotes any ephemeral blob "
+                                  "it reuses). Use 'permanent' for production builds."))
 
   build_dirs = build_parser.add_argument_group(title="Customise aliBuild directories")
   build_dirs.add_argument("-C", "--chdir", metavar="DIR", dest="chdir", default=DEFAULT_CHDIR,
@@ -357,7 +481,7 @@ def doParseArgs():
   def optionOrder(x):
     if x in ["--debug", "-d", "-n", "--dry-run"]:
       return 0
-    if x in ["build", "init", "clean", "analytics", "doctor", "deps", "completion"]:
+    if x in ["build", "init", "clean", "analytics", "doctor", "deps", "completion", "install", "reconstruct", "migrate"]:
       return 1
     return 2
   rest.sort(key=optionOrder)
@@ -446,9 +570,7 @@ def finaliseArgs(args, parser):
     # in docker the docker image is given by the first part of the
     # architecture we want to build for.
     if args.docker and not args.dockerImage:
-      distro = args.architecture.split("_")[0]
-      cpu_suffix = "-arm" if args.architecture.endswith("_aarch64") else ""
-      args.dockerImage = "registry.cern.ch/alisw/%s%s-builder" % (distro, cpu_suffix)
+      args.dockerImage = default_builder_image(args.architecture)
 
   if "annotate" in args:
     for comment_assignment in args.annotate:
@@ -480,6 +602,12 @@ def finaliseArgs(args, parser):
     if args.remoteStore.endswith("::rw"):
       args.remoteStore = args.remoteStore[0:-4]
       args.writeStore = args.remoteStore
+
+    # The optional ledger store mirrors --remote-store's ::rw semantics.
+    args.acWriteStore = ""
+    if getattr(args, "acStore", "").endswith("::rw"):
+      args.acStore = args.acStore[0:-4]
+      args.acWriteStore = args.acStore
 
   if args.action in ["build", "init"]:
     if "develPrefix" in args and args.develPrefix is None:

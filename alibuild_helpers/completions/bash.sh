@@ -53,7 +53,7 @@ _aliBuild_complete() {
   local subcmd=""
   for (( i=1; i < cword; i++ )); do
     case "${words[i]}" in
-      build|clean|deps|doctor|init|analytics|architecture|version|completion)
+      build|clean|deps|doctor|init|install|reconstruct|migrate|analytics|architecture|version|completion)
         subcmd="${words[i]}"
         break
         ;;
@@ -64,7 +64,7 @@ _aliBuild_complete() {
   if [[ -z "$subcmd" ]]; then
     COMPREPLY=( $(compgen -W "
       -d --debug -n --dry-run
-      build clean deps doctor init analytics architecture version completion
+      build clean deps doctor init install reconstruct migrate analytics architecture version completion
     " -- "$cur") )
     return
   fi
@@ -73,8 +73,10 @@ _aliBuild_complete() {
   case "$subcmd" in
     build)
       case "$prev" in
-        -a|--architecture|-z|--devel-prefix|-e|-j|--jobs|--plugin|--docker-image|--docker-extra-args|-v|--remote-store|--write-store)
+        -a|--architecture|-z|--devel-prefix|-e|-j|--jobs|--plugin|--docker-image|--docker-extra-args|-v|--remote-store|--write-store|--ac-store)
           return ;;
+        --storage)
+          COMPREPLY=( $(compgen -W "ephemeral permanent" -- "$cur") ); return ;;
         --defaults)
           _alibuild_defaults; return ;;
         --no-local|--disable|--force-rebuild)
@@ -91,7 +93,7 @@ _aliBuild_complete() {
           --no-local --force-tracked --plugin --disable --force-rebuild
           --annotate --only-deps
           --docker --docker-image --docker-extra-args -v
-          --no-remote-store --remote-store --write-store --insecure
+          --no-remote-store --remote-store --write-store --ac-store --storage --insecure
           -C --chdir -w --work-dir -c --config-dir --reference-sources
           --aggressive-cleanup --no-auto-cleanup
           --always-prefer-system --no-system
@@ -155,6 +157,56 @@ _aliBuild_complete() {
         " -- "$cur") )
       else
         _alibuild_packages
+      fi
+      ;;
+    install)
+      case "$prev" in
+        --version|--revision|-a|--architecture|--remote-store|--ac-store)
+          return ;;
+        -w|--work-dir|--prefix)
+          _filedir -d; return ;;
+      esac
+      if [[ "$cur" == -* ]]; then
+        COMPREPLY=( $(compgen -W "
+          --version --revision -a --architecture --remote-store --ac-store --insecure
+          -w --work-dir --prefix
+        " -- "$cur") )
+      else
+        _alibuild_packages
+      fi
+      ;;
+    reconstruct)
+      case "$prev" in
+        --version|--revision|-a|--architecture|--remote-store|--ac-store)
+          return ;;
+        -w|--work-dir|--output-config)
+          _filedir -d; return ;;
+      esac
+      if [[ "$cur" == -* ]]; then
+        COMPREPLY=( $(compgen -W "
+          --version --revision -a --architecture --remote-store --ac-store --insecure
+          -w --work-dir --output-config
+        " -- "$cur") )
+      else
+        _alibuild_packages
+      fi
+      ;;
+    migrate)
+      case "$prev" in
+        -a|--architecture|--remote-store|--read-store|--ac-store|--container|-j|--jobs)
+          return ;;
+        --storage)
+          COMPREPLY=( $(compgen -W "ephemeral permanent" -- "$cur") ); return ;;
+        --alidist|-w|--work-dir|--source-mirror)
+          _filedir -d; return ;;
+      esac
+      if [[ "$cur" == -* ]]; then
+        COMPREPLY=( $(compgen -W "
+          --alidist -a --architecture --remote-store --read-store --ac-store --storage --insecure
+          -w --work-dir --container --no-verify --closure -j --jobs --snapshot-sources --source-mirror
+        " -- "$cur") )
+      else
+        _filedir
       fi
       ;;
     init)

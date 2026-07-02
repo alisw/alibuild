@@ -16,7 +16,8 @@ from alibuild_helpers.utilities import resolve_tag, resolve_version, short_commi
 from alibuild_helpers.git import Git, git
 from alibuild_helpers.sl import Sapling
 from alibuild_helpers.scm import SCMError
-from alibuild_helpers.sync import remote_from_url
+from alibuild_helpers.sync import remote_from_url, REAPIRemoteSync
+from alibuild_helpers.source import GitSourceStore, store_refs
 from alibuild_helpers.workarea import logged_scm, updateReferenceRepoSpec, checkout_sources
 from alibuild_helpers.log import ProgressPrint, log_current_package
 from glob import glob
@@ -111,14 +112,18 @@ def update_git_repos(args, specs, buildOrder):
 
 # Creates a directory in the store which contains symlinks to the package
 # and its direct / indirect dependencies
-def build_ac_entry(spec, specs, architecture):
+def build_ac_entry(spec, specs, architecture, container=None, source_artifact=None,
+                   refs_artifact=None):
   """Assemble the Action Cache (AC) entry for a freshly built package.
 
-  The entry records what produced the tarball -- recipe, git commit, dependency
-  action hashes and build environment -- so that the content-addressed store
-  (CAS) can later be reconstructed from the (small) action cache, and so that a
-  package can be installed from its runtime closure without a build. See
-  REMOTE_STORE_CAS_AC.md.
+  The entry records what produced the tarball -- the full recipe, git commit,
+  source, dependency action hashes, build environment and (if any) the build
+  container -- so that the content-addressed store (CAS) can later be
+  reconstructed from the (small) action cache, and so that a package can be
+  installed from its runtime closure without a build. See REMOTE_STORE_CAS_AC.md.
+
+  `container` is an optional dict describing the build container (image
+  reference + immutable digest); None for native builds.
 
   The action hash is spec["remote_revision_hash"]; this entry is keyed by it.
   Dependencies are referenced by their *action* hash (specs[dep]["hash"]), which
@@ -141,11 +146,13 @@ def build_ac_entry(spec, specs, architecture):
     return [{"package": dep, "actionHash": specs[dep]["hash"]}
             for dep in sorted(dep_names)]
 
-  recipe_text = spec.get("recipe", "") or ""
+  # Archive the full recipe (header + body), so the build can be reconstructed
+  # without an alidist checkout. spec["recipe"] is only the build body.
+  recipe_text = spec.get("fullRecipe") or spec.get("recipe") or ""
   recipe_digest = hashlib.sha256(recipe_text.encode("utf-8", "ignore")).hexdigest()
 
   return {
-    "schemaVersion": 1,
+    "schemaVersion": 2,
     "action": {
       "package": spec["package"],
       "version": spec["version"],
@@ -157,7 +164,12 @@ def build_ac_entry(spec, specs, architecture):
         "commitHash": real_commit_hash,
         "altRefs": alt_refs,
       },
+      "source": spec.get("source"),
+      "tag": spec.get("tag"),
       "recipeDigest": "sha256:" + recipe_digest,
+      "container": container,
+      "sourceArtifact": source_artifact,
+      "refsArtifact": refs_artifact,
       "env": dict(spec.get("env") or {}),
       "append_path": dict(spec.get("append_path") or {}),
       "prepend_path": dict(spec.get("prepend_path") or {}),
@@ -168,6 +180,73 @@ def build_ac_entry(spec, specs, architecture):
       "depsHash": spec.get("deps_hash", ""),
     },
   }
+
+
+def snapshot_source(spec, syncHelper):
+  """Best-effort: archive the package's git source into the CAS so the build is
+  reconstructible without upstream git. Returns a source-artifact dict, or None
+  when not applicable (non-reapi store, devel/source-less package) or on any
+  failure -- source archival must never break a build. Snapshots from the full
+  reference mirror (spec["reference"]), not the partial working clone."""
+  if not isinstance(syncHelper, REAPIRemoteSync) or not getattr(syncHelper, "writeStore", ""):
+    return None
+  if spec.get("is_devel_pkg") or "source" not in spec or "reference" not in spec:
+    return None
+  # The source store is git-only for now; other SCMs (Sapling) skip cleanly and
+  # fall back to upstream at reconstruct time. See REMOTE_STORE_CAS_AC.md.
+  if not isinstance(spec.get("scm"), Git):
+    return None
+  try:
+    commit = git(("rev-parse", spec["commit_hash"] + "^{commit}"),
+                 directory=spec["reference"]).strip()
+    return GitSourceStore(syncHelper).snapshot(spec["reference"], spec["source"], commit)
+  except Exception as exc:   # pylint: disable=broad-except
+    warning("Could not snapshot source for %s, it will not be reconstructible "
+            "without upstream git: %s", spec["package"], exc)
+    return None
+
+
+def snapshot_refs(spec, syncHelper):
+  """Best-effort: archive the package's ref->commit mapping (scm_refs) into the
+  CAS, so tag resolution at reconstruct time needs no upstream `git ls-remote`.
+  Returns a refs-artifact dict or None. Gated like snapshot_source()."""
+  if not isinstance(syncHelper, REAPIRemoteSync) or not getattr(syncHelper, "writeStore", ""):
+    return None
+  if spec.get("is_devel_pkg") or not spec.get("scm_refs"):
+    return None
+  # apply_refs (reconstruct side) is git-only, so only archive refs for git.
+  if not isinstance(spec.get("scm"), Git):
+    return None
+  try:
+    return store_refs(syncHelper, spec.get("source"), spec["scm_refs"])
+  except Exception as exc:   # pylint: disable=broad-except
+    warning("Could not snapshot refs for %s: %s", spec["package"], exc)
+    return None
+
+
+def resolve_container_provenance(args):
+  """Best-effort capture of the build container for reproducibility: its
+  reference ("location") and immutable digest ("hash"). Returns None for native
+  (non-container) builds, and leaves digest None if it cannot be resolved."""
+  if not getattr(args, "docker", False) or not getattr(args, "dockerImage", None):
+    return None
+  image = args.dockerImage
+  provenance = {"runtime": None, "image": image, "digest": None}
+  # Prefer docker; fall back to Apple's "container" runtime.
+  for runtime in ("docker", "container"):
+    if getstatusoutput("command -v " + runtime)[0]:
+      continue
+    provenance["runtime"] = runtime
+    # RepoDigests carries the registry digest (repo@sha256:...); fall back to
+    # the local image Id (sha256:...) if the image was never pulled/pushed.
+    for fmt in ("{{index .RepoDigests 0}}", "{{.Id}}"):
+      err, out = getstatusoutput("%s image inspect --format %s %s" %
+                                 (runtime, quote(fmt), quote(image)))
+      if not err and "sha256:" in out:
+        provenance["digest"] = out.strip()
+        break
+    break
+  return provenance
 
 
 def createDistLinks(spec, specs, args, syncHelper, repoType, requiresType):
@@ -514,7 +593,14 @@ def create_provenance_info(package, specs, args):
 
 def doBuild(args, parser):
   syncHelper = remote_from_url(args.remoteStore, args.writeStore, args.architecture,
-                               args.workDir, getattr(args, "insecure", False))
+                               args.workDir, getattr(args, "insecure", False),
+                               ac_url=getattr(args, "acStore", "") or "",
+                               ac_write_url=getattr(args, "acWriteStore", "") or "",
+                               storage=getattr(args, "storage", "ephemeral"))
+
+  # Capture the build container (if any) once: it is constant for the run and
+  # recorded in every Action Cache entry for reproducibility.
+  container_provenance = resolve_container_provenance(args)
 
   packages = args.pkgname
   specs = {}
@@ -1132,10 +1218,12 @@ def doBuild(args, parser):
       ("GIT_COMMITTER_EMAIL", "unknown"),
       ("INCREMENTAL_BUILD_HASH", spec.get("incremental_hash", "0")),
       ("JOBS", str(args.jobs)),
-      # Produce reproducible, content-stable tarballs for packages that may be
-      # uploaded to the remote store. Devel packages are never uploaded, so we
-      # leave their install trees untouched to avoid perturbing mtimes that
-      # incremental rebuilds might care about.
+      # Produce reproducible, content-stable tarballs for all packages, since
+      # byte-stable output is useful regardless of the remote store (build-to-
+      # build determinism, CAS dedup, rsync/mirror efficiency). Devel packages
+      # are excluded (NORMALIZE_TARBALL unset): they are never uploaded, and
+      # normalising would perturb install-tree mtimes that incremental rebuilds
+      # rely on. See REMOTE_STORE_CAS_AC.md.
       ("NORMALIZE_TARBALL", "" if spec["is_devel_pkg"] else "1"),
       ("PKGHASH", spec["hash"]),
       ("PKGNAME", spec["package"]),
@@ -1299,7 +1387,10 @@ def doBuild(args, parser):
     if not spec["revision"].startswith("local"):
       # Assemble the Action Cache entry so AC/CAS-aware backends can record what
       # produced this tarball. Backends that don't understand it ignore it.
-      spec["ac_entry"] = build_ac_entry(spec, specs, args.architecture)
+      spec["ac_entry"] = build_ac_entry(
+        spec, specs, args.architecture, container=container_provenance,
+        source_artifact=snapshot_source(spec, syncHelper),
+        refs_artifact=snapshot_refs(spec, syncHelper))
       syncHelper.upload_symlinks_and_tarball(spec)
 
   if not args.onlyDeps:

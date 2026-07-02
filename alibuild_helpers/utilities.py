@@ -144,6 +144,15 @@ def file_digest(path, algo="sha256", _chunk_size=1 << 20):
   return hasher.hexdigest()
 
 
+def default_builder_image(architecture):
+  """Return the default builder container image for an architecture, e.g.
+  registry.cern.ch/alisw/slc8-builder. Shared by the build (to pick the docker
+  image) and by store migration (to supply a container for legacy releases)."""
+  distro = architecture.split("_")[0]
+  cpu_suffix = "-arm" if architecture.endswith("_aarch64") else ""
+  return "registry.cern.ch/alisw/%s%s-builder" % (distro, cpu_suffix)
+
+
 def short_commit_hash(spec):
   """Shorten the spec's commit hash to make it more human-readable.
 
@@ -437,6 +446,10 @@ def parseRecipe(reader):
     header,recipe = d.split("---", 1)
     spec = yamlLoad(header)
     validateSpec(spec)
+    # Retain the full recipe text (header + body) so it can be archived in the
+    # CAS and used to reconstruct the build later. spec["recipe"] (set by the
+    # caller) is only the build body; the header fields are parsed out of it.
+    spec["fullRecipe"] = d
   except RuntimeError as e:
     err = str(e)
   except OSError as e:
