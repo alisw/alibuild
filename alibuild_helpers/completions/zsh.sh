@@ -69,6 +69,8 @@ _aliBuild_cmd_build() {
     '--no-remote-store[Disable the use of the remote store]' \
     '--remote-store[Where to find prebuilt tarballs to reuse]:store: ' \
     '--write-store[Where to upload newly built packages]:store: ' \
+    '--ac-store[Separate reapi:// ledger store (AC + reconstruction inputs)]:store: ' \
+    '--storage[Retention for uploaded tarball blobs]:storage:(ephemeral permanent)' \
     '--insecure[Do not validate TLS certificates for remote store]' \
     '(-C --chdir)'{-C,--chdir}'[Change to directory before building]:directory:_directories' \
     '(-w --work-dir)'{-w,--work-dir}'[Toplevel directory for builds]:directory:_directories' \
@@ -141,6 +143,51 @@ _aliBuild_cmd_init() {
     '::package:_alibuild_packages'
 }
 
+_aliBuild_cmd_install() {
+  _arguments -s -S \
+    '--version[Version of the package to install]:version: ' \
+    '--revision[Revision to install]:revision: ' \
+    '(-a --architecture)'{-a,--architecture}'[Architecture to install for]:architecture: ' \
+    '--remote-store[reapi:// store to install from]:store: ' \
+    '--ac-store[Separate reapi:// ledger store]:store: ' \
+    '--insecure[Use http instead of https for the reapi:// endpoint]' \
+    '(-w --work-dir)'{-w,--work-dir}'[Default install prefix]:directory:_directories' \
+    '--prefix[Directory to install into]:directory:_directories' \
+    '::package:_alibuild_packages'
+}
+
+_aliBuild_cmd_reconstruct() {
+  _arguments -s -S \
+    '--version[Version of the package to reconstruct]:version: ' \
+    '--revision[Revision to reconstruct]:revision: ' \
+    '(-a --architecture)'{-a,--architecture}'[Architecture to reconstruct for]:architecture: ' \
+    '--remote-store[reapi:// store to reconstruct from / into]:store: ' \
+    '--ac-store[Separate reapi:// ledger store]:store: ' \
+    '--insecure[Use http instead of https for the reapi:// endpoint]' \
+    '(-w --work-dir)'{-w,--work-dir}'[Work directory]:directory:_directories' \
+    '--output-config[Where to materialise the recipes]:directory:_directories' \
+    '::package:_alibuild_packages'
+}
+
+_aliBuild_cmd_migrate() {
+  _arguments -s -S \
+    '--alidist[alidist checkout/mirror to recover recipes from]:directory:_directories' \
+    '(-a --architecture)'{-a,--architecture}'[Architecture being migrated]:architecture: ' \
+    '--remote-store[reapi:// store to migrate into]:store: ' \
+    '--ac-store[Separate reapi:// ledger store]:store: ' \
+    '--read-store[Read-only http(s) old store to fetch tarballs from]:url: ' \
+    '--insecure[Use http instead of https for the reapi:// endpoint]' \
+    '(-w --work-dir)'{-w,--work-dir}'[Work directory]:directory:_directories' \
+    '--container[Container image to record for migrated builds]:image: ' \
+    '--storage[Retention for migrated tarball blobs]:storage:(ephemeral permanent)' \
+    '--no-verify[Skip the structural self-check of recovered recipes]' \
+    '--closure[Migrate the whole build closure of each top package]' \
+    '(-j --jobs)'{-j,--jobs}'[Migrate this many packages in parallel]:jobs: ' \
+    '--snapshot-sources[Also archive each release git source into the CAS]' \
+    '--source-mirror[Where to cache source clones]:directory:_directories' \
+    '*:tarball:_files'
+}
+
 _aliBuild_cmd_analytics() {
   _arguments -s -S \
     ':state:(on off)'
@@ -181,6 +228,9 @@ _aliBuild() {
         'deps:Show dependency tree for a package'
         'doctor:Check system requirements for a package'
         'init:Initialise a local development area'
+        'install:Install a prebuilt package from a reapi:// store'
+        'reconstruct:Reconstruct missing CAS tarballs from the Action Cache'
+        'migrate:Migrate legacy tarballs into a reapi:// store'
         'analytics:Turn analysis data reporting on or off'
         'architecture:Display detected architecture'
         'version:Display aliBuild version'

@@ -8,6 +8,8 @@ from unittest.mock import patch, MagicMock
 
 from alibuild_helpers import sync
 from alibuild_helpers.utilities import resolve_links_path, resolve_store_path
+from alibuild_helpers.utilities import resolve_cas_path, resolve_ac_path
+import json
 
 
 ARCHITECTURE = "slc7_x86-64"
@@ -326,6 +328,252 @@ class Boto3TestCase(unittest.TestCase):
         self.assertRaises(SystemExit, b3sync.upload_symlinks_and_tarball, BAD_SPEC)
         b3sync.s3.put_object.assert_not_called()
         b3sync.s3.upload_file.assert_not_called()
+
+
+REAPI_HASH = "deadbeef" * 5     # 40 hex chars, like a real action hash
+REAPI_RECIPE_DIGEST = "a" * 64
+REAPI_CONTENT_HASH = "c" * 64
+REAPI_SPEC = {
+    "package": PACKAGE, "version": "v1.3.1", "revision": "1",
+    "hash": REAPI_HASH,
+    "remote_revision_hash": REAPI_HASH,
+    "remote_hashes": [REAPI_HASH],
+    "recipe": "build steps here",
+    "ac_entry": {
+        "schemaVersion": 1,
+        "action": {
+            "actionHash": REAPI_HASH,
+            "recipeDigest": "sha256:" + REAPI_RECIPE_DIGEST,
+        },
+    },
+}
+
+
+@patch("os.makedirs", new=MagicMock(return_value=None))
+@patch("alibuild_helpers.sync.symlink", new=MagicMock(return_value=None))
+@patch("alibuild_helpers.sync.ProgressPrint", new=MagicMock())
+@patch("alibuild_helpers.log.error", new=MagicMock())
+@patch("alibuild_helpers.sync.REAPIRemoteSync._s3_init", new=MagicMock())
+class REAPIRemoteSyncTestCase(unittest.TestCase):
+    """Check the reapi:// (Action Cache + CAS) remote store."""
+
+    def make_sync(self, client):
+        reapi = sync.REAPIRemoteSync(
+            remoteStore="reapi://localhost/bucket",
+            writeStore="reapi://localhost/bucket",
+            architecture=ARCHITECTURE, workdir="/sw")
+        reapi.s3 = client
+        return reapi
+
+    def make_client(self, existing=()):
+        """Mock S3 client: head_object 404s unless the key is in `existing`,
+        and all directory listings are empty (so uploads see no conflicts)."""
+        from botocore.exceptions import ClientError
+
+        def head_object(Bucket, Key):
+            if Key in existing:
+                return {"ContentLength": 4096}
+            raise ClientError({"Error": {"Code": "404"}}, "head_object")
+
+        return MagicMock(
+            head_object=MagicMock(side_effect=head_object),
+            get_paginator=lambda method: MagicMock(
+                paginate=lambda **kw: [{"Contents": []}]),
+            put_object=MagicMock(return_value=None),
+            upload_file=MagicMock(return_value=None),
+            download_file=MagicMock(return_value=None),
+        )
+
+    def put_keys(self, client):
+        return [c.kwargs["Key"] for c in client.put_object.call_args_list]
+
+    def test_parse_url(self) -> None:
+        self.assertEqual(
+            sync.REAPIRemoteSync._parse_reapi_url("reapi://s3.cern.ch/alibuild-repo", "https"),
+            ("https://s3.cern.ch", "alibuild-repo"))
+        self.assertEqual(
+            sync.REAPIRemoteSync._parse_reapi_url("reapi://localhost:9000/bkt", "http"),
+            ("http://localhost:9000", "bkt"))
+        self.assertEqual(sync.REAPIRemoteSync._parse_reapi_url("", "https"), ("", ""))
+
+    def test_factory(self) -> None:
+        obj = sync.remote_from_url("reapi://s3.example/bucket",
+                                   "reapi://s3.example/bucket", ARCHITECTURE, "/sw")
+        self.assertIsInstance(obj, sync.REAPIRemoteSync)
+        self.assertEqual(obj.remoteStore, "bucket")
+        self.assertEqual(obj.endpoint_url, "https://s3.example")
+
+    @patch("alibuild_helpers.sync.file_digest",
+           new=MagicMock(return_value=REAPI_CONTENT_HASH))
+    @patch("os.path.getsize", new=MagicMock(return_value=4096))
+    @patch("os.listdir",
+           new=lambda path: [tarball_name(REAPI_SPEC)] if path.endswith("-1") else [])
+    @patch("os.readlink", new=MagicMock(return_value="../../store/de/dead/x.tar.gz"))
+    @patch("os.path.islink", new=MagicMock(return_value=True))
+    def test_upload_writes_cas_ac_redirect(self) -> None:
+        client = self.make_client()
+        reapi = self.make_sync(client)
+        reapi.upload_symlinks_and_tarball(REAPI_SPEC)
+
+        cas_path = resolve_cas_path(REAPI_CONTENT_HASH)
+        recipe_cas = resolve_cas_path(REAPI_RECIPE_DIGEST)
+        ac_path = resolve_ac_path(ARCHITECTURE, REAPI_HASH)
+        store_key = resolve_store_path(ARCHITECTURE, REAPI_HASH) + "/" + tarball_name(REAPI_SPEC)
+
+        # Tarball bytes go to the CAS via upload_file (content-addressed).
+        client.upload_file.assert_called_once()
+        self.assertEqual(client.upload_file.call_args.kwargs["Key"], cas_path)
+
+        keys = self.put_keys(client)
+        self.assertIn(recipe_cas, keys)   # recipe blob stored in CAS
+        self.assertIn(ac_path, keys)      # Action Cache entry written
+        self.assertIn(store_key, keys)    # legacy store object written
+
+        # The legacy store object is a redirect to the CAS blob, not the bytes.
+        redirect = next(c for c in client.put_object.call_args_list
+                        if c.kwargs["Key"] == store_key)
+        self.assertEqual(redirect.kwargs["WebsiteRedirectLocation"], "/" + cas_path)
+
+        # The AC entry records the output digest pointing at the CAS blob.
+        ac_call = next(c for c in client.put_object.call_args_list
+                       if c.kwargs["Key"] == ac_path)
+        entry = json.loads(ac_call.kwargs["Body"])
+        self.assertEqual(entry["result"]["outputDigest"],
+                         "sha256:" + REAPI_CONTENT_HASH)
+        self.assertEqual(entry["result"]["size"], 4096)
+
+    @patch("alibuild_helpers.sync.file_digest",
+           new=MagicMock(return_value=REAPI_CONTENT_HASH))
+    @patch("os.path.getsize", new=MagicMock(return_value=4096))
+    @patch("os.listdir",
+           new=lambda path: [tarball_name(REAPI_SPEC)] if path.endswith("-1") else [])
+    @patch("os.readlink", new=MagicMock(return_value="../../store/de/dead/x.tar.gz"))
+    @patch("os.path.islink", new=MagicMock(return_value=True))
+    def test_upload_routes_ledger_and_artifact_to_separate_stores(self) -> None:
+        client = self.make_client()
+        reapi = sync.REAPIRemoteSync(
+            remoteStore="reapi://localhost/artifacts",
+            writeStore="reapi://localhost/artifacts",
+            architecture=ARCHITECTURE, workdir="/sw",
+            acStore="reapi://localhost/ledger",
+            acWriteStore="reapi://localhost/ledger")
+        reapi.s3 = client
+        reapi.upload_symlinks_and_tarball(REAPI_SPEC)
+
+        cas_path = resolve_cas_path(REAPI_CONTENT_HASH)
+        recipe_cas = resolve_cas_path(REAPI_RECIPE_DIGEST)
+        ac_path = resolve_ac_path(ARCHITECTURE, REAPI_HASH)
+        store_key = resolve_store_path(ARCHITECTURE, REAPI_HASH) + "/" + tarball_name(REAPI_SPEC)
+        bucket_of = {c.kwargs["Key"]: c.kwargs["Bucket"]
+                     for c in client.put_object.call_args_list}
+
+        # Keep-forever ledger: AC entry + recipe blob.
+        self.assertEqual(bucket_of[ac_path], "ledger")
+        self.assertEqual(bucket_of[recipe_cas], "ledger")
+        # Deletable artifact store: tarball bytes + legacy redirect/link.
+        self.assertEqual(client.upload_file.call_args.kwargs["Bucket"], "artifacts")
+        self.assertEqual(client.upload_file.call_args.kwargs["Key"], cas_path)
+        self.assertEqual(bucket_of[store_key], "artifacts")
+
+    @patch("alibuild_helpers.sync.file_digest",
+           new=MagicMock(return_value=REAPI_CONTENT_HASH))
+    @patch("os.path.getsize", new=MagicMock(return_value=4096))
+    @patch("os.listdir",
+           new=lambda path: [tarball_name(REAPI_SPEC)] if path.endswith("-1") else [])
+    @patch("os.readlink", new=MagicMock(return_value="../../store/de/dead/x.tar.gz"))
+    @patch("os.path.islink", new=MagicMock(return_value=True))
+    def test_upload_dedups_existing_cas_blob(self) -> None:
+        # The CAS already has the tarball bytes (e.g. from an equivalent hash).
+        client = self.make_client(existing={resolve_cas_path(REAPI_CONTENT_HASH)})
+        reapi = self.make_sync(client)
+        reapi.upload_symlinks_and_tarball(REAPI_SPEC)
+        # We must not re-upload identical bytes, but we still write the AC entry.
+        client.upload_file.assert_not_called()
+        self.assertIn(resolve_ac_path(ARCHITECTURE, REAPI_HASH), self.put_keys(client))
+
+    @patch("alibuild_helpers.sync.file_digest",
+           new=MagicMock(return_value=REAPI_CONTENT_HASH))
+    @patch("os.path.getsize", new=MagicMock(return_value=4096))
+    @patch("os.listdir",
+           new=lambda path: [tarball_name(REAPI_SPEC)] if path.endswith("-1") else [])
+    @patch("os.readlink", new=MagicMock(return_value="../../store/de/dead/x.tar.gz"))
+    @patch("os.path.islink", new=MagicMock(return_value=True))
+    def test_upload_tags_ephemeral_by_default(self) -> None:
+        client = self.make_client()
+        reapi = self.make_sync(client)   # default storage = ephemeral
+        reapi.upload_symlinks_and_tarball(REAPI_SPEC)
+        self.assertEqual(client.upload_file.call_args.kwargs["ExtraArgs"],
+                         {"Tagging": "retention=ephemeral"})
+
+    @patch("alibuild_helpers.sync.file_digest",
+           new=MagicMock(return_value=REAPI_CONTENT_HASH))
+    @patch("os.path.getsize", new=MagicMock(return_value=4096))
+    @patch("os.listdir",
+           new=lambda path: [tarball_name(REAPI_SPEC)] if path.endswith("-1") else [])
+    @patch("os.readlink", new=MagicMock(return_value="../../store/de/dead/x.tar.gz"))
+    @patch("os.path.islink", new=MagicMock(return_value=True))
+    def test_permanent_build_promotes_ephemeral_blob(self) -> None:
+        # The blob already exists tagged ephemeral; a permanent build promotes it.
+        client = self.make_client(existing={resolve_cas_path(REAPI_CONTENT_HASH)})
+        client.get_object_tagging = MagicMock(
+            return_value={"TagSet": [{"Key": "retention", "Value": "ephemeral"}]})
+        client.put_object_tagging = MagicMock()
+        reapi = sync.REAPIRemoteSync("reapi://localhost/bucket", "reapi://localhost/bucket",
+                                     architecture=ARCHITECTURE, workdir="/sw",
+                                     storage="permanent")
+        reapi.s3 = client
+        reapi.upload_symlinks_and_tarball(REAPI_SPEC)
+        client.upload_file.assert_not_called()        # deduped, not re-uploaded
+        client.put_object_tagging.assert_called_once()
+        self.assertEqual(client.put_object_tagging.call_args.kwargs["Tagging"],
+                         {"TagSet": [{"Key": "retention", "Value": "permanent"}]})
+
+    @patch("os.path.exists", new=MagicMock(return_value=False))
+    def test_download_refreshes_old_ephemeral(self) -> None:
+        from datetime import datetime, timezone, timedelta
+        client = self.make_client()
+        client.get_object_tagging = MagicMock(
+            return_value={"TagSet": [{"Key": "retention", "Value": "ephemeral"}]})
+        client.head_object = MagicMock(
+            return_value={"LastModified": datetime.now(timezone.utc) - timedelta(days=75)})
+        client.copy_object = MagicMock()
+        reapi = sync.REAPIRemoteSync("reapi://localhost/bucket", "reapi://localhost/bucket",
+                                     architecture=ARCHITECTURE, workdir="/sw",
+                                     storage="permanent")
+        reapi.s3 = client
+        reapi.download_artifact(REAPI_CONTENT_HASH, "/tmp/x")
+        client.copy_object.assert_called_once()       # LRU-refreshed (75d >= 60d)
+
+        client.copy_object.reset_mock()
+        client.head_object = MagicMock(
+            return_value={"LastModified": datetime.now(timezone.utc) - timedelta(days=10)})
+        reapi.download_artifact(REAPI_CONTENT_HASH, "/tmp/x")
+        client.copy_object.assert_not_called()        # fresh (10d < 60d), no refresh
+
+    @patch("glob.glob", new=MagicMock(return_value=[]))
+    @patch("os.makedirs", new=MagicMock())
+    def test_fetch_via_action_cache(self) -> None:
+        cas_path = resolve_cas_path(REAPI_CONTENT_HASH)
+        # The CAS blob exists, so head_object (for its size) succeeds.
+        client = self.make_client(existing={cas_path})
+        ac_path = resolve_ac_path(ARCHITECTURE, REAPI_HASH)
+        entry = {"result": {"tarball": tarball_name(REAPI_SPEC),
+                            "outputDigest": "sha256:" + REAPI_CONTENT_HASH}}
+
+        def get_object(Bucket, Key):
+            if Key == ac_path:
+                return {"Body": MagicMock(read=lambda: json.dumps(entry).encode())}
+            raise NotImplementedError(Key)
+        client.get_object = MagicMock(side_effect=get_object)
+
+        reapi = self.make_sync(client)
+        reapi.fetch_tarball(REAPI_SPEC)
+
+        # We downloaded the CAS blob to the local action-store path.
+        client.download_file.assert_called_once()
+        self.assertEqual(client.download_file.call_args.kwargs["Key"], cas_path)
+        self.assertTrue(client.download_file.call_args.kwargs["Filename"].endswith(
+            resolve_store_path(ARCHITECTURE, REAPI_HASH) + "/" + tarball_name(REAPI_SPEC)))
 
 
 if __name__ == '__main__':
