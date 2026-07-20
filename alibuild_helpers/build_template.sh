@@ -41,6 +41,7 @@ export PATH=$WORK_DIR/wrapper-scripts:$PATH
 # - DEVEL_PREFIX
 # - INCREMENTAL_BUILD_HASH
 # - JOBS
+# - NORMALIZE_TARBALL
 # - PKGHASH
 # - PKGNAME
 # - PKGREVISION
@@ -291,6 +292,26 @@ mkdir -p "${WORK_DIR}/TARS/$HASH_PATH" \
          "${WORK_DIR}/TARS/$ARCHITECTURE/$PKGNAME"
 
 PACKAGE_WITH_REV=$PKGNAME-$PKGVERSION-$PKGREVISION.$ARCHITECTURE.tar.gz
+
+# Decide whether to produce a normalized (reproducible) tarball. Only packages
+# that may end up in the remote store are normalized; devel packages have
+# NORMALIZE_TARBALL unset so their install trees (and mtimes) are left untouched,
+# which matters for incremental rebuilds.
+do_normalize=
+if [ "$NORMALIZE_TARBALL" = 1 ] && [ "$CAN_DELETE" != 1 ] && [ -z "$CACHED_TARBALL" ]; then
+  do_normalize=1
+  # Normalize mtimes in place to a fixed, reproducible epoch. This must happen
+  # before the parallel rsync below, so the installed copy and the tarball agree
+  # and neither reads the tree while we mutate it. We avoid tar's --mtime, as
+  # old GNU tar (e.g. slc7's 1.26) doesn't support it. date(1) differs between
+  # GNU (-d @epoch) and BSD (-r epoch), so try both.
+  norm_epoch="${SOURCE_DATE_EPOCH:-0}"
+  if norm_stamp=$(date -d "@$norm_epoch" +%%Y%%m%%d%%H%%M.%%S 2>/dev/null) ||
+     norm_stamp=$(date -r "$norm_epoch" +%%Y%%m%%d%%H%%M.%%S 2>/dev/null); then
+    find "$WORK_DIR/INSTALLROOT/$PKGHASH" -exec touch -h -t "$norm_stamp" {} +
+  fi
+fi
+
 # Copy and tar/compress (if applicable) in parallel.
 # Use -H to match tar's behaviour of preserving hardlinks.
 rsync -DgloprH "$WORK_DIR/INSTALLROOT/$PKGHASH/" "$WORK_DIR" & rsync_pid=$!
@@ -302,9 +323,29 @@ elif [ -z "$CACHED_TARBALL" ]; then
   # Use pigz to compress, if we can, because it's multicore.
   gzip=$(command -v pigz) || gzip=$(command -v gzip)
   # We don't have an existing tarball, and we want to keep the one we create now.
-  tar -cC "$WORK_DIR/INSTALLROOT/$PKGHASH" . |
-    # Avoid having broken left overs if the tar fails.
-    $gzip -c > "$WORK_DIR/TARS/$HASH_PATH/$PACKAGE_WITH_REV.processing"
+  if [ -n "$do_normalize" ]; then
+    # Reproducible archive: deterministic entry order (via a sorted file list,
+    # since old GNU tar and bsdtar lack --sort), zeroed ownership, and the
+    # normalized mtimes set above. The file list is NUL-delimited end to end
+    # (find -print0 | sort -z | tar --null -T -) so any filename -- including one
+    # with a newline -- is handled, matching what plain "tar ." would archive.
+    # Ownership flags are spelled differently by GNU tar (--owner/--group) and
+    # bsdtar (--uid/--gid). gzip -n drops the gzip header's name and timestamp.
+    if tar --version 2>/dev/null | grep -qi 'GNU tar'; then
+      tar_owner="--owner=0 --group=0 --numeric-owner"
+    else
+      tar_owner="--uid 0 --gid 0 --numeric-owner"
+    fi
+    ( cd "$WORK_DIR/INSTALLROOT/$PKGHASH" &&
+      find . -mindepth 1 -print0 | LC_ALL=C sort -z |
+        tar -cf - --no-recursion $tar_owner --null -T - ) |
+      # Avoid having broken left overs if the tar fails.
+      $gzip -n -c > "$WORK_DIR/TARS/$HASH_PATH/$PACKAGE_WITH_REV.processing"
+  else
+    tar -cC "$WORK_DIR/INSTALLROOT/$PKGHASH" . |
+      # Avoid having broken left overs if the tar fails.
+      $gzip -c > "$WORK_DIR/TARS/$HASH_PATH/$PACKAGE_WITH_REV.processing"
+  fi
   mv "$WORK_DIR/TARS/$HASH_PATH/$PACKAGE_WITH_REV.processing" \
      "$WORK_DIR/TARS/$HASH_PATH/$PACKAGE_WITH_REV"
   ln -nfs "../../$HASH_PATH/$PACKAGE_WITH_REV" \
