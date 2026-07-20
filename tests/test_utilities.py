@@ -10,9 +10,12 @@ from alibuild_helpers.utilities import prunePaths
 from alibuild_helpers.utilities import resolve_version
 from alibuild_helpers.utilities import topological_sort
 from alibuild_helpers.utilities import resolveFilename, resolveDefaultsFilename
+from alibuild_helpers.utilities import resolve_store_path, resolve_cas_path, resolve_ac_path, file_digest
 import alibuild_helpers
+import hashlib
 import os
 import string
+import tempfile
 
 UBUNTU_1510_OS_RELEASE = """
 NAME="Ubuntu"
@@ -279,6 +282,30 @@ class TestUtilities(unittest.TestCase):
     self.assertEqual(h2.hexdigest(), "1619bcdbeff6828138ad9b6e43cc17e856457603")
     self.assertEqual(h3.hexdigest(), "0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33")
     self.assertNotEqual(h1.hexdigest(), h2.hexdigest())
+
+  def test_cas_ac_paths(self) -> None:
+    h = "abcdef0123456789abcdef0123456789abcdef01"
+    chash = "f" * 64
+    # The action store and the CAS/AC namespaces all shard on the first two
+    # hex characters of the hash, matching resolve_store_path's convention.
+    self.assertEqual(resolve_store_path("slc7_x86-64", h),
+                     "TARS/slc7_x86-64/store/ab/" + h)
+    self.assertEqual(resolve_cas_path(chash),
+                     "cas/sha256/ff/" + chash)
+    self.assertEqual(resolve_cas_path(chash, algo="sha1"),
+                     "cas/sha1/ff/" + chash)
+    self.assertEqual(resolve_ac_path("slc7_x86-64", h),
+                     "ac/slc7_x86-64/ab/" + h + ".json")
+
+  def test_file_digest(self) -> None:
+    payload = b"the quick brown fox\n" * 100000  # exceed the 1 MiB read chunk
+    expected = hashlib.sha256(payload).hexdigest()
+    with tempfile.NamedTemporaryFile() as tmp:
+      tmp.write(payload)
+      tmp.flush()
+      self.assertEqual(file_digest(tmp.name), expected)
+      self.assertEqual(file_digest(tmp.name, algo="sha1"),
+                       hashlib.sha1(payload).hexdigest())
 
   def test_asList(self) -> None:
     self.assertEqual(asList("a"), ["a"])
