@@ -2,6 +2,7 @@ import logging
 import sys
 import re
 import time
+import threading
 import datetime
 
 def dieOnError(err, msg) -> None:
@@ -137,3 +138,31 @@ warning = logger.warning
 info = logger.info
 banner = logger.banner
 success = logger.success
+
+
+def byte_progress(label, total=None, every_bytes=200 << 20, every_seconds=30):
+  """Return a callback(delta_bytes) that logs cumulative transfer progress at
+  DEBUG level, at most once per `every_bytes` transferred or `every_seconds`
+  elapsed. Suitable as a boto3 upload/download Callback (called per chunk from
+  possibly several threads) or in a manual download loop. Counts are approximate
+  under concurrency, which is fine for a progress indicator."""
+  lock = threading.Lock()
+  state = {"seen": 0, "bytes_mark": 0, "time_mark": time.monotonic()}
+
+  def report(delta):
+    with lock:
+      state["seen"] += delta
+      now = time.monotonic()
+      if (state["seen"] - state["bytes_mark"] < every_bytes and
+          now - state["time_mark"] < every_seconds):
+        return
+      state["bytes_mark"] = state["seen"]
+      state["time_mark"] = now
+      seen_mb = state["seen"] >> 20
+      if total:
+        debug("%s: %d/%d MB (%.0f%%)", label, seen_mb, total >> 20,
+              100.0 * state["seen"] / total)
+      else:
+        debug("%s: %d MB transferred", label, seen_mb)
+
+  return report

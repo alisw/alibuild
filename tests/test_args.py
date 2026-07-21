@@ -55,7 +55,7 @@ CORRECT_BEHAVIOR = [
   ((), "build zlib -a slc7_x86-64"                                                     , [("docker", False), ("dockerImage", None), ("docker_extra_args", [])]),
   ((), "build zlib -a slc7_x86-64 --docker-image registry.cern.ch/alisw/some-builder"  , [("docker", True), ("dockerImage", "registry.cern.ch/alisw/some-builder")]),
   ((), "build zlib -a slc7_x86-64 --docker"                                            , [("docker", True), ("dockerImage", "registry.cern.ch/alisw/slc7-builder")]),
-  ((), "build zlib -a slc7_x86-64 --docker-extra-args=--foo"                           , [("docker", True), ("dockerImage", "registry.cern.ch/alisw/slc7-builder"), ("docker_extra_args", ["--foo"])]),
+  ((), "build zlib -a slc7_x86-64 --docker-extra-args=--foo"                           , [("docker", True), ("dockerImage", "registry.cern.ch/alisw/slc7-builder"), ("docker_extra_args", ["--platform", "linux/amd64", "--foo"])]),
   ((), "build zlib --devel-prefix -a slc7_x86-64 --docker"                             , [("docker", True), ("dockerImage", "registry.cern.ch/alisw/slc7-builder"), ("develPrefix", "%s-slc7_x86-64" % os.path.basename(os.getcwd()))]),
   ((), "build zlib --devel-prefix -a slc7_x86-64 --docker-image someimage"             , [("docker", True), ("dockerImage", "someimage"), ("develPrefix", "%s-slc7_x86-64" % os.path.basename(os.getcwd()))]),
   ((), "--debug build --force-unknown-architecture --defaults o2 O2"                   , [("debug", True), ("action",  "build"), ("defaults", "o2"), ("pkgname", ["O2"])]),

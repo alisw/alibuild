@@ -7,7 +7,7 @@ from subprocess import TimeoutExpired
 from shlex import quote
 import platform
 
-from alibuild_helpers.log import debug, error, dieOnError
+from alibuild_helpers.log import debug, info, warning, error, dieOnError
 
 def decode_with_fallback(data):
   """Try to decode DATA as utf-8; if that doesn't work, fall back to latin-1.
@@ -69,6 +69,31 @@ def execute(command, printer=debug, timeout=None):
   return popen.returncode
 
 
+def stream_pull(runtime, image):
+  """Ensure a container `image` is present for `runtime` ("docker" or
+  "container"), pulling it with *streamed* progress if it is not.
+
+  Without this, the detached `run` in the container runners pulls a missing image
+  internally while getoutput() captures all its output -- so a first-time pull
+  looks like a silent hang. Best-effort: on any error we return quietly and let
+  the run pull it the old (captured) way."""
+  if not image:
+    return
+  present, _ = getstatusoutput([runtime, "image", "inspect", image])
+  if present == 0:
+    debug("Container image %s already present locally", image)
+    return
+  info("Pulling container image %s (not present locally); this can take a while...",
+       image)
+  # Inherit stdio (do NOT pipe) so the runtime renders its own tty-aware pull
+  # progress directly to the terminal, instead of it being captured/line-buffered
+  # into a silent pipe. Falls back to plain line output when stdout isn't a tty.
+  code = Popen([runtime, "image", "pull", image]).wait()
+  if code:
+    warning("Pull of %s exited with code %d; the container run will retry it.",
+            image, code)
+
+
 BASH = "bash" if getstatusoutput("/bin/bash --version")[0] else "/bin/bash"
 
 class AppleContainerRunner:
@@ -93,6 +118,7 @@ class AppleContainerRunner:
         if not self._container_image:
             return getstatusoutput_host
 
+        stream_pull("container", self._container_image)
         envOpts = [opt for k, v in self._extra_env.items() for opt in ("-e", f"{k}={v}")]
         volumes = [opt for v in self._extra_volumes for opt in ("-v", v)]
         # Apple Container is more picky about missing entrypoints, so we always override it
@@ -100,13 +126,18 @@ class AppleContainerRunner:
         cmd = ["container", "run", "--detach"] + envOpts + volumes + ["--rm", "--entrypoint=/bin/sleep"]
         cmd += self._container_run_args
         cmd += [self._container_image, "inf"]
+        debug("Starting Apple container (this pulls %s first if it is not present "
+              "locally, which can take a while with no output): %s",
+              self._container_image, " ".join(cmd))
         self._container = getoutput(cmd).strip()
+        debug("Apple container started: %s", self._container)
 
         def getstatusoutput_container(cmd, cwd=None):
             if self._container is None:
                 return getstatusoutput_host(cmd, cwd=cwd)
             envOpts = [opt for k, v in self._extra_env.items() for opt in ("-e", f"{k}={v}")]
             exec_cmd = ["container", "exec"] + envOpts + [self._container, "bash", "-c", cmd]
+            debug("container exec: %s", cmd)
             return getstatusoutput(exec_cmd, cwd=cwd)
 
         return getstatusoutput_container
@@ -134,13 +165,18 @@ class DockerRunner:
 
   def __enter__(self):
     if self._docker_image:
+      stream_pull("docker", self._docker_image)
       # "sleep inf" pauses forever, until we kill it.
       envOpts = [opt for k, v in self._extra_env.items() for opt in ("-e", f"{k}={v}")]
       volumes = [opt for v in self._extra_volumes for opt in ("-v", v)]
       cmd = ["docker", "run", "--detach"] + envOpts + volumes + ["--rm", "--entrypoint="]
       cmd += self._docker_run_args
       cmd += [self._docker_image, "sleep", "inf"]
+      debug("Starting Docker container (this pulls %s first if it is not present "
+            "locally, which can take a while with no output): %s",
+            self._docker_image, " ".join(cmd))
       self._container = getoutput(cmd).strip()
+      debug("Docker container started: %s", self._container)
 
     def getstatusoutput_docker(cmd, cwd=None):
       if self._container is None:
@@ -154,6 +190,7 @@ class DockerRunner:
         envOpts.append("-e")
         envOpts.append(f"{env[0]}={env[1]}")
       exec_cmd = ["docker", "container", "exec"] + envOpts + [self._container, "bash", "-c", cmd]
+      debug("docker exec: %s", cmd)
       return getstatusoutput(exec_cmd, cwd=cwd)
 
     return getstatusoutput_docker

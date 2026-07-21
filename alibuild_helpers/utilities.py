@@ -106,6 +106,30 @@ def resolve_links_path(architecture, package):
   return "/".join(("TARS", architecture, package))
 
 
+
+def default_builder_image(architecture):
+  """Return the default builder container image for an architecture, e.g.
+  registry.cern.ch/alisw/slc8-builder. Shared by the build (to pick the docker
+  image) and by store migration (to supply a container for legacy releases)."""
+  distro = architecture.split("_")[0]
+  cpu_suffix = "-arm" if architecture.endswith("_aarch64") else ""
+  return "registry.cern.ch/alisw/%s%s-builder" % (distro, cpu_suffix)
+
+
+def docker_platform_for(architecture):
+  """Return the OCI platform (e.g. 'linux/amd64') for an aliBuild architecture,
+  so a container run selects the image variant matching the *target* rather than
+  the host. This matters when they differ -- e.g. an x86-64 builder image on an
+  arm64 host with Apple's `container`, which (unlike Docker) refuses to cross-run
+  without an explicit --platform. Returns None if the architecture is unknown."""
+  arch = (architecture or "").lower()
+  if "aarch64" in arch or "arm64" in arch:
+    return "linux/arm64"
+  if "x86-64" in arch or "x86_64" in arch or "amd64" in arch:
+    return "linux/amd64"
+  return None
+
+
 def short_commit_hash(spec):
   """Shorten the spec's commit hash to make it more human-readable.
 

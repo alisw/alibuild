@@ -10,7 +10,18 @@ from alibuild_helpers.utilities import prunePaths
 from alibuild_helpers.utilities import resolve_version
 from alibuild_helpers.utilities import topological_sort
 from alibuild_helpers.utilities import resolveFilename, resolveDefaultsFilename
+from alibuild_helpers.utilities import docker_platform_for
 import alibuild_helpers
+
+class DockerPlatformTestCase(unittest.TestCase):
+    def test_docker_platform_for(self):
+        self.assertEqual(docker_platform_for("slc9_x86-64"), "linux/amd64")
+        self.assertEqual(docker_platform_for("ubuntu2004_x86_64"), "linux/amd64")
+        self.assertEqual(docker_platform_for("slc9_aarch64"), "linux/arm64")
+        self.assertEqual(docker_platform_for("something_arm64"), "linux/arm64")
+        # Unknown / empty architectures yield no platform.
+        self.assertIsNone(docker_platform_for("weird_arch"))
+        self.assertIsNone(docker_platform_for(""))
 import os
 import string
 
