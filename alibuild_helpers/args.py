@@ -1,5 +1,5 @@
 import argparse
-from alibuild_helpers.utilities import detectArch, normalise_multiple_options
+from alibuild_helpers.utilities import detectArch, normalise_multiple_options, default_builder_image, docker_platform_for
 from alibuild_helpers.workarea import cleanup_git_log
 import multiprocessing
 
@@ -436,6 +436,15 @@ def finaliseArgs(args, parser):
 
     args.docker_extra_args = shlex.split(args.docker_extra_args)
 
+    # Select the image variant matching the *target* architecture, so a container
+    # run works when the host arch differs -- e.g. an x86-64 builder image on an
+    # arm64 host with Apple's `container`, which (unlike Docker) refuses to
+    # cross-run without an explicit --platform. Respect a user-supplied one.
+    if args.docker and "--platform" not in args.docker_extra_args:
+      platform = docker_platform_for(args.architecture)
+      if platform:
+        args.docker_extra_args = ["--platform", platform] + args.docker_extra_args
+
     if args.docker and args.architecture.startswith("osx"):
       parser.error("cannot use `-a %s` and --docker" % args.architecture)
 
@@ -446,9 +455,7 @@ def finaliseArgs(args, parser):
     # in docker the docker image is given by the first part of the
     # architecture we want to build for.
     if args.docker and not args.dockerImage:
-      distro = args.architecture.split("_")[0]
-      cpu_suffix = "-arm" if args.architecture.endswith("_aarch64") else ""
-      args.dockerImage = "registry.cern.ch/alisw/%s%s-builder" % (distro, cpu_suffix)
+      args.dockerImage = default_builder_image(args.architecture)
 
   if "annotate" in args:
     for comment_assignment in args.annotate:

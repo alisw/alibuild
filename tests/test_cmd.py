@@ -22,6 +22,7 @@ class CmdTestCase(unittest.TestCase):
     @mock.patch("alibuild_helpers.cmd.getstatusoutput")
     def test_DockerRunner(self, mock_getstatusoutput, mock_getoutput):
         mock_getoutput.side_effect = lambda cmd: "container-id\n"
+        mock_getstatusoutput.return_value = (0, "")   # image already present: stream_pull is a no-op
         with DockerRunner("image", ["extra arg"]) as getstatusoutput_docker:
             mock_getoutput.assert_called_with(["docker", "run", "--detach", "--rm", "--entrypoint=",
                                                "extra arg", "image", "sleep", "inf"])
@@ -42,6 +43,7 @@ class CmdTestCase(unittest.TestCase):
     @mock.patch("alibuild_helpers.cmd.getstatusoutput")
     def test_AppleContainerRunner(self, mock_getstatusoutput, mock_getoutput):
         mock_getoutput.side_effect = lambda cmd: "container-id\n"
+        mock_getstatusoutput.return_value = (0, "")   # image already present: stream_pull is a no-op
         with AppleContainerRunner("image", ["extra arg"], extra_env={}, extra_volumes=[]) as getstatusoutput_container:
             mock_getoutput.assert_called_with(["container", "run", "--detach", "--rm", "--entrypoint=/bin/sleep",
                                                "extra arg", "image", "inf"])
@@ -63,6 +65,7 @@ class CmdTestCase(unittest.TestCase):
     def test_DockerRunner_with_env_vars(self, mock_getstatusoutput, mock_getoutput):
         # Test that environment variables are properly injected into docker exec commands.
         mock_getoutput.side_effect = lambda cmd: "container-id\n"
+        mock_getstatusoutput.return_value = (0, "")   # image already present: stream_pull is a no-op
 
         # Test with environment variables
         extra_env = {"TEST_VAR": "test_value", "ANOTHER_VAR": "another_value"}
@@ -87,6 +90,27 @@ class CmdTestCase(unittest.TestCase):
             mock_getoutput.assert_not_called()
             getstatusoutput_docker("echo test")
             mock_getstatusoutput.assert_called_with("env TEST_VAR=test_value ANOTHER_VAR=another_value /bin/bash -c 'echo test'", cwd=None)
+
+    @mock.patch("alibuild_helpers.cmd.Popen")
+    @mock.patch("alibuild_helpers.cmd.getstatusoutput")
+    def test_stream_pull(self, mock_getstatusoutput, mock_popen):
+        from alibuild_helpers.cmd import stream_pull
+        # Image already present -> inspect only, no pull.
+        mock_getstatusoutput.return_value = (0, "")
+        stream_pull("container", "img")
+        mock_getstatusoutput.assert_called_with(["container", "image", "inspect", "img"])
+        mock_popen.assert_not_called()
+        # Image absent -> pull with inherited stdio (no PIPE args).
+        mock_getstatusoutput.return_value = (1, "not found")
+        mock_popen.return_value.wait.return_value = 0
+        stream_pull("docker", "img2")
+        mock_popen.assert_called_with(["docker", "image", "pull", "img2"])
+        # No image -> nothing at all.
+        mock_getstatusoutput.reset_mock()
+        mock_popen.reset_mock()
+        stream_pull("docker", "")
+        mock_getstatusoutput.assert_not_called()
+        mock_popen.assert_not_called()
 
     @mock.patch("alibuild_helpers.cmd.getoutput")
     @mock.patch("alibuild_helpers.cmd.getstatusoutput")
