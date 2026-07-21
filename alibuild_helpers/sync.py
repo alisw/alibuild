@@ -12,7 +12,7 @@ from requests.exceptions import RequestException
 from urllib.parse import quote
 
 from alibuild_helpers.cmd import execute
-from alibuild_helpers.log import debug, info, error, dieOnError, ProgressPrint
+from alibuild_helpers.log import debug, info, warning, error, dieOnError, ProgressPrint, byte_progress
 from alibuild_helpers.utilities import resolve_store_path, resolve_links_path, symlink
 
 
@@ -494,6 +494,7 @@ class Boto3RemoteSync:
     self.writeStore = re.sub("^b3://", "", writeStore)
     self.architecture = architecture
     self.workdir = workdir
+    self.endpoint_url = "https://s3.cern.ch"
     self._s3_init()
 
   def _s3_init(self) -> None:
@@ -507,18 +508,24 @@ class Boto3RemoteSync:
       error("boto3 must be installed to use %s", Boto3RemoteSync)
       sys.exit(1)
 
+    # Generous timeouts + retries: large source-bundle uploads can move many MB
+    # per multipart part through a re-signing proxy to CERN, which easily exceeds
+    # botocore's default 60s read timeout; and transient stalls should retry the
+    # part, not abort the whole snapshot.
+    common = dict(connect_timeout=60, read_timeout=300,
+                  retries={"max_attempts": 10, "mode": "adaptive"},
+                  # Allow room for parallel migrate/build jobs sharing this client.
+                  max_pool_connections=32)
     try:
       try:
-        config = Config(
-          request_checksum_calculation='WHEN_REQUIRED',
-          response_checksum_validation='WHEN_REQUIRED',
-        )
+        config = Config(request_checksum_calculation='WHEN_REQUIRED',
+                        response_checksum_validation='WHEN_REQUIRED', **common)
       except TypeError:
         # Older boto3 versions don't support these parameters (<1.36.0)
-        config = None
+        config = Config(**common)
       self.s3 = boto3.client("s3",
                              **({"config": config} if config else {}),
-                             endpoint_url="https://s3.cern.ch",
+                             endpoint_url=self.endpoint_url,
                              aws_access_key_id=os.environ["AWS_ACCESS_KEY_ID"],
                              aws_secret_access_key=os.environ["AWS_SECRET_ACCESS_KEY"])
     except KeyError:
@@ -564,19 +571,26 @@ class Boto3RemoteSync:
       # ever use one anyway.)
       for tarball in self._s3_listdir(store_path):
         debug("Fetching tarball %s", tarball)
-        progress = ProgressPrint("Downloading tarball for %s@%s" %
-                                 (spec["package"], spec["version"]), min_interval=5.0)
-        progress("[0%%] Starting download of %s", tarball)   # initialise progress bar
         # Create containing directory locally. (exist_ok= is python3-specific.)
         os.makedirs(os.path.join(self.workdir, store_path), exist_ok=True)
         meta = self.s3.head_object(Bucket=self.remoteStore, Key=tarball)
+        fetch_key = tarball
+        redirect = meta.get("WebsiteRedirectLocation")
+        if redirect:
+          fetch_key = redirect.lstrip("/")
+          debug("Store object %s redirects to CAS blob %s; fetching that",
+                tarball, fetch_key)
+          meta = self.s3.head_object(Bucket=self.remoteStore, Key=fetch_key)
         total_size = int(meta.get("ContentLength", 0))
+        debug("Downloading tarball for %s@%s: %s (%d MB)", spec["package"],
+              spec["version"], tarball, total_size >> 20)
+        # boto3 invokes Callback with the per-chunk *delta*, not the cumulative
+        # total; byte_progress accumulates it (a raw delta looks stuck at 256 KB).
         self.s3.download_file(
-          Bucket=self.remoteStore, Key=tarball,
+          Bucket=self.remoteStore, Key=fetch_key,
           Filename=os.path.join(self.workdir, store_path, os.path.basename(tarball)),
-          Callback=lambda num_bytes: progress("[%d/%d] bytes transferred", num_bytes, total_size),
-        )
-        progress.end("done")
+          Callback=byte_progress("download %s@%s" % (spec["package"], spec["version"]),
+                                 total_size))
         return
 
     debug("Remote has no tarballs for %s with hashes %s", spec["package"],
@@ -733,5 +747,10 @@ class Boto3RemoteSync:
     debug("Uploaded %d dist symlinks in %.2f seconds",
           total_symlinks, end_time - start_time)
 
+    self._upload_tarball(spec, tar_path)
+
+  def _upload_tarball(self, spec, tar_path) -> None:
+    """Upload the tarball bytes to the remote store under tar_path.
+    """
     self.s3.upload_file(Bucket=self.writeStore, Key=tar_path,
                         Filename=os.path.join(self.workdir, tar_path))
