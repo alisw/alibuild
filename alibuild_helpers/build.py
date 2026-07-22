@@ -493,11 +493,18 @@ def doBuild(args, parser):
     scm = Sapling()
   else:
     scm = Git()
+  # ALIBUILD_ALIDIST_HASH is provenance only (recorded in the AC entry and logged;
+  # it is NOT part of the action hash). Normally it is the alidist checkout's
+  # commit. A caller that has the recipes without an SCM checkout -- e.g.
+  # the upcoming `aliBuild reconstruct`, which materialises archived recipes into a plain
+  # directory -- can instead pre-set it in the environment; we honour that only
+  # when there is genuinely no checkout to read (an SCMError below).
   try:
-    checkedOutCommitName = scm.checkedOutCommitName(directory=args.configDir)
+    os.environ["ALIBUILD_ALIDIST_HASH"] = scm.checkedOutCommitName(directory=args.configDir)
   except SCMError:
-    dieOnError(True, "Cannot find SCM directory in %s." % args.configDir)
-  os.environ["ALIBUILD_ALIDIST_HASH"] = checkedOutCommitName
+    dieOnError("ALIBUILD_ALIDIST_HASH" not in os.environ,
+               "Cannot find SCM directory in %s. If the recipes are not a checkout, "
+               "set ALIBUILD_ALIDIST_HASH." % args.configDir)
 
   debug("Building for architecture %s", args.architecture)
   debug("Number of parallel builds: %d", args.jobs)

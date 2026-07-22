@@ -458,5 +458,52 @@ class BuildTestCase(unittest.TestCase):
                       "unescaped '%%' that should be '%%%%'): %s" % exc)
 
 
+class AlidistHashFallbackTestCase(unittest.TestCase):
+    """doBuild honours a pre-set ALIBUILD_ALIDIST_HASH when there is no SCM
+    checkout to read (the `aliBuild reconstruct` path), and still dies otherwise.
+    Only the ALIBUILD_ALIDIST_HASH block is exercised: install_wrapper_script,
+    which runs just after it, raises _Bound to stop doBuild there."""
+
+    class _Bound(Exception):
+        """Marker: doBuild reached just past the ALIBUILD_ALIDIST_HASH block."""
+
+    def _run_reaching_scm_block(self):
+        from alibuild_helpers.scm import SCMError
+        from alibuild_helpers.git import Git
+        args = Namespace(
+            remoteStore="", writeStore="", architecture=TEST_ARCHITECTURE,
+            docker=False, dockerImage=None, workDir="/sw", pkgname=["zlib"],
+            configDir="/no-such-alidist", disable=[], defaults="release", jobs=2,
+        )
+        with patch("alibuild_helpers.build.exists", new=MagicMock(return_value=True)), \
+             patch("alibuild_helpers.build.pruneWorkdirFromPaths", new=MagicMock()), \
+             patch("alibuild_helpers.build.makedirs", new=MagicMock()), \
+             patch("alibuild_helpers.build.git",
+                   new=MagicMock(return_value=("", "refs/heads/master"))), \
+             patch("alibuild_helpers.build.parseDefaults",
+                   new=MagicMock(return_value=(None, {}, {}))), \
+             patch.object(Git, "checkedOutCommitName",
+                          side_effect=SCMError("no checkout")), \
+             patch("alibuild_helpers.build.install_wrapper_script",
+                   side_effect=self._Bound()):
+            doBuild(args, MagicMock())
+
+    def test_preset_hash_is_honoured_without_checkout(self) -> None:
+        """A pre-set value survives when checkedOutCommitName raises (no die)."""
+        os.environ["ALIBUILD_ALIDIST_HASH"] = "preset123"
+        try:
+            with self.assertRaises(self._Bound):
+                self._run_reaching_scm_block()
+            self.assertEqual(os.environ["ALIBUILD_ALIDIST_HASH"], "preset123")
+        finally:
+            os.environ.pop("ALIBUILD_ALIDIST_HASH", None)
+
+    def test_missing_hash_without_checkout_dies(self) -> None:
+        """With no checkout and nothing pre-set, doBuild still dies (old behaviour)."""
+        os.environ.pop("ALIBUILD_ALIDIST_HASH", None)
+        with self.assertRaises(SystemExit):
+            self._run_reaching_scm_block()
+
+
 if __name__ == '__main__':
     unittest.main()
