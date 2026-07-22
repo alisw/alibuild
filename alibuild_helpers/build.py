@@ -517,7 +517,7 @@ def doBuild(args, parser):
       with tempfile.TemporaryDirectory(prefix=f"alibuild_prefer_check_{pkg['package']}_") as temp_dir:
         return getstatusoutput_container(cmd, cwd=temp_dir)
 
-    systemPackages, ownPackages, failed, validDefaults = \
+    systemPackages, ownPackages, failed, validDefaults, systemPackageSpecs = \
       getPackageList(packages                = packages,
                      specs                   = specs,
                      configDir               = args.configDir,

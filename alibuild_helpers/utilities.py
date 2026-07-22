@@ -423,6 +423,10 @@ def parseRecipe(reader):
     header,recipe = d.split("---", 1)
     spec = yamlLoad(header)
     validateSpec(spec)
+    # Retain the full recipe text (header + body) so it can be archived in the
+    # CAS and used to reconstruct the build later. spec["recipe"] (set by the
+    # caller) is only the build body; the header fields are parsed out of it.
+    spec["fullRecipe"] = d
   except RuntimeError as e:
     err = str(e)
   except OSError as e:
@@ -489,6 +493,14 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
   systemPackages = set()
   ownPackages = set()
   failedRequirements = set()
+  # Specs of packages satisfied from the system -- both prefer_system packages
+  # taken from the host and system_requirement packages (make, yacc-like, ...)
+  # whose check passes. These produce no tarball but ARE actions: their check
+  # must run to validate the build host. Captured here (regardless of --no-system,
+  # since a required system tool must be validated even when everything else is
+  # built) so the reapi backend can record them as validate-system AC entries and
+  # dependents can reference them. Keyed by package name -> its (full) spec.
+  systemPackageSpecs = {}
   testCache = {}
   requirementsCache = {}
   trackingEnvCache = {}
@@ -597,6 +609,7 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
           # No replacement spec name given. Fall back to old system package
           # behaviour and just disable the package.
           systemPackages.add(spec["package"])
+          systemPackageSpecs[spec["package"]] = spec
           disable.append(spec["package"])
         elif match:
           # The check printed the name of a replacement; use it.
@@ -627,6 +640,7 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
               ownPackages.add(spec["package"])
             else:
               systemPackages.add(spec["package"])
+              systemPackageSpecs[spec["package"]] = spec
           else:
             warning(f"Could not find named replacement spec for {spec['package']}: {key}, "
                     "falling back to building the package ourselves.")
@@ -643,7 +657,11 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
         failedRequirements.update([spec["package"]])
         spec["version"] = "failed"
       else:
+        # A satisfied system_requirement (make, yacc-like, ...): disabled from the
+        # build (it has no recipe body), but recorded as a validate-system action
+        # so reconstruct can materialise its recipe and re-run the check.
         disable.append(spec["package"])
+        systemPackageSpecs[spec["package"]] = spec
 
     spec["disabled"] = list(disable)
     if spec["package"] in disable:
@@ -662,6 +680,10 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
     spec["disabled"] += [x for x in fn("requires")]
     spec["disabled"] += [x for x in fn("build_requires")]
     fn = lambda what: filterByArchitectureDefaults(architecture, defaults, spec.get(what, []))
+    # The arch-filtered requires *before* system/disabled ones are removed, so we
+    # can recover which of this package's dependencies are system actions once the
+    # full system set is known (a system dep may be resolved after its dependent).
+    spec["arch_requires"] = list(fn("requires")) + list(fn("build_requires"))
     spec["requires"] = [x for x in fn("requires") if x not in disable]
     spec["build_requires"] = [x for x in fn("build_requires") if x not in disable]
     if spec["package"] != "defaults-release":
@@ -678,7 +700,17 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
       spec["force_rebuild"] = True
     specs[spec["package"]] = spec
     packages += spec["requires"]
-  return (systemPackages, ownPackages, failedRequirements, validDefaults)
+
+  # Now that every package is resolved, record for each built package which of its
+  # (arch-filtered) dependencies turned out to be system actions. These are dropped
+  # from spec["requires"] (they are not built), but the reapi backend records them
+  # in the AC entry's deps so reconstruct can walk to their validate-system entry,
+  # materialise the recipe and re-run the check on the host.
+  for spec in specs.values():
+    spec["system_requires"] = sorted({r for r in spec.get("arch_requires", [])
+                                      if r in systemPackageSpecs})
+  return (systemPackages, ownPackages, failedRequirements, validDefaults,
+          systemPackageSpecs)
 
 
 class Hasher:
