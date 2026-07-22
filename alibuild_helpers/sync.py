@@ -85,6 +85,7 @@ class HttpRemoteSync:
           reportTime = time.time()
           result = []
 
+          destFp = None
           try:
             destFp = open(dest+".tmp", "wb") if dest else None
             for chunk in filter(bool, resp.iter_content(chunk_size=32768)):
@@ -344,7 +345,7 @@ class CVMFSRemoteSync:
     os.makedirs(os.path.join(self.workdir, links_path), exist_ok=True)
 
     cvmfs_architecture = re.sub(r"slc(\d+)_x86-64", r"el\1-x86_64", self.architecture)
-    err = execute("""\
+    _ = execute("""\
     set -x
     # Exit without error in case we do not have any package published
     test -d "{remote_store}/{cvmfs_architecture}/Packages/{package}" || exit 0
@@ -359,9 +360,9 @@ class CVMFSRemoteSync:
       ln -sf ../../{architecture}/store/${{pkg_hash:0:2}}/$pkg_hash/$tarball "{workDir}/{links_path}/$tarball"
       # Create the dummy tarball, if it does not exists
       test -f "{workDir}/{architecture}/store/${{pkg_hash:0:2}}/$pkg_hash/$tarball" && continue
-      mkdir -p "{workDir}/INSTALLROOT/$pkg_hash/{architecture}/{package}"
-      find "{remote_store}/{cvmfs_architecture}/Packages/{package}/$full_version" -mindepth 1 -maxdepth 1 ! -name etc -exec ln -sf {{}} "{workDir}/INSTALLROOT/$pkg_hash/{architecture}/{package}/" \\;
-      cp -fr "{remote_store}/{cvmfs_architecture}/Packages/{package}/$full_version/etc" "{workDir}/INSTALLROOT/$pkg_hash/{architecture}/{package}/etc"
+      mkdir -p "{workDir}/INSTALLROOT/$pkg_hash/{architecture}/{package}/$full_version"
+      find "{remote_store}/{cvmfs_architecture}/Packages/{package}/$full_version" -mindepth 1 -maxdepth 1 ! -name etc -exec ln -sf {{}} "{workDir}/INSTALLROOT/$pkg_hash/{architecture}/{package}/$full_version/" \\;
+      cp -fr "{remote_store}/{cvmfs_architecture}/Packages/{package}/$full_version/etc" "{workDir}/INSTALLROOT/$pkg_hash/{architecture}/{package}/$full_version/etc"
       mkdir -p "{workDir}/TARS/{architecture}/store/${{pkg_hash:0:2}}/$pkg_hash"
       tar -C "{workDir}/INSTALLROOT/$pkg_hash" -czf "{workDir}/TARS/{architecture}/store/${{pkg_hash:0:2}}/$pkg_hash/$tarball" .
       rm -rf "{workDir}/INSTALLROOT/$pkg_hash"
