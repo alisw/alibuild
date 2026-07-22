@@ -9,7 +9,13 @@ GIT_COMMAND_TIMEOUT_SEC = 120
 
 GIT_CMD_TIMEOUTS = {
   "clone": 600,
-  "checkout": 600
+  "checkout": 600,
+  # Fetching and bundling a source snapshot can move a whole repository's history
+  # (a first base bundle for a large package -- e.g. onnxruntime -- packs the
+  # entire history), which far exceeds the 120s default. Default to 30 min and
+  # allow tuning for monster repos via the environment, without a code change.
+  "fetch": int(os.environ.get("ALIBUILD_GIT_FETCH_TIMEOUT", "1800")),
+  "bundle": int(os.environ.get("ALIBUILD_GIT_BUNDLE_TIMEOUT", "1800")),
 }
 """Customised timeout for some commands."""
 
@@ -80,7 +86,7 @@ class Git(SCM):
     return line.startswith("?? ")
 
 
-def git(args, directory=".", check=True, prompt=True):
+def git(args, directory=".", check=True, prompt=True, timeout=None):
   baseGitOverride = int(os.environ.get("GIT_CONFIG_COUNT", "0"))
   debug("Executing git %s (in directory %s)", " ".join(args), directory)
   # Force core.fsmonitor off: a global core.fsmonitor=true hangs git on a
@@ -110,7 +116,8 @@ def git(args, directory=".", check=True, prompt=True):
     prompt_var="GIT_TERMINAL_PROMPT=0" if not prompt else "",
     config_count=baseGitOverride + len(gitConfigOverrides),
     config_vars=gitConfigVars,
-  ), timeout=GIT_CMD_TIMEOUTS.get(args[0] if len(args) else "*", GIT_COMMAND_TIMEOUT_SEC))
+  ), timeout=timeout if timeout is not None else
+     GIT_CMD_TIMEOUTS.get(args[0] if len(args) else "*", GIT_COMMAND_TIMEOUT_SEC))
   if check and err != 0:
     raise SCMError("Error {} from git {}: {}".format(err, " ".join(args), output))
   return output if check else (err, output)
