@@ -88,6 +88,23 @@ RECIPES = {
       exit 1
     ---
     """),
+    # A system_requirement (like make): satisfied on the host, so it is disabled
+    # from the build but recorded as a validate-system action. Must have no body.
+    "CONFIG_DIR/make-like.sh": dedent("""\
+    package: make-like
+    version: v1
+    system_requirement: 'ARCH'
+    system_requirement_check: 'true'
+    ---
+    """),
+    # A normal package depending on the system_requirement above.
+    "CONFIG_DIR/needs-make.sh": dedent("""\
+    package: needs-make
+    version: v1
+    requires:
+        - make-like
+    ---
+    """),
 }
 
 class MockReader:
@@ -142,7 +159,7 @@ class ReplacementTestCase(unittest.TestCase):
         def fake_exists(n):
             return n in RECIPES.keys()
         with patch.object(os.path, "exists", fake_exists):
-            specs, systemPkgs, ownPkgs, failedReqs, validDefaults = \
+            specs, systemPkgs, ownPkgs, failedReqs, validDefaults, systemSpecs = \
                 getPackageListWithDefaults(["disable"])
             self.assertIn("disable", systemPkgs)
             self.assertNotIn("disable", ownPkgs)
@@ -157,7 +174,7 @@ class ReplacementTestCase(unittest.TestCase):
         def fake_exists(n):
             return n in RECIPES.keys()
         with patch.object(os.path, "exists", fake_exists):
-            specs, systemPkgs, ownPkgs, failedReqs, validDefaults = \
+            specs, systemPkgs, ownPkgs, failedReqs, validDefaults, systemSpecs = \
                 getPackageListWithDefaults(["with-replacement"])
             self.assertIn("with-replacement", specs)
             self.assertEqual(specs["with-replacement"]["env"]["SENTINEL_VAR"], "magic")
@@ -177,7 +194,7 @@ class ReplacementTestCase(unittest.TestCase):
         def fake_exists(n):
             return n in RECIPES.keys()
         with patch.object(os.path, "exists", fake_exists):
-            specs, systemPkgs, ownPkgs, failedReqs, validDefaults = \
+            specs, systemPkgs, ownPkgs, failedReqs, validDefaults, systemSpecs = \
                 getPackageListWithDefaults(["with-replacement-recipe"])
             self.assertIn("with-replacement-recipe", specs)
             self.assertIn("recipe", specs["with-replacement-recipe"])
@@ -200,7 +217,7 @@ class ReplacementTestCase(unittest.TestCase):
                 if warning_msg in str(msg):
                     warning_exists = True
             mock_warning.side_effect = side_effect
-            specs, systemPkgs, ownPkgs, failedReqs, validDefaults = \
+            specs, systemPkgs, ownPkgs, failedReqs, validDefaults, systemSpecs = \
                 getPackageListWithDefaults(["missing-spec"])
             self.assertTrue(warning_exists)
 
@@ -223,7 +240,7 @@ class ForceRebuildTestCase(unittest.TestCase):
         def fake_exists(n):
             return n in RECIPES.keys()
         with patch.object(os.path, "exists", fake_exists):
-            specs, _, _, _, _ = getPackageListWithDefaults(["force-rebuild"])
+            specs, _, _, _, _, _ = getPackageListWithDefaults(["force-rebuild"])
             self.assertTrue(specs["force-rebuild"]["force_rebuild"])
             self.assertFalse(specs["defaults-release"]["force_rebuild"])
 
@@ -232,7 +249,7 @@ class ForceRebuildTestCase(unittest.TestCase):
         def fake_exists(n):
             return n in RECIPES.keys()
         with patch.object(os.path, "exists", fake_exists):
-            specs, _, _, _, _ = getPackageListWithDefaults(
+            specs, _, _, _, _, _ = getPackageListWithDefaults(
                 ["force-rebuild"], force_rebuild=["defaults-release", "force-rebuild"],
             )
             self.assertTrue(specs["force-rebuild"]["force_rebuild"])
@@ -255,10 +272,43 @@ class Issue880TestCase(unittest.TestCase):
             with patch.object(os.path, "exists", fake_exists):
                 pruneWorkdirFromPaths("/fake/workdir")
                 self.assertIn("GENFIT_VERSION", os.environ)
-                _, systemPkgs, ownPkgs, _, _ = getPackageListWithDefaults(["version-check"])
+                _, systemPkgs, ownPkgs, _, _, _ = getPackageListWithDefaults(["version-check"])
                 self.assertIn("version-check", systemPkgs)
         finally:
             os.environ.pop("GENFIT_VERSION", None)
+
+
+@mock.patch("alibuild_helpers.utilities.getRecipeReader", new=MockReader)
+class SystemActionTestCase(unittest.TestCase):
+    """getPackageList outputs the reapi backend builds on: parseRecipe keeps the
+    verbatim recipe text, and a satisfied system_requirement becomes a
+    validate-system action recorded on itself and referenced by its dependents."""
+
+    def test_parse_recipe_keeps_full_recipe(self) -> None:
+        """parseRecipe stores the whole document (header + body) as fullRecipe,
+        distinct from spec["recipe"], which is only the build body."""
+        from alibuild_helpers.utilities import parseRecipe
+        text = "package: foo\nversion: v1\n---\necho building foo\n"
+        err, spec, recipe = parseRecipe(lambda: text)
+        self.assertIsNone(err)
+        self.assertEqual(spec["fullRecipe"], text)
+        self.assertEqual(recipe, "\necho building foo\n")
+        self.assertNotEqual(spec["fullRecipe"], recipe)
+
+    def test_system_requirement_recorded_and_referenced(self) -> None:
+        """A satisfied system_requirement is captured in systemPackageSpecs (no
+        tarball is built for it) and listed in its dependent's system_requires --
+        the validate-system link the reapi backend records in the AC entry."""
+        def fake_exists(n):
+            return n in RECIPES.keys()
+        with patch.object(os.path, "exists", fake_exists):
+            specs, systemPkgs, ownPkgs, failedReqs, validDefaults, systemSpecs = \
+                getPackageListWithDefaults(["needs-make"])
+            # Recorded as a system action, but disabled -> not built into a tarball.
+            self.assertIn("make-like", systemSpecs)
+            self.assertNotIn("make-like", specs)
+            # Its dependent references it as a system dependency.
+            self.assertEqual(specs["needs-make"]["system_requires"], ["make-like"])
 
 
 if __name__ == '__main__':

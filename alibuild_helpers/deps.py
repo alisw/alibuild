@@ -19,7 +19,7 @@ def doDeps(args, parser):
     def performCheck(pkg, cmd):
       return getstatusoutput_docker(cmd)
     
-    systemPackages, ownPackages, failed, validDefaults = \
+    systemPackages, ownPackages, failed, validDefaults, _systemSpecs = \
       getPackageList(packages                = [args.package],
                      specs                   = specs,
                      configDir               = args.configDir,
