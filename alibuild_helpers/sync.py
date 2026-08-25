@@ -91,8 +91,15 @@ class HttpRemoteSync:
             target = resp.headers.get("x-amz-website-redirect-location")
             if target:
               resp.close()
-              url = quote("/".join((redirect_base.rstrip("/"), target.lstrip("/"))),
-                          safe=":/")
+              # An ABSOLUTE target is used as-is. That is what lets the legacy
+              # links live in one bucket while the CAS blobs live in another:
+              # a relative "/cas/..." resolves against whatever store we are
+              # reading from, which would be the wrong bucket. Relative targets
+              # keep working exactly as before, so single-bucket stores and
+              # everything written before this are unaffected.
+              url = (quote(target, safe=":/") if target.startswith(("http://", "https://"))
+                     else quote("/".join((redirect_base.rstrip("/"), target.lstrip("/"))),
+                                safe=":/"))
               debug("Following store redirect to %s", url)
               resp = get(url, stream=True, verify=not self.insecure,
                          timeout=self.httpTimeoutSec)

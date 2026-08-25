@@ -174,6 +174,44 @@ class SyncTestCase(unittest.TestCase):
         self.assertIn("%s/%s" % (store, cas), requested,
                       "the redirect was not followed: %s" % requested)
 
+    @patch("alibuild_helpers.sync.open", new=lambda fn, mode: BytesIO())
+    @patch("os.path.isfile", new=MagicMock(return_value=False))
+    @patch("os.rename", new=MagicMock(return_value=None))
+    @patch("os.makedirs", new=MagicMock(return_value=None))
+    @patch("os.listdir", new=MagicMock(return_value=[]))
+    @patch("alibuild_helpers.sync.symlink", new=MagicMock(return_value=None))
+    @patch("requests.Session.get")
+    def test_http_follows_absolute_store_redirect(self, mock_get):
+        """An absolute redirect target is used as given, not joined onto the store.
+
+        That is what lets the legacy TARS/ tree live in one bucket while the CAS
+        blobs live in another: joining an absolute URL onto the store being read
+        would produce .../<store>/https:/<host>/... and 404 mid-download.
+        """
+        store = "https://localhost/legacy"
+        elsewhere = "https://localhost/cas-bucket/cas/sha256/de/deadbeef"
+        requested = []
+
+        def get(url, *args, **kw):
+            requested.append(url)
+            if url.endswith(tarball_name(GOOD_SPEC)) and "/store/" in url:
+                return MockRequest([{"name": tarball_name(GOOD_SPEC)}],
+                                   redirect=elsewhere)
+            if url == elsewhere:
+                return MockRequest([{"name": tarball_name(GOOD_SPEC)}])
+            return self.mock_get(url, *args, **kw)
+
+        mock_get.side_effect = get
+        syncer = sync.HttpRemoteSync(remoteStore=store, architecture=ARCHITECTURE,
+                                     workdir="/sw", insecure=False)
+        syncer.httpBackoff = 0
+        syncer.fetch_tarball(GOOD_SPEC)
+
+        self.assertIn(elsewhere, requested,
+                      "the absolute redirect was not followed as-is: %s" % requested)
+        self.assertFalse([u for u in requested if u.startswith(store + "/https")],
+                         "the absolute target was joined onto the store: %s" % requested)
+
     def test_s3cmd_follows_store_redirect(self):
         """s3cmd cannot see the redirect header, so the stub is spotted by content."""
         commands = []
