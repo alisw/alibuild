@@ -146,6 +146,41 @@ def dummy_git(args, directory=".", check=True, prompt=True):
 TIMES_ASKED = {}
 
 
+def make_doBuild_args(**overrides):
+    """Return a Namespace with standard doBuild arguments for tests."""
+    defaults = dict(
+        remoteStore="",
+        writeStore="",
+        referenceSources="/sw/MIRROR",
+        docker=False,
+        dockerImage=None,
+        docker_extra_args=["--network=host"],
+        architecture=TEST_ARCHITECTURE,
+        workDir="/sw",
+        pkgname=["root"],
+        configDir="/alidist",
+        disable=[],
+        force_rebuild=[],
+        defaults="release",
+        jobs=2,
+        annotate={},
+        preferSystem=[],
+        noSystem=None,
+        debug=True,
+        dryRun=False,
+        aggressiveCleanup=False,
+        environment=[],
+        autoCleanup=False,
+        noDevel=[],
+        onlyDeps=False,
+        fetchRepos=False,
+        forceTracked=False,
+        plugin="legacy",
+    )
+    defaults.update(overrides)
+    return Namespace(**defaults)
+
+
 def dummy_open(x, mode="r", encoding=None, errors=None):
     if x.endswith("/fetch-log.txt") and mode == "w":
         return MagicMock(__enter__=lambda _: StringIO())
@@ -266,35 +301,7 @@ class BuildTestCase(unittest.TestCase):
         os.environ["ALIBUILD_NO_ANALYTICS"] = "1"
 
         mock_parser = MagicMock()
-        args = Namespace(
-            remoteStore="",
-            writeStore="",
-            referenceSources="/sw/MIRROR",
-            docker=False,
-            dockerImage=None,
-            docker_extra_args=["--network=host"],
-            architecture=TEST_ARCHITECTURE,
-            workDir="/sw",
-            pkgname=["root"],
-            configDir="/alidist",
-            disable=[],
-            force_rebuild=[],
-            defaults="release",
-            jobs=2,
-            annotate={},
-            preferSystem=[],
-            noSystem=None,
-            debug=True,
-            dryRun=False,
-            aggressiveCleanup=False,
-            environment=[],
-            autoCleanup=False,
-            noDevel=[],
-            onlyDeps=False,
-            fetchRepos=False,
-            forceTracked=False,
-            plugin="legacy"
-        )
+        args = make_doBuild_args()
 
         def mkcall(args):
             cmd, directory, check = args
@@ -399,6 +406,81 @@ class BuildTestCase(unittest.TestCase):
         self.assertEqual(len(extra["local_hashes"]), 3)
         self.assertEqual(len(extra["remote_hashes"]), 3)
         self.assertEqual(extra["local_hashes"][0], TEST_EXTRA_BUILD_HASH)
+
+    @patch("alibuild_helpers.analytics", new=MagicMock())
+    @patch("requests.Session.get", new=MagicMock())
+    @patch("alibuild_helpers.sync.execute", new=dummy_execute)
+    @patch("alibuild_helpers.git.git")
+    @patch("alibuild_helpers.build.exists", new=MagicMock(side_effect=dummy_exists))
+    @patch("os.path.exists", new=MagicMock(side_effect=dummy_exists))
+    @patch("alibuild_helpers.utilities.dieOnError", new=MagicMock())
+    @patch("alibuild_helpers.utilities.warning")
+    @patch("alibuild_helpers.build.readDefaults",
+           new=MagicMock(return_value=(OrderedDict({"package": "defaults-release", "disable": []}), "")))
+    @patch("shutil.rmtree", new=MagicMock(return_value=None))
+    @patch("os.makedirs", new=MagicMock(return_value=None))
+    @patch("alibuild_helpers.build.makedirs", new=MagicMock(return_value=None))
+    @patch("alibuild_helpers.build.symlink", new=MagicMock(return_value=None))
+    @patch("alibuild_helpers.workarea.symlink", new=MagicMock(return_value=None))
+    @patch("alibuild_helpers.utilities.open", new=lambda x: {
+        "/alidist/root.sh": StringIO(TEST_ROOT_RECIPE),
+        "/alidist/zlib.sh": StringIO(TEST_ZLIB_RECIPE),
+        "/alidist/defaults-release.sh": StringIO(TEST_DEFAULT_RELEASE)
+    }[x])
+    @patch("alibuild_helpers.sync.open", new=MagicMock(side_effect=dummy_open))
+    @patch("alibuild_helpers.build.open", new=MagicMock(side_effect=dummy_open))
+    @patch("codecs.open", new=MagicMock(side_effect=dummy_open))
+    @patch("alibuild_helpers.build.shutil", new=MagicMock())
+    @patch("os.listdir")
+    @patch("alibuild_helpers.build.glob", new=lambda pattern: {
+        # Simulate a local checkout named "root" (lowercase) — wrong case for package "ROOT"
+        "*": ["root"],
+        f"/sw/TARS/{TEST_ARCHITECTURE}/store/{TEST_DEFAULT_RELEASE_BUILD_HASH[:2]}/{TEST_DEFAULT_RELEASE_BUILD_HASH}/*gz": [],
+        f"/sw/TARS/{TEST_ARCHITECTURE}/store/{TEST_ZLIB_BUILD_HASH[:2]}/{TEST_ZLIB_BUILD_HASH}/*gz": [],
+        f"/sw/TARS/{TEST_ARCHITECTURE}/store/{TEST_ROOT_BUILD_HASH[:2]}/{TEST_ROOT_BUILD_HASH}/*gz": [],
+        f"/sw/TARS/{TEST_ARCHITECTURE}/defaults-release/defaults-release-v1-1.{TEST_ARCHITECTURE}.tar.gz":
+        [f"../../{TEST_ARCHITECTURE}/store/{TEST_DEFAULT_RELEASE_BUILD_HASH[:2]}/{TEST_DEFAULT_RELEASE_BUILD_HASH}/defaults-release-v1-1.{TEST_ARCHITECTURE}.tar.gz"],
+    }[pattern])
+    @patch("os.path.isdir", new=lambda x: x == "root")
+    @patch("alibuild_helpers.build.readlink", new=dummy_readlink)
+    @patch("alibuild_helpers.build.banner", new=MagicMock(return_value=None))
+    @patch("alibuild_helpers.build.debug")
+    @patch("alibuild_helpers.workarea.is_writeable", new=MagicMock(return_value=True))
+    @patch("alibuild_helpers.build.basename", new=os.path.basename)
+    @patch("alibuild_helpers.build.install_wrapper_script", new=MagicMock())
+    @patch("alibuild_helpers.build.dieOnError")
+    def test_misspelled_checkout_directory(self, mock_die, mock_debug, mock_listdir,
+                                           mock_warning, mock_git_git) -> None:
+        """dieOnError should be called with a correction hint when a local
+        checkout directory has the wrong capitalisation (e.g. 'root' vs 'ROOT')."""
+        mock_git_git.side_effect = dummy_git
+        mock_debug.side_effect = lambda *args: None
+        mock_warning.side_effect = lambda *args: None
+        mock_listdir.side_effect = lambda directory: {
+            f"/sw/TARS/{TEST_ARCHITECTURE}/defaults-release": [f"defaults-release-v1-1.{TEST_ARCHITECTURE}.tar.gz"],
+            f"/sw/TARS/{TEST_ARCHITECTURE}/zlib": [],
+            f"/sw/TARS/{TEST_ARCHITECTURE}/ROOT": [],
+        }.get(directory, DEFAULT)
+        os.environ["ALIBUILD_NO_ANALYTICS"] = "1"
+
+        # Make dieOnError a no-op so doBuild can proceed past the check;
+        # we only care that it was called with the right arguments.
+        mock_die.return_value = None
+
+        mock_parser = MagicMock()
+        args = make_doBuild_args()
+
+        doBuild(args, mock_parser)
+
+        # dieOnError must have been called at least once for the misspelling
+        misspelling_calls = [
+            c for c in mock_die.call_args_list
+            if c.args[0]  # condition is truthy
+            and "root -> ROOT" in c.args[1]
+        ]
+        self.assertTrue(misspelling_calls,
+                        "Expected dieOnError to be called about 'root -> ROOT' renaming, "
+                        f"but got calls: {mock_die.call_args_list}")
 
     def test_initdotsh(self) -> None:
         """Sanity-check the generated init.sh for a few variables."""
