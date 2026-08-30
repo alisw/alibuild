@@ -53,7 +53,7 @@ alibuild_helpers = ['build_template.sh', 'completions/*.sh']
 
 [tool.setuptools.packages.find]
 where = ["."]
-exclude = ["yaml"]
+exclude = ["debian", "docs", "docs.*", "templates", "tests", "tests.*"]
 
 [tool.setuptools.dynamic]
 readme = {file = ["README.rst"]}
