@@ -17,6 +17,8 @@ from alibuild_helpers.git import Git, git
 from alibuild_helpers.sl import Sapling
 from alibuild_helpers.scm import SCMError
 from alibuild_helpers.sync import remote_from_url
+from alibuild_helpers.sync_reapi import REAPIRemoteSync, signature_checker
+from alibuild_helpers.source import GitSourceStore, store_refs
 from alibuild_helpers.workarea import logged_scm, updateReferenceRepoSpec, checkout_sources
 from alibuild_helpers.log import ProgressPrint, log_current_package
 from glob import glob
@@ -25,6 +27,7 @@ from shlex import quote
 import tempfile
 
 import concurrent.futures
+import hashlib
 import importlib
 import json
 import socket
@@ -110,6 +113,241 @@ def update_git_repos(args, specs, buildOrder):
 
 # Creates a directory in the store which contains symlinks to the package
 # and its direct / indirect dependencies
+def build_ac_entry(spec, specs, architecture, container=None, source_artifact=None,
+                   refs_artifact=None, system_specs=None):
+  """Assemble the Action Cache (AC) entry for a freshly built package.
+
+  The entry records what produced the tarball -- the full recipe, git commit,
+  source, dependency action hashes, build environment and (if any) the build
+  container -- so that the content-addressed store (CAS) can later be
+  reconstructed from the (small) action cache, and so that a package can be
+  installed from its runtime closure without a build. See REMOTE_STORE_CAS_AC.md.
+
+  `container` is an optional dict describing the build container (image
+  reference + immutable digest); None for native builds.
+
+  The action hash is spec["remote_revision_hash"]; this entry is keyed by it.
+  Dependencies are referenced by their *action* hash (specs[dep]["hash"]), which
+  is what the action hash itself folds in (see storeHashes()), so the recorded
+  DAG matches the hash and is independent of whether builds are byte-reproducible.
+
+  result.outputDigest / result.size are filled in by the remote backend at
+  upload time, once the tarball bytes exist and have been hashed.
+  """
+  # Resolve the real git commit and the tag aliases pointing at it, mirroring
+  # storeHashes() so the recorded provenance matches the computed action hash.
+  scm_refs = spec.get("scm_refs", {})
+  real_commit_hash = scm_refs.get("refs/tags/" + spec["commit_hash"],
+                                  spec["commit_hash"])
+  alt_refs = {ref[len("refs/tags/"):]: git_hash
+              for ref, git_hash in scm_refs.items()
+              if ref.startswith("refs/tags/") and git_hash == real_commit_hash}
+
+  def dep_refs(dep_names):
+    return [{"package": dep, "actionHash": specs[dep]["hash"]}
+            for dep in sorted(dep_names)]
+
+  # System dependencies (make, yacc-like, a prefer_system package taken from the
+  # host, ...) produce no tarball, so they are not in specs and not in build_requires;
+  # but they ARE validate-system actions. Reference them here -- by their recipe
+  # digest, matching their validate-system entry's action hash -- so reconstruct
+  # walks to them, materialises the recipe and re-runs the check on the host.
+  system_specs = system_specs or {}
+  def system_refs(dep_names):
+    return [{"package": dep, "actionHash": system_recipe_digest(system_specs[dep])}
+            for dep in sorted(dep_names) if dep in system_specs]
+
+  # Archive the full recipe (header + body), so the build can be reconstructed
+  # without an alidist checkout. spec["recipe"] is only the build body.
+  recipe_text = spec.get("fullRecipe") or spec.get("recipe") or ""
+  recipe_digest = hashlib.sha256(recipe_text.encode("utf-8", "ignore")).hexdigest()
+
+  return {
+    "schemaVersion": 2,
+    # Outside "action": provenance, not identity. Here rather than in the tarball
+    # because both vary independently of the action hash, which would make
+    # identical builds produce different bytes. Advisory: not covered by the
+    # signature.
+    "provenance": {
+      "alibuildVersion": __version__ or "unknown",
+      "alidistCommit": os.environ.get("ALIBUILD_ALIDIST_HASH", ""),
+    },
+    "action": {
+      "package": spec["package"],
+      "version": spec["version"],
+      "revision": spec["revision"],
+      "architecture": architecture,
+      "actionHash": spec["remote_revision_hash"],
+      "commit": {
+        "ref": spec["commit_hash"],
+        "commitHash": real_commit_hash,
+        "altRefs": alt_refs,
+      },
+      "source": spec.get("source"),
+      "tag": spec.get("tag"),
+      "recipeDigest": "sha256:" + recipe_digest,
+      "container": container,
+      "sourceArtifact": source_artifact,
+      "refsArtifact": refs_artifact,
+      "env": dict(spec.get("env") or {}),
+      "append_path": dict(spec.get("append_path") or {}),
+      "prepend_path": dict(spec.get("prepend_path") or {}),
+      "track_env": dict(spec.get("track_env") or {}),
+      "relocatePaths": sorted(spec.get("relocate_paths", [])),
+      "deps": dep_refs(spec.get("full_requires", [])) +
+              system_refs(spec.get("system_requires", [])),
+      "runtimeDeps": dep_refs(spec.get("full_runtime_requires", [])),
+      "depsHash": spec.get("deps_hash", ""),
+    },
+  }
+
+
+def system_recipe_digest(spec):
+  """The sha256 of a system package's full recipe. It is both the recipeDigest and
+  the *action hash* of the package's validate-system node: content-addressed, so a
+  dependent and the node itself compute the same value and the dependent's deps
+  reference resolves, and equal recipes (the same system tool required by many
+  packages) deduplicate to a single entry.
+
+  For a replaced package (prefer_system_replacement_specs) fullRecipe is the selected
+  replacement rendered as a recipe, so the digest covers what was adopted."""
+  recipe_text = spec.get("fullRecipe") or spec.get("recipe") or ""
+  return hashlib.sha256(recipe_text.encode("utf-8", "ignore")).hexdigest()
+
+
+def publish_validate_system_entries(syncHelper, systemPackageSpecs, specs,
+                                    architecture):
+  """Record validate-system actions for the system / prefer_system packages.
+
+  The Action Cache has to hold the full recipe closure: reconstruct materialises
+  these recipes (dependency resolution needs them) and re-validates the system
+  requirement on the target host, with no alidist checkout.
+
+  Written before the first package is uploaded, not after the build: packages are
+  published as they are built, and assert_deps_in_ledger refuses to publish one
+  whose dependencies are absent -- which every dependent of a system package is,
+  until these exist. Done once per run; the entries are keyed by recipe digest and
+  are the same for every dependent.
+  """
+  # A read-only store -- reconstruct's isolated rebuild, say -- writes nothing.
+  if not getattr(syncHelper, "writeStore", "") or \
+     getattr(syncHelper, "_validate_system_published", False):
+    return
+  for _, sysspec in sorted(systemPackageSpecs.items()):
+    recipe_text = sysspec.get("fullRecipe") or sysspec.get("recipe") or ""
+    syncHelper.put_ac_entry(build_validate_system_entry(sysspec, specs, architecture),
+                            recipe_text, sign=True)
+  syncHelper._validate_system_published = True
+
+
+def build_validate_system_entry(spec, specs, architecture):
+  """Assemble a 'validate-system' Action Cache entry for a satisfied system /
+  prefer_system package -- a closure node that produces no tarball. It archives the
+  recipe (with its system_requirement/prefer_system check) so reconstruct can
+  materialise it and re-validate on the target host. Keyed by the recipe digest (see
+  system_recipe_digest), which is what dependents reference in their deps."""
+  recipe_digest = system_recipe_digest(spec)
+  return {
+    "schemaVersion": 2,
+    "action": {
+      "kind": "validate-system",
+      "package": spec["package"],
+      "version": spec.get("version"),
+      "revision": spec.get("revision") or "1",
+      "architecture": architecture,
+      "actionHash": recipe_digest,
+      "recipeDigest": "sha256:" + recipe_digest,
+      # What this node validates, readable without fetching the recipe. Immutable:
+      # part of the recipe the entry is keyed by.
+      **{key: spec[key] for key in ("system_requirement_check", "prefer_system_check")
+         if spec.get(key)},
+      "deps": [],
+    },
+  }
+
+
+def snapshot_source(spec, syncHelper):
+  """Best-effort: archive the package's git source into the CAS so the build is
+  reconstructible without upstream git. Returns a source-artifact dict, or None
+  when not applicable (non-reapi store, devel/source-less package) or on any
+  failure -- source archival must never break a build. Snapshots from the reference
+  mirror (spec["reference"]); the bundler backfills a partial mirror first."""
+  if not isinstance(syncHelper, REAPIRemoteSync) or not getattr(syncHelper, "writeStore", ""):
+    return None
+  if spec.get("is_devel_pkg") or "source" not in spec or "reference" not in spec:
+    return None
+  # The source store is git-only for now; other SCMs (Sapling) skip cleanly and
+  # fall back to upstream at reconstruct time. See REMOTE_STORE_CAS_AC.md.
+  if not isinstance(spec.get("scm"), Git):
+    return None
+  try:
+    # Resolve the tag/branch label to a commit SHA. `git rev-parse <tag>^{commit}`
+    # needs the tag *ref* to exist in the local clone -- which it does for a normal
+    # build off a full mirror, but NOT for a reconstruct rebuild whose source is a
+    # restored working checkout (no tag refs). Prefer the archived ref map, then the
+    # commit actually checked out for this build, and only then rev-parse. snapshot()
+    # is idempotent per commit, so an already-archived source re-uploads nothing and
+    # its reference is preserved in the regenerated AC entry.
+    commit_hash = spec["commit_hash"]
+    scm_refs = spec.get("scm_refs") or {}
+    commit = (scm_refs.get("refs/tags/" + commit_hash) or
+              scm_refs.get("refs/heads/" + commit_hash))
+    if not commit:
+      try:
+        commit = spec["scm"].checkedOutCommitName(directory=spec["source"])
+      except SCMError:
+        commit = git(("rev-parse", commit_hash + "^{commit}"),
+                     directory=spec["reference"]).strip()
+    return GitSourceStore(syncHelper).snapshot(spec["reference"], spec["source"], commit)
+  except Exception as exc:   # pylint: disable=broad-except
+    warning("Could not snapshot source for %s, it will not be reconstructible "
+            "without upstream git: %s", spec["package"], exc)
+    return None
+
+
+def snapshot_refs(spec, syncHelper):
+  """Best-effort: archive the package's ref->commit mapping (scm_refs) into the
+  CAS, so tag resolution at reconstruct time needs no upstream `git ls-remote`.
+  Returns a refs-artifact dict or None. Gated like snapshot_source()."""
+  if not isinstance(syncHelper, REAPIRemoteSync) or not getattr(syncHelper, "writeStore", ""):
+    return None
+  if spec.get("is_devel_pkg") or not spec.get("scm_refs"):
+    return None
+  # apply_refs (reconstruct side) is git-only, so only archive refs for git.
+  if not isinstance(spec.get("scm"), Git):
+    return None
+  try:
+    return store_refs(syncHelper, spec.get("source"), spec["scm_refs"])
+  except Exception as exc:   # pylint: disable=broad-except
+    warning("Could not snapshot refs for %s: %s", spec["package"], exc)
+    return None
+
+
+def resolve_container_provenance(args):
+  """Best-effort capture of the build container for reproducibility: its
+  reference ("location") and immutable digest ("hash"). Returns None for native
+  (non-container) builds, and leaves digest None if it cannot be resolved."""
+  if not getattr(args, "docker", False) or not getattr(args, "dockerImage", None):
+    return None
+  image = args.dockerImage
+  provenance = {"runtime": None, "image": image, "digest": None}
+  # Prefer docker; fall back to Apple's "container" runtime.
+  for runtime in ("docker", "container"):
+    if getstatusoutput("command -v " + runtime)[0]:
+      continue
+    provenance["runtime"] = runtime
+    # RepoDigests carries the registry digest (repo@sha256:...); fall back to
+    # the local image Id (sha256:...) if the image was never pulled/pushed.
+    for fmt in ("{{index .RepoDigests 0}}", "{{.Id}}"):
+      err, out = getstatusoutput("%s image inspect --format %s %s" %
+                                 (runtime, quote(fmt), quote(image)))
+      if not err and "sha256:" in out:
+        provenance["digest"] = out.strip()
+        break
+    break
+  return provenance
+
+
 def createDistLinks(spec, specs, args, syncHelper, repoType, requiresType):
   # At the point we call this function, spec has a single, definitive hash.
   target_dir = "{work_dir}/TARS/{arch}/{repo}/{package}/{package}-{version}-{revision}" \
@@ -120,6 +358,90 @@ def createDistLinks(spec, specs, args, syncHelper, repoType, requiresType):
     dep_tarball = "../../../../../TARS/{arch}/store/{short_hash}/{hash}/{package}-{version}-{revision}.{arch}.tar.gz" \
       .format(arch=args.architecture, short_hash=specs[pkg]["hash"][:2], **specs[pkg])
     symlink(dep_tarball, target_dir)
+
+
+def report_plan(plan):
+  """Print what a build would do, one line per package, then a count.
+
+  The per-package lines go to STDOUT with print(), not through the logger, which
+  writes to stderr: the point of --plan is to be piped, and the reuse lines are
+  PACKAGE/VERSION-REVISION, exactly the spec `aliBuild migrate` takes. So
+
+      aliBuild build O2Suite --plan ... | awk '$1 == "reuse" { print $2 }'
+
+  is the list of things to migrate before a build can publish against a store
+  that does not have them yet. The summary stays on stderr so it cannot land in
+  the middle of that data.
+  """
+  for package, version_revision, pkg_hash, action in plan:
+    print("%s %s/%s %s" % (action, package, version_revision, pkg_hash))
+  reused = sum(1 for entry in plan if entry[3] == "reuse")
+  banner("plan: %d package(s): %d reused from the remote store, %d to build.",
+         len(plan), reused, len(plan) - reused)
+
+
+def bound_unpublished_rebuild(package, rebuilt, ac_store):
+  """Allow ONE rebuild of a package that is built locally but not published.
+
+  The publish check and the "is it published" check can disagree permanently.
+  upload_symlinks_and_tarball returns early when the tarball and its link are
+  already in the legacy store, while is_published() asks the Action Cache -- so a
+  package that exists only as a pre-2.0 legacy tarball is "already uploaded" and
+  "not published" at the same time, and rebuilding to fix it changes neither. The
+  loop that results is unbounded: observed as 1743 rebuilds of defaults-release
+  in 26 minutes, each one succeeding.
+
+  One rebuild is worth attempting, because the usual cause -- an interrupted run
+  that left the package here but unuploaded -- really is repaired by it. A second
+  visit means rebuilding is not the answer, so say what is: the tarball predates
+  the CAS/AC layout and has to be migrated into it.
+  """
+  dieOnError(package in rebuilt,
+             "%s is built locally but cannot be published to %s: rebuilding it "
+             "did not produce an Action Cache entry. Its tarball is almost "
+             "certainly a pre-2.0 legacy one, which upload_symlinks_and_tarball "
+             "adopts as already-uploaded without ever writing an AC entry, so no "
+             "number of rebuilds will publish it. Migrate it into the CAS/AC "
+             "layout first: aliBuild migrate %s/<version>-<revision> --closure "
+             "--read-store <legacy store URL>." % (package, ac_store, package))
+  rebuilt.add(package)
+
+
+def select_cached_tarball(tarballs, wanted, uploading):
+  """Pick which local tarball to unpack instead of rebuilding, or "" to rebuild.
+
+  The store is keyed by hash, but a tarball's name -- and the paths inside it --
+  carry the revision, so the one built as -1 is not the one we can publish as
+  -2. Reusing it anyway skips packaging entirely (build_template.sh only tars
+  when CACHED_TARBALL is empty), and the upload then dies on a missing file
+  having ALREADY published the symlink claim and the dist links, leaving the
+  store advertising a tarball that does not exist.
+
+  Re-tarring the unpacked tree is not the way out: unpacking runs
+  relocate-me.sh and deletes the .unrelocated copies, so by then the tree is
+  specific to this machine and would poison every other consumer.
+
+  So when we are going to upload, only the tarball named for our revision will
+  do; anything else is a rebuild. When we are not uploading, any revision is
+  fine -- the unpack path relocates whatever it finds (see the $PKGVERSION-*
+  glob in build_template.sh) and nothing downstream needs the name to match.
+
+  A revision is normally stable for a given hash, so this only bites when one
+  gets reassigned: another builder claimed it first, or -- as when the legacy
+  link tree was being read from the wrong bucket -- the revision was picked
+  while blind to what was already published.
+  """
+  for tarball in sorted(tarballs):
+    if os.path.basename(tarball) == wanted:
+      return tarball
+  if not tarballs:
+    return ""
+  if uploading:
+    debug("Ignoring cached tarball(s) %s: built for another revision, and we "
+          "must produce %s to upload it", ", ".join(
+            sorted(os.path.basename(t) for t in tarballs)), wanted)
+    return ""
+  return sorted(tarballs)[0]
 
 
 def storeHashes(package, specs, considerRelocation):
@@ -430,11 +752,20 @@ def create_provenance_info(package, specs, args):
   def dependency_list(key):
     return [spec_info(specs[dep]) for dep in specs[package].get(key, ())]
 
+  # Deterministic fields only: this lives inside the tarball, so anything varying
+  # independently of the action hash breaks reproducibility. alibuild_version and the
+  # alidist commit moved to the AC entry for that reason; the recipe replaces them
+  # and makes the tarball self-describing without the ledger.
+  recipe_text = specs[package].get("fullRecipe") or specs[package].get("recipe") or ""
+
   return json.dumps({
     "comment": args.annotate.get(package),
-    "alibuild_version": __version__,
-    "alidist": {
-      "commit": os.environ["ALIBUILD_ALIDIST_HASH"],
+    "recipe": {
+      "digest": "sha256:" + hashlib.sha256(recipe_text.encode("utf-8", "ignore")).hexdigest(),
+      "text": recipe_text,
+      "env": dict(specs[package].get("env") or {}),
+      "append_path": dict(specs[package].get("append_path") or {}),
+      "prepend_path": dict(specs[package].get("prepend_path") or {}),
     },
     "architecture": args.architecture,
     "defaults": args.defaults,
@@ -453,8 +784,37 @@ def create_provenance_info(package, specs, args):
 
 
 def doBuild(args, parser):
+  # Always sign reapi:// uploads: refuse to upload unsigned unless --no-sign, so
+  # nothing lands in a reapi ledger without a signature by accident.
+  if args.writeStore.startswith("reapi://") and not getattr(args, "noSign", False):
+    dieOnError(not (getattr(args, "signUrl", "") and
+                    (getattr(args, "signToken", "") or getattr(args, "signTokenFile", ""))),
+               "uploading to a reapi:// store signs Action Cache entries by default: "
+               "pass --sign-url and --sign-token (or --sign-token-file), or --no-sign "
+               "to upload unsigned.")
+
   syncHelper = remote_from_url(args.remoteStore, args.writeStore, args.architecture,
-                               args.workDir, getattr(args, "insecure", False))
+                               args.workDir, getattr(args, "insecure", False),
+                               ac_url=getattr(args, "acStore", "") or "",
+                               ac_write_url=getattr(args, "acWriteStore", "") or "",
+                               storage=getattr(args, "storage", "ephemeral"),
+                               sign_url=getattr(args, "signUrl", "") if not getattr(args, "noSign", False) else "",
+                               sign_token=getattr(args, "signToken", ""),
+                               sign_token_file=getattr(args, "signTokenFile", ""),
+                               signer=getattr(args, "signer", "alibuild"),
+                               legacy_url=getattr(args, "legacyStore", "") or "",
+                               cas_public_url=getattr(args, "casPublicUrl", "") or "")
+
+  # Verify signatures on prebuilt reapi:// tarballs reused during the build. The
+  # keyring defaults to <alidist>/keyring.json (args.configDir); under the default
+  # 'warn' policy this is a no-op when no keyring is present, so builds without a
+  # keyring are unaffected.
+  if isinstance(syncHelper, REAPIRemoteSync):
+    syncHelper.verify_checker = signature_checker(args)
+
+  # Capture the build container (if any) once: it is constant for the run and
+  # recorded in every Action Cache entry for reproducibility.
+  container_provenance = resolve_container_provenance(args)
 
   packages = args.pkgname
   specs = {}
@@ -754,6 +1114,12 @@ def doBuild(args, parser):
     mainPackage = buildOrder.pop()
     warning("Not rebuilding %s because --only-deps option provided.", mainPackage)
 
+  # Packages already rebuilt once because they were unpublished; see
+  # bound_unpublished_rebuild. Per run, not per package: the loop revisits the
+  # same entry, so the state has to outlive one iteration.
+  rebuilt_unpublished = set()
+  # (package, version-revision, hash, "reuse"|"build") for --plan.
+  plan = []
   while buildOrder:
     p = buildOrder[0]
     spec = specs[p]
@@ -922,6 +1288,16 @@ def doBuild(args, parser):
     else:
       spec["hash"] = spec["remote_revision_hash"]
 
+    # Everything a DEPENDENT needs -- version, revision, hash -- is settled by
+    # here, and nothing below has run yet, so this is where a plan can be taken
+    # without perturbing the packages that follow. Popping and continuing is the
+    # same shape the "already built" path uses further down.
+    if getattr(args, "plan", False):
+      plan.append((spec["package"], "%s-%s" % (spec["version"], spec["revision"]),
+                   spec["hash"], "build" if candidate is None else "reuse"))
+      buildOrder.pop(0)
+      continue
+
     # We do not use the override for devel packages, because we
     # want to avoid having to rebuild things when the /tmp gets cleaned.
     if spec["is_devel_pkg"]:
@@ -975,9 +1351,24 @@ def doBuild(args, parser):
       fileHash = readHashFile(hashFile)
     # Development packages have their own rebuild-detection logic above.
     # spec["hash"] is only useful here for regular packages.
-    if fileHash == spec["hash"] and not spec["is_devel_pkg"]:
-      # If we get here, we know we are in sync with whatever remote store.  We
-      # can therefore create a directory which contains all the packages which
+    # Being built locally says nothing about the store: an interrupted run, or one
+    # against a different store, leaves the package here but unpublished, and
+    # skipping it then means it is never uploaded while its dependents are -- a
+    # dangling closure. Check rather than assume; rebuilding is the cost of being
+    # wrong, and bound_unpublished_rebuild is what actually bounds it -- this
+    # comment used to claim the bound without anything implementing it.
+    published = True
+    if fileHash == spec["hash"] and not spec["is_devel_pkg"] and \
+       isinstance(syncHelper, REAPIRemoteSync) and getattr(syncHelper, "writeStore", ""):
+      published = syncHelper.is_published(spec["remote_revision_hash"])
+      if not published:
+        bound_unpublished_rebuild(p, rebuilt_unpublished, syncHelper.acWriteStore)
+        info("%s is built locally but not published to %s; rebuilding it so it can "
+             "be uploaded", spec["package"], syncHelper.acWriteStore)
+
+    if fileHash == spec["hash"] and not spec["is_devel_pkg"] and published:
+      # We are in sync with whatever remote store (verified above when there is one).
+      # We can therefore create a directory which contains all the packages which
       # were used to compile this one.
       debug("Package %s was correctly compiled. Moving to next one.", spec["package"])
       # If using incremental builds, next time we execute the script we need to remove
@@ -1026,7 +1417,11 @@ def doBuild(args, parser):
     if not spec["is_devel_pkg"]:
       syncHelper.fetch_tarball(spec)
       tarballs = glob(os.path.join(tar_hash_dir, "*gz"))
-      spec["cachedTarball"] = tarballs[0] if len(tarballs) else ""
+      spec["cachedTarball"] = select_cached_tarball(
+        tarballs,
+        "{package}-{version}-{revision}.{arch}.tar.gz".format(
+          arch=args.architecture, **spec),
+        uploading=bool(getattr(syncHelper, "writeStore", "")))
       debug("Found tarball in %s" % spec["cachedTarball"]
             if spec["cachedTarball"] else "No cache tarballs found")
 
@@ -1079,10 +1474,12 @@ def doBuild(args, parser):
       ("GIT_COMMITTER_EMAIL", "unknown"),
       ("INCREMENTAL_BUILD_HASH", spec.get("incremental_hash", "0")),
       ("JOBS", str(args.jobs)),
-      # Produce reproducible, content-stable tarballs for packages that may be
-      # uploaded to the remote store. Devel packages are never uploaded, so we
-      # leave their install trees untouched to avoid perturbing mtimes that
-      # incremental rebuilds might care about.
+      # Produce reproducible, content-stable tarballs for all packages, since
+      # byte-stable output is useful regardless of the remote store (build-to-
+      # build determinism, CAS dedup, rsync/mirror efficiency). Devel packages
+      # are excluded (NORMALIZE_TARBALL unset): they are never uploaded, and
+      # normalising would perturb install-tree mtimes that incremental rebuilds
+      # rely on. See REMOTE_STORE_CAS_AC.md.
       ("NORMALIZE_TARBALL", "" if spec["is_devel_pkg"] else "1"),
       ("PKGHASH", spec["hash"]),
       ("PKGNAME", spec["package"]),
@@ -1244,7 +1641,25 @@ def doBuild(args, parser):
     # Make sure not to upload local-only packages! These might have been
     # produced in a previous run with a read-only remote store.
     if not spec["revision"].startswith("local"):
+      # Only the reapi backend records an Action Cache entry / source snapshot; for
+      # every other backend (b3://, s3://, rsync, http, ...) this whole block is a
+      # no-op, so the build+upload path stays byte-identical to before the reapi
+      # work. The gate is explicit so it can never silently leak into normal builds.
+      if isinstance(syncHelper, REAPIRemoteSync):
+        source_artifact = None if getattr(args, "no_snapshot_sources", False) \
+          else snapshot_source(spec, syncHelper)
+        spec["ac_entry"] = build_ac_entry(
+          spec, specs, args.architecture, container=container_provenance,
+          source_artifact=source_artifact,
+          refs_artifact=snapshot_refs(spec, syncHelper),
+          system_specs=systemPackageSpecs)
+        publish_validate_system_entries(syncHelper, systemPackageSpecs, specs,
+                                        args.architecture)
       syncHelper.upload_symlinks_and_tarball(spec)
+
+  if getattr(args, "plan", False):
+    report_plan(plan)
+    return
 
   if not args.onlyDeps:
       banner("Build of %s successfully completed on `%s'.\n"

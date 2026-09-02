@@ -136,9 +136,17 @@ EOF
       PKGVER=${PKG##*/}
       PKGNAME=${PKG%/*}
       PKGNAME=${PKGNAME##*/}
-      [[ ! -e "$PKG/etc/modulefiles/$PKGNAME" ]] && continue
-      mkdir -p "$WORK_DIR/MODULES/$ARCHITECTURE/$PKGNAME"
-      cp "$PKG/etc/modulefiles/$PKGNAME" "$WORK_DIR/MODULES/$ARCHITECTURE/$PKGNAME/$PKGVER"
+      [[ ! -d "$PKG/etc/modulefiles" ]] && continue
+      # A package may ship more than the modulefile named after itself: e.g.
+      # IgProf also ships IgProfCPU and IgProfMemory, opt-in variants that arm
+      # the profiler on the very same installation. Publish every modulefile
+      # found, under the version of the package providing it.
+      for MODFILE in "$PKG"/etc/modulefiles/*; do
+        [[ -f "$MODFILE" ]] || continue
+        MODNAME=${MODFILE##*/}
+        mkdir -p "$WORK_DIR/MODULES/$ARCHITECTURE/$MODNAME"
+        cp "$MODFILE" "$WORK_DIR/MODULES/$ARCHITECTURE/$MODNAME/$PKGVER"
+      done
     done < <(find $WORK_DIR/$ARCHITECTURE -maxdepth 2 -mindepth 2 2> /dev/null)
   else
     printf "${EY}WARNING: not updating modulefiles${EZ}\n" >&2
