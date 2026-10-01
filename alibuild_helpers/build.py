@@ -1158,8 +1158,24 @@ def doBuild(args, parser):
     buildErrMsg = f"{red}{bold}BUILD FAILED:{reset} {spec['package']}@{spec['version']}{devel_note}\n"
     buildErrMsg += "=" * 70 + "\n\n"
 
-    buildErrMsg += f"{bold}Log File:{reset}\n"
-    buildErrMsg += f"  {log_path}\n\n"
+    # THE LOG MAY NOT EXIST. The build script writes it, so a failure BEFORE
+    # that -- a broken environment, a missing dependency, an interrupted
+    # previous run leaving the build directory in a state the script will not
+    # touch -- leaves nothing behind. Printing the path regardless sends the
+    # reader to a file that is not there, and anything parsing this output
+    # concludes the build produced nothing without saying why.
+    #
+    # Not hypothetical: ALICE CI uploads whatever matches BUILD/*latest*/log,
+    # so with no log it publishes a 551-byte stub and the pull request gets a
+    # bare red check carrying no reason at all. On 2026-10-01 that misread one
+    # broken work area as eight broken pull requests for most of a day.
+    if os.path.exists(log_path):
+      buildErrMsg += f"{bold}Log File:{reset}\n"
+      buildErrMsg += f"  {log_path}\n\n"
+    else:
+      buildErrMsg += f"{bold}No log was produced.{reset}\n"
+      buildErrMsg += f"  The build script failed before writing {log_path}.\n"
+      buildErrMsg += "  This is an environment or setup failure, not a compilation error.\n\n"
 
     buildErrMsg += f"{bold}Build Directory:{reset}\n"
     buildErrMsg += f"  {build_dir}\n"
@@ -1226,7 +1242,8 @@ def doBuild(args, parser):
 
     # Add Next Steps section
     buildErrMsg += f"\n{bold}Next Steps:{reset}\n"
-    buildErrMsg += f"  • View error log:          cat {log_path}\n"
+    if os.path.exists(log_path):
+      buildErrMsg += f"  • View error log:          cat {log_path}\n"
     if not args.debug:
       buildErrMsg += f"  • Rebuild with debug:      aliBuild build {spec['package']} --debug\n"
     buildErrMsg += f"  • Please upload the full log to CERNBox/Dropbox if you intend to request support.\n"
