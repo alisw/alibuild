@@ -343,6 +343,31 @@ class BuildTestCase(unittest.TestCase):
         ], any_order=True)
         self.assertEqual(mock_git_git.call_count, len(common_calls) + 1)
 
+        # A .build-hash can outlive the tree it vouches for, if a cleanup was
+        # interrupted. Such a package must be rebuilt rather than skipped, so
+        # make zlib's environment script missing while its marker still reads
+        # back, and check it is no longer taken for granted.
+        zlib_dir = f"/sw/{TEST_ARCHITECTURE}/zlib/v1.3.1-local1"
+
+        def exists_without_zlib_initdotsh(path):
+            if str(path) == zlib_dir + "/etc/profile.d/init.sh":
+                return False
+            return dummy_exists(path)
+
+        mock_debug.reset_mock()
+        with patch("alibuild_helpers.build.exists",
+                   new=MagicMock(side_effect=exists_without_zlib_initdotsh)), \
+             patch("alibuild_helpers.build.warning") as mock_build_warning:
+            doBuild(args, mock_parser)
+        mock_build_warning.assert_any_call(
+            "%s in %s claims to be built, but its environment script is "
+            "missing. Rebuilding it.", "zlib", zlib_dir)
+        # Exactly once: the loop re-examines a package after building it, so a
+        # guard that fired on every pass would never terminate.
+        fired = [c for c in mock_build_warning.call_args_list
+                 if c.args[1:] == ("zlib", zlib_dir)]
+        self.assertEqual(len(fired), 1, fired)
+
     def setup_spec(self, script):
         """Parse the alidist recipe in SCRIPT and return its spec."""
         err, spec, recipe = parseRecipe(lambda: script)
