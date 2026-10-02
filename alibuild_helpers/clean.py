@@ -75,7 +75,14 @@ def doClean(workDir, architecture, aggressiveCleanup, dryRun):
   have_error = False
   for directory in toDelete:
     try:
-      shutil.rmtree(directory)
+      # rmtree works bottom-up and is not atomic. If it is interrupted, the top
+      # directory survives holding its .build-hash, and the next build trusts
+      # that marker and skips reinstalling an emptied tree. Renaming first is
+      # atomic, so the canonical path never names a half-deleted package; the
+      # leftover is picked up by the next cleanup.
+      doomed = "%s.deleting.%s" % (directory, os.getpid())
+      os.rename(directory, doomed)
+      shutil.rmtree(doomed)
     except OSError as exc:
       have_error = True
       log.error("Unable to delete %s:", directory, exc_info=exc)

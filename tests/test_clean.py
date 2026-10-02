@@ -81,6 +81,8 @@ class CleanTestCase(unittest.TestCase):
         mock_path.realpath.side_effect = lambda x: REALPATH_WITH_OBSOLETE_FILES[x]
         mock_path.islink.side_effect = lambda x: "latest" in x
         mock_os.readlink.side_effect = lambda x: READLINK_MOCKUP_DB[x]
+        # Deletion renames before removing, so the pid must be deterministic.
+        mock_os.getpid.return_value = 4242
 
         files_to_delete = [
             "sw/TMP",
@@ -91,7 +93,11 @@ class CleanTestCase(unittest.TestCase):
             "sw/osx_x86-64/b/v1",
             "sw/osx_x86-64/b/v3",
         ]
-        remove_files_calls = list(map(call, files_to_delete))
+        # Each directory is renamed out of the way first, so rmtree sees the
+        # renamed path, never the original.
+        doomed_files = [f + ".deleting.4242" for f in files_to_delete]
+        remove_files_calls = list(map(call, doomed_files))
+        rename_calls = [call(f, d) for f, d in zip(files_to_delete, doomed_files)]
         files_delete_formatarg = "\n".join(files_to_delete)
 
         mock_glob.glob.side_effect = lambda x: []
@@ -126,6 +132,7 @@ class CleanTestCase(unittest.TestCase):
           doClean(workDir="sw", architecture="osx_x86-64", aggressiveCleanup=True, dryRun=False)
         self.assertEqual(cm.exception.code, 0)
         self.assertEqual(mock_shutil.rmtree.mock_calls, remove_files_calls)
+        self.assertEqual(mock_os.rename.mock_calls, rename_calls)
         mock_log.banner.assert_called_with("This %s delete the following directories:\n%s",
                                            "will", files_delete_formatarg)
         mock_log.info.assert_not_called()
@@ -133,6 +140,7 @@ class CleanTestCase(unittest.TestCase):
         mock_log.banner.reset_mock()
         mock_log.info.reset_mock()
         mock_shutil.rmtree.reset_mock()
+        mock_os.rename.reset_mock()
 
         def failing_rmtree(directory):
             raise OSError("sentinel exception")
