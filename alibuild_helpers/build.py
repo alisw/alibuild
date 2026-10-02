@@ -754,6 +754,11 @@ def doBuild(args, parser):
     mainPackage = buildOrder.pop()
     warning("Not rebuilding %s because --only-deps option provided.", mainPackage)
 
+  # Packages whose .build-hash was found standing over an emptied install tree.
+  # Forcing a rebuild is only safe ONCE: the loop re-examines a package after
+  # building it rather than popping it, so a tree that came back still
+  # incomplete would spin here forever.
+  gutted = set()
   while buildOrder:
     p = buildOrder[0]
     spec = specs[p]
@@ -973,6 +978,21 @@ def doBuild(args, parser):
       fileHash = spec["hash"]
     else:
       fileHash = readHashFile(hashFile)
+      # The marker lives inside the tree it vouches for, so it can outlive its
+      # own contents. Dependents source init.sh, so if that is missing the
+      # package is not usable, whatever .build-hash claims. Treating it as an
+      # absent marker also keeps the "Mismatch" message below honest: the
+      # hashes agree, so there is nothing to report as a mismatch.
+      if fileHash != "0" and not exists(join(hashPath, "etc", "profile.d", "init.sh")):
+        dieOnError(spec["package"] in gutted,
+                   "%s in %s has no etc/profile.d/init.sh even after being "
+                   "rebuilt. The install area is probably not writable."
+                   % (spec["package"], hashPath))
+        if spec["package"] not in gutted:
+          warning("%s in %s claims to be built, but its environment script is "
+                  "missing. Rebuilding it.", spec["package"], hashPath)
+          gutted.add(spec["package"])
+          fileHash = "0"
     # Development packages have their own rebuild-detection logic above.
     # spec["hash"] is only useful here for regular packages.
     if fileHash == spec["hash"] and not spec["is_devel_pkg"]:
@@ -1016,9 +1036,22 @@ def doBuild(args, parser):
     if fileHash != "0":
       debug("Mismatch between local area (%s) and the one which I should build (%s). Redoing.",
             fileHash, spec["hash"])
-    # shutil.rmtree under Python 2 fails when hashFile is unicode and the
-    # directory contains files with non-ASCII names, e.g. Golang/Boost.
-    shutil.rmtree(dirname(hashFile).encode("utf-8"), True)
+    # Remove the stale install directory before rebuilding. Rename first:
+    # rmtree is bottom-up and not atomic, so an interrupted removal would leave
+    # .build-hash standing over an emptied tree -- the exact state the check
+    # above exists to recover from. Renaming is atomic, so the canonical path
+    # never names a half-deleted package. A leftover is swept by the next
+    # cleanup, whose glob over the install directory already matches it.
+    installDir = dirname(hashFile)
+    if exists(installDir):
+      try:
+        doomed = "%s.deleting.%s" % (installDir, os.getpid())
+        os.rename(installDir, doomed)
+      except OSError:
+        doomed = installDir
+      # shutil.rmtree under Python 2 fails when the path is unicode and the
+      # directory contains files with non-ASCII names, e.g. Golang/Boost.
+      shutil.rmtree(doomed.encode("utf-8"), True)
 
     tar_hash_dir = os.path.join(workDir, resolve_store_path(args.architecture, spec["hash"]))
     debug("Looking for cached tarball in %s", tar_hash_dir)
