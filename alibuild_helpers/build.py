@@ -515,7 +515,12 @@ def doBuild(args, parser):
 
   extra_env = {
     "ALIBUILD_CONFIG_DIR": "/alidist" if args.docker else os.path.abspath(args.configDir),
-    "ALIBUILD_VERSION": __version__ or "unknown"
+    "ALIBUILD_VERSION": __version__ or "unknown",
+    # The checks run through the container, which sees only extra_env. Outside it
+    # they inherit ALIBUILD_ARCHITECTURE from os.environ; pass both spellings, as
+    # ARCHITECTURE is what the build scripts get.
+    "ARCHITECTURE": args.architecture,
+    "ALIBUILD_ARCHITECTURE": args.architecture,
   }
   extra_env.update(dict([e.partition('=')[::2] for e in args.environment]))
 

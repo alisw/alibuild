@@ -530,5 +530,47 @@ class AlidistHashFallbackTestCase(unittest.TestCase):
             self._run_reaching_scm_block()
 
 
+class CheckEnvironmentTestCase(unittest.TestCase):
+    """The architecture must reach prefer_system_check & friends, which run
+    through ContainerRunner -- and therefore see nothing but extra_env.
+    Bound at getPackageList, just after extra_env is built."""
+
+    class _Bound(Exception):
+        """Marker: doBuild reached getPackageList."""
+
+    def test_architecture_is_in_the_check_environment(self) -> None:
+        from alibuild_helpers.git import Git
+        captured = {}
+
+        def fake_container_runner(image, run_args, extra_env, extra_volumes):
+            captured.update(extra_env)
+            return MagicMock()
+
+        args = Namespace(
+            remoteStore="", writeStore="", architecture=TEST_ARCHITECTURE,
+            docker=False, dockerImage=None, docker_extra_args=[], environment=[],
+            workDir="/sw", pkgname=["zlib"], configDir="/no-such-alidist",
+            disable=[], defaults="release", jobs=2,
+            preferSystem=False, noSystem=None, force_rebuild=[],
+        )
+        with patch("alibuild_helpers.build.exists", new=MagicMock(return_value=True)), \
+             patch("alibuild_helpers.build.pruneWorkdirFromPaths", new=MagicMock()), \
+             patch("alibuild_helpers.build.makedirs", new=MagicMock()), \
+             patch("alibuild_helpers.build.install_wrapper_script", new=MagicMock()), \
+             patch("alibuild_helpers.build.parseDefaults",
+                   new=MagicMock(return_value=(None, {}, {}))), \
+             patch.object(Git, "checkedOutCommitName",
+                          new=MagicMock(return_value="deadbeef")), \
+             patch("alibuild_helpers.build.ContainerRunner",
+                   new=fake_container_runner), \
+             patch("alibuild_helpers.build.getPackageList",
+                   side_effect=self._Bound()):
+            with self.assertRaises(self._Bound):
+                doBuild(args, MagicMock())
+
+        self.assertEqual(captured.get("ARCHITECTURE"), TEST_ARCHITECTURE)
+        self.assertEqual(captured.get("ALIBUILD_ARCHITECTURE"), TEST_ARCHITECTURE)
+
+
 if __name__ == '__main__':
     unittest.main()

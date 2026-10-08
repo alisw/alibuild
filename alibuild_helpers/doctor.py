@@ -146,7 +146,11 @@ def doDoctor(args, parser):
       error("%s", msg)
     return (ok,msg,valid)
 
-  extra_env = {"ALIBUILD_CONFIG_DIR": "/alidist" if args.docker else os.path.abspath(args.configDir)}
+  # ARCHITECTURE/ALIBUILD_ARCHITECTURE: the checks run through the container,
+  # which sees only extra_env. See doBuild() for the full story.
+  extra_env = {"ALIBUILD_CONFIG_DIR": "/alidist" if args.docker else os.path.abspath(args.configDir),
+               "ARCHITECTURE": args.architecture,
+               "ALIBUILD_ARCHITECTURE": args.architecture}
   extra_env.update(dict([e.partition('=')[::2] for e in args.environment]))
   
   with ContainerRunner(args.dockerImage, args.docker_extra_args, extra_env=extra_env, extra_volumes=[f"{os.path.abspath(args.configDir)}:/alidist:ro"] if args.docker else []) as getstatusoutput_docker:
