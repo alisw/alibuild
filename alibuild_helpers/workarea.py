@@ -2,14 +2,45 @@ import codecs
 import errno
 import os
 import os.path
+import re
 import shutil
 import tempfile
 from collections import OrderedDict
 
 from alibuild_helpers.log import dieOnError, debug, error
+from alibuild_helpers.scm import SCMError
 from alibuild_helpers.utilities import call_ignoring_oserrors, symlink, short_commit_hash, asList
 
 FETCH_LOG_NAME = "fetch-log.txt"
+
+#: A tag that is a full commit id cannot move: it names its own content. 40 hex
+#: digits in a SHA-1 repository, 64 in a SHA-256 one.
+IMMUTABLE_TAG_RE = re.compile(r"[0-9a-fA-F]{40}(?:[0-9a-fA-F]{24})?\Z")
+
+
+def has_pinned_commit(scm, spec, referenceRepo):
+  """True if the spec pins a commit the reference repo already has.
+
+  Fetching then cannot discover anything. The reason to refresh a reference
+  repo at all is that a tag may have been moved, and a commit id cannot be
+  moved -- so if the object is already here, the fetch has nothing to find.
+
+  Worth skipping rather than merely tolerating, because that fetch is not free:
+  it asks the upstream for every ref in the repository, on every round, on
+  every builder. For Eigen3 -- pinned to a commit, and mirrored from gitlab.com
+  rather than from one of the alisw GitHub mirrors -- that is the request most
+  likely to be throttled, and a 403 there is fatal to the whole build.
+  """
+  tag = str(spec.get("tag", ""))
+  if not IMMUTABLE_TAG_RE.match(tag):
+    return False
+  try:
+    err, _ = scm.exec(scm.hasCommitCmd(tag), directory=referenceRepo,
+                      check=False, prompt=False)
+  except (NotImplementedError, SCMError, OSError):
+    # An SCM that cannot answer the question gets the old behaviour.
+    return False
+  return err == 0
 
 
 def cleanup_git_log(referenceSources):
@@ -112,6 +143,9 @@ def updateReferenceRepo(referenceSources, p, spec,
   if not os.path.exists(referenceRepo):
     cmd = scm.cloneReferenceCmd(spec["source"], referenceRepo, usePartialClone)
     logged_scm(scm, p, referenceSources, cmd, ".", allowGitPrompt)
+  elif fetch and has_pinned_commit(scm, spec, referenceRepo):
+    debug("%s is pinned to commit %s, which %s already has: not fetching",
+          p, spec["tag"], referenceRepo)
   elif fetch:
     ref_match_rule = asList(spec.get("ref_match_rule", ["+refs/tags/*:refs/tags/*", "+refs/heads/*:refs/heads/*"]))
     cmd = scm.fetchCmd(spec["source"], *ref_match_rule)
