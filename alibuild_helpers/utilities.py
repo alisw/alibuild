@@ -46,6 +46,16 @@ def symlink(link_target, link_name):
 asList = lambda x : x if type(x) == list else [x]
 
 
+def plain_data(value):
+  """Recursively turn OrderedDicts into plain dicts, so a parsed spec fragment can
+  be re-serialised with yaml.safe_dump (which refuses to represent OrderedDict)."""
+  if isinstance(value, dict):
+    return {key: plain_data(item) for key, item in value.items()}
+  if isinstance(value, list):
+    return [plain_data(item) for item in value]
+  return value
+
+
 def topological_sort(specs):
   """Topologically sort specs so that dependencies come before the packages that depend on them.
 
@@ -105,6 +115,43 @@ def resolve_links_path(architecture, package):
   """
   return "/".join(("TARS", architecture, package))
 
+
+def resolve_cas_path(content_hash, algo="sha256"):
+  """Return the store path for a content-addressed blob (REAPI-style CAS).
+
+  Unlike resolve_store_path(), which is keyed by the *action* hash (a hash of
+  the recipe and its inputs), this is keyed by a hash of the blob's actual
+  bytes. The path is sharded on the first two hex characters of the hash, like
+  the action store, to keep directory fan-out manageable on local mirrors.
+
+  The returned path is relative to the working directory or the root of the
+  remote store.
+  """
+  return "/".join(("cas", algo, content_hash[:2], content_hash))
+
+
+def resolve_ac_path(architecture, action_hash):
+  """Return the store path for an Action Cache entry (REAPI-style AC).
+
+  The entry is keyed by the action hash (spec["remote_revision_hash"]) and
+  records what produced the artifact, so the CAS can be reconstructed from it.
+
+  The returned path is relative to the working directory or the root of the
+  remote store.
+  """
+  return "/".join(("ac", architecture, action_hash[:2], action_hash + ".json"))
+
+
+def file_digest(path, algo="sha256", _chunk_size=1 << 20):
+  """Return the hex digest of the bytes of the file at the given path.
+
+  Used to content-address tarballs and recipe blobs for the CAS.
+  """
+  hasher = hashlib.new(algo)
+  with open(path, "rb") as fileobj:
+    for chunk in iter(lambda: fileobj.read(_chunk_size), b""):
+      hasher.update(chunk)
+  return hasher.hexdigest()
 
 
 def default_builder_image(architecture):
@@ -654,6 +701,16 @@ def getPackageList(packages, specs, configDir, preferSystem, noSystem,
               # Unlike the recipe's own track_env, the value is not shell code to
               # be run: the check has already computed it for us.
               spec.setdefault("track_env", OrderedDict())[name.strip()] = value
+            # A replacement is a header fragment with no fullRecipe of its own;
+            # without this every replaced package's validate-system node hashes ""
+            # and they all collide. Render the *selected* replacement rather than
+            # the original recipe, so a later python3.14 matcher does not invalidate
+            # the python3.12 validation, which stays distinct via the key.
+            # sort_keys=False preserves authored env/prepend_path order.
+            header = {k: v for k, v in spec.items() if k not in ("recipe", "fullRecipe")}
+            spec["fullRecipe"] = "%s---\n%s" % (
+              yaml.safe_dump(plain_data(header), default_flow_style=False, sort_keys=False),
+              spec.get("recipe", ""))
             recipe = replacement.get("recipe", "")
             # If there's an explicitly-specified recipe, we're still building
             # the package. If not, aliBuild will still "build" it, but it's

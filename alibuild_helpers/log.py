@@ -19,19 +19,25 @@ class LogFormatter(logging.Formatter):
                           logging.CRITICAL: "\033[1;37;41m",
                           logging.SUCCESS:  "\033[1;32m" } if sys.stdout.isatty() else {}
   def format(self, record):
-    record.msg = record.msg % record.args
+    # getMessage() rather than "record.msg % record.args": a record is shared
+    # by every handler attached to the logger, so substituting into record.msg
+    # and leaving record.args in place makes the NEXT formatter re-apply the
+    # args to an already-expanded string -- "not all arguments converted".
+    # Harmless with only our handler attached, which is why it went unnoticed;
+    # under pytest, whose logging plugin adds its own handler, it aborts.
+    msg = record.getMessage()
     if record.levelno == logging.BANNER and sys.stdout.isatty():
-      lines = record.msg.split("\n")
+      lines = msg.split("\n")
       return "\n\033[1;34m==>\033[m \033[1m%s\033[m" % lines[0] + \
              "".join("\n    \033[1m%s\033[m" % x for x in lines[1:])
     elif record.levelno == logging.INFO or record.levelno == logging.BANNER:
-      return record.msg
+      return msg
     return "\n".join(self.fmtstr % {
       "asctime": datetime.datetime.now().strftime("%Y-%m-%d@%H:%M:%S"),
       "levelname": (self.LEVEL_COLORS.get(record.levelno, self.COLOR_RESET) +
                     record.levelname + self.COLOR_RESET),
       "message": x,
-    } for x in record.msg.split("\n"))
+    } for x in msg.split("\n"))
 
 
 def log_current_package(package, main_package, specs, devel_prefix) -> None:

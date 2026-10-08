@@ -76,6 +76,12 @@ class Git(SCM):
   def fetchCmd(self, remote, *refs):
     return ["fetch", "-f", "--prune"] + clone_speedup_options() + [remote, *refs]
 
+  def hasCommitCmd(self, commit):
+    # -e is silent and just sets the exit code. The ^{commit} peel matters: a
+    # bare cat-file -e succeeds for any object, so a hash that happens to name
+    # a blob or a tree would look like a usable commit.
+    return ["cat-file", "-e", commit + "^{commit}"]
+
   def setWriteUrlCmd(self, url):
     return ["remote", "set-url", "--push", "origin", url]
 
