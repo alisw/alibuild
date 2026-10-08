@@ -55,6 +55,13 @@ def doParseArgs():
                                         description="Verify the status of your system.")
   init_parser = subparsers.add_parser("init", help="initialise local packages",
                                       description="Initialise development packages.")
+  # The reapi:// subcommands register their own parsers from their implementation
+  # modules (args live with the command), so this shared parser stays free of their
+  # options. Order is preserved for --help listing.
+  from alibuild_helpers import install, reconstruct, migrate
+  install.add_parser(subparsers, detectedArch, DEFAULT_WORK_DIR)
+  reconstruct.add_parser(subparsers, detectedArch, DEFAULT_WORK_DIR)
+  migrate.add_parser(subparsers, detectedArch, DEFAULT_WORK_DIR)
   version_parser = subparsers.add_parser("version", help="display %(prog)s version",
                                          description="Display %(prog)s and architecture.")
   completion_parser = subparsers.add_parser("completion", help="output shell completion code",
@@ -142,6 +149,14 @@ def doParseArgs():
   'https://s3.cern.ch/swift/v1/alibuild-repo'. It requires no credentials and
   provides tarballs for the most common supported architectures.
   """)
+  build_parser.add_argument("--plan", dest="plan", action="store_true",
+                            help=("Resolve the build and print what it WOULD do -- for each "
+                                  "package the version-revision it lands on, its hash, and "
+                                  "whether it comes from the remote store or gets built -- then "
+                                  "stop. Unlike -n/--dry-run, which returns before any of that "
+                                  "is known, this runs the real resolution and so reads the "
+                                  "remote store. The 'reuse' lines are PACKAGE/VERSION-REVISION "
+                                  "specs, which is what `aliBuild migrate` consumes."))
   build_remote.add_argument("--no-remote-store", action="store_true",
                             help="Disable the use of the remote store, even if it is enabled by default.")
   build_remote.add_argument("--remote-store", dest="remoteStore", metavar="STORE", default="",
@@ -156,6 +171,70 @@ def doParseArgs():
                                   "except ::rw is not recognised. Implies --no-system."))
   build_remote.add_argument("--insecure", dest="insecure", action="store_true",
                             help="Don't validate TLS certificates when connecting to an https:// remote store.")
+  build_remote.add_argument("--ac-store", dest="acStore", metavar="STORE", default="",
+                            help=("For reapi:// stores, a separate ledger store for the "
+                                  "Action Cache and reconstruction inputs (recipe/source/refs), "
+                                  "which are kept while the artifact tarballs are deletable. "
+                                  "Same ::rw syntax as --remote-store. Defaults to --remote-store."))
+  build_remote.add_argument("--legacy-links-store", dest="legacyStore", metavar="STORE",
+                            default="",
+                            help=("For reapi:// stores, where to publish the legacy "
+                                  "TARS/<arch>/ link and store objects, if not in the "
+                                  "artifact store. Use this to keep an existing repo "
+                                  "browsable by consumers that only know that layout, "
+                                  "while the bytes stay content-addressed. The store "
+                                  "objects then redirect to an absolute CAS URL, which "
+                                  "needs an aliBuild new enough to follow one."))
+  build_remote.add_argument("--cas-public-url", dest="casPublicUrl", metavar="URL",
+                            default="",
+                            help=("Public base URL of the CAS bucket, e.g. "
+                                  "https://s3.cern.ch/swift/v1/alibuild-cas. Required "
+                                  "with --legacy-links-store: the legacy store objects "
+                                  "redirect there by absolute URL, and the endpoint a "
+                                  "build uploads through (a proxy, say) is not "
+                                  "necessarily reachable by consumers."))
+  build_remote.add_argument("--storage", dest="storage", choices=("ephemeral", "permanent"),
+                            default="ephemeral",
+                            help=("Retention for uploaded reapi:// tarball blobs: 'ephemeral' "
+                                  "(default; LRU-expired by the bucket lifecycle, refreshed on "
+                                  "use) or 'permanent' (pinned; also promotes any ephemeral blob "
+                                  "it reuses). Use 'permanent' for production builds."))
+  build_remote.add_argument("--no-snapshot-sources", dest="no_snapshot_sources",
+                            action="store_true",
+                            help=("Don't archive built packages' git sources into a reapi:// "
+                                  "ledger. Source archival is best-effort and skipped for partial "
+                                  "(blobless/treeless) mirrors anyway; use this to skip it entirely "
+                                  "(reconstruct then relies on upstream git for sources)."))
+  build_remote.add_argument("--sign-url", dest="signUrl", metavar="URL", default="",
+                            help=("Endpoint of the security-proxy sign route used to sign "
+                                  "Action Cache entries uploaded to a reapi:// store (e.g. "
+                                  "https://<proxy>/sign/alibuild-ac). Uploading to a reapi:// "
+                                  "store signs by default and requires this unless --no-sign."))
+  build_remote.add_argument("--sign-token", dest="signToken", metavar="TOKEN", default="",
+                            help="Gate token presented to --sign-url. Prefer --sign-token-file "
+                                 "for short-lived credentials.")
+  build_remote.add_argument("--sign-token-file", dest="signTokenFile", metavar="FILE", default="",
+                            help=("Read the credential for --sign-url from FILE, freshly for "
+                                  "every signing request. Use this for short-lived tokens that "
+                                  "are refreshed in place -- e.g. a Nomad workload-identity JWT, "
+                                  "whose TTL is minutes while a build signs entries for hours."))
+  build_remote.add_argument("--signer", dest="signer", metavar="NAME", default="alibuild",
+                            help=("Human-readable signer label recorded in the signature "
+                                  "(the keyid is authoritative). Default '%(default)s'."))
+  build_remote.add_argument("--no-sign", dest="noSign", action="store_true",
+                            help=("Upload to a reapi:// store without signing Action Cache "
+                                  "entries. By default uploads are signed and refused if "
+                                  "--sign-url/--sign-token are not given."))
+  build_remote.add_argument("--require-signature", dest="requireSignature",
+                            choices=("off", "warn", "require"), default="warn",
+                            help=("Verify signatures on prebuilt reapi:// tarballs reused "
+                                  "during a build, against --trusted-keys: 'warn' (default; "
+                                  "log unverified), 'off' (skip), or 'require' (fail closed)."))
+  build_remote.add_argument("--trusted-keys", dest="trustedKeys", default="", metavar="KEYRING",
+                            help=("Path to the JSON keyring of trusted signing keys. This "
+                                  "REPLACES the defaults, which are the keyring shipped with "
+                                  "alibuild merged with keyring.json from the alidist "
+                                  "checkout (if any)."))
 
   build_dirs = build_parser.add_argument_group(title="Customise aliBuild directories")
   build_dirs.add_argument("-C", "--chdir", metavar="DIR", dest="chdir", default=DEFAULT_CHDIR,
@@ -357,7 +436,7 @@ def doParseArgs():
   def optionOrder(x):
     if x in ["--debug", "-d", "-n", "--dry-run"]:
       return 0
-    if x in ["build", "init", "clean", "analytics", "doctor", "deps", "completion"]:
+    if x in ["build", "init", "clean", "analytics", "doctor", "deps", "completion", "install", "reconstruct", "migrate"]:
       return 1
     return 2
   rest.sort(key=optionOrder)
@@ -490,6 +569,12 @@ def finaliseArgs(args, parser):
     if args.remoteStore.endswith("::rw"):
       args.remoteStore = args.remoteStore[0:-4]
       args.writeStore = args.remoteStore
+
+    # The optional ledger store mirrors --remote-store's ::rw semantics.
+    args.acWriteStore = ""
+    if getattr(args, "acStore", "").endswith("::rw"):
+      args.acStore = args.acStore[0:-4]
+      args.acWriteStore = args.acStore
 
   if args.action in ["build", "init"]:
     if "develPrefix" in args and args.develPrefix is None:

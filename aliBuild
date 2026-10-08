@@ -17,6 +17,9 @@ from alibuild_helpers.deps import doDeps
 from alibuild_helpers.log import info, debug, logger, error
 from alibuild_helpers.utilities import detectArch
 from alibuild_helpers.build import doBuild
+from alibuild_helpers.install import doInstall
+from alibuild_helpers.reconstruct import doReconstruct
+from alibuild_helpers.migrate import doMigrate
 from alibuild_helpers.completion import doCompletion
 
 
@@ -82,6 +85,15 @@ def doMain(args, parser):
   if args.action == "build":
     doBuild(args, parser)
     sys.exit(0)
+
+  if args.action == "install":
+    sys.exit(0 if doInstall(args, parser) else 1)
+
+  if args.action == "reconstruct":
+    sys.exit(0 if doReconstruct(args, parser) else 1)
+
+  if args.action == "migrate":
+    sys.exit(0 if doMigrate(args, parser) else 1)
 
 
 if __name__ == "__main__":
