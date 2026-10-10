@@ -255,6 +255,7 @@ On Linux, x86-64:
 - `slc7_x86-64`: RHEL7 / CC7 compatible
 - `slc8_x86-64`: RHEL8 / CC8 compatible
 - `slc9_x86-64`: RHEL9 / ALMA9 compatible
+- `slc10_x86-64`: RHEL10 / ALMA10 compatible
 - `ubuntu2004_x86-64`: Ubuntu 20.04 compatible
 - `ubuntu2204_x86-64`: Ubuntu 22.04 compatible
 - `ubuntu2404_x86-64`: Ubuntu 24.04 compatible
