@@ -397,7 +397,7 @@ On Mac, 1-2 latest supported OSX versions:
 """
 
 # When updating this variable, also update docs/docs/user.md!
-S3_SUPPORTED_ARCHS = "slc7_x86-64", "slc8_x86-64", "ubuntu2004_x86-64", "ubuntu2204_x86-64", "ubuntu2404_x86-64", "slc9_x86-64", "slc9_aarch64"
+S3_SUPPORTED_ARCHS = "slc7_x86-64", "slc8_x86-64", "ubuntu2004_x86-64", "ubuntu2204_x86-64", "ubuntu2404_x86-64", "slc9_x86-64", "slc9_aarch64", "slc10_x86-64"
 
 def finaliseArgs(args, parser):
 
