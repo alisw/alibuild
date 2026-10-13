@@ -1,0 +1,30 @@
+{
+  "_comment": [
+    "Trust anchor for reapi:// Action Cache signatures, shipped inside the",
+    "alibuild package. It is consulted by every consuming command (install,",
+    "reconstruct, build-with-fetch); `install` in particular has no alidist to",
+    "read a keyring from, so without this it would verify nothing at all.",
+    "",
+    "It is an anchor precisely because it arrives with the code the user already",
+    "executes -- a different channel from the store being verified. A keyring",
+    "served from the store itself could be replaced by anyone able to write to",
+    "the store, which is the attacker signing exists to stop.",
+    "",
+    "alidist/keyring.json is merged on top of this when present, so keys can be",
+    "added without cutting an alibuild release. Merging never widens trust:",
+    "validity windows intersect and revocations union, so a key revoked here",
+    "stays revoked no matter what any other keyring says. Revoking by shipping a",
+    "new alibuild works because builds track the latest alibuild.",
+    "",
+    "Key ids are sha256 of the raw 32-byte Ed25519 public key and are checked on",
+    "load, so an id cannot be pointed at a different key."
+  ],
+  "keys": {
+    "263745eacc18c1794d22fc4527a9d9e5a6e4b700cab6a046edcc8018f8572a98": {
+      "notAfter": "2028-01-01T00:00:00Z",
+      "publicKey": "bppFX0aJ4woEoZPBkCo2hV6gGAua/7ul2Ta5dteXsno=",
+      "signer": "giulio-laptop"
+    }
+  },
+  "revoked": []
+}
