@@ -119,6 +119,68 @@ class WorkareaTestCase(unittest.TestCase):
         ], directory=".", check=False, prompt=True)
         self.assertEqual(spec.get("reference"), "%s/sw/MIRROR/aliroot" % getcwd())
 
+    @patch("os.path.exists")
+    @patch("os.makedirs")
+    @patch("codecs.open")
+    @patch("alibuild_helpers.git.git")
+    @patch("alibuild_helpers.workarea.is_writeable", new=MagicMock(return_value=True))
+    def test_pinned_commit_present_is_not_fetched(self, mock_git, mock_open,
+                                                  mock_makedirs, mock_exists):
+        """A tag that is a commit id cannot move, so a present object needs no fetch.
+
+        The point of refreshing a mirror is to notice a moved tag. A commit id
+        names its own content, so there is nothing to notice, and the fetch is
+        pure cost -- it asks upstream for every ref, on every round, on every
+        builder, and upstreams throttle that.
+        """
+        mock_exists.return_value = True
+        mock_git.return_value = 0, ""    # cat-file -e succeeds: the commit is here
+        spec = MOCK_SPEC.copy()
+        spec["tag"] = "e7248b26a1ed53fa030c5c459f7ea095dfd276ac"
+        updateReferenceRepoSpec(referenceSources="sw/MIRROR", p="AliRoot",
+                                spec=spec, fetch=True)
+        # called ONCE: the existence check, and no fetch after it
+        mock_git.assert_called_once_with(
+            ["cat-file", "-e", spec["tag"] + "^{commit}"],
+            directory="%s/sw/MIRROR/aliroot" % getcwd(), check=False, prompt=False)
+        self.assertEqual(spec.get("reference"), "%s/sw/MIRROR/aliroot" % getcwd())
+
+    @patch("os.path.exists")
+    @patch("os.makedirs")
+    @patch("codecs.open")
+    @patch("alibuild_helpers.git.git")
+    @patch("alibuild_helpers.workarea.is_writeable", new=MagicMock(return_value=True))
+    def test_pinned_commit_missing_is_fetched(self, mock_git, mock_open,
+                                              mock_makedirs, mock_exists):
+        """A pinned commit we do NOT have still has to be fetched."""
+        mock_exists.return_value = True
+        mock_git.side_effect = [(1, "not found"), (0, "sentinel output")]
+        spec = MOCK_SPEC.copy()
+        spec["tag"] = "0" * 40
+        updateReferenceRepoSpec(referenceSources="sw/MIRROR", p="AliRoot",
+                                spec=spec, fetch=True)
+        self.assertEqual(mock_git.call_count, 2)
+        self.assertEqual(mock_git.call_args_list[-1][0][0][0], "fetch")
+
+    @patch("os.path.exists")
+    @patch("os.makedirs")
+    @patch("codecs.open")
+    @patch("alibuild_helpers.git.git")
+    @patch("alibuild_helpers.workarea.is_writeable", new=MagicMock(return_value=True))
+    def test_movable_tag_is_always_fetched(self, mock_git, mock_open,
+                                           mock_makedirs, mock_exists):
+        """A named tag can be moved, so it is fetched without even asking."""
+        mock_exists.return_value = True
+        mock_git.return_value = 0, "sentinel output"
+        spec = MOCK_SPEC.copy()
+        spec["tag"] = "v3.4.0"
+        updateReferenceRepoSpec(referenceSources="sw/MIRROR", p="AliRoot",
+                                spec=spec, fetch=True)
+        mock_git.assert_called_once_with([
+            "fetch", "-f", "--prune", "--filter=blob:none", spec["source"],
+            "+refs/tags/*:refs/tags/*", "+refs/heads/*:refs/heads/*",
+        ], directory="%s/sw/MIRROR/aliroot" % getcwd(), check=False, prompt=True)
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -19,6 +19,8 @@ class SCM:
     raise NotImplementedError
   def fetchCmd(self, remote, *refs):
     raise NotImplementedError
+  def hasCommitCmd(self, commit):
+    raise NotImplementedError
   def cloneReferenceCmd(self, spec, referenceRepo, usePartialClone):
     raise NotImplementedError
   def cloneSourceCmd(self, source, destination, referenceRepo, usePartialClone):
