@@ -76,6 +76,9 @@ _aliBuild_cmd_build() {
     '--reference-sources[Directory for reference git repositories]:directory:_directories' \
     '--aggressive-cleanup[Delete as much build data as possible when cleaning up]' \
     '--no-auto-cleanup[Do not clean up build directories automatically]' \
+    '--sandbox[Run each recipe in a macOS sandbox]' \
+    '--no-sandbox[Do not use the macOS sandbox]' \
+    '*--sandbox-allow-write[Allow sandboxed recipes to write under PATH]:directory:_directories' \
     '(--no-system)--always-prefer-system[Always use system packages when compatible]' \
     '(--always-prefer-system)--no-system[Never use system packages]::packages: ' \
     '*:package:_alibuild_packages'

@@ -20,6 +20,7 @@ from alibuild_helpers.sync import remote_from_url
 from alibuild_helpers.workarea import logged_scm, updateReferenceRepoSpec, checkout_sources
 from alibuild_helpers.log import ProgressPrint, log_current_package
 from glob import glob
+from alibuild_helpers.sandbox import write_sandbox_profile, sandboxed_command, sandbox_failure_hint
 from collections import OrderedDict
 from shlex import quote
 import tempfile
@@ -1149,6 +1150,10 @@ def doBuild(args, parser):
     else:
       os.environ.update(buildEnvironment)
       build_command = f"{BASH} -e -x {quote(scriptDir)}/build.sh 2>&1"
+      if getattr(args, "sandbox", False):
+        sandbox_profile = write_sandbox_profile(scriptDir, spec, workDir, buildWorkDir, args.architecture,
+                                                develPrefix, args.sandboxAllowWrite)
+        build_command = sandboxed_command(sandbox_profile, build_command)
 
     debug("Build command: %s", build_command)
     progress_msg = "Unpacking %s@%s" if cachedTarball else "Compiling %s@%s"
@@ -1218,6 +1223,9 @@ def doBuild(args, parser):
     buildErrMsg += f"{bold}Build Directory:{reset}\n"
     buildErrMsg += f"  {build_dir}\n"
 
+    if getattr(args, "sandbox", False):
+      buildErrMsg += "\n" + sandbox_failure_hint(scriptDir, log_path)
+
     # Gather build info for the error message
     try:
       detected_arch = detectArch()
@@ -1226,7 +1234,7 @@ def doBuild(args, parser):
       safe_args = {
         "pkgname", "defaults", "architecture", "forceUnknownArch",
         "develPrefix", "jobs", "noSystem", "noDevel", "forceTracked", "plugin",
-        "disable", "annotate", "onlyDeps", "docker"
+        "disable", "annotate", "onlyDeps", "docker", "sandbox"
       }
       
       cli_args = []
