@@ -1,6 +1,7 @@
 import argparse
 from alibuild_helpers.utilities import detectArch, normalise_multiple_options, default_builder_image, docker_platform_for
 from alibuild_helpers.workarea import cleanup_git_log
+from alibuild_helpers.sandbox import sandbox_check
 import multiprocessing
 
 import re
@@ -132,6 +133,21 @@ def doParseArgs():
   build_docker.add_argument("-v", dest="volumes", action="append", default=[],
                             help=("Additional volume to be mounted inside the Docker container, if one is used. "
                                   "May be specified multiple times. Passed verbatim to 'docker run'."))
+
+  build_sandbox = build_parser.add_argument_group(title="Build inside a sandbox (macOS)", description="""\
+  On macOS, recipes can be run under a seatbelt sandbox (sandbox-exec) which
+  only lets them write to the directories of the package being built, plus
+  temporary and cache directories. Reads and network access are not
+  restricted. Set ALIBUILD_SANDBOX=1 to enable it by default.
+  """)
+  build_sandbox.add_argument("--sandbox", dest="sandbox", action="store_true", default=None,
+                             help="Run each recipe in a macOS sandbox.")
+  build_sandbox.add_argument("--no-sandbox", dest="sandbox", action="store_false",
+                             help="Do not use the sandbox, even if ALIBUILD_SANDBOX is set.")
+  build_sandbox.add_argument("--sandbox-allow-write", dest="sandboxAllowWrite", metavar="PATH",
+                             action="append", default=[],
+                             help=("Additionally allow sandboxed recipes to write under PATH. "
+                                   "May be specified multiple times."))
 
   build_remote = build_parser.add_argument_group(title="Re-use prebuilt tarballs", description="""\
   Reusing prebuilt tarballs saves compilation time, as common packages need not
@@ -459,6 +475,19 @@ def finaliseArgs(args, parser):
     # architecture we want to build for.
     if args.docker and not args.dockerImage:
       args.dockerImage = default_builder_image(args.architecture)
+
+  if args.action == "build":
+    # ALIBUILD_SANDBOX only applies where sandboxing is possible, so it can be
+    # set in a shared environment; an explicit --sandbox must work, or fail.
+    if args.sandbox is None:
+      args.sandbox = (sys.platform == "darwin" and not args.docker and
+                      os.environ.get("ALIBUILD_SANDBOX", "") not in ("", "0"))
+    if args.sandbox and args.docker:
+      parser.error("cannot use --sandbox and --docker together")
+    if args.sandbox:
+      problem = sandbox_check()
+      if problem:
+        parser.error("cannot use --sandbox: " + problem)
 
   if "annotate" in args:
     for comment_assignment in args.annotate:
