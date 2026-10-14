@@ -81,7 +81,7 @@ _aliBuild_complete() {
           _alibuild_packages; return ;;
         --annotate)
           return ;;
-        -C|--chdir|-w|--work-dir|-c|--config-dir|--reference-sources)
+        -C|--chdir|-w|--work-dir|-c|--config-dir|--reference-sources|--sandbox-allow-write)
           _filedir -d; return ;;
       esac
       if [[ "$cur" == -* ]]; then
@@ -95,6 +95,7 @@ _aliBuild_complete() {
           -C --chdir -w --work-dir -c --config-dir --reference-sources
           --aggressive-cleanup --no-auto-cleanup
           --always-prefer-system --no-system
+          --sandbox --no-sandbox --sandbox-allow-write
         " -- "$cur") )
       else
         _alibuild_packages
