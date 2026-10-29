@@ -166,12 +166,12 @@ class DockerRunner:
   def __enter__(self):
     if self._docker_image:
       stream_pull("docker", self._docker_image)
-      # "sleep inf" pauses forever, until we kill it.
+      # "/bin/sleep inf" pauses forever, until we kill it.
       envOpts = [opt for k, v in self._extra_env.items() for opt in ("-e", f"{k}={v}")]
       volumes = [opt for v in self._extra_volumes for opt in ("-v", v)]
-      cmd = ["docker", "run", "--detach"] + envOpts + volumes + ["--rm", "--entrypoint="]
+      cmd = ["docker", "run", "--detach"] + envOpts + volumes + ["--rm", "--entrypoint=/bin/sleep"]
       cmd += self._docker_run_args
-      cmd += [self._docker_image, "sleep", "inf"]
+      cmd += [self._docker_image, "inf"]
       debug("Starting Docker container (this pulls %s first if it is not present "
             "locally, which can take a while with no output): %s",
             self._docker_image, " ".join(cmd))
