@@ -122,9 +122,11 @@ jobs:
           set -x
           chmod 600 "$keydir/id"
           # Pin github.com from GitHub's published host keys rather than
-          # trusting whatever answers on port 22.
-          curl -fSsL https://api.github.com/meta \
-            | jq -r '.ssh_keys[] | "github.com \(.)"' > "$keydir/known_hosts"
+          # trusting whatever answers on port 22. Via gh, not curl: anonymous
+          # api.github.com calls from hosted runners share an IP pool that is
+          # normally already over the 60/hr limit, and answer 403.
+          gh api meta --jq '.ssh_keys[] | "github.com \(.)"' > "$keydir/known_hosts"
+          test -s "$keydir/known_hosts"
           export GIT_SSH_COMMAND="ssh -i $keydir/id -o IdentitiesOnly=yes -o UserKnownHostsFile=$keydir/known_hosts"
           git config user.name alibuild
           git config user.email 'alibuild@cern.ch'
@@ -133,3 +135,4 @@ jobs:
           git push git@github.com:alisw/homebrew-system-deps master
         env:
           DEPLOY_KEY: ${{ secrets.HOMEBREW_DEPLOY_KEY }}
+          GH_TOKEN: ${{ github.token }}
