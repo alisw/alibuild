@@ -16,7 +16,13 @@ aliBuild build [-h] [--defaults DEFAULT]
                [--only-deps] [--plugin PLUGIN]
                [--always-prefer-system | --no-system]
                [--docker] [--docker-image IMAGE] [--docker-extra-args ARGLIST] [-v VOLUMES]
-               [--no-remote-store] [--remote-store STORE] [--write-store STORE] [--insecure] 
+               [--no-remote-store] [--remote-store STORE] [--write-store STORE] [--insecure]
+               [--ac-store STORE] [--legacy-links-store STORE] [--cas-public-url URL]
+               [--storage {ephemeral,permanent}] [--no-snapshot-sources]
+               [--sign-url URL] [--sign-token TOKEN] [--sign-token-file FILE]
+               [--signer NAME] [--no-sign]
+               [--require-signature {off,warn,require}] [--trusted-keys KEYRING]
+               [--plan]
                [-C DIR] [-w WORKDIR] [-c CONFIGDIR] [--reference-sources MIRRORDIR]
                [--aggressive-cleanup] [--no-auto-cleanup]
                PACKAGE [PACKAGE ...]
@@ -52,6 +58,13 @@ aliBuild build [-h] [--defaults DEFAULT]
   downloaded during this run. May be specified multiple times.
 - `--only-deps`: Only build dependencies, not the main package. Useful for
   populating a build cache.
+- `--plan`: Resolve the build and print what it *would* do -- for each
+  package the version-revision it lands on, its hash, and whether it comes
+  from the remote store or gets built -- then stop. Unlike `-n`/`--dry-run`,
+  which returns before any of that is known, this runs the real resolution
+  and therefore reads the remote store. Its `reuse` lines are
+  `PACKAGE/VERSION-REVISION` specs, which is the form
+  [`aliBuild migrate`](#migrating-legacy-tarballs) consumes.
 - `--plugin PLUGIN`: Plugin to use for the build. Default is `legacy`.
 - `--always-prefer-system`: Always use system packages when compatible.
 - `--no-system`: Never use system packages, even if compatible.
@@ -75,13 +88,14 @@ e.g. `alisw/slc8-builder:latest`. They will be fetched if unavailable.
 ### Re-using prebuilt tarballs
 
 Reusing prebuilt tarballs saves compilation time, as common packages need not be
-rebuilt from scratch. `rsync://`, `https://`, `b3://`, `s3://` and `cvmfs://`
-remote stores are recognised. Some of these require credentials: `s3://` remotes
-require an `~/.s3cfg`; `b3://` remotes require `AWS_ACCESS_KEY_ID` and
-`AWS_SECRET_ACCESS_KEY` environment variables. A useful remote store is
+rebuilt from scratch. `rsync://`, `https://`, `b3://`, `s3://`, `reapi://`
+and `cvmfs://` remote stores are recognised. Some of these require
+credentials: `s3://` remotes require an `~/.s3cfg`; `b3://` and `reapi://`
+remotes require `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` environment
+variables, and for `reapi://` that applies to reading as well as writing. A useful remote store is
 `https://s3.cern.ch/swift/v1/alibuild-repo`. It requires no credentials and
 provides tarballs for the most common supported architectures. See
-[Reusing builds from CVMFS](#reusing-builds-from-cvmfs) for the `cvmfs://`
+[Reusing builds from CVMFS](#reusing-builds-from-cvmfs-experimental) for the `cvmfs://`
 store, which reuses packages already deployed on CVMFS without downloading
 anything.
 
@@ -95,7 +109,55 @@ anything.
 - `--write-store STORE`: Where to upload newly built packages. Same syntax as
   `--remote-store`, except `::rw` is not recognised. Implies `--no-system`.
 - `--insecure`: Don't validate TLS certificates when connecting to an `https://`
-  remote store.
+  remote store. For a `reapi://` store it selects `http` for the endpoint
+  instead, which is what a local MinIO or a loopback credential broker needs.
+
+The options below apply only to `reapi://` stores. See
+[Content-addressed stores and the Action
+Cache](#content-addressed-stores-and-the-action-cache) for what they are for.
+
+- `--ac-store STORE`: A separate ledger store for the Action Cache and the
+  reconstruction inputs (recipe, source, refs), which are kept even though
+  the artifact tarballs are deletable. Same `::rw` syntax as
+  `--remote-store`. Defaults to `--remote-store`.
+- `--legacy-links-store STORE`: Where to publish the legacy `TARS/<arch>/`
+  link and store objects, if not in the artifact store. Use this to keep an
+  existing repository browsable by consumers that only understand that
+  layout, while the bytes stay content-addressed.
+- `--cas-public-url URL`: Public base URL of the CAS bucket, e.g.
+  `https://s3.cern.ch/swift/v1/alibuild-cas`. Required with
+  `--legacy-links-store`, because the legacy store objects redirect there by
+  absolute URL, and the endpoint a build uploads *through* -- a credential
+  broker, say -- is not necessarily the one consumers read from.
+- `--storage {ephemeral,permanent}`: Retention for uploaded tarball blobs.
+  `ephemeral` (the default) lets the bucket lifecycle expire them;
+  `permanent` pins them, and also promotes any ephemeral blob the build
+  reuses. Use `permanent` for production builds.
+- `--no-snapshot-sources`: Don't archive built packages' git sources into the
+  ledger. Source archival is best-effort and is skipped for partial
+  (blobless or treeless) mirrors anyway; with this flag
+  `aliBuild reconstruct` falls back to fetching sources from upstream git.
+- `--sign-url URL`: Endpoint of the signing route used to sign Action Cache
+  entries, e.g. `https://<proxy>/sign/alibuild-ac`. Uploading to a `reapi://`
+  store signs by default and requires this unless `--no-sign` is given.
+- `--sign-token TOKEN`: Credential presented to `--sign-url`. Prefer
+  `--sign-token-file` for short-lived credentials.
+- `--sign-token-file FILE`: Read the credential for `--sign-url` from `FILE`,
+  freshly for every signing request. Use this for a token that is refreshed
+  in place while the build runs -- a workload-identity JWT whose lifetime is
+  minutes, against a build that signs entries for hours.
+- `--signer NAME`: Human-readable signer label recorded in the signature. The
+  key id is what is actually checked. Default `alibuild`.
+- `--no-sign`: Upload to a `reapi://` store without signing Action Cache
+  entries.
+- `--require-signature {off,warn,require}`: How to treat signatures on
+  prebuilt `reapi://` tarballs reused during the build: `warn` (the default;
+  log unverified entries and carry on), `off` (don't check), or `require`
+  (fail closed).
+- `--trusted-keys KEYRING`: Path to a JSON keyring of trusted signing keys.
+  This **replaces** the defaults, which are the keyring shipped inside
+  aliBuild merged with `keyring.json` from the alidist checkout, if there is
+  one.
 
 ### Customise aliBuild directories
 
@@ -194,6 +256,227 @@ A few things to keep in mind:
 * As with any remote store, a build is reused only if its hash (or an
   equivalent remote hash) matches what your copy of alidist would produce, so
   keep alidist in sync with the version deployed on CVMFS.
+
+## Content-addressed stores and the Action Cache
+
+A `reapi://` store keeps the same tarballs as the stores above, but addresses
+them by the hash of their *contents* rather than by the hash of the build that
+produced them, and it records how each one was built. The layout is modelled on
+the [Remote Execution API](https://github.com/bazelbuild/remote-apis) and, inside
+the bucket, looks like this:
+
+* `cas/<algo>/<xx>/<hash>` -- the content-addressed blobs: tarballs, archived
+  recipes, archived sources. Digests are `sha256`. Two builds whose difference
+  never reaches the output -- two tags on the same commit, say -- deduplicate to
+  a single blob.
+* `ac/<arch>/<xx>/<hash>.json` -- one *Action Cache* entry per build, keyed by
+  the same action hash the classic store uses to name its files. It records the
+  recipe, the source commit, the action hashes of the dependencies, the build
+  environment, and the `outputDigest` of the tarball that came out.
+* `TARS/<arch>/...` -- the classic store object, symlink and `.manifest` tree is
+  still written, with the store object as an S3 redirect to the CAS blob. Plain
+  `https://` clients and the CVMFS and RPM publishers therefore keep working,
+  and no bytes are stored twice.
+
+Recording the Action Cache buys two things the classic store cannot do. A
+package can be installed straight from the store with no recipes at all, because
+its entry already lists its runtime closure -- see
+[`aliBuild install`](#installing-a-prebuilt-package). And a tarball that has been
+deleted can be rebuilt from the entry that described it -- see
+[`aliBuild reconstruct`](#reconstructing-a-missing-tarball). That is what makes
+the tarballs safe to delete: the ledger is small and kept forever, while the
+artifacts are large and regenerable.
+
+### Addressing a reapi:// store
+
+The URL is `reapi://<endpoint-host>/<bucket>`, and both halves are optional:
+
+```bash
+# The standard CERN layout: endpoint s3.cern.ch, blobs in alibuild-cas, the
+# ledger in alibuild-ac, legacy links in alibuild-repo.
+aliBuild build O2 --remote-store reapi://
+
+# One named bucket, which opts out of the three-bucket default: the ledger and
+# the legacy links then live in that same bucket.
+aliBuild build O2 --remote-store reapi://s3.cern.ch/my-cache::rw
+```
+
+Naming a bucket opts out of the split entirely, so a single-bucket store stays a
+single bucket. Credentials come from `AWS_ACCESS_KEY_ID` and
+`AWS_SECRET_ACCESS_KEY`, for reading as well as for writing.
+
+### Retention
+
+Tarball blobs are tagged `retention=ephemeral` on upload unless
+`--storage permanent` is given. Ephemeral blobs are expired by the bucket
+lifecycle rule 90 days after they were last written or last reused; permanent
+ones are kept indefinitely. Ledger objects -- Action Cache entries, archived
+recipes and archived sources -- are never tagged and never expire, which is what
+makes it useful to keep them in their own bucket with `--ac-store`: the artifact
+store can then be emptied without losing the ability to rebuild it.
+
+### Signing
+
+Action Cache entries can carry Ed25519 signatures, so that a consumer can tell
+that an entry -- and, through its `outputDigest`, the bytes it points at -- came
+from a build it trusts rather than from whoever happened to be able to write to
+the bucket.
+
+Uploads to a `reapi://` store are signed **by default**, and are refused unless
+either `--sign-url` (with `--sign-token` or `--sign-token-file`) or `--no-sign`
+is given. aliBuild never holds the private key: it sends the bytes to be signed
+to the endpoint named by `--sign-url`, which signs them and returns the
+signature.
+
+On the consuming side -- `build` reusing a prebuilt tarball, `install`,
+`reconstruct` -- `--require-signature` selects the policy and defaults to
+`warn`. The keyring is the one shipped inside aliBuild
+(`alibuild_helpers/keyring.json`), merged with `keyring.json` from the alidist
+checkout when there is one; `--trusted-keys` replaces both. Merging can add keys
+but never widens trust: validity windows intersect and revocations are unioned,
+so a key revoked in the shipped keyring stays revoked whatever another keyring
+says about it. Verification needs the optional `cryptography` dependency
+(`pip install alibuild[signing]`); without it, `warn` degrades to a warning and
+`require` fails.
+
+### Installing a prebuilt package
+
+`aliBuild install` installs a package and its runtime closure straight from a
+`reapi://` store. It needs no alidist and runs no build: the Action Cache entry
+already names the closure, and the relocation logic ships inside the tarball, so
+neither has to be resolved or reimplemented.
+
+```bash
+aliBuild install GenTopo --version nightly-20261015 \
+    --remote-store reapi:// --prefix /opt/alisw
+```
+
+- `PACKAGE`: the package to install.
+- `--version VERSION`: required.
+- `--revision REVISION`: defaults to the highest available for the version.
+- `--prefix DIR`: where to install. Defaults to the work directory.
+
+It also takes `--remote-store` (required here, unlike for `build`), `--ac-store`,
+`--insecure`, `-a`/`--architecture`, `-w`/`--work-dir`, `--require-signature` and
+`--trusted-keys`, all as described above.
+
+Each package is unpacked into `<prefix>/<arch>/<package>/<version>-<revision>`
+and its in-tarball `relocate-me.sh` is run against the prefix; the package's own
+`etc/profile.d/init.sh` then sets up the environment. A package already present
+at that path is left alone, so re-running the command is cheap.
+
+### Reconstructing a missing tarball
+
+`aliBuild reconstruct` walks the *build* closure of a package in the Action
+Cache, finds the tarballs missing from the CAS, and materialises the archived
+recipes into a self-contained alidist directory. An ordinary
+`aliBuild build ... --remote-store reapi://...::rw` against that directory then
+recomputes the same action hashes, rebuilds what is missing and repopulates the
+CAS.
+
+```bash
+# What would it take, and is the ledger actually complete?
+aliBuild reconstruct O2 --version nightly-20261015 \
+    --remote-store reapi:// --verify
+
+# Prove the recorded blob can be regenerated byte for byte.
+aliBuild reconstruct O2 --version nightly-20261015 \
+    --remote-store reapi:// --verify --rebuild
+```
+
+- `--verify`: read-only. Reports the plan -- which tarballs would be reused from
+  the CAS and which rebuilt -- and checks the ledger for recipe integrity, a
+  complete dependency DAG and archived sources. Rebuilds nothing.
+- `--rebuild`: with `--verify`, actually rebuild just the target package,
+  reusing every dependency from the CAS and uploading nothing, then compare the
+  resulting tarball's content hash against the recorded `outputDigest`. A match
+  proves the blob is byte-for-byte regenerable.
+- `--strict`: with `--verify --rebuild`, treat a non-identical rebuild as a
+  failure. The default is lenient, because tarballs produced before output
+  normalisation are not bit-reproducible.
+- `--persist`: rebuild the target and, if it reproduces the recorded digest,
+  upload just that one blob back -- a content-addressed restore. Unlike a
+  `build ... ::rw` it writes nothing else: no revision assignment, no publisher
+  symlinks, no Action Cache rewrite, because all of those already point at the
+  blob. A dry run unless `--apply` is given.
+- `--rebaseline`: rebuild the target and, where its reproducible hash differs
+  from the recorded (legacy) one, rewrite the entry's `outputDigest` and the
+  store redirect to the rebuilt hash, so later verifications are byte-identical.
+  A dry run unless `--apply`; `--delete-old` additionally removes the blob the
+  re-baseline orphans.
+- `--output-config DIR`: where to materialise the recipes. Defaults to
+  `WORKDIR/reconstruct-PACKAGE`.
+- `--alidist DIR`: an alidist checkout to take the defaults file
+  (`defaults-<name>.sh`) from. A defaults file is configuration rather than a
+  package in the closure, so it is not archived in the ledger; this is needed to
+  rebuild a release built with non-`release` defaults, such as `o2`.
+- `--storage {ephemeral,permanent}`: retention for a blob restored by
+  `--persist`. Defaults to `permanent`, on the grounds that a deliberately
+  reconstructed blob should not then be LRU-expired.
+
+### Migrating legacy tarballs
+
+`aliBuild migrate` turns tarballs from a classic store into reapi entries, so
+that releases built before any of this existed become installable and
+reconstructible. For each tarball it reads the embedded `.meta.json` provenance,
+recovers the full recipe from the alidist commit recorded there, synthesises the
+Action Cache entry, and writes the CAS blob, the recipe blob, the entry, the
+legacy redirect and the per-package link. The old store is only ever read, never
+written.
+
+```bash
+# Preview a whole architecture, closures included, writing nothing.
+aliBuild migrate --match '.*' --closure -n -a slc9_x86-64 \
+    --read-store https://s3.cern.ch/swift/v1/alibuild-repo \
+    --alidist ~/alidist --remote-store reapi://
+
+# Migrate one release and everything it was built from, for keeps.
+aliBuild migrate O2PDPSuite/nightly-20261015-1 --closure -j 8 \
+    --read-store https://s3.cern.ch/swift/v1/alibuild-repo \
+    --alidist ~/alidist --remote-store reapi://::rw --storage permanent
+```
+
+- `TARBALL...`: local paths, or `PACKAGE/VERSION-REVISION` specs when
+  `--read-store` is given. `aliBuild build --plan` prints specs in that form.
+- `--read-store URL`: read-only `http(s)` old store to fetch tarballs from.
+- `--alidist DIR`: alidist checkout or mirror from which to recover recipes at
+  the recorded commits. Required to migrate tarballs.
+- `--closure`: treat each argument as a top package and migrate its whole build
+  closure, read from the old store's `dist` tree. Requires `--read-store`.
+- `--match REGEX`: migrate every `PACKAGE/VERSION-REVISION` published for the
+  architecture in the old store whose spec matches (Python `re.search`); `.*`
+  takes the whole architecture. Composes with `--closure` and with
+  `-n`/`--dry-run`.
+- `-j JOBS`, `--jobs JOBS`: migrate this many packages in parallel, overlapping
+  the downloads and uploads. Peak disk use scales with it.
+- `--snapshot-sources`: also archive each release's git source into the ledger,
+  so the release can be reconstructed with neither its tarball nor its upstream
+  still around. Idempotent: an already-migrated release is enriched in place
+  from its Action Cache entry, with no tarball re-download and no CAS rewrite.
+  Given no `TARBALL`, it walks the whole ledger instead, which works even after
+  the old store has pruned the tarballs.
+- `--source-mirror DIR`: where to cache the source clones `--snapshot-sources`
+  makes. Defaults to `WORKDIR/MIRROR-migrate`.
+- `--allow-no-provenance`: for tarballs predating `.meta.json`, store the
+  tarball, its redirect and its link anyway, reserving the version-revision so
+  that a later fresh build cannot shadow it. Such packages are preserved and
+  installable but **not** reconstructible, since no ledger entry can be
+  recovered for them.
+- `--container IMAGE`: container image to record for the migrated builds, marked
+  as assumed rather than observed. Defaults to the architecture's default
+  builder.
+- `--no-verify`: skip the structural self-check of recovered recipes -- that
+  each one parses, that its package field matches the metadata, and that every
+  recorded dependency carries a hash. Entries failing the check are skipped
+  rather than written.
+- `--populate-system`: walk the whole ledger and add `validate-system` nodes to
+  every build entry, to backfill entries migrated before that became automatic.
+  Idempotent, and honours `-n`/`--dry-run`.
+
+Two limitations are worth knowing before planning a bulk migration. Archived
+sources are git-only, so Sapling-backed packages are skipped. And
+self-verification is structural: it does not yet recompute the action hash and
+match it against the store key.
 
 ## Developing packages locally
 

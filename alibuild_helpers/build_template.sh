@@ -374,3 +374,46 @@ fi
 # Mark the build as successful with a placeholder. Allows running incremental
 # recipe in case the package is in development mode.
 echo "${DEVEL_HASH}${DEPS_HASH}" > "$BUILDDIR/.build_succeeded"
+
+# Peak memory for this package, read before the container holding the cgroup
+# goes away. O2Physics sizes its `analysis` ninja pool from the cgroup LIMIT at
+# an assumed 8 GiB per job -- a worst case measured off the heaviest producers.
+# This is what the build actually used, so the assumption can be checked against
+# it rather than argued about. cgroup v1 keeps a high-water mark in
+# memory.max_usage_in_bytes; v2 only grew memory.peak in Linux 5.19, and macOS
+# has neither, so staying quiet is the normal outcome on some builders.
+for _peak_file in /sys/fs/cgroup/memory/memory.max_usage_in_bytes \
+                  /sys/fs/cgroup/memory.peak; do
+  [ -r "$_peak_file" ] || continue
+  # No `|| continue` on the read: it reports failure at EOF when the file has no
+  # trailing newline, having already assigned the value. Let the numeric test
+  # below be the only gate, and clear the variable so a failed read cannot carry
+  # the previous iteration's number forward.
+  _peak_bytes=
+  read -r _peak_bytes < "$_peak_file" 2>/dev/null || true
+  case $_peak_bytes in ''|*[!0-9]*) continue ;; esac
+  # The limit is worth printing beside it: the pool is derived from that number,
+  # and it is NOT the Nomad reservation -- build-loop.sh keeps some back.
+  _limit_mib=
+  for _limit_file in /sys/fs/cgroup/memory/memory.limit_in_bytes \
+                     /sys/fs/cgroup/memory.max; do
+    [ -r "$_limit_file" ] || continue
+    _limit_bytes=
+    read -r _limit_bytes < "$_limit_file" 2>/dev/null || true
+    # cgroup v2 spells "no limit" as the literal string "max".
+    case $_limit_bytes in ''|*[!0-9]*) continue ;; esac
+    _limit_mib=$((_limit_bytes / 1048576))
+    break
+  done
+  echo "aliBuild: peak memory $PKGNAME-$PKGVERSION-$PKGREVISION $((_peak_bytes / 1048576)) MiB${_limit_mib:+ of $_limit_mib MiB}"
+  # Also machine-readable, appended rather than logged, so a caller can turn it
+  # into metrics without teeing and re-parsing the whole build output. Packages
+  # build one container at a time, so plain >> needs no locking. Whoever reads
+  # this owns truncating it: aliBuild has no idea where one CI round ends.
+  if [ -w "$WORK_DIR" ]; then
+    printf '%%s\t%%s\t%%s\n' "$PKGNAME-$PKGVERSION-$PKGREVISION" \
+      "$((_peak_bytes / 1048576))" "${_limit_mib:-0}" \
+      >> "$WORK_DIR/peak-memory.tsv" || true
+  fi
+  break
+done

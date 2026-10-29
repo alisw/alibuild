@@ -38,6 +38,12 @@ docs = [
 'mkdocs-material',
 'mkdocs-redirects',
 ]
+# Ed25519 signing of reapi:// Action Cache entries. Imported lazily, so the core
+# tool works without it -- but keep this in sync with setup.py's extras_require:
+# because [project] exists here, this table is what the built metadata advertises.
+signing = [
+'cryptography',
+]
 
 [project.urls]
 homepage = 'https://alisw.github.io/alibuild'
@@ -49,7 +55,7 @@ script-files = ["aliBuild", "alienv", "aliDoctor", "aliDeps", "pb"]
 write_to = "alibuild_helpers/_version.py"
 
 [tool.setuptools.package-data]
-alibuild_helpers = ['build_template.sh', 'completions/*.sh']
+alibuild_helpers = ['build_template.sh', 'completions/*.sh', 'keyring.json']
 
 [tool.setuptools.packages.find]
 where = ["."]
