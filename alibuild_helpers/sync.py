@@ -571,10 +571,64 @@ class Boto3RemoteSync:
             "variables to aliBuild in order to use the S3 remote store")
       sys.exit(1)
 
+    if self.writeStore:
+      self._check_conditional_write_support()
+
+  def _check_conditional_write_support(self):
+    """Fail early if we cannot claim packages before uploading them.
+
+    Only the client side is checkable: a store without conditional writes
+    ignores If-None-Match rather than rejecting it.
+    """
+    try:
+      supported = "IfNoneMatch" in self.s3.meta.service_model \
+        .operation_model("PutObject").input_shape.members
+    except Exception:      # pylint: disable=broad-except
+      supported = False
+    dieOnError(not supported,
+               "your boto3/botocore is too old to publish to an S3 store: it "
+               "cannot send If-None-Match, which aliBuild needs to claim a "
+               "package before uploading it. Upgrade it (S3 conditional writes "
+               "were added in August 2024) with: pip install -U boto3")
+
+  def _link_is_ours(self, link_path, link_body):
+    """Does the symlink on S3 point at the tarball we are about to write?
+
+    False if it turned out not to exist. Dies if it belongs to a different
+    build, which we have no way to arbitrate with.
+    """
+    from botocore.exceptions import ClientError
+    try:
+      remote_target = self.s3.get_object(
+        Bucket=self.writeStore, Key=link_path)["Body"].read().decode("utf-8").strip()
+    except ClientError as exc:
+      # Gone since we looked. Anything else and we cannot tell whose it is.
+      dieOnError(exc.response.get("Error", {}).get("Code")
+                 not in ("404", "NoSuchKey"),
+                 "%s exists on S3 but could not be read, so we cannot tell "
+                 "whether this build owns it: %s" % (link_path, exc))
+      return False
+    dieOnError(remote_target != link_body,
+               "%s already exists on S3 and points at %s, not %s: another build "
+               "owns this package. Aborting rather than repointing it." %
+               (link_path, remote_target, link_body))
+    return True
+
   def _put_link(self, link_path, link_body):
-    """Write the symlink object, whose body is the store path it stands for."""
-    self.s3.put_object(Bucket=self.writeStore, Key=link_path,
-                       Body=link_body.encode("utf-8"))
+    """Claim the symlink object, whose body is the store path it stands for.
+
+    Conditional on the key not existing yet; False if somebody claimed it first.
+    """
+    from botocore.exceptions import ClientError
+    try:
+      self.s3.put_object(Bucket=self.writeStore, Key=link_path, IfNoneMatch="*",
+                         Body=link_body.encode("utf-8"))
+      return True
+    except ClientError as exc:
+      if exc.response.get("Error", {}).get("Code") == "PreconditionFailed" or \
+         exc.response.get("ResponseMetadata", {}).get("HTTPStatusCode") == 412:
+        return False
+      raise
 
   def _s3_listdir(self, dirname):
     """List keys of items under dirname in the read bucket."""
@@ -715,11 +769,11 @@ class Boto3RemoteSync:
         debug("All %s symlinks already exist on S3, skipping upload", link_dir)
         continue
 
-      # Excluding our own symlinks (above), if there is anything in our link_dir
-      # on the remote, something else is uploading symlinks (or already has)!
-      dieOnError(symlinks_existing,
-                 "Conflicts detected in %s on S3; aborting: %s" %
-                 (link_dir, ", ".join(sorted(symlinks_existing))))
+      # Leftovers of a publish that died among these. Who owns the revision
+      # is decided by the package symlink claim below: foreign builds die
+      # there before writing anything, so rewriting is safe.
+      if symlinks_existing:
+        warning("%s is incomplete on S3; rewriting it.", link_dir)
 
       dist_symlinks[link_dir] = symlinks
 
@@ -740,10 +794,9 @@ class Boto3RemoteSync:
     else:
       # The tarball is in the local store but its link was never made: it was
       # fetched from a store where the link had not been published, so
-      # fetch_symlinks had nothing to copy. The body is the store path we are
-      # about to publish, so write the link rather than failing on a state we
-      # can repair -- and before the check below, which would otherwise report
-      # a missing local file as a conflict on the remote.
+      # fetch_symlinks had nothing to copy. Write the link rather than failing
+      # on a state we can repair -- and before the ownership check below, which
+      # would otherwise report a missing local file as a remote conflict.
       # A link body is the store path relative to TARS/, i.e.
       # "<arch>/store/xx/<hash>/<tarball>" -- that is what os.readlink(...)
       # .lstrip("./") yields for a link the build created, and fetch_symlinks
@@ -751,20 +804,37 @@ class Boto3RemoteSync:
       link_body = tar_path[len("TARS/"):] if tar_path.startswith("TARS/") else tar_path
       os.makedirs(os.path.dirname(local_link), exist_ok=True)
       symlink("../../" + link_body, local_link)
-    dieOnError(tar_exists or link_exists,
-               "%s already exists on S3 but %s does not, aborting!" %
-               (tar_path if tar_exists else link_path,
-                link_path if tar_exists else tar_path))
+    if tar_exists or link_exists:
+      # Half a publish: a previous run died between the two writes, or
+      # something else is uploading this package right now.
+      if link_exists:
+        link_exists = self._link_is_ours(link_path, link_body)
+      warning("%s was published only partially (%s is missing); completing it.",
+              tarball, tar_path if link_exists else link_path)
 
     debug("Uploading tarball and symlinks for %s %s-%s (%s) to S3",
           spec["package"], spec["version"], spec["revision"], spec["hash"])
 
-    # Upload the smaller file first, so that any parallel uploads are more
-    # likely to find it and fail.
-    self._put_link(link_path, link_body)
+    # Claim the package before uploading it, so a parallel upload fails here
+    # rather than overwriting us.
+    if link_exists:
+      debug("%s already points at our tarball", link_path)
+    elif not self._put_link(link_path, link_body):
+      # Somebody claimed it first. Dies unless they build the same hash.
+      dieOnError(not self._link_is_ours(link_path, link_body),
+                 "%s was created and then deleted while we were claiming it; "
+                 "refusing to publish a tarball with no symlink." % link_path)
+      # They may have died mid-publish, so check rather than assume they will
+      # finish; duplicating a live uploader's work is harmless.
+      if self._s3_key_exists(tar_path):
+        debug("%s was published by a concurrent build of the same hash", tarball)
+        return
+      warning("%s was claimed by a concurrent build of the same hash, which has "
+              "not uploaded the tarball; uploading ours.", link_path)
 
-    # Second, upload dist symlinks. These should be in place before the main
-    # tarball, to avoid races in the publisher.
+    # Second, upload dist symlinks. The publisher takes the tarball appearing
+    # under store/ as its signal to publish and reads runtime dependencies from
+    # dist-runtime/, where an incomplete listing means deps silently missing.
     start_time = time.time()
     total_symlinks = 0
 
@@ -805,7 +875,8 @@ class Boto3RemoteSync:
     debug("Uploaded %d dist symlinks in %.2f seconds",
           total_symlinks, end_time - start_time)
 
-    self._upload_tarball(spec, tar_path)
+    if not tar_exists:
+      self._upload_tarball(spec, tar_path)
 
   def _upload_tarball(self, spec, tar_path) -> None:
     """Upload the tarball bytes to the remote store under tar_path.
