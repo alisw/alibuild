@@ -112,10 +112,24 @@ jobs:
             echo "Formula unchanged after bump; nothing to push."
             exit 0
           fi
+          # Push with a deploy key scoped to the tap. The PAT this used to carry
+          # expired silently and stranded the formula for two months; a deploy
+          # key has no expiry and can touch nothing but this one repository.
+          keydir=$(mktemp -d)
+          trap 'rm -rf "$keydir"' EXIT
+          { set +x; } 2>/dev/null   # never trace the key into the log
+          printf '%s\n' "$DEPLOY_KEY" > "$keydir/id"
+          set -x
+          chmod 600 "$keydir/id"
+          # Pin github.com from GitHub's published host keys rather than
+          # trusting whatever answers on port 22.
+          curl -fSsL https://api.github.com/meta \
+            | jq -r '.ssh_keys[] | "github.com \(.)"' > "$keydir/known_hosts"
+          export GIT_SSH_COMMAND="ssh -i $keydir/id -o IdentitiesOnly=yes -o UserKnownHostsFile=$keydir/known_hosts"
           git config user.name alibuild
           git config user.email 'alibuild@cern.ch'
           git add alibuild.rb
           git commit -m "Update alibuild to ${{ steps.check.outputs.version }}"
-          git push "https://alibuild:$GITHUB_TOKEN@github.com/alisw/homebrew-system-deps" master
+          git push git@github.com:alisw/homebrew-system-deps master
         env:
-          GITHUB_TOKEN: ${{ secrets.homebrew_repo_token }}
+          DEPLOY_KEY: ${{ secrets.HOMEBREW_DEPLOY_KEY }}
