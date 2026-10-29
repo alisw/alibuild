@@ -15,6 +15,12 @@ name: Check PR
 
 permissions: {}
 
+# Two identical runs were being queued per push, so every push rolled the
+# macOS flakes twice and either roll could redden a required check.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   unittest:
     name: python${{ matrix.python-version }}
@@ -66,12 +72,17 @@ jobs:
           files: coverage.json
 
   mac-unittest:
-    name: mac-python${{ matrix.python-version }}
-    runs-on: macos-14
+    # The macos-15 names are required contexts in the "Protect master" ruleset,
+    # so they must stay exactly "mac-python<version>".
+    name: ${{ matrix.os == 'macos-15' && 'mac' || matrix.os }}-python${{ matrix.python-version }}
+    runs-on: ${{ matrix.os }}
 
     strategy:
       fail-fast: false   # continue executing other checks if one fails
       matrix:
+        os:
+          - 'macos-15'
+          - 'macos-26'
         python-version:
           - '3.11'
           - '3.12'
