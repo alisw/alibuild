@@ -15,6 +15,7 @@ PACKAGE = "zlib"
 GOOD_HASH = "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
 BAD_HASH = "baadf00dbaadf00dbaadf00dbaadf00dbaadf00d"
 NONEXISTENT_HASH = "TRIGGERS_A_404"
+RESUME_HASH = "f00dcafef00dcafef00dcafef00dcafef00dcafe"
 GOOD_SPEC = {    # fully present on the remote store
     "package": PACKAGE, "version": "v1.3.1", "revision": "1",
     "hash": GOOD_HASH,
@@ -32,6 +33,12 @@ MISSING_SPEC = {    # completely absent from the remote store
     "hash": NONEXISTENT_HASH,
     "remote_revision_hash": NONEXISTENT_HASH,
     "remote_hashes": [NONEXISTENT_HASH],
+}
+RESUME_SPEC = {  # symlink published, but the store object never made it
+    "package": PACKAGE, "version": "v1.3.1", "revision": "4",
+    "hash": RESUME_HASH,
+    "remote_revision_hash": RESUME_HASH,
+    "remote_hashes": [RESUME_HASH],
 }
 
 
@@ -285,7 +292,8 @@ class Boto3TestCase(unittest.TestCase):
         def paginate_listdir(Bucket, Delimiter, Prefix):
             dir = Prefix.rstrip(Delimiter)
             if dir in (resolve_store_path(ARCHITECTURE, NONEXISTENT_HASH),
-                       resolve_store_path(ARCHITECTURE, BAD_HASH)):
+                       resolve_store_path(ARCHITECTURE, BAD_HASH),
+                       resolve_store_path(ARCHITECTURE, RESUME_HASH)):
                 return [{}]
             elif dir in (resolve_store_path(ARCHITECTURE, GOOD_HASH),
                          resolve_links_path(ARCHITECTURE, PACKAGE)):
@@ -311,11 +319,17 @@ class Boto3TestCase(unittest.TestCase):
             elif dir.endswith("-" + MISSING_SPEC["revision"]):
                 # No pre-existing symlinks under dist*.
                 return [{"Contents": []}]
+            elif dir.endswith("-" + RESUME_SPEC["revision"]):
+                # The interrupted publish also died among the dist symlinks.
+                return [{"Contents": [
+                    {"Key": dir + Delimiter + "somedep-v1-1.%s.tar.gz" % ARCHITECTURE},
+                ]}]
             else:
                 raise NotImplementedError("unknown dist prefix " + Prefix)
 
         def head_object(Bucket, Key):
             if NONEXISTENT_HASH in Key or BAD_HASH in Key or \
+               RESUME_HASH in Key or \
                os.path.basename(Key) == tarball_name(MISSING_SPEC):
                 raise ClientError({"Error": {"Code": "404"}}, "head_object")
             return {}
@@ -377,30 +391,51 @@ class Boto3TestCase(unittest.TestCase):
 
     @patch("os.listdir", new=lambda path: (
         [] if path.endswith("-" + MISSING_SPEC["revision"]) else NotImplemented))
+    @patch("glob.glob", new=MagicMock(return_value=[]))
+    @patch("os.listdir", new=MagicMock(return_value=[]))
+    @patch("os.makedirs", new=MagicMock())
+    @patch("os.path.exists", new=MagicMock(return_value=False))
+    @patch("os.path.isfile", new=MagicMock(return_value=False))
     @patch("os.path.islink", new=MagicMock(return_value=False))
-    def test_missing_local_link_is_recreated(self) -> None:
-        """A tarball in the local store whose link was never made is publishable."""
+    def test_tarball_download_follows_reapi_redirect(self) -> None:
+        """A reapi:// store leaves the legacy store object as a website-redirect
+        stub pointing at the CAS blob. A b3:// consumer must follow the redirect
+        and download the real bytes from the CAS key -- not the stub -- while
+        still saving them under the legacy store path/name the build expects."""
+        from botocore.exceptions import ClientError
+        store_path = resolve_store_path(ARCHITECTURE, GOOD_HASH)
+        tarball_key = store_path + "/" + tarball_name(GOOD_SPEC)
+        cas_key = "cas/sha256/aa/" + "a" * 64
+
+        def paginate(Bucket, Delimiter, Prefix):
+            if Prefix.rstrip(Delimiter) == store_path:
+                return [{"Contents": [{"Key": tarball_key}]}]
+            return [{}]
+
+        def head_object(Bucket, Key):
+            if Key == tarball_key:            # legacy store object -> redirect stub
+                return {"WebsiteRedirectLocation": "/" + cas_key}
+            if Key == cas_key:                # the real content-addressed bytes
+                return {"ContentLength": 4096}
+            raise ClientError({"Error": {"Code": "404"}}, "head_object")
+
+        downloaded = []
         b3sync = sync.Boto3RemoteSync(
             remoteStore="b3://localhost", writeStore="b3://localhost",
             architecture=ARCHITECTURE, workdir="/sw")
-        b3sync.s3 = self.mock_s3()
-        b3sync.upload_symlinks_and_tarball(MISSING_SPEC)
-        tar_path = os.path.join(resolve_store_path(ARCHITECTURE, NONEXISTENT_HASH),
-                                tarball_name(MISSING_SPEC))
-        # The body is the store path relative to TARS/. build.py parses the
-        # local link, which fetch_symlinks builds as "../../" + body, to work
-        # out which revisions are taken -- a body carrying the "TARS/" prefix
-        # produces a link it cannot parse, so the revision looks free and the
-        # next build collides with what is already published.
-        body = tar_path[len("TARS/"):]
-        b3sync.s3.put_object.assert_any_call(
-            Bucket="localhost",
-            Key=os.path.join(resolve_links_path(ARCHITECTURE, PACKAGE),
-                             tarball_name(MISSING_SPEC)),
-            Body=body.encode("utf-8"))
-        self.assertNotIn("TARS/", body)
-        self.assertTrue(("../../" + body).startswith("../../%s/store/" % ARCHITECTURE),
-                        "local link would not parse: %r" % ("../../" + body))
+        b3sync.s3 = MagicMock(
+            get_paginator=lambda method: MagicMock(paginate=paginate),
+            head_object=head_object,
+            download_file=MagicMock(side_effect=lambda **kw: downloaded.append(kw)))
+
+        b3sync.fetch_tarball(GOOD_SPEC)
+
+        self.assertEqual(len(downloaded), 1)
+        # Bytes are fetched from the CAS blob, not the redirect stub...
+        self.assertEqual(downloaded[0]["Key"], cas_key)
+        # ...but saved under the legacy store path + tarball name.
+        self.assertTrue(downloaded[0]["Filename"].endswith(
+            store_path + "/" + tarball_name(GOOD_SPEC)))
 
     @patch("os.listdir", new=lambda path: (
         [tarball_name(GOOD_SPEC)] if path.endswith("-" + GOOD_SPEC["revision"]) else
@@ -434,13 +469,268 @@ class Boto3TestCase(unittest.TestCase):
         b3sync.s3.put_object.assert_not_called()
         b3sync.s3.upload_file.assert_not_called()
 
-        # Make sure conflict detection is working for tarball sync.
+        # Conflict detection: the remote symlink points at somebody else's
+        # store path, so they own this package and we must not touch it.
         b3sync.s3.put_object.reset_mock()
         b3sync.s3.upload_file.reset_mock()
         self.assertRaises(SystemExit, b3sync.upload_symlinks_and_tarball, BAD_SPEC)
         b3sync.s3.put_object.assert_not_called()
         b3sync.s3.upload_file.assert_not_called()
 
+    @patch("os.listdir", new=lambda path: (
+        [tarball_name(RESUME_SPEC)] if path.endswith("-" + RESUME_SPEC["revision"]) else
+        NotImplemented
+    ))
+    @patch("os.path.islink", new=MagicMock(return_value=True))
+    def test_tarball_upload_resume(self) -> None:
+        """A publish interrupted between the symlink and the tarball is resumable."""
+        link_target = os.path.join(
+            resolve_store_path(ARCHITECTURE, RESUME_HASH), tarball_name(RESUME_SPEC))
+        b3sync = sync.Boto3RemoteSync(
+            remoteStore="b3://localhost", writeStore="b3://localhost",
+            architecture=ARCHITECTURE, workdir="/sw")
+        b3sync.s3 = self.mock_s3()
+        # The remote symlink points where we are about to write: ours.
+        b3sync.s3.get_object = MagicMock(return_value={
+            "Body": MagicMock(read=lambda: link_target.encode("utf-8")),
+        })
+
+        with patch("os.readlink", new=MagicMock(return_value="../../" + link_target)):
+            b3sync.upload_symlinks_and_tarball(RESUME_SPEC)
+
+        b3sync.s3.upload_file.assert_called()
+        link_key = os.path.join(resolve_links_path(ARCHITECTURE, PACKAGE),
+                                tarball_name(RESUME_SPEC))
+        for call in b3sync.s3.put_object.mock_calls:
+            self.assertNotEqual(call.kwargs.get("Key"), link_key)
+
+    @patch("os.listdir", new=lambda path: (
+        [tarball_name(RESUME_SPEC)] if path.endswith("-" + RESUME_SPEC["revision"]) else
+        NotImplemented
+    ))
+    @patch("os.path.islink", new=MagicMock(return_value=True))
+    def test_tarball_present_link_missing(self) -> None:
+        """Only the missing symlink is written; the tarball is not re-uploaded."""
+        link_target = os.path.join(
+            resolve_store_path(ARCHITECTURE, RESUME_HASH), tarball_name(RESUME_SPEC))
+        b3sync = sync.Boto3RemoteSync(
+            remoteStore="b3://localhost", writeStore="b3://localhost",
+            architecture=ARCHITECTURE, workdir="/sw")
+        b3sync.s3 = self.mock_s3()
+        b3sync._s3_key_exists = lambda path: path == link_target
+
+        with patch("os.readlink", new=MagicMock(return_value="../../" + link_target)):
+            b3sync.upload_symlinks_and_tarball(RESUME_SPEC)
+
+        b3sync.s3.upload_file.assert_not_called()
+        b3sync.s3.put_object.assert_any_call(
+            Bucket="localhost", IfNoneMatch="*",
+            Key=os.path.join(resolve_links_path(ARCHITECTURE, PACKAGE),
+                             tarball_name(RESUME_SPEC)),
+            Body=link_target.encode("utf-8"))
+
+    @patch("os.listdir", new=lambda path: (
+        [tarball_name(RESUME_SPEC)] if path.endswith("-" + RESUME_SPEC["revision"]) else
+        NotImplemented
+    ))
+    @patch("os.readlink", new=MagicMock(return_value="dummy path"))
+    @patch("os.path.islink", new=MagicMock(return_value=True))
+    def test_tarball_upload_unreadable_link(self) -> None:
+        """If we cannot tell who owns the existing symlink, we must not touch it."""
+        from botocore.exceptions import ClientError
+        b3sync = sync.Boto3RemoteSync(
+            remoteStore="b3://localhost", writeStore="b3://localhost",
+            architecture=ARCHITECTURE, workdir="/sw")
+        b3sync.s3 = self.mock_s3()
+        b3sync.s3.get_object = MagicMock(side_effect=ClientError(
+            {"Error": {"Code": "AccessDenied"}}, "get_object"))
+
+        self.assertRaises(SystemExit, b3sync.upload_symlinks_and_tarball, RESUME_SPEC)
+        b3sync.s3.put_object.assert_not_called()
+        b3sync.s3.upload_file.assert_not_called()
+
+    @patch("os.listdir", new=lambda path: (
+        [] if path.endswith("-" + MISSING_SPEC["revision"]) else NotImplemented))
+    @patch("os.path.islink", new=MagicMock(return_value=False))
+    def test_missing_local_link_is_recreated(self) -> None:
+        """A tarball in the local store whose link was never made is publishable."""
+        b3sync = self.fresh_upload_sync()
+        b3sync.upload_symlinks_and_tarball(MISSING_SPEC)
+        tar_path = os.path.join(resolve_store_path(ARCHITECTURE, NONEXISTENT_HASH),
+                                tarball_name(MISSING_SPEC))
+        # The body is the store path relative to TARS/. build.py parses the
+        # local link, which fetch_symlinks builds as "../../" + body, to work
+        # out which revisions are taken -- a body carrying the "TARS/" prefix
+        # produces a link it cannot parse, so the revision looks free and the
+        # next build collides with what is already published.
+        body = tar_path[len("TARS/"):]
+        b3sync.s3.put_object.assert_any_call(
+            IfNoneMatch="*", Bucket="localhost",
+            Key=os.path.join(resolve_links_path(ARCHITECTURE, PACKAGE),
+                             tarball_name(MISSING_SPEC)),
+            Body=body.encode("utf-8"))
+        # ... and the link we wrote locally must be in the shape that parser
+        # expects: "../../<arch>/store/...", with no "TARS/" in the body.
+        self.assertNotIn("TARS/", body)
+        self.assertTrue(("../../" + body).startswith("../../%s/store/" % ARCHITECTURE),
+                        "local link would not parse: %r" % ("../../" + body))
+
+    def fresh_upload_sync(self):
+        """A sync object publishing MISSING_SPEC, which is absent from the remote."""
+        b3sync = sync.Boto3RemoteSync(
+            remoteStore="b3://localhost", writeStore="b3://localhost",
+            architecture=ARCHITECTURE, workdir="/sw")
+        b3sync.s3 = self.mock_s3()
+        return b3sync
+
+    def test_conditional_write_required(self) -> None:
+        """Publishing without If-None-Match support must fail before any work."""
+        import boto3
+        b3sync = self.fresh_upload_sync()
+        # A mock has no service model, standing in for an old botocore.
+        self.assertRaises(SystemExit, b3sync._check_conditional_write_support)
+        b3sync.s3 = boto3.client("s3", region_name="us-east-1",
+                                 aws_access_key_id="x", aws_secret_access_key="y")
+        b3sync._check_conditional_write_support()
+
+    @patch("os.listdir", new=lambda path: (
+        [] if path.endswith("-" + MISSING_SPEC["revision"]) else NotImplemented))
+    @patch("os.readlink", new=MagicMock(return_value="dummy path"))
+    @patch("os.path.islink", new=MagicMock(return_value=True))
+    def test_symlink_claimed_conditionally(self) -> None:
+        """The symlink is claimed with If-None-Match, where the store supports it."""
+        b3sync = self.fresh_upload_sync()
+        b3sync.upload_symlinks_and_tarball(MISSING_SPEC)
+        b3sync.s3.put_object.assert_any_call(
+            IfNoneMatch="*", Bucket="localhost",
+            Key=os.path.join(resolve_links_path(ARCHITECTURE, PACKAGE),
+                             tarball_name(MISSING_SPEC)),
+            Body=b"dummy path")
+
+    @patch("os.listdir", new=lambda path: (
+        [] if path.endswith("-" + MISSING_SPEC["revision"]) else NotImplemented))
+    @patch("os.readlink", new=MagicMock(return_value="dummy path"))
+    @patch("os.path.islink", new=MagicMock(return_value=True))
+    def test_symlink_claim_lost_to_other_build(self) -> None:
+        """Losing the claim to a build of a different hash must abort the upload."""
+        from botocore.exceptions import ClientError
+        b3sync = self.fresh_upload_sync()
+        b3sync.s3.put_object = MagicMock(side_effect=ClientError(
+            {"Error": {"Code": "PreconditionFailed"}}, "put_object"))
+        # mock_s3's get_object reports a target that is not ours.
+        self.assertRaises(SystemExit, b3sync.upload_symlinks_and_tarball, MISSING_SPEC)
+        b3sync.s3.upload_file.assert_not_called()
+
+    @patch("os.listdir", new=lambda path: (
+        [] if path.endswith("-" + MISSING_SPEC["revision"]) else NotImplemented))
+    @patch("os.readlink", new=MagicMock(return_value="dummy path"))
+    @patch("os.path.islink", new=MagicMock(return_value=True))
+    def test_symlink_claim_lost_to_same_hash(self) -> None:
+        """We upload anyway: the winner of the claim may have died mid-publish."""
+        b3sync = self.claim_losing_sync()
+        b3sync.upload_symlinks_and_tarball(MISSING_SPEC)
+        b3sync.s3.upload_file.assert_called()
+
+    @patch("os.listdir", new=lambda path: (
+        [] if path.endswith("-" + MISSING_SPEC["revision"]) else NotImplemented))
+    @patch("os.readlink", new=MagicMock(return_value="dummy path"))
+    @patch("os.path.islink", new=MagicMock(return_value=True))
+    def test_symlink_claim_lost_to_finished_build(self) -> None:
+        """...but not if the winner already finished: nothing left to do."""
+        b3sync = self.claim_losing_sync()
+        tar_path = os.path.join(resolve_store_path(ARCHITECTURE, NONEXISTENT_HASH),
+                                tarball_name(MISSING_SPEC))
+        # It shows up only after the two existence checks at the top.
+        checks = []
+
+        def key_exists(path):
+            checks.append(path)
+            return path == tar_path and len(checks) > 2
+
+        b3sync._s3_key_exists = key_exists
+        b3sync.upload_symlinks_and_tarball(MISSING_SPEC)
+        b3sync.s3.upload_file.assert_not_called()
+
+    @patch("os.listdir", new=lambda path: (
+        [] if path.endswith("-" + MISSING_SPEC["revision"]) else NotImplemented))
+    @patch("os.readlink", new=MagicMock(return_value="dummy path"))
+    @patch("os.path.islink", new=MagicMock(return_value=True))
+    def test_symlink_deleted_under_us(self) -> None:
+        """A symlink deleted while we claim it must not leave an unreferenced tarball."""
+        from botocore.exceptions import ClientError
+        b3sync = self.claim_losing_sync()
+        b3sync.s3.get_object = MagicMock(side_effect=ClientError(
+            {"Error": {"Code": "NoSuchKey"}}, "get_object"))
+
+        self.assertRaises(SystemExit, b3sync.upload_symlinks_and_tarball, MISSING_SPEC)
+        b3sync.s3.upload_file.assert_not_called()
+
+    def claim_losing_sync(self):
+        """A sync object that always loses the race to claim the symlink.
+
+        The winner reports the same target as ours, so it is building the same
+        hash rather than conflicting with us.
+        """
+        from botocore.exceptions import ClientError
+
+        def put_object(**kwargs):
+            if "IfNoneMatch" in kwargs:
+                raise ClientError({"Error": {"Code": "PreconditionFailed"}}, "put_object")
+
+        b3sync = self.fresh_upload_sync()
+        b3sync.s3.put_object = MagicMock(side_effect=put_object)
+        b3sync.s3.get_object = MagicMock(return_value={
+            "Body": MagicMock(read=lambda: b"dummy path")})
+        return b3sync
+
+
+
+
+@patch("alibuild_helpers.sync.Boto3RemoteSync._s3_init", new=MagicMock())
+class LegacyLinkBucketTestCase(unittest.TestCase):
+    """The legacy TARS/ tree must be written as a UNIT, into one bucket.
+
+    REAPIRemoteSync stores the bytes content-addressed and can put the legacy
+    tree elsewhere (--legacy-links-store). It overrides _upload_tarball, which
+    writes the store object -- but the SYMLINKS are written by the base class,
+    which used to send them to writeStore. The two halves then split across
+    buckets, and a client reading the legacy bucket found a store object it
+    could never reach by name, because the symlink naming it was in the other
+    bucket. Every helper below must therefore follow legacyWriteStore.
+    """
+
+    def make_sync(self):
+        sync_obj = sync.Boto3RemoteSync(
+            remoteStore="b3://read", writeStore="b3://artifacts",
+            architecture=ARCHITECTURE, workdir="/sw")
+        sync_obj.legacyWriteStore = "legacy"      # as REAPIRemoteSync sets it
+        sync_obj.s3 = MagicMock()
+        return sync_obj
+
+    def test_default_is_the_artifact_bucket(self):
+        """Unset, it must not change b3:// behaviour."""
+        sync_obj = sync.Boto3RemoteSync(
+            remoteStore="b3://read", writeStore="b3://artifacts",
+            architecture=ARCHITECTURE, workdir="/sw")
+        self.assertEqual(sync_obj.legacyWriteStore, sync_obj.writeStore)
+
+    def test_link_claim_goes_to_the_legacy_bucket(self):
+        sync_obj = self.make_sync()
+        sync_obj._put_link("TARS/x/pkg/pkg.tar.gz", "store/aa/hash/pkg.tar.gz")
+        self.assertEqual(sync_obj.s3.put_object.call_args.kwargs["Bucket"], "legacy")
+
+    def test_existence_check_looks_in_the_legacy_bucket(self):
+        sync_obj = self.make_sync()
+        sync_obj._s3_key_exists("TARS/x/store/aa/hash/pkg.tar.gz")
+        self.assertEqual(sync_obj.s3.head_object.call_args.kwargs["Bucket"], "legacy")
+
+    def test_link_ownership_read_uses_the_legacy_bucket(self):
+        sync_obj = self.make_sync()
+        body = MagicMock()
+        body.read.return_value = b"store/aa/hash/pkg.tar.gz"
+        sync_obj.s3.get_object.return_value = {"Body": body}
+        sync_obj._link_is_ours("TARS/x/pkg/pkg.tar.gz", "store/aa/hash/pkg.tar.gz")
+        self.assertEqual(sync_obj.s3.get_object.call_args.kwargs["Bucket"], "legacy")
 
 if __name__ == '__main__':
     unittest.main()
