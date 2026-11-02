@@ -24,8 +24,8 @@ class CmdTestCase(unittest.TestCase):
         mock_getoutput.side_effect = lambda cmd: "container-id\n"
         mock_getstatusoutput.return_value = (0, "")   # image already present: stream_pull is a no-op
         with DockerRunner("image", ["extra arg"]) as getstatusoutput_docker:
-            mock_getoutput.assert_called_with(["docker", "run", "--detach", "--rm", "--entrypoint=",
-                                               "extra arg", "image", "sleep", "inf"])
+            mock_getoutput.assert_called_with(["docker", "run", "--detach", "--rm", "--entrypoint=/bin/sleep",
+                                               "extra arg", "image", "inf"])
             getstatusoutput_docker("echo foo")
             mock_getstatusoutput.assert_called_with(["docker", "container", "exec", "container-id", "bash", "-c", "echo foo"], cwd=None)
         mock_getstatusoutput.assert_called_with("docker container kill container-id")
@@ -74,7 +74,7 @@ class CmdTestCase(unittest.TestCase):
             mock_getoutput.assert_called_with(["docker", "run", "--detach",
                                                "-e", "TEST_VAR=test_value",
                                                "-e", "ANOTHER_VAR=another_value",
-                                               "--rm", "--entrypoint=", "image", "sleep", "inf"])
+                                               "--rm", "--entrypoint=/bin/sleep", "image", "inf"])
 
             # Test that exec command includes environment variables
             getstatusoutput_docker("echo test")

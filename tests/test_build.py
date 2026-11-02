@@ -11,7 +11,8 @@ from io import StringIO
 from collections import OrderedDict
 
 from alibuild_helpers.utilities import parseRecipe, resolve_tag
-from alibuild_helpers.build import doBuild, storeHashes, generate_initdotsh
+from alibuild_helpers import sync_reapi
+from alibuild_helpers.build import doBuild, storeHashes, generate_initdotsh, build_ac_entry, select_cached_tarball, bound_unpublished_rebuild
 
 # Determine architecture based on platform
 def get_test_architecture():
@@ -217,6 +218,8 @@ class BuildTestCase(unittest.TestCase):
     @patch("alibuild_helpers.analytics", new=MagicMock())
     @patch("requests.Session.get", new=MagicMock())
     @patch("alibuild_helpers.sync.execute", new=dummy_execute)
+    @patch("alibuild_helpers.build.snapshot_source")
+    @patch("alibuild_helpers.build.build_ac_entry")
     @patch("alibuild_helpers.git.git")
     @patch("alibuild_helpers.build.exists", new=MagicMock(side_effect=dummy_exists))
     @patch("os.path.exists", new=MagicMock(side_effect=dummy_exists))
@@ -254,7 +257,8 @@ class BuildTestCase(unittest.TestCase):
     @patch("alibuild_helpers.workarea.is_writeable", new=MagicMock(return_value=True))
     @patch("alibuild_helpers.build.basename", new=MagicMock(return_value="aliBuild"))
     @patch("alibuild_helpers.build.install_wrapper_script", new=MagicMock())
-    def test_coverDoBuild(self, mock_debug, mock_listdir, mock_warning, mock_git_git) -> None:
+    def test_coverDoBuild(self, mock_debug, mock_listdir, mock_warning, mock_git_git,
+                          mock_build_ac_entry, mock_snapshot_source) -> None:
         mock_git_git.side_effect = dummy_git
         mock_debug.side_effect = lambda *args: None
         mock_warning.side_effect = lambda *args: None
@@ -425,6 +429,163 @@ class BuildTestCase(unittest.TestCase):
         self.assertEqual(len(extra["remote_hashes"]), 3)
         self.assertEqual(extra["local_hashes"][0], TEST_EXTRA_BUILD_HASH)
 
+    def test_build_validate_system_entry(self) -> None:
+        """build_validate_system_entry records a tarball-less validate-system
+        action: the recipe (with its system check), keyed by the recipe digest so
+        dependents that reference it (also by recipe digest) resolve to it."""
+        import hashlib
+        from alibuild_helpers.build import build_validate_system_entry
+        recipe = "package: yacc-like\nsystem_requirement: yacc\n"
+        digest = hashlib.sha256(recipe.encode("utf-8")).hexdigest()
+        yacc = {"package": "yacc-like", "version": "v1", "fullRecipe": recipe}
+        entry = build_validate_system_entry(yacc, {}, "slc7_x86-64")
+        action = entry["action"]
+        self.assertEqual(action["kind"], "validate-system")
+        self.assertEqual(action["package"], "yacc-like")
+        # Keyed by the recipe digest (not a build action hash), and defaults
+        # revision to "1" when the system spec has none.
+        self.assertEqual(action["actionHash"], digest)
+        self.assertEqual(action["recipeDigest"], "sha256:" + digest)
+        self.assertEqual(action["revision"], "1")
+        self.assertEqual(action["architecture"], "slc7_x86-64")
+        self.assertNotIn("result", entry)   # produces no tarball
+        self.assertEqual(action["deps"], [])
+
+    def test_build_ac_entry_references_system_deps(self) -> None:
+        """A built package's AC entry references its satisfied system deps by their
+        recipe digest, so reconstruct walks to the validate-system entry."""
+        import hashlib
+        from alibuild_helpers.build import build_ac_entry, system_recipe_digest
+        make_recipe = "package: make\nsystem_requirement: '.*'\n"
+        make_spec = {"package": "make", "fullRecipe": make_recipe}
+        spec = {"package": "probe", "version": "1", "revision": "1",
+                "remote_revision_hash": "p" * 40, "commit_hash": "0",
+                "scm_refs": {}, "full_requires": [], "system_requires": ["make"]}
+        entry = build_ac_entry(spec, {"probe": spec}, "slc7_x86-64",
+                               system_specs={"make": make_spec})
+        self.assertEqual(entry["action"]["deps"],
+                         [{"package": "make",
+                           "actionHash": system_recipe_digest(make_spec)}])
+
+    def test_build_ac_entry(self) -> None:
+        """build_ac_entry records the provenance needed to rebuild/install."""
+        import hashlib
+        default = self.setup_spec(TEST_DEFAULT_RELEASE)
+        zlib = self.setup_spec(TEST_ZLIB_RECIPE)
+        default["commit_hash"] = "0"
+        zlib.setdefault("requires", []).append(default["package"])
+        zlib["scm_refs"] = {ref: githash for githash, _, ref in (
+            line.partition("\t") for line in TEST_ZLIB_GIT_REFS.splitlines())}
+        try:
+            zlib["commit_hash"] = zlib["scm_refs"]["refs/tags/" + zlib["tag"]]
+        except KeyError:
+            zlib["commit_hash"] = zlib["scm_refs"]["refs/heads/" + zlib["tag"]]
+        specs = {pkg["package"]: pkg for pkg in (default, zlib)}
+        for spec in specs.values():
+            spec["is_devel_pkg"] = False
+
+        storeHashes("defaults-release", specs, considerRelocation=False)
+        default["hash"] = default["remote_revision_hash"]
+        storeHashes("zlib", specs, considerRelocation=False)
+        zlib["hash"] = zlib["remote_revision_hash"]
+        zlib["revision"] = "1"
+        # These closures are normally computed in doBuild() before upload.
+        zlib["full_requires"] = {"defaults-release"}
+        zlib["full_runtime_requires"] = set()
+        zlib["relocate_paths"] = ["lib", "bin"]
+
+        container = {"runtime": "docker", "image": "alisw/slc7-builder:latest",
+                     "digest": "sha256:abc"}
+        refs_artifact = {"type": "git-refs", "source": "u", "digest": "r" * 64}
+        entry = build_ac_entry(zlib, specs, "slc7_x86-64", container=container,
+                               refs_artifact=refs_artifact)
+        self.assertEqual(entry["schemaVersion"], 2)
+        action = entry["action"]
+        # Container + refs provenance are recorded verbatim for a reproducible env.
+        self.assertEqual(action["container"], container)
+        self.assertEqual(action["refsArtifact"], refs_artifact)
+        self.assertEqual(action["package"], "zlib")
+        self.assertEqual(action["version"], zlib["version"])
+        self.assertEqual(action["revision"], "1")
+        self.assertEqual(action["architecture"], "slc7_x86-64")
+        # The entry is keyed by the action hash, and deps are referenced by
+        # *their* action hash, so the recorded DAG matches storeHashes().
+        self.assertEqual(action["actionHash"], zlib["remote_revision_hash"])
+        self.assertEqual(action["deps"],
+                         [{"package": "defaults-release", "actionHash": default["hash"]}])
+        self.assertEqual(action["runtimeDeps"], [])
+        self.assertEqual(action["depsHash"], zlib["deps_hash"])
+        # The recipe digest is the sha256 of the *full* recipe (a CAS blob),
+        # so the build can be reconstructed without an alidist checkout.
+        self.assertEqual(action["recipeDigest"], "sha256:" +
+                         hashlib.sha256(zlib["fullRecipe"].encode("utf-8")).hexdigest())
+        self.assertEqual(action["source"], zlib.get("source"))
+        self.assertEqual(action["relocatePaths"], ["bin", "lib"])  # sorted
+        self.assertEqual(action["commit"]["ref"], zlib["commit_hash"])
+        # The output digest/size are filled in by the backend at upload time.
+        self.assertNotIn("result", entry)
+
+    def test_snapshot_source_gating(self) -> None:
+        """snapshot_source only archives for git, non-devel packages going to a
+        reapi store; everything else is a no-op (and never touches git)."""
+        from alibuild_helpers.build import snapshot_source
+        from alibuild_helpers import sync
+        # Not a reapi store -> never snapshots.
+        self.assertIsNone(snapshot_source({"package": "x"}, sync.NoRemoteSync()))
+        # reapi store, but devel / source-less packages are skipped before git.
+        with patch.object(sync_reapi.REAPIRemoteSync, "_s3_init", lambda self: None):
+            reapi = sync_reapi.REAPIRemoteSync("reapi://h/b", "reapi://h/b",
+                                         "slc7_x86-64", "/sw")
+        self.assertIsNone(snapshot_source(
+            {"package": "x", "is_devel_pkg": True, "source": "u", "reference": "r"}, reapi))
+        self.assertIsNone(snapshot_source(
+            {"package": "x", "is_devel_pkg": False}, reapi))  # no source
+
+    def test_snapshot_source_resolves_commit_from_refs(self) -> None:
+        """A reconstruct rebuild's restored source is a working checkout without the
+        tag ref, so `git rev-parse <tag>^{commit}` fails. snapshot_source must instead
+        resolve commit_hash via scm_refs (idempotent snapshot then preserves the
+        archived-source reference in the regenerated AC entry)."""
+        from alibuild_helpers.build import snapshot_source
+        from alibuild_helpers import sync
+        from alibuild_helpers.git import Git
+        with patch.object(sync_reapi.REAPIRemoteSync, "_s3_init", lambda self: None):
+            reapi = sync_reapi.REAPIRemoteSync("reapi://h/b", "reapi://h/b", "slc7_x86-64", "/sw")
+        spec = {"package": "zlib", "is_devel_pkg": False, "source": "https://x/zlib",
+                "reference": "/ref", "commit_hash": "v1.3.1", "scm": Git(),
+                "scm_refs": {"refs/tags/v1.3.1": "d" * 40}}
+        captured = {}
+
+        class FakeStore:
+            def __init__(self, _sync): pass
+            def snapshot(self, repo, url, commit):
+                captured["commit"] = commit
+                return {"type": "git", "commit": commit}
+
+        def fake_git(args, directory=None, check=True, **kw):
+            if args[:2] == ("config", "--get"):
+                return ("", "")   # not a partial clone
+            raise AssertionError("git rev-parse must not run when scm_refs resolves")
+
+        with patch("alibuild_helpers.build.GitSourceStore", FakeStore), \
+             patch("alibuild_helpers.build.git", side_effect=fake_git):
+            art = snapshot_source(spec, reapi)
+        self.assertEqual(captured["commit"], "d" * 40)   # resolved from scm_refs
+        self.assertEqual(art["commit"], "d" * 40)
+
+    def test_snapshot_refs_gating(self) -> None:
+        """snapshot_refs only archives scm_refs for non-devel packages going to
+        a reapi store."""
+        from alibuild_helpers.build import snapshot_refs
+        from alibuild_helpers import sync
+        self.assertIsNone(snapshot_refs({"package": "x"}, sync.NoRemoteSync()))
+        with patch.object(sync_reapi.REAPIRemoteSync, "_s3_init", lambda self: None):
+            reapi = sync_reapi.REAPIRemoteSync("reapi://h/b", "reapi://h/b",
+                                         "slc7_x86-64", "/sw")
+        self.assertIsNone(snapshot_refs(
+            {"package": "x", "is_devel_pkg": True, "scm_refs": {"a": "b"}}, reapi))
+        self.assertIsNone(snapshot_refs({"package": "x"}, reapi))  # no scm_refs
+
     def test_initdotsh(self) -> None:
         """Sanity-check the generated init.sh for a few variables."""
         specs = {
@@ -574,3 +735,4 @@ class CheckEnvironmentTestCase(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
