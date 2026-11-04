@@ -14,12 +14,13 @@ into, or removed from, which package, at which commit.
 import json
 import os
 import re
+import shutil
 import time
 from glob import glob, escape as glob_escape
 from os.path import abspath, basename, exists, isdir, islink, join
 
 from alibuild_helpers.git import git, Git
-from alibuild_helpers.log import error, info
+from alibuild_helpers.log import banner, error, info
 from alibuild_helpers.scm import SCMError
 from alibuild_helpers.sl import sapling, Sapling
 
@@ -66,6 +67,12 @@ def add_parser(subparsers, work_dir_default, chdir_default):
     a.add_argument("package", metavar="PKG")
     a.add_argument("ref", metavar="REF", help="What was merged, e.g. alisw/O2#1234.")
 
+  drop = actions.add_parser("drop", help="drop a session",
+                            description="Remove session NAME's latest-NAME links and its "
+                                        "record, so that `aliBuild clean` can delete its builds.")
+  drop.add_argument("name", metavar="NAME")
+  drop.add_argument("--worktrees", action="store_true",
+                    help="Also remove its PKG@NAME worktrees, unless they have uncommitted changes.")
   return p
 
 
@@ -158,6 +165,33 @@ def list_sessions(work_dir, root="."):
   return sorted(n for n in names if SESSION_NAME_RE.match(n))
 
 
+def session_links(work_dir, name):
+  """The links which keep session name's builds from being cleaned up.
+
+  These are BUILD/PKG-latest-NAME, and WORKDIR/ARCH/PKG/latest-NAME-DEFAULTS.
+  As defaults and session names may both contain dashes, the latter are told
+  apart from another session's by their target, NAME-REVISION.
+  """
+  target = re.compile(re.escape(name) + r"-[^-/]+\Z")
+  links = glob(join(glob_escape(work_dir), "BUILD", "*-latest-" + glob_escape(name)))
+  links += [l for l in glob(join(glob_escape(work_dir), "*", "*", "latest-" + glob_escape(name) + "-*"))
+            if islink(l) and target.match(os.readlink(l))]
+  return sorted(l for l in links if islink(l))
+
+
+def uncommitted_changes(directory):
+  if isinstance(scm_for(directory), Sapling):
+    return sapling(("status",), directory=directory)
+  return git(("status", "--porcelain"), directory=directory)
+
+
+def remove_worktree(package, directory):
+  if isinstance(scm_for(directory), Sapling):
+    shutil.rmtree(directory)
+  else:
+    git(("worktree", "remove", abspath(directory)), directory=package)
+
+
 def create_worktree(package, name):
   source, dest = package, f"{package}@{name}"
   if isdir(dest):
@@ -229,6 +263,9 @@ def doSession(args, parser):
             f"(at {(event['commit'] or 'unknown')[:12]}, {event['time']})")
     return True
 
+  if args.sessionAction == "drop":
+    return drop_session(args, name)
+
   # add / remove: record what was done to the worktree, and where it left it.
   if not exists(session_file(args.workDir, name)):
     error("No session %s: create it first with `aliBuild session create %s`", name, name)
@@ -243,3 +280,33 @@ def doSession(args, parser):
   save_session(args.workDir, session)
   return True
 
+
+def drop_session(args, name):
+  record = session_file(args.workDir, name)
+  links = session_links(args.workDir, name)
+  trees = worktrees(name) if args.worktrees else {}
+  if not exists(record) and not links and not trees:
+    error("No session %s to drop", name)
+    return False
+  dirty = [d for d in trees.values() if uncommitted_changes(d)]
+  if dirty:
+    error("Not dropping session %s, as these worktrees have uncommitted changes: %s",
+          name, ", ".join(dirty))
+    return False
+
+  doomed = links + ([record] if exists(record) else []) + list(trees.values())
+  banner("This %s delete:\n%s", "would" if getattr(args, "dryRun", False) else "will", "\n".join(doomed))
+  if getattr(args, "dryRun", False):
+    return True
+  for path in links + ([record] if exists(record) else []):
+    os.unlink(path)
+  for package, directory in trees.items():
+    try:
+      remove_worktree(package, directory)
+    except SCMError as e:
+      error("Cannot remove %s: %s", directory, e)
+      return False
+  if not args.worktrees and worktrees(name):
+    info("Its worktrees are still there: drop it with --worktrees to remove them too.")
+  info("Run `aliBuild clean` to delete the builds of session %s.", name)
+  return True
