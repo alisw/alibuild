@@ -10,6 +10,22 @@ def dieOnError(err, msg) -> None:
     error("%s", msg)
     sys.exit(1)
 
+# Credentials reach the log through command lines: the docker invocation carries
+# every -e NAME=VALUE, and CI passes JALIEN_TOKEN_KEY (a PEM private key) and
+# CCDB auth tokens that way. The value may be shell-quoted or, where the command
+# is " ".join()ed, bare and spanning several lines. A key whose END marker is
+# not in the same message is redacted to the end of the message.
+_PRIVATE_KEY_RE = re.compile(
+  r"-----BEGIN ([A-Z ]*)PRIVATE KEY-----.*?(?:-----END \1PRIVATE KEY-----|\Z)", re.DOTALL)
+_SECRET_ASSIGNMENT_RE = re.compile(
+  r"\b([A-Za-z0-9_]*(?:TOKEN|SECRET|PASSWORD|PASSWD)[A-Za-z0-9_]*=)"
+  r"('[^']*'|\"[^\"]*\"|[^\s'\"]+)")
+
+def redact_secrets(msg):
+  """Hide private keys and the values of *TOKEN*/*SECRET*/*PASSWORD* assignments."""
+  msg = _PRIVATE_KEY_RE.sub(r"-----BEGIN \1PRIVATE KEY----- <redacted>", msg)
+  return _SECRET_ASSIGNMENT_RE.sub(r"\1<redacted>", msg)
+
 class LogFormatter(logging.Formatter):
   def __init__(self, fmtstr) -> None:
     self.fmtstr = fmtstr
@@ -25,7 +41,7 @@ class LogFormatter(logging.Formatter):
     # args to an already-expanded string -- "not all arguments converted".
     # Harmless with only our handler attached, which is why it went unnoticed;
     # under pytest, whose logging plugin adds its own handler, it aborts.
-    msg = record.getMessage()
+    msg = redact_secrets(record.getMessage())
     if record.levelno == logging.BANNER and sys.stdout.isatty():
       lines = msg.split("\n")
       return "\n\033[1;34m==>\033[m \033[1m%s\033[m" % lines[0] + \
