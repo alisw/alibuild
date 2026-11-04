@@ -56,13 +56,14 @@ def doParseArgs():
                                         description="Verify the status of your system.")
   init_parser = subparsers.add_parser("init", help="initialise local packages",
                                       description="Initialise development packages.")
-  # The reapi:// subcommands register their own parsers from their implementation
+  # The reapi:// subcommands and session register their own parsers from their implementation
   # modules (args live with the command), so this shared parser stays free of their
   # options. Order is preserved for --help listing.
-  from alibuild_helpers import install, reconstruct, migrate
+  from alibuild_helpers import install, reconstruct, migrate, session
   install.add_parser(subparsers, detectedArch, DEFAULT_WORK_DIR)
   reconstruct.add_parser(subparsers, detectedArch, DEFAULT_WORK_DIR)
   migrate.add_parser(subparsers, detectedArch, DEFAULT_WORK_DIR)
+  session.add_parser(subparsers, DEFAULT_WORK_DIR, DEFAULT_CHDIR)
   version_parser = subparsers.add_parser("version", help="display %(prog)s version",
                                          description="Display %(prog)s and architecture.")
   completion_parser = subparsers.add_parser("completion", help="output shell completion code",
@@ -454,7 +455,7 @@ def doParseArgs():
   def optionOrder(x):
     if x in ["--debug", "-d", "-n", "--dry-run"]:
       return 0
-    if x in ["build", "init", "clean", "analytics", "doctor", "deps", "completion", "install", "reconstruct", "migrate"]:
+    if x in ["build", "init", "clean", "analytics", "doctor", "deps", "completion", "install", "reconstruct", "migrate", "session"]:
       return 1
     return 2
   rest.sort(key=optionOrder)
