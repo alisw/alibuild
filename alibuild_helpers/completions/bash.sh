@@ -95,7 +95,7 @@ _aliBuild_complete() {
           -a --architecture --defaults --force-unknown-architecture
           -z --devel-prefix -e -j --jobs -u --fetch-repos
           --no-local --force-tracked --plugin --disable --force-rebuild
-          --annotate --only-deps --plan
+          --annotate --only-deps --plan --json
           --docker --docker-image --docker-extra-args -v
           --no-remote-store --remote-store --write-store --ac-store --storage --insecure
           --legacy-links-store --cas-public-url
