@@ -72,6 +72,17 @@ aliBuild build [-h] [--defaults DEFAULT]
   `hash`, `action` (`reuse` or `build`), whether it is a development package
   (`devel`) and from which directory (`source`), its `devel_label` and
   `build_family`; and a `summary` with the counts.
+
+  Without `--plan`, the build ends by printing its result as one JSON object,
+  however it ends. Its `status` is `success`, `failure` when a package failed
+  to build, or `error` when aliBuild stopped for another reason, with the
+  error in `message`. `packages` has the same fields as in the plan, with an
+  `action` which is `built`, `unpacked` (from a tarball), `unchanged` or
+  `failed`, plus each development package's `build_dir`. On `failure`,
+  `failed` gives the package, its `log` (`null` if the build stopped before
+  writing one), its `build_dir`, the development packages it uses, and the
+  `sandbox_profile` if it was built with `--sandbox`. On `success`, there are
+  `install_dir` and the `alienv` name to enter.
 - `--plugin PLUGIN`: Plugin to use for the build. Default is `legacy`.
 - `--always-prefer-system`: Always use system packages when compatible.
 - `--no-system`: Never use system packages, even if compatible.
