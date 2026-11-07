@@ -593,6 +593,20 @@ When you are done with a session, `aliBuild session drop NAME` removes its
 its builds. With `--worktrees`, it removes its worktrees as well, unless one of
 them has uncommitted changes. `-n` shows what it would remove.
 
+### Running several builds at once
+
+Several `aliBuild build` processes can share a work directory, e.g. one per
+session. A package is only built by one of them at a time: another which needs
+the same package waits for it, and then uses it. By default, packages which
+are not shared are built in parallel. To limit how many are compiled at the
+same time, so that concurrent builds do not overload the machine, set
+`ALIBUILD_BUILD_SLOTS`:
+
+    export ALIBUILD_BUILD_SLOTS=1   # compile one package at a time
+
+The locks are in `sw/LOCKS`. They are released when the process holding them
+exits, however it ends.
+
 ### Incremental builds
 
 When developing locally using the development mode, if the external
