@@ -69,8 +69,14 @@ class SessionTestCase(unittest.TestCase):
     self.git("commit", "-q", "--allow-empty", "-m", "init")
     self.assertTrue(self.run_session("create", "s1", "O2")[0])
     self.assertTrue(os.path.isdir("O2@s1"))
-    # A session is only created once, and only records worktrees it has.
+    # Creating it again only adds worktrees, and it only records worktrees it has.
     self.assertFalse(self.run_session("create", "s1")[0])
+    self.assertFalse(self.run_session("create", "s1", "O2")[0])
+    os.mkdir("alidist")
+    self.git("init", "-q", cwd="alidist")
+    self.git("commit", "-q", "--allow-empty", "-m", "init", cwd="alidist")
+    self.assertTrue(self.run_session("create", "s1", "O2", "alidist")[0])
+    self.assertEqual(sorted(worktrees("s1")), ["O2", "alidist"])
     self.assertFalse(self.run_session("add", "s1", "ROOT", "alisw/root#1")[0])
     self.assertFalse(self.run_session("add", "s2", "O2", "alisw/O2#1")[0])
 
@@ -81,11 +87,12 @@ class SessionTestCase(unittest.TestCase):
     os.symlink("0123abcd", "sw/BUILD/O2-latest-s1")
 
     session = describe("sw", "s1")
-    self.assertEqual([(t["package"], t["commit"], t["build"]) for t in session["worktrees"]],
-                     [("O2", commit, "0123abcd")])
+    self.assertEqual([(t["package"], t["commit"], t["build"]) for t in session["worktrees"]][0],
+                     ("O2", commit, "0123abcd"))
     self.assertEqual([(e["ref"], e["commit"]) for e in session["merged"]],
                      [("alisw/O2#1", commit)])
-    self.assertEqual([e["action"] for e in session["events"]], ["create", "add"])
+    self.assertEqual([(e["action"], e["package"]) for e in session["events"]],
+                     [("create", "O2"), ("create", "alidist"), ("add", "O2")])
 
     ok, out = self.run_session("show", "s1", "--json")
     self.assertTrue(ok)

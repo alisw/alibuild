@@ -571,7 +571,14 @@ rebuilds the package it touches, and what depends on it.
     aliBuild build O2Physics -z fix-tracks
 
 `session create` makes a `git worktree` (or an `sl share`) of each package's
-checkout, at the commit it has checked out. `session add PKG REF` and
+checkout, at the commit it has checked out; for a session which exists, it
+adds the worktrees it does not have yet. A worktree of the recipes,
+`alidist@NAME`, is used by `-z NAME` builds instead of `alidist`, unless `-c`
+gives another directory:
+
+    aliBuild session create fix-tracks O2 alidist
+
+`session add PKG REF` and
 `session remove PKG REF` record that `REF` was merged into, or removed from,
 `PKG@NAME`, and at which commit the worktree was afterwards; they do not
 change the worktree themselves. The record is kept in

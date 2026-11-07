@@ -14,7 +14,7 @@ from collections import OrderedDict
 from alibuild_helpers.utilities import parseRecipe, resolve_tag
 from alibuild_helpers import sync_reapi
 from alibuild_helpers.build import doBuild, storeHashes, generate_initdotsh, build_ac_entry, select_cached_tarball, bound_unpublished_rebuild
-from alibuild_helpers.build import worktree_packages, devel_label, plan_entry, report_plan
+from alibuild_helpers.build import worktree_packages, devel_label, plan_entry, report_plan, worktree_config_dir
 from alibuild_helpers.log import dieOnError
 
 # Determine architecture based on platform
@@ -707,6 +707,14 @@ class WorktreeTestCase(unittest.TestCase):
         self.assertEqual(worktree_packages(["ROOT"], "fix", isdir), set())
         self.assertEqual(worktree_packages(["O2"], None, isdir), set())
         self.assertEqual(worktree_packages(["O2"], "", isdir), set())
+
+    def test_config_dir(self) -> None:
+        isdir = {"alidist@fix"}.__contains__
+        self.assertEqual(worktree_config_dir("alidist", "fix", isdir), "alidist@fix")
+        # Without the worktree, without -z, or with an explicit -c, nothing changes.
+        self.assertEqual(worktree_config_dir("alidist", "other", isdir), "alidist")
+        self.assertEqual(worktree_config_dir("alidist", None, isdir), "alidist")
+        self.assertEqual(worktree_config_dir("../alidist", "fix", isdir), "../alidist")
 
     def test_devel_label(self) -> None:
         # Without -z, no package has a label.

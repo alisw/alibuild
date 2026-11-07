@@ -15,6 +15,7 @@ import json
 import os
 import re
 import shutil
+import subprocess
 import time
 from glob import glob, escape as glob_escape
 from os.path import abspath, basename, exists, isdir, islink, join
@@ -194,17 +195,21 @@ def remove_worktree(package, directory):
 
 def create_worktree(package, name):
   source, dest = package, f"{package}@{name}"
-  if isdir(dest):
-    return
   if not isdir(source):
     raise SCMError(f"no {source} checkout to create {dest} from")
   scm = scm_for(source)
   commit = scm.checkedOutCommitName(directory=source)
+  # Not through git() and sapling(): checking out a large repository, e.g. O2,
+  # can take longer than their timeouts.
   if isinstance(scm, Sapling):
-    sapling(("share", "-U", abspath(source), abspath(dest)))
-    sapling(("goto", commit), directory=dest)
+    commands = [["sl", "share", "-U", abspath(source), abspath(dest)],
+                ["sl", "-R", abspath(dest), "goto", commit]]
   else:
-    git(("worktree", "add", "--detach", abspath(dest), commit), directory=source)
+    commands = [["git", "-C", abspath(source), "worktree", "add", "--detach", abspath(dest), commit]]
+  for command in commands:
+    proc = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    if proc.returncode:
+      raise SCMError("Error %d from %s: %s" % (proc.returncode, " ".join(command), proc.stdout.strip()))
 
 
 def doSession(args, parser):
@@ -222,24 +227,34 @@ def doSession(args, parser):
     return True
 
   if args.sessionAction == "create":
+    # Creating an existing session adds the worktrees it does not have yet.
     if exists(session_file(args.workDir, name)):
-      error("Session %s already exists: %s", name, session_file(args.workDir, name))
-      return False
-    missing = [p for p in args.packages if not isdir(p) and not isdir(f"{p}@{name}")]
+      session = load_session(args.workDir, name)
+      new = [p for p in args.packages if not isdir(f"{p}@{name}")]
+      if not new:
+        error("Session %s already exists, with worktrees for %s", name,
+              ", ".join(worktrees(name)) or "no packages")
+        return False
+    else:
+      session = {"name": name, "created": now(), "events": []}
+      new = args.packages
+    missing = [p for p in new if not isdir(p) and not isdir(f"{p}@{name}")]
     if missing:
       error("No checkout to create a worktree from: %s", ", ".join(missing))
       return False
-    session = {"name": name, "created": now(), "events": []}
-    for package in args.packages:
+    # Saved first, and after each worktree, so a failure leaves none unrecorded.
+    save_session(args.workDir, session)
+    for package in new:
       try:
-        create_worktree(package, name)
+        if not isdir(f"{package}@{name}"):   # an existing one is adopted
+          create_worktree(package, name)
       except SCMError as e:
         error("Cannot create a worktree for %s: %s", package, e)
         return False
       session["events"].append({"time": now(), "action": "create", "package": package,
                                  "commit": checked_out(f"{package}@{name}")})
+      save_session(args.workDir, session)
       info("Created %s@%s", package, name)
-    save_session(args.workDir, session)
     info("Build the session with: aliBuild build -z %s ...", name)
     return True
 
@@ -256,7 +271,8 @@ def doSession(args, parser):
     print("Worktrees:" if session["worktrees"] else "No worktrees.")
     for tree in session["worktrees"]:
       print(f"  {tree['package']}@{name} at {(tree['commit'] or 'unknown')[:12]}, " +
-            (f"last built as {tree['build']}" if tree["build"] else "not built"))
+            ("the recipes for -z " + name if tree["package"] == "alidist" else
+             f"last built as {tree['build']}" if tree["build"] else "not built"))
     print("Merged:" if session["merged"] else "Nothing merged.")
     for event in session["merged"]:
       print(f"  {event['package']}: {event['ref']} "
