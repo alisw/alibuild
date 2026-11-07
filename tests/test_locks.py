@@ -68,21 +68,34 @@ class LocksTestCase(unittest.TestCase):
 
   def test_real_lockf_without_k(self, info) -> None:
     # The same with the real lockf, as agents run it: the slot must not be
-    # shared once lockf has deleted its file.
+    # shared once lockf has deleted its file. Without -k, lockf gives no
+    # ordering guarantee, so either it or aliBuild may get the slot first;
+    # what must hold either way is that aliBuild ends up holding the file
+    # now at the path, so it excludes newcomers.
     path = join(self.work_dir, "LOCKS", "slot-0")
     first = take_build_slot(self.work_dir, 1, "a", poll=0.01)
-    proc = subprocess.Popen(["lockf", path, "sleep", "0.3"])
+    proc = subprocess.Popen(["lockf", path, "sleep", "0.3"],
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     time.sleep(0.2)  # lockf is waiting for the slot
     got = []
     waiter = threading.Thread(target=lambda: got.append(take_build_slot(self.work_dir, 1, "b", poll=0.01)))
     waiter.start()
-    os.close(first)  # lockf gets it, sleeps, deletes the file, exits
-    proc.wait(5)
+    os.close(first)  # lockf or the waiter gets it; lockf deletes the file on exit
     waiter.join(5)
     self.assertEqual(len(got), 1)
-    self.assertTrue(self.held("slot-0"))
-    self.assertEqual(os.stat(path).st_ino, os.fstat(got[0]).st_ino)
-    os.close(got[0])
+    try:
+      # If lockf won, it may still be running: let it finish (and delete its
+      # file), then aliBuild must have moved on to the file now at the path.
+      deadline = time.time() + 5
+      while proc.poll() is None and time.time() < deadline:
+        if os.path.exists(path) and os.stat(path).st_ino == os.fstat(got[0]).st_ino:
+          break  # aliBuild holds the current file: lockf is the one waiting
+        time.sleep(0.01)
+      self.assertTrue(self.held("slot-0"))
+      self.assertEqual(os.stat(path).st_ino, os.fstat(got[0]).st_ino)
+    finally:
+      os.close(got[0])  # lets a still-waiting lockf run, so it can exit
+      proc.wait(5)
 
   def test_build_slots(self, info) -> None:
     self.assertIsNone(build_slots({}))
