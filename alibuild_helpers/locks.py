@@ -35,17 +35,45 @@ def _try_lock(fd):
     return False
 
 
+def _still_named(fd, path):
+  """Whether path still names the file fd has open.
+
+  A lock on a file which has since been deleted, or replaced, excludes nobody:
+  the next process opens a new file under the same name, and locks that. macOS
+  lockf(1) deletes its lock file when it exits, unless given -k, so a lockf
+  sharing a slot with aliBuild can do this at any time."""
+  try:
+    return os.stat(path).st_ino == os.fstat(fd).st_ino
+  except FileNotFoundError:
+    return False
+
+
+def _lock_current(path, blocking):
+  """Lock the file currently at path. Without blocking, None if someone holds it."""
+  while True:
+    fd = _open(path)
+    if blocking:
+      fcntl.flock(fd, fcntl.LOCK_EX)
+    elif not _try_lock(fd):
+      os.close(fd)
+      return None
+    if _still_named(fd, path):
+      return fd
+    os.close(fd)  # locked a file no longer at path: lock the one which is
+
+
 def unlock(fd):
   os.close(fd)
 
 
 def lock_package(work_dir, pkg_hash, package):
   """Take the lock on pkg_hash, waiting for whoever holds it. unlock() the result."""
-  fd = _open(join(work_dir, "LOCKS", pkg_hash))
-  if not _try_lock(fd):
+  path = join(work_dir, "LOCKS", pkg_hash)
+  fd = _lock_current(path, blocking=False)
+  if fd is None:
     info("Waiting for another aliBuild, which is building %s", package)
     buildstatus.update(state="waiting for another aliBuild", package=package)
-    fcntl.flock(fd, fcntl.LOCK_EX)
+    fd = _lock_current(path, blocking=True)
   return fd
 
 
@@ -57,13 +85,12 @@ def build_slots(environ=os.environ):
 
 def take_build_slot(work_dir, slots, package, poll=SLOT_POLL_SEC):
   """Wait for one of slots build slots. unlock() the result."""
-  fds = [_open(join(work_dir, "LOCKS", f"slot-{i}")) for i in range(slots)]
+  paths = [join(work_dir, "LOCKS", f"slot-{i}") for i in range(slots)]
   waiting = False
   while True:
-    for i, fd in enumerate(fds):
-      if _try_lock(fd):
-        for other in fds[:i] + fds[i + 1:]:
-          os.close(other)
+    for path in paths:
+      fd = _lock_current(path, blocking=False)
+      if fd is not None:
         return fd
     if not waiting:
       info("Waiting for a build slot for %s: %d build(s) already running "
