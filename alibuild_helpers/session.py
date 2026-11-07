@@ -52,9 +52,9 @@ def add_parser(subparsers, work_dir_default, chdir_default):
                       help="Packages to create worktrees for, from the PKG checkout's "
                            "current commit.")
   create.add_argument("--seed-from", metavar="OTHER", dest="seedFrom",
-                      help="Start the build directories of the session's packages as "
-                           "copy-on-write clones of session OTHER's, so that their first "
-                           "build is incremental.")
+                      help="Experimental: start the build directories of the session's "
+                           "packages as copy-on-write clones of session OTHER's, so that "
+                           "their first build is incremental.")
 
   lst = actions.add_parser("list", help="list sessions")
   lst.add_argument("--json", action="store_true", help="Print JSON.")

@@ -133,8 +133,9 @@ TOOLS = [
    "inputSchema": _schema({"name": {"type": "string"},
                            "packages": {"type": "array", "items": {"type": "string"}},
                            "seed_from": {"type": "string",
-                                         "description": "Start the session's build directories "
-                                                        "as copy-on-write clones of this session's."}},
+                                         "description": "Experimental: start the session's build "
+                                                        "directories as copy-on-write clones of "
+                                                        "this session's."}},
                           ["name"])},
   {"name": "session_record",
    "description": "Record that REF was merged into (add) or removed from (remove) the "

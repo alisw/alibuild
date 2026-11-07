@@ -239,14 +239,39 @@ def rewrite_ninja_deps(path, rewrite):
     f.write(b"".join(out))
 
 
+#: The ninja versions whose logs are known to be rewritten right.
+NINJA_VERSIONS = ("1.11.", "1.13.")
+
+
+def ninja_program(build_dir):
+  """The ninja which builds build_dir, or None if it is not built with ninja by CMake."""
+  try:
+    with open(join(build_dir, "CMakeCache.txt"), errors="replace") as f:
+      for line in f:
+        if line.startswith("CMAKE_MAKE_PROGRAM:"):
+          program = line.split("=", 1)[1].strip()
+          return program if "ninja" in os.path.basename(program) else None
+  except OSError:
+    pass
+  return None
+
+
+def unknown_ninja(build_dir):
+  """The version of the ninja building build_dir, if seeding does not know it, else None."""
+  program = ninja_program(build_dir)
+  if program is None:
+    return None
+  try:
+    version = subprocess.run([program, "--version"], stdout=subprocess.PIPE, text=True).stdout.strip()
+  except OSError:
+    version = f"{program}, which cannot be run"
+  return None if version.startswith(NINJA_VERSIONS) else version or "unknown"
+
+
 def ninja_commands(build_dir):
   """Every command line in build_dir's build.ninja, as ninja evaluates them."""
-  program = None
-  with open(join(build_dir, "CMakeCache.txt"), errors="replace") as f:
-    for line in f:
-      if line.startswith("CMAKE_MAKE_PROGRAM:"):
-        program = line.split("=", 1)[1].strip()
-  if not program or "ninja" not in os.path.basename(program):
+  program = ninja_program(build_dir)
+  if program is None:
     return None
   proc = subprocess.run([program, "-C", build_dir, "-t", "compdb"],
                         stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -305,6 +330,11 @@ def seed_build_dir(work_dir, arch, defaults, spec, specs, other, root=".", backe
     same_arch = False
   if not same_arch:
     info("Not seeding %s: session %s's build in %s is not one for %s", package, other, src, arch)
+    return False
+  version = unknown_ninja(src)
+  if version is not None:
+    info("Not seeding %s: it is built with ninja %s, and seeding only knows the logs "
+         "of ninja %s", package, version, " and ".join(v + "x" for v in NINJA_VERSIONS))
     return False
   other_tree = join(root, f"{package}@{other}")
   if not isdir(other_tree):
