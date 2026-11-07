@@ -35,6 +35,9 @@ def add_parser(subparsers, work_dir_default, chdir_default):
                       "Default is '%(default)s'.")
   p.add_argument("-w", "--work-dir", dest="workDir", default=work_dir_default,
                  help="The work directory. Default is '%(default)s'.")
+  p.add_argument("--stdio", action="store_true",
+                 help="Talk over stdin and stdout, which is the only transport, e.g. through "
+                      "ssh and srun.")
   return p
 
 
@@ -149,8 +152,8 @@ class Server:
 
   def _run(self, argv, timeout=None):
     proc = subprocess.run(self.alibuild + argv, cwd=self.root, env=self.environ,
-                          stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
-                          timeout=timeout)
+                          stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                          stderr=subprocess.PIPE, text=True, timeout=timeout)
     return proc.returncode, proc.stdout, proc.stderr
 
   def _json_or_error(self, rc, out, err):
@@ -187,13 +190,15 @@ class Server:
       json.dump({"state": "starting"}, f)
     # The shell starts aliBuild in the background and exits, so the build is
     # nobody's child here and outlives this server. It writes its exit code
-    # last: that is how any server knows it has finished.
+    # last: that is how any server knows it has finished. It holds none of the
+    # server's stdio either, or ssh would wait for the build to close them.
     q = shlex.quote
     script = ("(%s > %s 2> %s < /dev/null; echo $? > %s) & echo $! > %s"
               % (" ".join(map(q, self.alibuild + argv)), q(join(d, "result.json")),
                  q(join(d, "aliBuild.log")), q(join(d, "exitcode")), q(join(d, "pid"))))
     subprocess.run(["/bin/sh", "-c", script], cwd=self.root, env=env, check=True,
-                   start_new_session=True)
+                   start_new_session=True, stdin=subprocess.DEVNULL,
+                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return {"id": build_id, "argv": argv}
 
   def build_state(self, build_id):

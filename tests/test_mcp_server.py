@@ -1,6 +1,7 @@
 import io
 import json
 import os
+import subprocess
 import sys
 import tempfile
 import time
@@ -143,6 +144,26 @@ class McpServerTestCase(unittest.TestCase):
     self.assertFalse(self.server._alive(join(self.server.builds_dir, started["id"])))
     message, err = self.tool("build_cancel", id=started["id"])
     self.assertTrue(err)
+
+  def test_stdio_closes_with_builds_running(self) -> None:
+    # Through ssh and srun, the client only sees the server end once nothing
+    # holds its stdout and stderr: a detached build must not.
+    script = ("import sys; from alibuild_helpers.mcp_server import Server; "
+              "Server(sys.argv[1], root=sys.argv[2], alibuild=sys.argv[3:]).serve()")
+    proc = subprocess.Popen([sys.executable, "-c", script, self.server.work_dir, self.tmp.name,
+                             *self.server.alibuild], stdin=subprocess.PIPE,
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                            env=dict(self.server.environ, FAKE_SLEEP="60"),
+                            cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    started = time.time()
+    out, _ = proc.communicate(json.dumps({"jsonrpc": "2.0", "id": 1, "method": "tools/call",
+                                          "params": {"name": "build",
+                                                     "arguments": {"packages": ["O2"]}}}) + "\n",
+                              timeout=30)
+    self.assertLess(time.time() - started, 30)
+    build_id = json.loads(json.loads(out)["result"]["content"][0]["text"])["id"]
+    self.assertEqual(self.server.build_state(build_id)["state"], "running")
+    self.server.cancel_build({"id": build_id})
 
   def test_sessions(self) -> None:
     sessions, err = self.tool("session_list")
