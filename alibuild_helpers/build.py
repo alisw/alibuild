@@ -856,6 +856,26 @@ def worktree_config_dir(config_dir, label, isdir=os.path.isdir):
   return config_dir
 
 
+def remove_stale_install(installDir):
+  """Remove the install directory of a package about to be rebuilt.
+
+  Rename first: rmtree is bottom-up and not atomic, so an interrupted removal
+  would leave .build-hash standing over an emptied tree. Renaming is atomic,
+  so the canonical path never names a half-deleted package. A leftover is
+  swept by the next cleanup, whose glob over the install directory already
+  matches it."""
+  if not exists(installDir):
+    return
+  try:
+    doomed = "%s.deleting.%s" % (installDir, os.getpid())
+    os.rename(installDir, doomed)
+  except OSError:
+    doomed = installDir
+  # shutil.rmtree under Python 2 fails when the path is unicode and the
+  # directory contains files with non-ASCII names, e.g. Golang/Boost.
+  shutil.rmtree(doomed.encode("utf-8"), True)
+
+
 def build_link(spec, session):
   """The entry in BUILD/ which names the build directory of spec in this run.
 
@@ -1622,23 +1642,6 @@ def _doBuild(args, parser, result):
     if fileHash != "0":
       debug("Mismatch between local area (%s) and the one which I should build (%s). Redoing.",
             fileHash, spec["hash"])
-    # Remove the stale install directory before rebuilding. Rename first:
-    # rmtree is bottom-up and not atomic, so an interrupted removal would leave
-    # .build-hash standing over an emptied tree -- the exact state the check
-    # above exists to recover from. Renaming is atomic, so the canonical path
-    # never names a half-deleted package. A leftover is swept by the next
-    # cleanup, whose glob over the install directory already matches it.
-    installDir = dirname(hashFile)
-    if exists(installDir):
-      try:
-        doomed = "%s.deleting.%s" % (installDir, os.getpid())
-        os.rename(installDir, doomed)
-      except OSError:
-        doomed = installDir
-      # shutil.rmtree under Python 2 fails when the path is unicode and the
-      # directory contains files with non-ASCII names, e.g. Golang/Boost.
-      shutil.rmtree(doomed.encode("utf-8"), True)
-
     tar_hash_dir = os.path.join(workDir, resolve_store_path(args.architecture, spec["hash"]))
     debug("Looking for cached tarball in %s", tar_hash_dir)
     spec["cachedTarball"] = ""
@@ -1748,6 +1751,12 @@ def _doBuild(args, parser, result):
 
     debug("Build command: %s", build_command)
     slot = take_build_slot(workDir, slots, p) if slots and not cachedTarball else None
+    # Only now, holding the slot, remove the stale install: a build can wait a
+    # long time for its slot, and the install must stay usable meanwhile. A
+    # development package installs in place, with no tarball to restore it
+    # from, so removing it earlier left the session without it for the whole
+    # wait, and for good if the waiting aliBuild was interrupted.
+    remove_stale_install(dirname(hashFile))
     progress_msg = "Unpacking %s@%s" if cachedTarball else "Compiling %s@%s"
     if not cachedTarball and not args.debug:
       progress_msg += " (use --debug for full output)"
