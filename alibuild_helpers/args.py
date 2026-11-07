@@ -177,7 +177,9 @@ def doParseArgs():
                                   "remote store. The 'reuse' lines are PACKAGE/VERSION-REVISION "
                                   "specs, which is what `aliBuild migrate` consumes."))
   build_parser.add_argument("--json", dest="json", action="store_true",
-                            help="With --plan, print the plan as one JSON object instead.")
+                            help=("Print the result of the build as one JSON object on stdout: "
+                                  "what happened to each package and, if one failed, which one, "
+                                  "with its log. With --plan, print the plan as JSON instead."))
   build_remote.add_argument("--no-remote-store", action="store_true",
                             help="Disable the use of the remote store, even if it is enabled by default.")
   build_remote.add_argument("--remote-store", dest="remoteStore", metavar="STORE", default="",
@@ -559,9 +561,6 @@ def finaliseArgs(args, parser):
     # architecture we want to build for.
     if args.docker and not args.dockerImage:
       args.dockerImage = default_builder_image(args.architecture)
-
-  if args.action == "build" and args.json and not args.plan:
-    parser.error("--json is only supported together with --plan")
 
   if args.action == "build":
     # ALIBUILD_SANDBOX only applies where sandboxing is possible, so it can be
