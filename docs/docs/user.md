@@ -22,7 +22,7 @@ aliBuild build [-h] [--defaults DEFAULT]
                [--sign-url URL] [--sign-token TOKEN] [--sign-token-file FILE]
                [--signer NAME] [--no-sign]
                [--require-signature {off,warn,require}] [--trusted-keys KEYRING]
-               [--plan]
+               [--plan] [--json]
                [-C DIR] [-w WORKDIR] [-c CONFIGDIR] [--reference-sources MIRRORDIR]
                [--aggressive-cleanup] [--no-auto-cleanup]
                PACKAGE [PACKAGE ...]
@@ -38,7 +38,9 @@ aliBuild build [-h] [--defaults DEFAULT]
 - `--force-unknown-architecture`: Build on this system, even if it doesn't have
   a supported architecture.
 - `-z [DEVELPREFIX]`, `--devel-prefix [DEVELPREFIX]`: Version name to use for
-  development packages. Defaults to branch name.
+  development packages. Defaults to branch name. If a `PKG@DEVELPREFIX`
+  directory exists, it is used as the checkout of `PKG`, and only such
+  packages get this version (see [Worktrees](#worktrees)).
 - `-e ENVIRONMENT`: KEY=VALUE binding to add to the build environment. May be
   specified multiple times.
 - `-j JOBS`, `--jobs JOBS`: The number of parallel compilation processes to run.
@@ -65,6 +67,22 @@ aliBuild build [-h] [--defaults DEFAULT]
   and therefore reads the remote store. Its `reuse` lines are
   `PACKAGE/VERSION-REVISION` specs, which is the form
   [`aliBuild migrate`](#migrating-legacy-tarballs) consumes.
+- `--json`: With `--plan`, print the plan as one JSON object instead: a
+  `packages` list in build order, with each package's `version`, `revision`,
+  `hash`, `action` (`reuse` or `build`), whether it is a development package
+  (`devel`) and from which directory (`source`), its `devel_label` and
+  `build_family`; and a `summary` with the counts.
+
+  Without `--plan`, the build ends by printing its result as one JSON object,
+  however it ends. Its `status` is `success`, `failure` when a package failed
+  to build, or `error` when aliBuild stopped for another reason, with the
+  error in `message`. `packages` has the same fields as in the plan, with an
+  `action` which is `built`, `unpacked` (from a tarball), `unchanged` or
+  `failed`, plus each development package's `build_dir`. On `failure`,
+  `failed` gives the package, its `log` (`null` if the build stopped before
+  writing one), its `build_dir`, the development packages it uses, and the
+  `sandbox_profile` if it was built with `--sandbox`. On `success`, there are
+  `install_dir` and the `alienv` name to enter.
 - `--plugin PLUGIN`: Plugin to use for the build. Default is `legacy`.
 - `--always-prefer-system`: Always use system packages when compatible.
 - `--no-system`: Never use system packages, even if compatible.
@@ -514,6 +532,210 @@ tgz will be empty.
 
 If you wish to temporary compile with the package as specified by
 alidist, you can use the `--no-local <PACKAGE>` option.
+
+### Worktrees
+
+To build a variant of a development package next to the one you are working
+on, e.g. to test a pull request, put a second checkout of it in a directory
+called `PKG@LABEL` and build with `-z LABEL`. A `git worktree` or a
+`sl share` of the main checkout is the cheapest way to get one:
+
+    cd O2 && git worktree add ../O2@fix-tracks some-branch && cd ..
+    aliBuild build O2Physics -z fix-tracks
+
+When any such directory exists, `LABEL` only applies to the packages which have
+one. Here O2 is built from `O2@fix-tracks` with version `fix-tracks`, while
+the other development packages, e.g. a `ROOT` checkout, keep the version they
+get without `-z`. Their hash does not change, so their existing builds are
+reused rather than rebuilt; only O2 and what depends on it are built again.
+
+A build with worktrees does not move the `latest` links, which stay those of
+the main tree's builds: none of the packages it builds, from a worktree or
+not, gets `sw/BUILD/PKG-latest` or `sw/<arch>/PKG/latest`. They get
+`sw/BUILD/PKG-latest-fix-tracks` and `sw/<arch>/PKG/latest-fix-tracks-<defaults>`
+instead, so you can enter it with:
+
+    alienv enter O2Physics/latest-fix-tracks-o2
+
+Worktrees are not supported together with `--docker`; they are ignored, with a
+warning, in that case.
+
+### Sessions
+
+A session gives a set of worktrees a name which stays the same as you merge
+pull requests into them, together with a record of what was merged. Keeping
+the merged pull requests out of the `-z` label means merging one more only
+rebuilds the package it touches, and what depends on it.
+
+    aliBuild session create fix-tracks O2 O2Physics   # O2@fix-tracks, O2Physics@fix-tracks
+    cd O2@fix-tracks && gh pr checkout 1234 && cd ..  # or merge it, ...
+    aliBuild session add fix-tracks O2 alisw/AliceO2#1234
+    aliBuild build O2Physics -z fix-tracks
+
+`session create` makes a `git worktree` (or an `sl share`) of each package's
+checkout, at the commit it has checked out; for a session which exists, it
+adds the worktrees it does not have yet. Where the filesystem can, the
+worktree's files are copy-on-write clones of the checkout's (see "Copy-on-write
+clones" below), so that they take no space and the files which are the same as
+at that commit keep their modification times; then the changes not committed in
+the checkout are reverted, and the files not tracked are removed. Otherwise,
+or while the checkout holds a lock or is in the middle of e.g. a rebase, the
+files are checked out as usual. A worktree of the recipes,
+`alidist@NAME`, is used by `-z NAME` builds instead of `alidist`, unless `-c`
+gives another directory. Like the other worktrees, it makes `-z NAME` apply
+only to the packages with a `PKG@NAME` worktree, and keeps the build from
+moving the `latest` links:
+
+    aliBuild session create fix-tracks O2 alidist
+
+`session add PKG REF` and
+`session remove PKG REF` record that `REF` was merged into, or removed from,
+`PKG@NAME`, and at which commit the worktree was afterwards; they do not
+change the worktree themselves. The record is kept in
+`sw/SESSIONS/NAME.json`.
+
+`aliBuild session list` lists the sessions, and `aliBuild session show NAME`
+shows a session's worktrees, the commit each has checked out, the build its
+`latest-NAME` link points to, and what is merged into it. Both take `--json`.
+
+When you are done with a session, `aliBuild session drop NAME` removes its
+`latest-NAME` links and its record, so that the next `aliBuild clean` deletes
+its builds. With `--worktrees`, it removes its worktrees as well, unless one of
+them has uncommitted changes. `-n` shows what it would remove.
+
+#### Seeding a session from another one (experimental)
+
+This is experimental, and only done when asked for with `--seed-from`. It
+rewrites ninja's own log files, whose format is not public: it is known to work
+with ninja 1.11 and 1.13, and nothing is seeded for a package built with
+another version of ninja.
+
+A new session's first build of a large package, e.g. O2, starts from an empty
+build directory, even when another session has just built nearly the same
+code. `--seed-from` makes it start from the other session's instead:
+
+    aliBuild session create fix-vertex O2 --seed-from fix-tracks
+    aliBuild build O2 -z fix-vertex
+
+It is recorded in `sw/SESSIONS/NAME.json`, as `seed_from`; giving it to
+`session create` for an existing session changes it. The first time
+`-z fix-vertex` builds a package with a `PKG@fix-vertex` worktree, and that
+package's build directory does not exist yet, aliBuild makes it a
+copy-on-write clone of the other session's, `sw/BUILD/O2-latest-fix-tracks/O2`,
+and then:
+
+- replaces the other session's paths in it with this one's: its build
+  directory, its `SOURCES` and `PKG@NAME` directories, and the installs it was
+  built against, which are those its `latest-OTHER-DEFAULTS` links point to.
+  This is done in the text files and symlinks, keeping their modification
+  times, and in ninja's `.ninja_log` and `.ninja_deps`, where the hashes of
+  the command lines which only changed by these paths are recomputed, so that
+  ninja does not run them again for that;
+- gives each file of `PKG@fix-vertex` which is the same as in `PKG@fix-tracks`
+  the modification time it has there, so that only what differs is rebuilt;
+- removes `.build_succeeded`, so that the recipe runs, configures and builds
+  incrementally in the clone.
+
+Only packages whose recipe has an `incremental_recipe` are seeded, as the
+build directory of the others is always started afresh. Nothing of the other
+session's is modified. Its build is not seeded from while it is being built,
+nor when it has no build of the package for this architecture, no
+`PKG@OTHER` worktree, or when the build directory cannot be cloned: the
+package is then built from scratch, as without `--seed-from`, and aliBuild
+says why. Object files keep naming the other session's sources in their debug
+information until they are rebuilt.
+
+#### Copy-on-write clones
+
+Cloning never falls back to copying. The backends are tried in this order:
+
+- `apfs-clonefile`: macOS's `clonefile(2)`, which clones a whole tree at once
+  on APFS;
+- `cp-clone`: `cp -c -R -p` on APFS, or `cp -a --reflink=always` on Linux, for
+  Btrfs, XFS and other filesystems with reflinks;
+- `zfs`: not implemented, as ZFS clones datasets rather than directories;
+- `none`: never clones.
+
+`ALIBUILD_COW_BACKEND=NAME[,NAME...]` picks the backends to try, and
+`ALIBUILD_COW_BACKEND=none` turns seeding off. A backend, in
+`alibuild_helpers/cow.py`, is a `CloneBackend` with a `name`,
+`unavailable_reason(src, dst)`, which returns why it cannot clone `src` to
+`dst` or `None`, and `clone_tree(src, dst)`, which raises `CloneError` if it
+fails; add an instance to `BACKENDS` to have it tried. Seeding and
+`session create` only go through `cow.clone_tree()`.
+
+### Running several builds at once
+
+Several `aliBuild build` processes can share a work directory, e.g. one per
+session. A package is only built by one of them at a time: another which needs
+the same package waits for it, and then uses it. By default, packages which
+are not shared are built in parallel. To limit how many are compiled at the
+same time, so that concurrent builds do not overload the machine, set
+`ALIBUILD_BUILD_SLOTS`:
+
+    export ALIBUILD_BUILD_SLOTS=1   # compile one package at a time
+
+The locks are in `sw/LOCKS`. They are released when the process holding them
+exits, however it ends.
+
+### Driving aliBuild from agents (MCP)
+
+`aliBuild mcp` is a [Model Context Protocol](https://modelcontextprotocol.io)
+server, which lets AI agents plan and run builds, follow them and manage
+sessions. It talks over stdin and stdout, so a client starts it, e.g. for
+Claude Code:
+
+    claude mcp add alibuild -- aliBuild mcp -C ~/src
+
+Its tools:
+
+- `plan`: the result of `--plan --json`.
+- `build`: start a build in the background, and return its id at once.
+- `build_status`: what a build is doing, e.g. waiting for a build slot or
+  building which package. Once it finishes, the result of `--json`. It can
+  wait for the build to finish.
+- `builds`: the builds of the work directory, from every client.
+- `build_log`, `build_cancel`.
+- `session_list`, `session_show`, `session_create`, `session_record` and
+  `session_drop`, which match `aliBuild session`.
+
+Every client starts its own server, so a build's state is kept in
+`sw/BUILDS/ID`: the request, a status file which the build keeps up to date
+through `ALIBUILD_STATUS_FILE`, its JSON result, its exit code and its
+output. Builds are detached from the server, so they go on if the client goes
+away, and every client sees every build.
+
+With `--gated --approvals-key OWNER.pub`, e.g. for an agent working on a
+machine of its own, nothing is built or run without the owner's approval:
+
+    aliBuild mcp --stdio --gated --approvals-key ~/owner.pub -C ~/src -w ~/sw
+
+- `build`, `session_drop` with `worktrees`, and the gated mode's own
+  `build_dir` (`cmake --build` in a development package's build directory, in
+  the environment of its `.envrc`) and `run` (a program, with a build's
+  `alienv` environment) first only return a request: canonical JSON of what
+  they would do, with the host, `SLURM_JOB_ID`, the arguments, and the commit
+  and a hash of the uncommitted changes of alidist and of each checkout the
+  build would use. It expires after 30 minutes.
+- The owner signs it with `ssh-keygen -Y sign -n epn-approval -f KEY`, e.g.
+  with `python3 -m alibuild_helpers.epn_approve approve REQUEST.json`, which
+  shows the request first, and the agent passes the signature to the `approve`
+  tool.
+- Called again with `approval: ID`, the tool recomputes the request: if
+  anything changed since, e.g. a source file, the approval is `stale`. A valid
+  approval is used once.
+- A `build` can ask for `runs`, `[{argv_prefix, max}]`: up to `max` runs of
+  programs whose argv starts with `argv_prefix`, with that build's
+  environment, without another approval.
+- `plan` stays free, but only takes options which cannot point it at other
+  recipes, as planning runs their system checks.
+- So are `read_file`, `list_files` and `fetch_result`, which read files under
+  the source root (`-C`) and, for `fetch_result`, the work directory, and
+  `edit_file` and `apply_patch`, which change files of the package checkouts
+  there, but not alidist's, nor anything in `.git` or `.sl`. Paths are
+  resolved first, so that neither `..` nor a symbolic link leads elsewhere.
+
+The approvals are kept in the server, so they end with it.
 
 ### Incremental builds
 
