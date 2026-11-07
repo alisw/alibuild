@@ -230,7 +230,7 @@ _aliBuild_complete() {
           _filedir -d; return ;;
       esac
       if [[ "$cur" == -* ]]; then
-        COMPREPLY=( $(compgen -W "-C --chdir -w --work-dir --json --worktrees" -- "$cur") )
+        COMPREPLY=( $(compgen -W "-C --chdir -w --work-dir --json --worktrees --seed-from" -- "$cur") )
       else
         COMPREPLY=( $(compgen -W "create list show add remove drop" -- "$cur") )
       fi

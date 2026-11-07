@@ -51,6 +51,10 @@ def add_parser(subparsers, work_dir_default, chdir_default):
   create.add_argument("packages", metavar="PKG", nargs="*",
                       help="Packages to create worktrees for, from the PKG checkout's "
                            "current commit.")
+  create.add_argument("--seed-from", metavar="OTHER", dest="seedFrom",
+                      help="Start the build directories of the session's packages as "
+                           "copy-on-write clones of session OTHER's, so that their first "
+                           "build is incremental.")
 
   lst = actions.add_parser("list", help="list sessions")
   lst.add_argument("--json", action="store_true", help="Print JSON.")
@@ -123,6 +127,12 @@ def load_session(work_dir, name):
     return json.load(f)
 
 
+def seed_from(work_dir, name):
+  """The session whose builds session name's first builds start from, or None."""
+  path = session_file(work_dir, name) if name else None
+  return load_session(work_dir, name).get("seed_from") if path and exists(path) else None
+
+
 def save_session(work_dir, session):
   path = session_file(work_dir, session["name"])
   os.makedirs(join(work_dir, "SESSIONS"), exist_ok=True)
@@ -152,6 +162,7 @@ def describe(work_dir, name, root="."):
   return {
     "name": name,
     "created": session.get("created"),
+    "seed_from": session.get("seed_from"),
     "recorded": exists(path),
     "worktrees": trees,
     "merged": merged_refs(session["events"]),
@@ -228,17 +239,23 @@ def doSession(args, parser):
     return True
 
   if args.sessionAction == "create":
+    seed = args.seedFrom
+    if seed is not None and (seed == name or not exists(session_file(args.workDir, seed))):
+      error("Cannot seed session %s from %s: there is no other session %s", name, seed, seed)
+      return False
     # Creating an existing session adds the worktrees it does not have yet.
     if exists(session_file(args.workDir, name)):
       session = load_session(args.workDir, name)
       new = [p for p in args.packages if not isdir(f"{p}@{name}")]
-      if not new:
+      if not new and seed is None:
         error("Session %s already exists, with worktrees for %s", name,
               ", ".join(worktrees(name)) or "no packages")
         return False
     else:
       session = {"name": name, "created": now(), "events": []}
       new = args.packages
+    if seed is not None:
+      session["seed_from"] = seed
     missing = [p for p in new if not isdir(p) and not isdir(f"{p}@{name}")]
     if missing:
       error("No checkout to create a worktree from: %s", ", ".join(missing))
@@ -268,7 +285,8 @@ def doSession(args, parser):
     if args.json:
       print(json.dumps(session, indent=2))
       return True
-    print(f"Session {name}" + (f", created {session['created']}" if session["created"] else ""))
+    print(f"Session {name}" + (f", created {session['created']}" if session["created"] else "") +
+          (f", seeded from {session['seed_from']}" if session["seed_from"] else ""))
     print("Worktrees:" if session["worktrees"] else "No worktrees.")
     for tree in session["worktrees"]:
       print(f"  {tree['package']}@{name} at {(tree['commit'] or 'unknown')[:12]}, " +

@@ -131,7 +131,10 @@ TOOLS = [
    "description": "Create a session, with a PKG@NAME worktree of each package's checkout; "
                   "for an existing session, add the worktrees it lacks.",
    "inputSchema": _schema({"name": {"type": "string"},
-                           "packages": {"type": "array", "items": {"type": "string"}}},
+                           "packages": {"type": "array", "items": {"type": "string"}},
+                           "seed_from": {"type": "string",
+                                         "description": "Start the session's build directories "
+                                                        "as copy-on-write clones of this session's."}},
                           ["name"])},
   {"name": "session_record",
    "description": "Record that REF was merged into (add) or removed from (remove) the "
@@ -765,7 +768,8 @@ class Server:
     if name == "session_show":
       return self._session(["show", a["name"], "--json"], want_json=True)
     if name == "session_create":
-      return self._session(["create", a["name"], *(a.get("packages") or [])])
+      return self._session(["create", a["name"], *(a.get("packages") or [])] +
+                           (["--seed-from", a["seed_from"]] if a.get("seed_from") else []))
     if name == "session_record":
       return self._session([a["action"], a["name"], a["package"], a["ref"]])
     if name == "session_drop":

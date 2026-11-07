@@ -9,7 +9,7 @@ from contextlib import redirect_stdout
 from unittest.mock import patch
 
 from alibuild_helpers.session import (add_parser, doSession, describe, list_sessions,
-                                      merged_refs, worktrees)
+                                      merged_refs, seed_from, worktrees)
 
 
 def event(action, package, ref):
@@ -104,6 +104,25 @@ class SessionTestCase(unittest.TestCase):
     self.assertTrue(self.run_session("remove", "s1", "O2", "alisw/O2#1")[0])
     self.assertEqual(describe("sw", "s1")["merged"], [])
     self.assertFalse(self.run_session("show", "nothing")[0])
+
+  def test_seed_from(self) -> None:
+    os.mkdir("O2")
+    self.git("init", "-q")
+    self.git("commit", "-q", "--allow-empty", "-m", "init")
+    # Only from another session which exists.
+    self.assertFalse(self.run_session("create", "s1", "O2", "--seed-from", "s0")[0])
+    self.assertTrue(self.run_session("create", "s0", "O2")[0])
+    self.assertFalse(self.run_session("create", "s1", "O2", "--seed-from", "s1")[0])
+    self.assertFalse(os.path.exists("sw/SESSIONS/s1.json"))
+    self.assertTrue(self.run_session("create", "s1", "O2", "--seed-from", "s0")[0])
+    self.assertEqual(seed_from("sw", "s1"), "s0")
+    self.assertIsNone(seed_from("sw", "s0"))
+    self.assertIsNone(seed_from("sw", None))
+    self.assertIn("seeded from s0", self.run_session("show", "s1")[1])
+    # Creating it again with --seed-from changes it.
+    self.assertTrue(self.run_session("create", "s2")[0])
+    self.assertTrue(self.run_session("create", "s1", "--seed-from", "s2")[0])
+    self.assertEqual(seed_from("sw", "s1"), "s2")
 
   def test_drop(self) -> None:
     os.mkdir("O2")
