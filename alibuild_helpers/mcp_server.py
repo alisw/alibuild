@@ -61,8 +61,11 @@ def add_parser(subparsers, work_dir_default, chdir_default):
   p.add_argument("--gated", action="store_true",
                  help="Run builds, build directories and programs only with an approval "
                       "signed by a key of --approvals-key.")
+  # Made absolute here: aliBuild changes to -C before the server opens it.
   p.add_argument("--approvals-key", metavar="FILE", dest="approvalsKey",
-                 help="With --gated, the owner's public key (or keys, one per line).")
+                 type=lambda path: os.path.abspath(os.path.expanduser(path)),
+                 help="With --gated, the owner's public key (or keys, one per line), "
+                      "relative to the directory aliBuild was started in.")
   return p
 
 
