@@ -565,6 +565,11 @@ change the worktree themselves. The record is kept in
 shows a session's worktrees, the commit each has checked out, the build its
 `latest-NAME` link points to, and what is merged into it. Both take `--json`.
 
+When you are done with a session, `aliBuild session drop NAME` removes its
+`latest-NAME` links and its record, so that the next `aliBuild clean` deletes
+its builds. With `--worktrees`, it removes its worktrees as well, unless one of
+them has uncommitted changes. `-n` shows what it would remove.
+
 ### Incremental builds
 
 When developing locally using the development mode, if the external

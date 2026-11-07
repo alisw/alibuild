@@ -207,7 +207,8 @@ _aliBuild_cmd_session() {
     '(-C --chdir)'{-C,--chdir}'[Directory with the worktrees]:directory:_directories' \
     '(-w --work-dir)'{-w,--work-dir}'[Work directory]:directory:_directories' \
     '--json[Print JSON]' \
-    ':action:(create list show add remove)' \
+    '--worktrees[With drop, also remove the worktrees]' \
+    ':action:(create list show add remove drop)' \
     '*::argument: '
 }
 
