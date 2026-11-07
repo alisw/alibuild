@@ -1,4 +1,5 @@
 from argparse import Namespace
+import json
 import os
 import os.path
 import platform
@@ -13,7 +14,7 @@ from collections import OrderedDict
 from alibuild_helpers.utilities import parseRecipe, resolve_tag
 from alibuild_helpers import sync_reapi
 from alibuild_helpers.build import doBuild, storeHashes, generate_initdotsh, build_ac_entry, select_cached_tarball, bound_unpublished_rebuild
-from alibuild_helpers.build import worktree_packages, devel_label
+from alibuild_helpers.build import worktree_packages, devel_label, plan_entry, report_plan
 
 # Determine architecture based on platform
 def get_test_architecture():
@@ -716,6 +717,37 @@ class WorktreeTestCase(unittest.TestCase):
         # development packages keep their version, hence their hash and build.
         self.assertEqual(devel_label("O2", "fix", {"O2"}), "fix")
         self.assertIsNone(devel_label("O2Physics", "fix", {"O2"}))
+
+
+class PlanTestCase(unittest.TestCase):
+    """--plan prints one line per package, or with --json one JSON object."""
+
+    def setUp(self) -> None:
+        base = {"version": "v1", "revision": "1", "build_family": "fix-o2", "devel_label": None}
+        self.plan = [
+            plan_entry(dict(base, package="ROOT", hash="aaaa", is_devel_pkg=False), True),
+            plan_entry(dict(base, package="O2", hash="bbbb", is_devel_pkg=True, version="fix",
+                            revision="local1", source="/src/O2@fix", devel_label="fix"), False),
+        ]
+
+    def report(self, as_json):
+        with patch("sys.stdout", new=StringIO()) as out, patch("alibuild_helpers.build.banner"):
+            report_plan(self.plan, as_json)
+        return out.getvalue()
+
+    def test_text(self) -> None:
+        self.assertEqual(self.report(False),
+                         "reuse ROOT/v1-1 aaaa\nbuild O2/fix-local1 bbbb\n")
+
+    def test_json(self) -> None:
+        plan = json.loads(self.report(True))
+        self.assertEqual(plan["summary"], {"packages": 2, "reuse": 1, "build": 1})
+        root, o2 = plan["packages"]
+        self.assertEqual((root["action"], root["devel"], root["source"]), ("reuse", False, None))
+        self.assertEqual((o2["package"], o2["version"], o2["revision"], o2["hash"], o2["action"]),
+                         ("O2", "fix", "local1", "bbbb", "build"))
+        self.assertEqual((o2["devel"], o2["source"], o2["devel_label"], o2["build_family"]),
+                         (True, "/src/O2@fix", "fix", "fix-o2"))
 
 
 class CheckEnvironmentTestCase(unittest.TestCase):

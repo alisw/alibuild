@@ -22,7 +22,7 @@ aliBuild build [-h] [--defaults DEFAULT]
                [--sign-url URL] [--sign-token TOKEN] [--sign-token-file FILE]
                [--signer NAME] [--no-sign]
                [--require-signature {off,warn,require}] [--trusted-keys KEYRING]
-               [--plan]
+               [--plan] [--json]
                [-C DIR] [-w WORKDIR] [-c CONFIGDIR] [--reference-sources MIRRORDIR]
                [--aggressive-cleanup] [--no-auto-cleanup]
                PACKAGE [PACKAGE ...]
@@ -67,6 +67,11 @@ aliBuild build [-h] [--defaults DEFAULT]
   and therefore reads the remote store. Its `reuse` lines are
   `PACKAGE/VERSION-REVISION` specs, which is the form
   [`aliBuild migrate`](#migrating-legacy-tarballs) consumes.
+- `--json`: With `--plan`, print the plan as one JSON object instead: a
+  `packages` list in build order, with each package's `version`, `revision`,
+  `hash`, `action` (`reuse` or `build`), whether it is a development package
+  (`devel`) and from which directory (`source`), its `devel_label` and
+  `build_family`; and a `summary` with the counts.
 - `--plugin PLUGIN`: Plugin to use for the build. Default is `legacy`.
 - `--always-prefer-system`: Always use system packages when compatible.
 - `--no-system`: Never use system packages, even if compatible.
