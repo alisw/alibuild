@@ -549,9 +549,11 @@ the other development packages, e.g. a `ROOT` checkout, keep the version they
 get without `-z`. Their hash does not change, so their existing builds are
 reused rather than rebuilt; only O2 and what depends on it are built again.
 
-A build from a worktree does not move the `latest` links of the main checkout:
-it gets `sw/BUILD/O2-latest-fix-tracks` and `sw/<arch>/O2/latest-fix-tracks-<defaults>`,
-so you can enter it with:
+A build with worktrees does not move the `latest` links, which stay those of
+the main tree's builds: none of the packages it builds, from a worktree or
+not, gets `sw/BUILD/PKG-latest` or `sw/<arch>/PKG/latest`. They get
+`sw/BUILD/PKG-latest-fix-tracks` and `sw/<arch>/PKG/latest-fix-tracks-<defaults>`
+instead, so you can enter it with:
 
     alienv enter O2Physics/latest-fix-tracks-o2
 
@@ -574,7 +576,9 @@ rebuilds the package it touches, and what depends on it.
 checkout, at the commit it has checked out; for a session which exists, it
 adds the worktrees it does not have yet. A worktree of the recipes,
 `alidist@NAME`, is used by `-z NAME` builds instead of `alidist`, unless `-c`
-gives another directory:
+gives another directory. Like the other worktrees, it makes `-z NAME` apply
+only to the packages with a `PKG@NAME` worktree, and keeps the build from
+moving the `latest` links:
 
     aliBuild session create fix-tracks O2 alidist
 
