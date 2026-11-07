@@ -21,6 +21,7 @@ from alibuild_helpers.install import doInstall
 from alibuild_helpers.reconstruct import doReconstruct
 from alibuild_helpers.migrate import doMigrate
 from alibuild_helpers.session import doSession
+from alibuild_helpers.mcp_server import doMcp
 from alibuild_helpers.completion import doCompletion
 
 
@@ -98,6 +99,9 @@ def doMain(args, parser):
 
   if args.action == "session":
     sys.exit(0 if doSession(args, parser) else 1)
+
+  if args.action == "mcp":
+    sys.exit(0 if doMcp(args) else 1)
 
 
 if __name__ == "__main__":

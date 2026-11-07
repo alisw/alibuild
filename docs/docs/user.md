@@ -611,6 +611,33 @@ same time, so that concurrent builds do not overload the machine, set
 The locks are in `sw/LOCKS`. They are released when the process holding them
 exits, however it ends.
 
+### Driving aliBuild from agents (MCP)
+
+`aliBuild mcp` is a [Model Context Protocol](https://modelcontextprotocol.io)
+server, which lets AI agents plan and run builds, follow them and manage
+sessions. It talks over stdin and stdout, so a client starts it, e.g. for
+Claude Code:
+
+    claude mcp add alibuild -- aliBuild mcp -C ~/src
+
+Its tools:
+
+- `plan`: the result of `--plan --json`.
+- `build`: start a build in the background, and return its id at once.
+- `build_status`: what a build is doing, e.g. waiting for a build slot or
+  building which package. Once it finishes, the result of `--json`. It can
+  wait for the build to finish.
+- `builds`: the builds of the work directory, from every client.
+- `build_log`, `build_cancel`.
+- `session_list`, `session_show`, `session_create`, `session_record` and
+  `session_drop`, which match `aliBuild session`.
+
+Every client starts its own server, so a build's state is kept in
+`sw/BUILDS/ID`: the request, a status file which the build keeps up to date
+through `ALIBUILD_STATUS_FILE`, its JSON result, its exit code and its
+output. Builds are detached from the server, so they go on if the client goes
+away, and every client sees every build.
+
 ### Incremental builds
 
 When developing locally using the development mode, if the external

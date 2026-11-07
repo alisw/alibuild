@@ -779,12 +779,12 @@ class PlanTestCase(unittest.TestCase):
 class BuildResultTestCase(unittest.TestCase):
     """With --json, a build always ends with one JSON object on stdout."""
 
-    def build(self, body, **args):
+    def build(self, body, plan=False, **args):
         with patch("alibuild_helpers.build._doBuild", side_effect=body), \
              patch("sys.stdout", new=StringIO()) as out, \
              patch("sys.stderr", new=StringIO()):
             try:
-                doBuild(Namespace(json=True, plan=False, **args), None)
+                doBuild(Namespace(json=True, plan=plan, **args), None)
             except SystemExit as exc:
                 self.assertEqual(exc.code, 1)
         return json.loads(out.getvalue())
@@ -813,12 +813,24 @@ class BuildResultTestCase(unittest.TestCase):
         self.assertEqual(result["failed"]["package"], "zlib")
         self.assertNotIn("message", result)
 
+    def test_plan(self) -> None:
+        # A plan prints itself; only an error stopping it is printed by doBuild.
+        def body(args, parser, result):
+            print("the plan")
+            result["status"] = "planned"
+        with patch("alibuild_helpers.build._doBuild", side_effect=body), \
+             patch("sys.stdout", new=StringIO()) as out:
+            doBuild(Namespace(json=True, plan=True), None)
+        self.assertEqual(out.getvalue(), "the plan\n")
+        def failing(args, parser, result):
+            dieOnError(True, "Package nosuchpkg not found")
+        self.assertEqual(self.build(failing, plan=True)["status"], "error")
+
     def test_without_json(self) -> None:
         with patch("alibuild_helpers.build._doBuild") as body, \
              patch("sys.stdout", new=StringIO()) as out:
-            doBuild(Namespace(json=True, plan=True), None)
             doBuild(Namespace(), None)
-        self.assertEqual(body.call_count, 2)
+        self.assertEqual(body.call_count, 1)
         self.assertEqual(out.getvalue(), "")
 
 

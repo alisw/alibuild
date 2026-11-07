@@ -53,7 +53,7 @@ _aliBuild_complete() {
   local subcmd=""
   for (( i=1; i < cword; i++ )); do
     case "${words[i]}" in
-      build|clean|deps|doctor|init|install|reconstruct|migrate|session|analytics|architecture|version|completion)
+      build|clean|deps|doctor|init|install|reconstruct|migrate|session|mcp|analytics|architecture|version|completion)
         subcmd="${words[i]}"
         break
         ;;
@@ -64,7 +64,7 @@ _aliBuild_complete() {
   if [[ -z "$subcmd" ]]; then
     COMPREPLY=( $(compgen -W "
       -d --debug -n --dry-run
-      build clean deps doctor init install reconstruct migrate session analytics architecture version completion
+      build clean deps doctor init install reconstruct migrate session mcp analytics architecture version completion
     " -- "$cur") )
     return
   fi
@@ -216,6 +216,13 @@ _aliBuild_complete() {
       else
         _filedir
       fi
+      ;;
+    mcp)
+      case "$prev" in
+        -C|--chdir|-w|--work-dir)
+          _filedir -d; return ;;
+      esac
+      COMPREPLY=( $(compgen -W "-C --chdir -w --work-dir" -- "$cur") )
       ;;
     session)
       case "$prev" in
