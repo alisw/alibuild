@@ -650,8 +650,10 @@ machine of its own, nothing is built or run without the owner's approval:
   they would do, with the host, `SLURM_JOB_ID`, the arguments, and the commit
   and a hash of the uncommitted changes of alidist and of each checkout the
   build would use. It expires after 30 minutes.
-- The owner signs it with `ssh-keygen -Y sign -n epn-approval -f KEY`, and the
-  agent passes the signature to the `approve` tool.
+- The owner signs it with `ssh-keygen -Y sign -n epn-approval -f KEY`, e.g.
+  with `python3 -m alibuild_helpers.epn_approve approve REQUEST.json`, which
+  shows the request first, and the agent passes the signature to the `approve`
+  tool.
 - Called again with `approval: ID`, the tool recomputes the request: if
   anything changed since, e.g. a source file, the approval is `stale`. A valid
   approval is used once.
