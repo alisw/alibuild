@@ -86,7 +86,9 @@ def doParseArgs():
   build_parser.add_argument("--force-unknown-architecture", dest="forceUnknownArch", action="store_true",
                             help="Build on this system, even if it doesn't have a supported architecture.")
   build_parser.add_argument("-z", "--devel-prefix", nargs="?", dest="develPrefix", default=argparse.SUPPRESS,
-                            help="Version name to use for development packages. Defaults to branch name.")
+                            help=("Version name to use for development packages. Defaults to branch name. "
+                                  "If a PKG@DEVELPREFIX directory exists, it is used as the checkout of PKG, "
+                                  "and only such packages get this version."))
   build_parser.add_argument("-e", dest="environment", action="append", default=[],
                             help="KEY=VALUE binding to add to the build environment. May be specified multiple times.")
   build_parser.add_argument("-j", "--jobs", dest="jobs", type=int, default=multiprocessing.cpu_count(),
