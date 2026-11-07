@@ -14,6 +14,7 @@ from collections import OrderedDict
 from alibuild_helpers.utilities import parseRecipe, resolve_tag
 from alibuild_helpers import sync_reapi
 from alibuild_helpers.build import doBuild, storeHashes, generate_initdotsh, build_ac_entry, select_cached_tarball, bound_unpublished_rebuild
+from alibuild_helpers.build import update_git_repos
 from alibuild_helpers.build import worktree_packages, devel_label, plan_entry, report_plan, worktree_config_dir
 from alibuild_helpers.log import dieOnError
 
@@ -805,6 +806,29 @@ class BuildResultTestCase(unittest.TestCase):
             doBuild(Namespace(), None)
         self.assertEqual(body.call_count, 2)
         self.assertEqual(out.getvalue(), "")
+
+
+class UpdateGitReposTestCase(unittest.TestCase):
+    """Listing remote refs only stops the build for packages which need them."""
+
+    def test_devel_refs(self) -> None:
+        scm = MagicMock()
+        scm.listRefsCmd.return_value = ["bookmark", "--list", "--remote"]
+        scm.exec.return_value = (255, "abort: remote url default does not have a name")
+        scm.parseRefs.side_effect = lambda output: {"refs/heads/main": "abc"} if output else {}
+        specs = {"FairMQ": {"package": "FairMQ", "source": "/src/FairMQ", "is_devel_pkg": True, "scm": scm},
+                 "zlib": {"package": "zlib", "source": "https://x/zlib", "is_devel_pkg": False, "scm": scm}}
+        args = Namespace(referenceSources="/sw/MIRROR", fetchRepos=False)
+        with patch("alibuild_helpers.build.updateReferenceRepoSpec"), \
+             patch("alibuild_helpers.build.logged_scm", return_value="refs") as logged, \
+             patch("alibuild_helpers.build.warning") as warning, \
+             patch("alibuild_helpers.build.ProgressPrint"):
+            update_git_repos(args, specs, ["FairMQ", "zlib"])
+        self.assertEqual(specs["FairMQ"]["scm_refs"], {})
+        self.assertIn("FairMQ", warning.call_args[0])
+        # Other packages still go through logged_scm, which stops the build on errors.
+        self.assertEqual([c.args[1] for c in logged.call_args_list], ["zlib"])
+        self.assertEqual(specs["zlib"]["scm_refs"], {"refs/heads/main": "abc"})
 
 
 class CheckEnvironmentTestCase(unittest.TestCase):
