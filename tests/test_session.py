@@ -139,6 +139,19 @@ class SessionTestCase(unittest.TestCase):
     self.assertFalse(os.path.exists("O2@s1"))
     self.assertFalse(self.run_session("drop", "s1")[0])
 
+  def test_git_repository_used_by_sapling(self) -> None:
+    # A git repository Sapling has been used on (.git/sl) is still shared with
+    # a git worktree: sl share cannot share a git-format repository.
+    os.mkdir("O2")
+    self.git("init", "-q")
+    self.git("commit", "-q", "--allow-empty", "-m", "init")
+    os.mkdir("O2/.git/sl")
+    with patch("alibuild_helpers.session.scm_for") as scm:
+      scm.return_value.checkedOutCommitName.side_effect = lambda directory: subprocess.check_output(
+        ["git", "rev-parse", "HEAD"], cwd=directory, text=True).strip()
+      self.assertTrue(self.run_session("create", "s1", "O2")[0])
+    self.assertTrue(os.path.isfile("O2@s1/.git"))  # a git worktree's .git is a file
+
   def test_invalid_name(self) -> None:
     with patch.object(self.parser, "error", side_effect=SystemExit) as error, \
          self.assertRaises(SystemExit):
