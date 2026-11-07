@@ -122,10 +122,21 @@ function detectShell() {
 
 function collectModules() {
   if [[ -z "$NO_REFRESH" ]]; then
-    # Collect all modulefiles in one place
-    rm -rf $WORK_DIR/MODULES/$ARCHITECTURE
-    mkdir -p $WORK_DIR/MODULES/$ARCHITECTURE/BASE
-    cat > $WORK_DIR/MODULES/$ARCHITECTURE/BASE/1.0 <<EOF
+    # Collect all modulefiles in one place. Other alienv calls may read the
+    # directory meanwhile, so it is never emptied: each modulefile is written
+    # next to it and renamed into place, and only then are the modulefiles of
+    # packages which are gone removed.
+    local DEST=$WORK_DIR/MODULES/$ARCHITECTURE STAGE PKG PKGVER PKGNAME MODFILE MODNAME
+    mkdir -p "$DEST"
+    STAGE=$(mktemp -d "$WORK_DIR/MODULES/.refresh-$ARCHITECTURE.XXXXXX") || return 1
+    function publish() {
+      # Install $1 (a file, or - for stdin) as the modulefile $2, relative to $DEST.
+      mkdir -p "$DEST/${2%/*}"
+      if [[ $1 == - ]]; then cat > "$STAGE/file"; else cp "$1" "$STAGE/file"; fi
+      mv -f "$STAGE/file" "$DEST/$2"
+      echo "$2" >> "$STAGE/published"
+    }
+    publish - BASE/1.0 <<EOF
 #%Module1.0
 set base_path $WORK_DIR/$ARCHITECTURE
 setenv BASEDIR \$base_path
@@ -144,10 +155,15 @@ EOF
       for MODFILE in "$PKG"/etc/modulefiles/*; do
         [[ -f "$MODFILE" ]] || continue
         MODNAME=${MODFILE##*/}
-        mkdir -p "$WORK_DIR/MODULES/$ARCHITECTURE/$MODNAME"
-        cp "$MODFILE" "$WORK_DIR/MODULES/$ARCHITECTURE/$MODNAME/$PKGVER"
+        publish "$MODFILE" "$MODNAME/$PKGVER"
       done
     done < <(find $WORK_DIR/$ARCHITECTURE -maxdepth 2 -mindepth 2 2> /dev/null)
+    # BASE/1.0 is always published, so the list is never empty here.
+    (cd "$DEST" && find . -type f ! -name '.*' | sed -e 's|^\./||') | grep -vxF -f "$STAGE/published" | \
+      while read MODFILE; do rm -f "$DEST/$MODFILE"; done
+    find "$DEST" -mindepth 1 -type d -empty -delete 2> /dev/null
+    rm -rf "$STAGE"
+    unset -f publish
   else
     printf "${EY}WARNING: not updating modulefiles${EZ}\n" >&2
   fi
