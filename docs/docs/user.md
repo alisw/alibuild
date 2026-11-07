@@ -574,7 +574,13 @@ rebuilds the package it touches, and what depends on it.
 
 `session create` makes a `git worktree` (or an `sl share`) of each package's
 checkout, at the commit it has checked out; for a session which exists, it
-adds the worktrees it does not have yet. A worktree of the recipes,
+adds the worktrees it does not have yet. Where the filesystem can, the
+worktree's files are copy-on-write clones of the checkout's (see "Copy-on-write
+clones" below), so that they take no space and the files which are the same as
+at that commit keep their modification times; then the changes not committed in
+the checkout are reverted, and the files not tracked are removed. Otherwise,
+or while the checkout holds a lock or is in the middle of e.g. a rebase, the
+files are checked out as usual. A worktree of the recipes,
 `alidist@NAME`, is used by `-z NAME` builds instead of `alidist`, unless `-c`
 gives another directory. Like the other worktrees, it makes `-z NAME` apply
 only to the packages with a `PKG@NAME` worktree, and keeps the build from
@@ -639,6 +645,8 @@ package is then built from scratch, as without `--seed-from`, and aliBuild
 says why. Object files keep naming the other session's sources in their debug
 information until they are rebuilt.
 
+#### Copy-on-write clones
+
 Cloning never falls back to copying. The backends are tried in this order:
 
 - `apfs-clonefile`: macOS's `clonefile(2)`, which clones a whole tree at once
@@ -653,8 +661,8 @@ Cloning never falls back to copying. The backends are tried in this order:
 `alibuild_helpers/cow.py`, is a `CloneBackend` with a `name`,
 `unavailable_reason(src, dst)`, which returns why it cannot clone `src` to
 `dst` or `None`, and `clone_tree(src, dst)`, which raises `CloneError` if it
-fails; add an instance to `BACKENDS` to have it tried. Seeding only goes
-through `cow.clone_tree()`.
+fails; add an instance to `BACKENDS` to have it tried. Seeding and
+`session create` only go through `cow.clone_tree()`.
 
 ### Running several builds at once
 
