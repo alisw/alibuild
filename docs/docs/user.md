@@ -660,6 +660,11 @@ machine of its own, nothing is built or run without the owner's approval:
   environment, without another approval.
 - `plan` stays free, but only takes options which cannot point it at other
   recipes, as planning runs their system checks.
+- So are `read_file`, `list_files` and `fetch_result`, which read files under
+  the source root (`-C`) and, for `fetch_result`, the work directory, and
+  `edit_file` and `apply_patch`, which change files of the package checkouts
+  there, but not alidist's, nor anything in `.git` or `.sl`. Paths are
+  resolved first, so that neither `..` nor a symbolic link leads elsewhere.
 
 The approvals are kept in the server, so they end with it.
 

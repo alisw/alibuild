@@ -14,9 +14,11 @@ signs with `ssh-keygen -Y sign -n epn-approval`, and the signature is given
 back with the approve tool. Called again with the request's id, the tool
 recomputes the request from what is there now, so that any change since, e.g.
 to the sources, voids it, checks the signature against --approvals-key, and
-only then runs.
+only then runs. Gated mode also has tools to read the sources, and to change
+those of the package checkouts.
 """
 
+import base64
 import calendar
 import hashlib
 import json
@@ -30,7 +32,8 @@ import sys
 import tempfile
 import time
 import uuid
-from os.path import abspath, dirname, exists, isdir, isfile, islink, join, realpath
+from glob import glob, escape as glob_escape
+from os.path import abspath, dirname, exists, isdir, isfile, islink, join, realpath, relpath
 
 from alibuild_helpers import __version__
 
@@ -177,7 +180,34 @@ GATED_TOOLS = [
                            "build": {"type": "string",
                                      "description": "The id of a finished build."},
                            "cwd": {"type": "string"}}, ["argv"])},
+  {"name": "read_file",
+   "description": "Read a file under the source root (-C), by lines.",
+   "inputSchema": _schema({"path": {"type": "string", "description": "From the source root."},
+                           "offset": {"type": "integer", "minimum": 1,
+                                      "description": "The first line. Default 1."},
+                           "limit": {"type": "integer", "minimum": 1,
+                                     "description": "How many lines. Default 2000."}}, ["path"])},
+  {"name": "list_files",
+   "description": "List a directory under the source root, or with pattern, the files there "
+                  "matching it, e.g. **/*.cxx. At most 1000.",
+   "inputSchema": _schema({"path": {"type": "string", "description": "Default: the source root."},
+                           "pattern": {"type": "string"}})},
+  {"name": "edit_file",
+   "description": "Replace old with new in a file of a package checkout under the source root. "
+                  "old must be there once, unless all is true.",
+   "inputSchema": _schema({"path": {"type": "string"}, "old": {"type": "string"},
+                           "new": {"type": "string"}, "all": {"type": "boolean"}},
+                          ["path", "old", "new"])},
+  {"name": "apply_patch",
+   "description": "Apply a unified diff to files of the package checkouts, with git apply: "
+                  "paths are from the source root, with a/ and b/, e.g. a/O2/CMakeLists.txt.",
+   "inputSchema": _schema({"patch": {"type": "string"}}, ["patch"])},
+  {"name": "fetch_result",
+   "description": "A file in the work directory, given from there or absolute, or under the "
+                  "source root: its text, or if it is not text, base64.",
+   "inputSchema": _schema({"path": {"type": "string"}}, ["path"])},
 ]
+MAX_FETCH_BYTES = 4 << 20
 
 
 def tool_list(gated):
@@ -596,6 +626,96 @@ class Server:
       with open(join(d, "exitcode"), "w") as f:
         f.write("%d\n" % (128 + signal.SIGTERM))
     return {"id": a["id"], "cancelled": True}
+
+  # -- files ---------------------------------------------------------------
+
+  def _path(self, path, roots, change=False):
+    """path, resolved, if it is under one of roots.
+
+    With change, it must also be in a package checkout, outside its .git or
+    .sl, which would let one run commands, and not in alidist, whose recipes
+    plan runs.
+    """
+    if not isinstance(path, str) or not path:
+      raise ToolError("no path given")
+    for root in map(realpath, roots):
+      full = realpath(join(root, path))
+      if full == root or full.startswith(root + os.sep):
+        break
+    else:
+      raise ToolError("%s is not under %s" % (path, " or ".join(roots)))
+    parts = full[len(root) + 1:].split(os.sep)
+    if change and (len(parts) < 2 or parts[0].partition("@")[0] == "alidist" or
+                   {".git", ".sl", ".hg"} & set(parts) or
+                   not any(exists(join(root, parts[0], scm)) for scm in (".git", ".sl"))):
+      raise ToolError("%s is not a file of a package checkout which can be changed" % path)
+    return full
+
+  def read_file(self, a):
+    path = self._path(a.get("path"), [self.root])
+    with open(path, encoding="utf-8", errors="replace") as f:
+      lines = f.readlines()
+    start = int(a.get("offset") or 1) - 1
+    return {"path": path, "lines": len(lines),
+            "text": "".join(lines[start:start + int(a.get("limit") or 2000)])}
+
+  def list_files(self, a):
+    d = self._path(a.get("path") or ".", [self.root])
+    if a.get("pattern"):
+      found = glob(join(glob_escape(d), a["pattern"]), recursive=True)
+      inside = [p for p in found if realpath(p).startswith(realpath(self.root) + os.sep)]
+    else:
+      inside = [join(d, n) for n in os.listdir(d)]
+    files = sorted(relpath(p, d) + ("/" if isdir(p) else "") for p in inside)
+    return {"path": d, "files": files[:1000], "truncated": len(files) > 1000}
+
+  def edit_file(self, a):
+    path = self._path(a.get("path"), [self.root], change=True)
+    with open(path, encoding="utf-8", errors="surrogateescape", newline="") as f:
+      text = f.read()
+    count = text.count(a["old"]) if a["old"] else 0
+    if not count or (count > 1 and not a.get("all")):
+      raise ToolError("old is %d times in %s: it must be there once, or give all" % (count, path))
+    with open(path, "w", encoding="utf-8", errors="surrogateescape", newline="") as f:
+      f.write(text.replace(a["old"], a["new"]))
+    return {"path": path, "replaced": count}
+
+  def apply_patch(self, a):
+    patch, paths = a.get("patch") or "", []
+    # Every path git apply could take one from, and some it would not.
+    for line in patch.splitlines():
+      if line.startswith(("--- ", "+++ ")) and not line[4:].startswith("/dev/null"):
+        paths.append(line[4:].split("\t")[0].partition("/")[2])
+      elif line.startswith("diff --git "):
+        if len(line.split(" ")) != 4:
+          raise ToolError("paths with spaces are not supported: %s" % line)
+        paths += [p.partition("/")[2] for p in line.split(" ")[2:]]
+      elif line.startswith(("rename from ", "rename to ", "copy from ", "copy to ")):
+        paths.append(line.split(" ", 2)[2])
+      elif line.startswith(("new file mode ", "new mode ")) and line.endswith("120000"):
+        raise ToolError("patches cannot make symbolic links")
+    if not paths:
+      raise ToolError("no file to patch")
+    for path in paths:
+      self._path(path, [self.root], change=True)
+    env = {k: v for k, v in self.environ.items() if not k.startswith("GIT_")}
+    proc = subprocess.run(["git", "apply", "--verbose", "-"], cwd=self.root, input=patch,
+                          env=dict(env, GIT_CEILING_DIRECTORIES=dirname(realpath(self.root))),
+                          text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    if proc.returncode:
+      raise ToolError("git apply failed: " + proc.stdout.strip())
+    return {"files": sorted(set(paths)), "output": proc.stdout.strip()}
+
+  def fetch_result(self, a):
+    path = self._path(a.get("path"), [self.work_dir, self.root])
+    if os.path.getsize(path) > MAX_FETCH_BYTES:
+      raise ToolError("%s is larger than %d bytes" % (path, MAX_FETCH_BYTES))
+    with open(path, "rb") as f:
+      data = f.read()
+    try:
+      return {"path": path, "size": len(data), "text": data.decode()}
+    except UnicodeDecodeError:
+      return {"path": path, "size": len(data), "base64": base64.b64encode(data).decode()}
 
   # -- sessions ------------------------------------------------------------
 
