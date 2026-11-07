@@ -53,7 +53,7 @@ _aliBuild_complete() {
   local subcmd=""
   for (( i=1; i < cword; i++ )); do
     case "${words[i]}" in
-      build|clean|deps|doctor|init|install|reconstruct|migrate|analytics|architecture|version|completion)
+      build|clean|deps|doctor|init|install|reconstruct|migrate|session|analytics|architecture|version|completion)
         subcmd="${words[i]}"
         break
         ;;
@@ -64,7 +64,7 @@ _aliBuild_complete() {
   if [[ -z "$subcmd" ]]; then
     COMPREPLY=( $(compgen -W "
       -d --debug -n --dry-run
-      build clean deps doctor init install reconstruct migrate analytics architecture version completion
+      build clean deps doctor init install reconstruct migrate session analytics architecture version completion
     " -- "$cur") )
     return
   fi
@@ -95,7 +95,7 @@ _aliBuild_complete() {
           -a --architecture --defaults --force-unknown-architecture
           -z --devel-prefix -e -j --jobs -u --fetch-repos
           --no-local --force-tracked --plugin --disable --force-rebuild
-          --annotate --only-deps --plan
+          --annotate --only-deps --plan --json
           --docker --docker-image --docker-extra-args -v
           --no-remote-store --remote-store --write-store --ac-store --storage --insecure
           --legacy-links-store --cas-public-url
@@ -215,6 +215,17 @@ _aliBuild_complete() {
         " -- "$cur") )
       else
         _filedir
+      fi
+      ;;
+    session)
+      case "$prev" in
+        -C|--chdir|-w|--work-dir)
+          _filedir -d; return ;;
+      esac
+      if [[ "$cur" == -* ]]; then
+        COMPREPLY=( $(compgen -W "-C --chdir -w --work-dir --json --worktrees" -- "$cur") )
+      else
+        COMPREPLY=( $(compgen -W "create list show add remove drop" -- "$cur") )
       fi
       ;;
     init)
