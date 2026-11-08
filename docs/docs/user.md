@@ -638,6 +638,31 @@ through `ALIBUILD_STATUS_FILE`, its JSON result, its exit code and its
 output. Builds are detached from the server, so they go on if the client goes
 away, and every client sees every build.
 
+With `--gated --approvals-key OWNER.pub`, e.g. for an agent working on a
+machine of its own, nothing is built or run without the owner's approval:
+
+    aliBuild mcp --stdio --gated --approvals-key ~/owner.pub -C ~/src -w ~/sw
+
+- `build`, `session_drop` with `worktrees`, and the gated mode's own
+  `build_dir` (`cmake --build` in a development package's build directory, in
+  the environment of its `.envrc`) and `run` (a program, with a build's
+  `alienv` environment) first only return a request: canonical JSON of what
+  they would do, with the host, `SLURM_JOB_ID`, the arguments, and the commit
+  and a hash of the uncommitted changes of alidist and of each checkout the
+  build would use. It expires after 30 minutes.
+- The owner signs it with `ssh-keygen -Y sign -n epn-approval -f KEY`, and the
+  agent passes the signature to the `approve` tool.
+- Called again with `approval: ID`, the tool recomputes the request: if
+  anything changed since, e.g. a source file, the approval is `stale`. A valid
+  approval is used once.
+- A `build` can ask for `runs`, `[{argv_prefix, max}]`: up to `max` runs of
+  programs whose argv starts with `argv_prefix`, with that build's
+  environment, without another approval.
+- `plan` stays free, but only takes options which cannot point it at other
+  recipes, as planning runs their system checks.
+
+The approvals are kept in the server, so they end with it.
+
 ### Incremental builds
 
 When developing locally using the development mode, if the external

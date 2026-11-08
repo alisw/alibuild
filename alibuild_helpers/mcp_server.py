@@ -7,22 +7,39 @@ WORKDIR/BUILDS/ID with its request, the status the build keeps up to date (see
 buildstatus), its --json result, its exit code and its output. Builds are
 detached from the server, so they go on if the client goes away, and every
 server sees every build: the list of builds is the queue of the work directory.
+
+With --gated, building and running anything needs the owner's approval: a
+gated tool first answers with a request, in canonical JSON, which the owner
+signs with `ssh-keygen -Y sign -n epn-approval`, and the signature is given
+back with the approve tool. Called again with the request's id, the tool
+recomputes the request from what is there now, so that any change since, e.g.
+to the sources, voids it, checks the signature against --approvals-key, and
+only then runs.
 """
 
+import calendar
+import hashlib
 import json
 import os
+import secrets
 import shlex
 import signal
+import socket
 import subprocess
 import sys
+import tempfile
 import time
 import uuid
-from os.path import abspath, exists, join
+from os.path import abspath, dirname, exists, isdir, isfile, islink, join, realpath
 
 from alibuild_helpers import __version__
 
 PROTOCOL_VERSION = "2025-06-18"
 MAX_WAIT_SEC = 300
+APPROVAL_NAMESPACE = "epn-approval"
+APPROVAL_PRINCIPAL = "ktf"
+APPROVAL_TTL_SEC = 1800
+TIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
 
 def add_parser(subparsers, work_dir_default, chdir_default):
@@ -38,6 +55,11 @@ def add_parser(subparsers, work_dir_default, chdir_default):
   p.add_argument("--stdio", action="store_true",
                  help="Talk over stdin and stdout, which is the only transport, e.g. through "
                       "ssh and srun.")
+  p.add_argument("--gated", action="store_true",
+                 help="Run builds, build directories and programs only with an approval "
+                      "signed by a key of --approvals-key.")
+  p.add_argument("--approvals-key", metavar="FILE", dest="approvalsKey",
+                 help="With --gated, the owner's public key (or keys, one per line).")
   return p
 
 
@@ -121,18 +143,242 @@ TOOLS = [
                            "dry_run": {"type": "boolean"}}, ["name"])},
 ]
 
+# With --gated: what needs an approval (session_drop only with worktrees, as
+# only then it deletes sources), and the tools only gated mode has.
+GATED = ("build", "build_dir", "run", "session_drop")
+_APPROVAL = {"type": "string", "description": "The id of an approved request. Call without it "
+                                              "first: that returns the request to approve."}
+_RUNS = {"type": "array", "description": "Runs to approve with the build: up to max runs of "
+                                         "argv starting with argv_prefix, with this build's "
+                                         "environment, without another approval.",
+         "items": _schema({"argv_prefix": {"type": "array", "items": {"type": "string"},
+                                           "minItems": 1},
+                           "max": {"type": "integer", "minimum": 1},
+                           "cwd": {"type": "string"}}, ["argv_prefix", "max"])}
+GATED_TOOLS = [
+  {"name": "approve",
+   "description": "Give the owner's signature of a request which a gated tool returned. Then "
+                  "call that tool again, with the same arguments and approval: ID.",
+   "inputSchema": _schema({"id": {"type": "string"}, "signature": {"type": "string"}},
+                          ["id", "signature"])},
+  {"name": "build_dir",
+   "description": "Build in a development package's build directory, "
+                  "BUILD/PACKAGE-latest[-SESSION]/PACKAGE, with cmake --build in the "
+                  "environment its .envrc sets up. Runs in the background, like build: "
+                  "follow it with build_status and build_log.",
+   "inputSchema": _schema({"package": {"type": "string"}, "session": {"type": "string"},
+                           "target": {"type": "string"}}, ["package"])},
+  {"name": "run",
+   "description": "Run a program in the background, in the work directory or cwd within it, "
+                  "and with build, in the environment of that build's packages (alienv). "
+                  "Follow it with build_status and build_log, which has its output. Needs an "
+                  "approval, unless the build's approval had runs matching argv.",
+   "inputSchema": _schema({"argv": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+                           "build": {"type": "string",
+                                     "description": "The id of a finished build."},
+                           "cwd": {"type": "string"}}, ["argv"])},
+]
+
+
+def tool_list(gated):
+  if not gated:
+    return TOOLS
+  tools = []
+  for tool in TOOLS + GATED_TOOLS:
+    if tool["name"] in GATED:
+      schema = tool["inputSchema"]
+      extra = dict(approval=_APPROVAL, **({"runs": _RUNS} if tool["name"] == "build" else {}))
+      tool = dict(tool, description=tool["description"] + " Needs an approval.",
+                  inputSchema=dict(schema, properties=dict(schema["properties"], **extra)))
+    tools.append(tool)
+  return tools
+
 
 class ToolError(Exception):
   pass
 
 
+class ApprovalError(ToolError):
+  def __init__(self, status, request_id, message):
+    super().__init__(json.dumps({"status": status, "id": request_id, "message": message}))
+
+
+#: The options of aliBuild build which plan takes in gated mode. A plan runs
+#: the recipes' system checks, so it must not be pointed at other recipes.
+PLAN_OPTIONS = ("-a", "--architecture", "--always-prefer-system", "-d", "--debug", "--disable",
+                "--force-rebuild", "--force-tracked", "--no-local", "--no-remote-store",
+                "--no-system", "--only-deps", "--remote-store")
+NAME_CHARS = frozenset("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._+-")
+
+
 class Server:
-  def __init__(self, work_dir, root=".", alibuild=None, environ=None):
+  def __init__(self, work_dir, root=".", alibuild=None, environ=None, approvals_key=None,
+               alienv=None):
     self.work_dir = abspath(work_dir)
     self.root = abspath(root)
     self.alibuild = alibuild or [sys.executable, abspath(sys.argv[0])]
+    self.alienv = alienv or [join(dirname(abspath(sys.argv[0])), "alienv")]
     self.environ = dict(os.environ if environ is None else environ)
     self.builds_dir = join(self.work_dir, "BUILDS")
+    # With approvals_key, gated: requests by id, the nonces used, and per
+    # build its approved runs. All in memory: they end with the server.
+    self.gated = approvals_key is not None
+    self.pending, self.used, self.allowed_runs = {}, set(), {}
+    if self.gated:
+      with open(os.path.expanduser(approvals_key)) as f:
+        keys = [l.strip() for l in f if l.strip() and not l.startswith("#")]
+      if not keys:
+        raise ToolError("no key in %s" % approvals_key)
+      self.allowed_signers = "".join('%s namespaces="%s" %s\n' % (
+        APPROVAL_PRINCIPAL, APPROVAL_NAMESPACE, k) for k in keys)
+
+  # -- approvals -----------------------------------------------------------
+
+  def _needs_approval(self, name, a):
+    if name == "session_drop":
+      return a.get("worktrees") and not a.get("dry_run")
+    return name in GATED
+
+  def _check_names(self, a):
+    for name in [*(a.get("packages") or []), a.get("package"), a.get("defaults"),
+                 a.get("session")]:
+      if name is not None and (not isinstance(name, str) or not name or name[0] in ".-"
+                               or not NAME_CHARS.issuperset(name)):
+        raise ToolError("invalid name %r" % (name,))
+
+  def _gate(self, name, a, approval):
+    """Return None if the call may go ahead, or the request to approve first."""
+    known = next(t for t in tool_list(True) if t["name"] == name)["inputSchema"]["properties"]
+    if set(a) - set(known):
+      raise ToolError("unknown arguments: %s" % ", ".join(sorted(set(a) - set(known))))
+    if approval is None:
+      if name == "run" and self._allowed_run(a):
+        return None
+      nonce = secrets.token_hex(16)
+      expires = time.strftime(TIME_FORMAT, time.gmtime(time.time() + APPROVAL_TTL_SEC))
+      text = self._request(name, a, expires, nonce)
+      self.pending[nonce[:12]] = {"request": text}
+      return {"status": "approval_required", "id": nonce[:12], "request": text,
+              "summary": self._summary(json.loads(text))}
+    pending = self.pending.get(approval)
+    if not pending:
+      raise ApprovalError("approval_invalid", approval, "no such request: call without approval")
+    request = json.loads(pending["request"])
+    if request["nonce"] in self.used:
+      raise ApprovalError("used", approval, "this approval was used already")
+    if not self._verified(pending["request"], pending.get("signature")):
+      raise ApprovalError("approval_invalid", approval, "not approved: no valid signature")
+    if calendar.timegm(time.strptime(request["expires"], TIME_FORMAT)) < time.time():
+      raise ApprovalError("expired", approval, "the approval expired at " + request["expires"])
+    if (request["host"], request["job"]) != (socket.gethostname(),
+                                             self.environ.get("SLURM_JOB_ID")):
+      raise ApprovalError("approval_invalid", approval, "approved for another host or job")
+    if self._request(name, a, request["expires"], request["nonce"]) != pending["request"]:
+      raise ApprovalError("stale", approval, "the arguments, sources or recipes changed since: "
+                                             "call without approval for a new request")
+    self.used.add(request["nonce"])
+    return None
+
+  def approve(self, a):
+    pending = self.pending.get(a.get("id"))
+    if not pending:
+      raise ApprovalError("approval_invalid", a.get("id"), "no such request")
+    if not self._verified(pending["request"], a.get("signature")):
+      raise ApprovalError("approval_invalid", a["id"], "the signature is not the owner's, "
+                                                      "for namespace " + APPROVAL_NAMESPACE)
+    pending["signature"] = a["signature"]
+    return {"status": "approved", "id": a["id"]}
+
+  def _verified(self, text, signature):
+    if not signature:
+      return False
+    with tempfile.TemporaryDirectory(prefix="alibuild-mcp-") as tmp:
+      for name, content in (("allowed_signers", self.allowed_signers), ("signature", signature)):
+        with open(join(tmp, name), "w") as f:
+          f.write(content)
+      return subprocess.run(["ssh-keygen", "-Y", "verify", "-f", join(tmp, "allowed_signers"),
+                             "-I", APPROVAL_PRINCIPAL, "-n", APPROVAL_NAMESPACE,
+                             "-s", join(tmp, "signature")],
+                            input=text.encode(), stdout=subprocess.DEVNULL,
+                            stderr=subprocess.DEVNULL).returncode == 0
+
+  def _request(self, name, a, expires, nonce):
+    """The canonical JSON of what the call would do now, to be signed."""
+    if name == "build":
+      for run in a.get("runs") or []:
+        if (not isinstance(run, dict) or not run.get("argv_prefix") or
+            not all(isinstance(x, str) for x in run["argv_prefix"]) or
+            not isinstance(run.get("max"), int) or run["max"] < 1):
+          raise ToolError("runs must be a list of {argv_prefix: [...], max: N}")
+    if name == "session_drop":
+      session = a["name"]
+    elif name == "run":
+      session = self.build_state(a["build"]).get("session") if a.get("build") else None
+    else:
+      session = a.get("session")
+    sources = self._sources(session)
+    request = dict(a, v=1, host=socket.gethostname(), job=self.environ.get("SLURM_JOB_ID"),
+                   session=session, action=name, alidist=sources.pop("alidist", None),
+                   sources=sources, expires=expires, nonce=nonce)
+    return json.dumps(request, sort_keys=True, separators=(",", ":"))
+
+  def _summary(self, r):
+    fixed = ("v", "host", "job", "session", "action", "alidist", "sources", "expires", "nonce")
+    return "%s %s, session %s, on %s, job %s, until %s; alidist %s; sources: %s" % (
+      r["action"], json.dumps({k: v for k, v in r.items() if k not in fixed}, sort_keys=True),
+      r["session"], r["host"], r["job"], r["expires"], r["alidist"],
+      ", ".join("%s %s" % s for s in sorted(r["sources"].items())) or "none")
+
+  def _sources(self, session):
+    """{package: BASE+SHA256} for each checkout in the source root a build would use.
+
+    That is PKG@SESSION instead of PKG, and the hash is of the uncommitted
+    changes, including untracked files, as computed here.
+    """
+    sources = {}
+    for entry in sorted(os.listdir(self.root)):
+      package, _, label = entry.partition("@")
+      d = join(self.root, entry)
+      if label and label != session:
+        continue    # another session's
+      if not label and session and isdir("%s@%s" % (d, session)):
+        continue    # replaced by the session's
+      if exists(join(d, ".sl")) or exists(join(d, ".git")):
+        sources[package] = self._source_state(d)
+    return sources
+
+  def _source_state(self, d):
+    if exists(join(d, ".sl")) or exists(join(d, ".git", "sl")):
+      sl = ["sl", "--config", "ui.interactive=false", "--pager=never"]
+      base, diff, untracked = sl + ["whereami"], sl + ["diff", "--git"], sl + ["status", "-un0"]
+    else:
+      git = ["git", "-c", "core.fsmonitor=false"]
+      base, diff = git + ["rev-parse", "HEAD"], git + ["diff", "--binary", "--no-ext-diff",
+                                                       "--no-textconv", "HEAD"]
+      untracked = git + ["ls-files", "-z", "--others", "--exclude-standard"]
+    def out(argv):
+      return subprocess.run(argv, cwd=d, env=dict(self.environ, HGPLAIN="1"), check=True,
+                            stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                            stderr=subprocess.DEVNULL).stdout
+    h = hashlib.sha256(out(diff))
+    for name in filter(None, out(untracked).split(b"\0")):
+      h.update(b"\0" + name + b"\0")
+      path = join(d, os.fsdecode(name))
+      if islink(path):
+        h.update(os.fsencode(os.readlink(path)))
+      elif isfile(path):
+        with open(path, "rb") as f:
+          h.update(f.read())
+    return "%s+%s" % (out(base).decode().strip(), h.hexdigest())
+
+  def _allowed_run(self, a):
+    """Take one of the runs a build's approval allowed, if argv matches one."""
+    for run in self.allowed_runs.get(a.get("build"), []):
+      if (a["argv"][:len(run["argv_prefix"])] == run["argv_prefix"] and
+          a.get("cwd") == run.get("cwd") and run["used"] < run["max"]):
+        run["used"] += 1
+        return True
+    return False
 
   # -- running aliBuild ---------------------------------------------------
 
@@ -173,33 +419,84 @@ class Server:
       raise ToolError("no build %s" % build_id)
     return d
 
-  def start_build(self, a):
-    argv = self._build_argv(a)
+  def _new_dir(self):
     build_id = time.strftime("%Y%m%d-%H%M%S-") + uuid.uuid4().hex[:6]
     d = join(self.builds_dir, build_id)
     os.makedirs(d)
+    return build_id, d
+
+  def _detach(self, d, request, env, redirect):
+    """Run request["argv"] in the background, with its output as redirect says."""
+    with open(join(d, "request.json"), "w") as f:
+      json.dump(request, f, indent=2)
+    # The shell starts it in the background and exits, so it is nobody's
+    # child here and outlives this server. It writes its exit code last: that
+    # is how any server knows it has finished. It holds none of the server's
+    # stdio either, or ssh would wait for it to close them.
+    q = shlex.quote
+    script = ("(%s %s < /dev/null; echo $? > %s) & echo $! > %s"
+              % (" ".join(map(q, request["command"])), redirect, q(join(d, "exitcode")),
+                 q(join(d, "pid"))))
+    subprocess.run(["/bin/sh", "-c", script], cwd=request["cwd"], env=env, check=True,
+                   start_new_session=True, stdin=subprocess.DEVNULL,
+                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    return {"id": request["id"], "argv": request["argv"]}
+
+  def start_build(self, a):
+    argv = self._build_argv(a)
+    build_id, d = self._new_dir()
     env = dict(self.environ, ALIBUILD_STATUS_FILE=join(d, "status.json"))
     if a.get("build_slots"):
       env["ALIBUILD_BUILD_SLOTS"] = str(int(a["build_slots"]))
-    request = {"id": build_id, "argv": argv, "cwd": self.root,
-               "started": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
-               "build_slots": env.get("ALIBUILD_BUILD_SLOTS")}
-    with open(join(d, "request.json"), "w") as f:
-      json.dump(request, f, indent=2)
     with open(join(d, "status.json"), "w") as f:
       json.dump({"state": "starting"}, f)
-    # The shell starts aliBuild in the background and exits, so the build is
-    # nobody's child here and outlives this server. It writes its exit code
-    # last: that is how any server knows it has finished. It holds none of the
-    # server's stdio either, or ssh would wait for the build to close them.
+    if a.get("runs"):
+      self.allowed_runs[build_id] = [dict(run, used=0) for run in a["runs"]]
     q = shlex.quote
-    script = ("(%s > %s 2> %s < /dev/null; echo $? > %s) & echo $! > %s"
-              % (" ".join(map(q, self.alibuild + argv)), q(join(d, "result.json")),
-                 q(join(d, "aliBuild.log")), q(join(d, "exitcode")), q(join(d, "pid"))))
-    subprocess.run(["/bin/sh", "-c", script], cwd=self.root, env=env, check=True,
-                   start_new_session=True, stdin=subprocess.DEVNULL,
-                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    return {"id": build_id, "argv": argv}
+    return self._detach(d, {"id": build_id, "argv": argv, "command": self.alibuild + argv,
+                            "cwd": self.root, "started": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+                            "build_slots": env.get("ALIBUILD_BUILD_SLOTS"),
+                            "packages": a["packages"], "session": a.get("session")},
+                        env, "> %s 2> %s" % (q(join(d, "result.json")),
+                                             q(join(d, "aliBuild.log"))))
+
+  def _start(self, kind, argv, command, cwd, **extra):
+    """Start what build_dir and run run; its output is its log."""
+    build_id, d = self._new_dir()
+    return self._detach(d, dict(extra, id=build_id, kind=kind, argv=argv, command=command,
+                                cwd=cwd, started=time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+                                log="output.log"),
+                        self.environ, "> %s 2>&1" % shlex.quote(join(d, "output.log")))
+
+  def build_dir(self, a):
+    self._check_names(a)
+    link = a["package"] + "-latest" + ("-" + a["session"] if a.get("session") else "")
+    d = join(self.work_dir, "BUILD", link, a["package"])
+    if not exists(join(d, ".envrc")):
+      raise ToolError("no development build of %s at %s" % (a["package"], d))
+    argv = ["cmake", "--build", "."] + (["--target", a["target"]] if a.get("target") else [])
+    # The environment of the build: the .envrc aliBuild writes for direnv,
+    # without direnv, whose source_up only adds the user's own .envrc files.
+    return self._start("build_dir", argv, ["/bin/bash", "-c", 'source_up() { :; }; '
+                                           'source ./.envrc && exec "$@"', "build_dir", *argv], d)
+
+  def run(self, a):
+    argv = a.get("argv")
+    if not argv or not all(isinstance(x, str) for x in argv):
+      raise ToolError("argv must be a non-empty list of strings")
+    cwd, work_dir = realpath(join(self.work_dir, a.get("cwd") or ".")), realpath(self.work_dir)
+    if cwd != work_dir and not cwd.startswith(work_dir + os.sep):
+      raise ToolError("cwd must be in the work directory %s" % self.work_dir)
+    command = argv
+    if a.get("build"):
+      state = self.build_state(a["build"])
+      built = {p["package"]: p for p in (state.get("result") or {}).get("packages") or []}
+      packages = state.get("packages") or []
+      if state["exit_code"] != 0 or not packages or not all(p in built for p in packages):
+        raise ToolError("build %s has not built its packages" % a["build"])
+      modules = ",".join("%(package)s/%(version)s-%(revision)s" % built[p] for p in packages)
+      command = self.alienv + ["-w", self.work_dir, "setenv", modules, "-c", *argv]
+    return self._start("run", argv, command, cwd, build=a.get("build"))
 
   def build_state(self, build_id):
     d = self._dir(build_id)
@@ -262,7 +559,7 @@ class Server:
     if a.get("package"):
       path = self._package_log(state, a["package"])
     else:
-      path = join(self._dir(a["id"]), "aliBuild.log")
+      path = join(self._dir(a["id"]), state.get("log", "aliBuild.log"))
     lines = int(a.get("lines") or 100)
     try:
       with open(path, errors="replace") as f:
@@ -313,6 +610,21 @@ class Server:
   # -- MCP -----------------------------------------------------------------
 
   def call(self, name, a):
+    if self.gated:
+      a = dict(a)
+      approval = a.pop("approval", None)
+      if name == "plan":
+        self._check_names(a)
+        options = [x for x in a.get("args") or [] if not isinstance(x, str) or x.startswith("-")]
+        if any(not isinstance(x, str) or x.split("=")[0] not in PLAN_OPTIONS for x in options):
+          raise ToolError("plan only takes these options: " + " ".join(PLAN_OPTIONS))
+      if self._needs_approval(name, a):
+        self._check_names(a)
+        request = self._gate(name, a, approval)
+        if request:
+          return request
+      if name in [t["name"] for t in GATED_TOOLS]:
+        return getattr(self, name)(a)
     if name == "plan":
       return self._json_or_error(*self._run(self._build_argv(a, plan=True)))
     if name == "build":
@@ -350,13 +662,14 @@ class Server:
     elif method == "ping":
       result = {}
     elif method == "tools/list":
-      result = {"tools": TOOLS}
+      result = {"tools": tool_list(self.gated)}
     elif method == "tools/call":
       params = msg.get("params") or {}
       try:
         value = self.call(params.get("name"), params.get("arguments") or {})
         result = {"content": [{"type": "text", "text": json.dumps(value, indent=2)}]}
-      except (ToolError, KeyError, subprocess.SubprocessError, OSError) as exc:
+      except (ToolError, KeyError, TypeError, ValueError, AttributeError,
+              subprocess.SubprocessError, OSError) as exc:
         result = {"content": [{"type": "text", "text": str(exc)}], "isError": True}
     else:
       return {"jsonrpc": "2.0", "id": msg_id,
@@ -379,7 +692,10 @@ class Server:
 
 
 def doMcp(args):
+  if args.gated != bool(args.approvalsKey):
+    print("aliBuild mcp: --gated needs --approvals-key, and the other way round", file=sys.stderr)
+    return False
   # The logging of aliBuild goes to stderr, which MCP leaves to the server, so
   # stdout carries nothing but protocol messages.
-  Server(args.workDir).serve()
+  Server(args.workDir, approvals_key=args.approvalsKey).serve()
   return True
