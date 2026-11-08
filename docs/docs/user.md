@@ -597,6 +597,60 @@ When you are done with a session, `aliBuild session drop NAME` removes its
 its builds. With `--worktrees`, it removes its worktrees as well, unless one of
 them has uncommitted changes. `-n` shows what it would remove.
 
+#### Seeding a session from another one
+
+A new session's first build of a large package, e.g. O2, starts from an empty
+build directory, even when another session has just built nearly the same
+code. `--seed-from` makes it start from the other session's instead:
+
+    aliBuild session create fix-vertex O2 --seed-from fix-tracks
+    aliBuild build O2 -z fix-vertex
+
+It is recorded in `sw/SESSIONS/NAME.json`, as `seed_from`; giving it to
+`session create` for an existing session changes it. The first time
+`-z fix-vertex` builds a package with a `PKG@fix-vertex` worktree, and that
+package's build directory does not exist yet, aliBuild makes it a
+copy-on-write clone of the other session's, `sw/BUILD/O2-latest-fix-tracks/O2`,
+and then:
+
+- replaces the other session's paths in it with this one's: its build
+  directory, its `SOURCES` and `PKG@NAME` directories, and the installs it was
+  built against, which are those its `latest-OTHER-DEFAULTS` links point to.
+  This is done in the text files and symlinks, keeping their modification
+  times, and in ninja's `.ninja_log` and `.ninja_deps`, where the hashes of
+  the command lines which only changed by these paths are recomputed, so that
+  ninja does not run them again for that;
+- gives each file of `PKG@fix-vertex` which is the same as in `PKG@fix-tracks`
+  the modification time it has there, so that only what differs is rebuilt;
+- removes `.build_succeeded`, so that the recipe runs, configures and builds
+  incrementally in the clone.
+
+Only packages whose recipe has an `incremental_recipe` are seeded, as the
+build directory of the others is always started afresh. Nothing of the other
+session's is modified. Its build is not seeded from while it is being built,
+nor when it has no build of the package for this architecture, no
+`PKG@OTHER` worktree, or when the build directory cannot be cloned: the
+package is then built from scratch, as without `--seed-from`, and aliBuild
+says why. Object files keep naming the other session's sources in their debug
+information until they are rebuilt.
+
+Cloning never falls back to copying. The backends are tried in this order:
+
+- `apfs-clonefile`: macOS's `clonefile(2)`, which clones a whole tree at once
+  on APFS;
+- `cp-clone`: `cp -c -R -p` on APFS, or `cp -a --reflink=always` on Linux, for
+  Btrfs, XFS and other filesystems with reflinks;
+- `zfs`: not implemented, as ZFS clones datasets rather than directories;
+- `none`: never clones.
+
+`ALIBUILD_COW_BACKEND=NAME[,NAME...]` picks the backends to try, and
+`ALIBUILD_COW_BACKEND=none` turns seeding off. A backend, in
+`alibuild_helpers/cow.py`, is a `CloneBackend` with a `name`,
+`unavailable_reason(src, dst)`, which returns why it cannot clone `src` to
+`dst` or `None`, and `clone_tree(src, dst)`, which raises `CloneError` if it
+fails; add an instance to `BACKENDS` to have it tried. Seeding only goes
+through `cow.clone_tree()`.
+
 ### Running several builds at once
 
 Several `aliBuild build` processes can share a work directory, e.g. one per
