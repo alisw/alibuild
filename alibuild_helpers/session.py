@@ -8,7 +8,9 @@ depends on it.
 
 What the name does not say is kept in WORKDIR/SESSIONS/NAME.json: when the
 session was created, and which pull requests (or any other refs) were merged
-into, or removed from, which package, at which commit.
+into, or removed from, which package, at which commit. A session also gets its
+own copy of aliBuild, in WORKDIR/SESSIONS/NAME/alibuild, which
+`aliBuild build -z NAME` then runs, whatever aliBuild it was started with.
 """
 
 import json
@@ -16,13 +18,14 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import time
 from glob import glob, escape as glob_escape
-from os.path import abspath, basename, exists, isdir, islink, join
+from os.path import abspath, basename, dirname, exists, expanduser, isdir, islink, join, realpath
 
-from alibuild_helpers import cow
+from alibuild_helpers import __version__, cow
 from alibuild_helpers.git import git, Git
-from alibuild_helpers.log import banner, error, info
+from alibuild_helpers.log import banner, error, info, warning
 from alibuild_helpers.scm import SCMError
 from alibuild_helpers.sl import sapling, Sapling
 
@@ -56,6 +59,12 @@ def add_parser(subparsers, work_dir_default, chdir_default):
                       help="Experimental: start the build directories of the session's "
                            "packages as copy-on-write clones of session OTHER's, so that "
                            "their first build is incremental.")
+  create.add_argument("--no-alibuild-copy", dest="alibuildCopy", action="store_false",
+                      help="Do not give the session its own copy of aliBuild: its builds then "
+                           "run whichever aliBuild they are started with.")
+  create.add_argument("--alibuild-rev", metavar="REV", dest="alibuildRev",
+                      help="The commit of aliBuild to give the session. Default is the one "
+                           "checked out where the aliBuild running comes from.")
 
   lst = actions.add_parser("list", help="list sessions")
   lst.add_argument("--json", action="store_true", help="Print JSON.")
@@ -134,6 +143,12 @@ def seed_from(work_dir, name):
   return load_session(work_dir, name).get("seed_from") if path and exists(path) else None
 
 
+def session_alibuild(work_dir, name):
+  """What session name records of its own copy of aliBuild, or None."""
+  path = session_file(work_dir, name) if name and SESSION_NAME_RE.match(name) else None
+  return load_session(work_dir, name).get("alibuild") if path and exists(path) else None
+
+
 def save_session(work_dir, session):
   path = session_file(work_dir, session["name"])
   os.makedirs(join(work_dir, "SESSIONS"), exist_ok=True)
@@ -164,6 +179,7 @@ def describe(work_dir, name, root="."):
     "name": name,
     "created": session.get("created"),
     "seed_from": session.get("seed_from"),
+    "alibuild": session.get("alibuild"),
     "recorded": exists(path),
     "worktrees": trees,
     "merged": merged_refs(session["events"]),
@@ -294,6 +310,82 @@ def create_worktree(package, name):
     run("git", "clean", "-fdxq", cwd=dest)
 
 
+#: What a copy of aliBuild which is not a checkout gets, next to alibuild_helpers.
+SCRIPTS = ("aliBuild", "alienv", "aliDoctor", "aliDeps", "pb")
+#: Set to the copy of aliBuild a session build was started again from.
+REEXEC_ENV = "ALIBUILD_SESSION_ALIBUILD"
+
+
+def running_alibuild():
+  """Where the aliBuild running comes from: the directory with its alibuild_helpers."""
+  return dirname(dirname(abspath(__file__)))
+
+
+def copy_alibuild(work_dir, name, rev=None, root=None):
+  """Give session name a copy of the aliBuild running, at rev or at the commit checked out.
+
+  It is an sl share or a git worktree of the checkout aliBuild runs from, or,
+  if it is not a checkout, a copy-on-write clone of alibuild_helpers and the
+  scripts. Return what the session records of it.
+  """
+  root = root or running_alibuild()
+  dest = abspath(join(work_dir, "SESSIONS", name, "alibuild"))
+  if exists(dest):
+    raise SCMError(f"{dest} exists already")
+  os.makedirs(dirname(dest), exist_ok=True)
+  try:
+    if exists(join(root, ".sl")):
+      kind, commit = "sl", run("sl", "-R", root, "log", "-l", "1", "-r", rev or ".", "-T", "{node}").strip()
+      run("sl", "--config", "extensions.share=", "share", "-U", root, dest)
+      run("sl", "-R", dest, "goto", "-q", commit)
+    elif exists(join(root, ".git")):
+      kind, commit = "git", run("git", "-C", root, "rev-parse", "--verify", (rev or "HEAD") + "^{commit}").strip()
+      run("git", "-C", root, "worktree", "add", "-q", "--detach", dest, commit)
+    elif rev:
+      raise SCMError(f"{root} is not a checkout, to take commit {rev} from")
+    else:
+      kind, commit = "copy", __version__
+      os.mkdir(dest)
+      for entry in ("alibuild_helpers",) + SCRIPTS:
+        found = [d for d in (root, dirname(realpath(sys.argv[0]))) if exists(join(d, entry))]
+        if found:
+          cow.clone_tree(join(found[0], entry), join(dest, entry))
+  except (SCMError, cow.CloneError):
+    shutil.rmtree(dest, ignore_errors=True)   # git worktree add leaves none behind
+    raise
+  return {"path": dest, "kind": kind, "commit": commit, "source": root}
+
+
+def remove_alibuild(copy):
+  if copy["kind"] == "git":
+    run("git", "-C", copy["source"], "worktree", "remove", "--force", copy["path"])
+  else:
+    shutil.rmtree(copy["path"])
+  try:
+    os.rmdir(dirname(copy["path"]))
+  except OSError:
+    pass
+
+
+def reexec_session_alibuild(args, argv, environ=os.environ, execve=os.execve):
+  """Start aliBuild again from the copy of session -z NAME, if it has one and is not it."""
+  if args.action != "build" or not getattr(args, "develPrefix", None):
+    return
+  name = args.develPrefix
+  copy = session_alibuild(join(expanduser(getattr(args, "chdir", ".")), args.workDir), name)
+  if not copy or realpath(copy["path"]) == realpath(running_alibuild()):
+    return
+  script = join(copy["path"], "aliBuild")
+  if environ.get(REEXEC_ENV) == copy["path"] or not exists(script):
+    warning("Not running session %s's own aliBuild, %s, but %s: %s", name, copy["path"],
+            running_alibuild(), "it is missing" if not exists(script) else "it did not run from there")
+    return
+  info("Session %s: running aliBuild from %s, at %s", name, copy["path"], copy["commit"])
+  sys.stdout.flush()
+  sys.stderr.flush()
+  execve(sys.executable, [sys.executable, script, *argv], dict(environ, **{REEXEC_ENV: copy["path"]}))
+
+
 def doSession(args, parser):
   name = getattr(args, "name", None)
   if name is not None and not SESSION_NAME_RE.match(name):
@@ -317,7 +409,10 @@ def doSession(args, parser):
     if exists(session_file(args.workDir, name)):
       session = load_session(args.workDir, name)
       new = [p for p in args.packages if not isdir(f"{p}@{name}")]
-      if not new and seed is None:
+      if args.alibuildRev and "alibuild" in session:
+        error("Session %s already has its own aliBuild, at %s", name, session["alibuild"]["commit"])
+        return False
+      if not new and seed is None and ("alibuild" in session or not args.alibuildCopy):
         error("Session %s already exists, with worktrees for %s", name,
               ", ".join(worktrees(name)) or "no packages")
         return False
@@ -332,6 +427,18 @@ def doSession(args, parser):
       return False
     # Saved first, and after each worktree, so a failure leaves none unrecorded.
     save_session(args.workDir, session)
+    if args.alibuildCopy and "alibuild" not in session:
+      try:
+        session["alibuild"] = copy_alibuild(args.workDir, name, args.alibuildRev)
+      except (SCMError, cow.CloneError, OSError) as e:
+        if args.alibuildRev:
+          error("Cannot give session %s its own aliBuild: %s", name, e)
+          return False
+        warning("Session %s runs whichever aliBuild builds it, as it cannot have its own: %s", name, e)
+      else:
+        save_session(args.workDir, session)
+        info("Session %s runs aliBuild from %s, at %s", name, session["alibuild"]["path"],
+             session["alibuild"]["commit"])
     for package in new:
       try:
         if not isdir(f"{package}@{name}"):   # an existing one is adopted
@@ -357,6 +464,9 @@ def doSession(args, parser):
       return True
     print(f"Session {name}" + (f", created {session['created']}" if session["created"] else "") +
           (f", seeded from {session['seed_from']}" if session["seed_from"] else ""))
+    copy = session["alibuild"]
+    print(f"aliBuild: {copy['path']}, {copy['kind']} of {copy['source']} at {(copy['commit'] or 'unknown')[:12]}"
+          if copy else "aliBuild: whichever one builds it")
     print("Worktrees:" if session["worktrees"] else "No worktrees.")
     for tree in session["worktrees"]:
       print(f"  {tree['package']}@{name} at {(tree['commit'] or 'unknown')[:12]}, " +
@@ -390,6 +500,8 @@ def drop_session(args, name):
   record = session_file(args.workDir, name)
   links = session_links(args.workDir, name)
   trees = worktrees(name) if args.worktrees else {}
+  copy = session_alibuild(args.workDir, name)
+  copies = [copy["path"]] if copy and exists(copy["path"]) else []
   if not exists(record) and not links and not trees:
     error("No session %s to drop", name)
     return False
@@ -399,10 +511,16 @@ def drop_session(args, name):
           name, ", ".join(dirty))
     return False
 
-  doomed = links + ([record] if exists(record) else []) + list(trees.values())
+  doomed = copies + links + ([record] if exists(record) else []) + list(trees.values())
   banner("This %s delete:\n%s", "would" if getattr(args, "dryRun", False) else "will", "\n".join(doomed))
   if getattr(args, "dryRun", False):
     return True
+  if copies:
+    try:
+      remove_alibuild(copy)
+    except SCMError as e:
+      error("Cannot remove %s: %s", copy["path"], e)
+      return False
   for path in links + ([record] if exists(record) else []):
     os.unlink(path)
   for package, directory in trees.items():
