@@ -20,6 +20,7 @@ import time
 from glob import glob, escape as glob_escape
 from os.path import abspath, basename, exists, isdir, islink, join
 
+from alibuild_helpers import cow
 from alibuild_helpers.git import git, Git
 from alibuild_helpers.log import banner, error, info
 from alibuild_helpers.scm import SCMError
@@ -204,24 +205,93 @@ def remove_worktree(package, directory):
     git(("worktree", "remove", abspath(directory)), directory=package)
 
 
+#: What a checkout in the middle of an operation, e.g. a rebase, has in .sl or .git.
+SL_OPERATIONS = ("merge/state", "merge/state2", "rebasestate", "histedit-state", "graftstate",
+                 "updatestate", "updatemergestate", "shelvedstate")
+GIT_OPERATIONS = ("MERGE_HEAD", "rebase-merge", "rebase-apply", "CHERRY_PICK_HEAD", "REVERT_HEAD",
+                  "index.lock")
+
+
+def run(*command, cwd=None):
+  # Not through git() and sapling(): checking out a large repository, e.g. O2,
+  # can take longer than their timeouts.
+  proc = subprocess.run(command, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+  if proc.returncode:
+    raise SCMError("Error %d from %s: %s" % (proc.returncode, " ".join(command), proc.stdout.strip()))
+  return proc.stdout
+
+
+def busy(source, sapling_repo):
+  """Why checkout source must not be cloned now, or None if it can be."""
+  if sapling_repo:
+    meta = join(source, ".sl")
+    # It exits with the number of locks held, and leaves out one it cannot read.
+    proc = subprocess.run(["sl", "-R", abspath(source), "debuglocks"],
+                          stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    if proc.returncode or sorted(re.findall(r"^(w?lock):\s+free$", proc.stdout, re.M)) != ["lock", "wlock"]:
+      return f"sl holds a lock in {source}"
+  else:
+    meta = run("git", "-C", abspath(source), "rev-parse", "--absolute-git-dir").strip()
+  pending = [f for f in (SL_OPERATIONS if sapling_repo else GIT_OPERATIONS) if exists(join(meta, f))]
+  return f"{source} is in the middle of an operation ({', '.join(pending)})" if pending else None
+
+
+def clone_files(source, dest, meta):
+  """Clone source's files into dest, except its meta(data) directory."""
+  for entry in sorted(os.listdir(source)):
+    if entry != meta:
+      cow.clone_tree(join(source, entry), join(dest, entry))
+
+
 def create_worktree(package, name):
+  """Create PKG@NAME at the commit checked out in PKG.
+
+  Its files are copy-on-write clones of PKG's, where a backend of cow.py can
+  clone them, so that they take no space, and the files which are the same
+  as at the commit keep their modification times. The SCM then reverts what PKG
+  changed since the commit, and removes the files it does not track. Without
+  a backend, or when PKG is busy, the SCM checks the files out itself.
+  """
   source, dest = package, f"{package}@{name}"
   if not isdir(source):
     raise SCMError(f"no {source} checkout to create {dest} from")
   commit = scm_for(source).checkedOutCommitName(directory=source)
-  # Not through git() and sapling(): checking out a large repository, e.g. O2,
-  # can take longer than their timeouts. sl share only works for Sapling's own
-  # repositories: one in git format (.git, with or without .git/sl) needs a
-  # git worktree.
-  if exists(join(source, ".sl")):
-    commands = [["sl", "share", "-U", abspath(source), abspath(dest)],
-                ["sl", "-R", abspath(dest), "goto", commit]]
+  # sl share only works for Sapling's own repositories: one in git format
+  # (.git, with or without .git/sl) needs a git worktree. Neither share nor
+  # worktree is made by cloning .sl or .git: a checkout which is not itself a
+  # share has the whole store in its .sl.
+  sapling_repo = exists(join(source, ".sl"))
+  if sapling_repo:
+    # share is a bundled extension, off unless the user's config enables it
+    run("sl", "--config", "extensions.share=", "share", "-U", abspath(source), abspath(dest))
   else:
-    commands = [["git", "-C", abspath(source), "worktree", "add", "--detach", abspath(dest), commit]]
-  for command in commands:
-    proc = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-    if proc.returncode:
-      raise SCMError("Error %d from %s: %s" % (proc.returncode, " ".join(command), proc.stdout.strip()))
+    run("git", "-C", abspath(source), "worktree", "add", "--no-checkout", "--detach", abspath(dest), commit)
+  reason = busy(source, sapling_repo)
+  if reason is None:
+    try:
+      clone_files(source, dest, ".sl" if sapling_repo else ".git")
+    except cow.CloneError as e:
+      reason = str(e)
+      for entry in set(os.listdir(dest)) - {".sl", ".git"}:
+        path = join(dest, entry)
+        shutil.rmtree(path) if isdir(path) and not islink(path) else os.unlink(path)
+  if reason is not None:
+    info("Checking out %s, as its files cannot be cloned from %s: %s", dest, source, reason)
+    if sapling_repo:
+      run("sl", "-R", abspath(dest), "goto", commit)
+    else:
+      run("git", "reset", "-q", "--hard", cwd=dest)
+  elif sapling_repo:
+    for command in (("debugrebuilddirstate", "-r", commit), ("revert", "--all", "--no-backup"),
+                    ("purge", "--files", "--dirs", "--ignored")):
+      run("sl", "-R", abspath(dest), *command)
+  else:
+    # update-index fails when files differ from the index, as they may: the
+    # checkout then rewrites only those.
+    run("git", "reset", "-q", cwd=dest)
+    subprocess.run(["git", "update-index", "-q", "--refresh"], cwd=dest, stdout=subprocess.DEVNULL)
+    run("git", "checkout-index", "-a", "-f", cwd=dest)
+    run("git", "clean", "-fdxq", cwd=dest)
 
 
 def doSession(args, parser):
