@@ -198,6 +198,16 @@ class SeedTestCase(unittest.TestCase):
     # Never twice.
     self.assertFalse(self.seed())
 
+  def test_ninja_version(self) -> None:
+    ninja = join(self.root, "ninja")
+    with open(join(self.src, "CMakeCache.txt"), "a") as f:
+      f.write(f"CMAKE_MAKE_PROGRAM:FILEPATH={ninja}\n")
+    for version, seeded in (("1.12.1", False), ("1.11.1.git.kitware.jobserver-1", True)):
+      with open(ninja, "w") as f:
+        f.write(f"#!/bin/sh\necho {version}\n")
+      os.chmod(ninja, 0o755)
+      self.assertEqual(self.seed(), seeded)
+
   def test_not_seeded(self) -> None:
     del self.spec["incremental_recipe"]
     self.assertFalse(self.seed())

@@ -597,7 +597,12 @@ When you are done with a session, `aliBuild session drop NAME` removes its
 its builds. With `--worktrees`, it removes its worktrees as well, unless one of
 them has uncommitted changes. `-n` shows what it would remove.
 
-#### Seeding a session from another one
+#### Seeding a session from another one (experimental)
+
+This is experimental, and only done when asked for with `--seed-from`. It
+rewrites ninja's own log files, whose format is not public: it is known to work
+with ninja 1.11 and 1.13, and nothing is seeded for a package built with
+another version of ninja.
 
 A new session's first build of a large package, e.g. O2, starts from an empty
 build directory, even when another session has just built nearly the same
