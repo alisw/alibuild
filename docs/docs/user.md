@@ -744,6 +744,20 @@ machine of its own, nothing is built or run without the owner's approval:
 
 The approvals are kept in the server, so they end with it.
 
+#### Claude Code plugin
+
+The aliBuild repository is also a Claude Code plugin marketplace. Its
+`alibuild` plugin registers `aliBuild mcp` (without `--gated`), which needs
+`aliBuild` on the `PATH`, and adds a skill on running agents in sessions and
+building concurrently. Install it from Claude Code with:
+
+    /plugin marketplace add alisw/alibuild
+    /plugin install alibuild@alibuild
+
+The server runs in the directory Claude Code was started in, so start Claude
+Code where alidist and your checkouts are, or set `ALIBUILD_CHDIR` and
+`ALIBUILD_WORK_DIR`. The plugin lives in `plugins/alibuild`.
+
 ### Incremental builds
 
 When developing locally using the development mode, if the external
