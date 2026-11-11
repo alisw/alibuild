@@ -551,6 +551,66 @@ class ReconstructTestCase(unittest.TestCase):
                          workDir="/sw", outputConfig=None)
         self.assertRaises(SystemExit, doReconstruct, args, None)
 
+    def _publish_args(self, **kw):
+        return Namespace(package="zlib", version="v1", revision="1", architecture=ARCH,
+                         remoteStore="reapi://proxy/cas", acStore="reapi://proxy/ac::rw",
+                         insecure=True, workDir="/sw", outputConfig=None,
+                         rebaseline=True, apply=True, legacyStore="reapi://proxy/repo",
+                         casPublicUrl="https://example/cas", **kw)
+
+    def test_doReconstruct_refuses_rebaseline_apply_without_signer(self):
+        with patch("alibuild_helpers.reconstruct.remote_from_url") as remote:
+            self.assertRaises(SystemExit, doReconstruct, self._publish_args(), None)
+        remote.assert_not_called()   # refused before touching any store
+
+    def test_doReconstruct_passes_publishing_options_like_build(self):
+        # Stop right after the store is built: it is not a REAPIRemoteSync.
+        for no_sign, sign_url in ((False, "https://proxy/sign"), (True, "")):
+            args = self._publish_args(signUrl="https://proxy/sign", signToken="",
+                                      signTokenFile="/tok", signer="ci", noSign=no_sign)
+            with patch("alibuild_helpers.reconstruct.remote_from_url",
+                       return_value=object()) as remote:
+                self.assertRaises(SystemExit, doReconstruct, args, None)
+            kw = remote.call_args.kwargs
+            self.assertEqual((kw["legacy_url"], kw["cas_public_url"]),
+                             ("reapi://proxy/repo", "https://example/cas"))
+            self.assertEqual((kw["sign_url"], kw["sign_token_file"], kw["signer"]),
+                             (sign_url, "/tok", "ci"))
+
+    @patch("alibuild_helpers.signing.sign_via_proxy")
+    @patch("alibuild_helpers.sync_reapi.REAPIRemoteSync._s3_init", new=MagicMock())
+    def test_do_rebaseline_reproduced_digest_leaves_ac_entry_untouched(self, sign_via_proxy):
+        s = sync_reapi.REAPIRemoteSync(
+            "reapi://proxy/cas", "reapi://proxy/cas", ARCH, "/sw",
+            legacyStore="reapi://proxy/repo", casPublicUrl="https://example/cas",
+            sign_url="https://proxy/sign", sign_token="tok")
+        s.s3 = MagicMock()
+        result = RebuildResult(True, kind="match", algo="sha256",
+                               recorded="a" * 64, rebuilt="a" * 64, tarball="/x")
+        self.assertTrue(do_rebaseline(Namespace(package="zlib", version="v1", apply=True,
+                                                delete_old=False), s,
+                                      [self._rebaseline_entry()], result))
+        sign_via_proxy.assert_not_called()
+        s.s3.put_object.assert_not_called()
+        s.s3.upload_file.assert_not_called()
+
+    def test_verify_rebuild_keeps_the_recorded_hash_and_revision(self):
+        """A missing blob is rebuilt under its recorded action hash and revision,
+        which are in the tarball: no --force-rebuild, and the legacy links in view."""
+        closure = [make_entry("zlib", "v1", "1", "c" * 64, "rz")]
+        args = self._rebuild_args()
+        args.legacyStore, args.casPublicUrl = "reapi://x/repo", "https://example/cas"
+        for present, forced in ((False, False), (True, True)):
+            commands = []
+            with patch("alibuild_helpers.reconstruct.materialize_recipes"), \
+                 patch("alibuild_helpers.reconstruct.restore_sources", return_value=([], [])), \
+                 patch("alibuild_helpers.reconstruct.GitSourceStore"):
+                verify_rebuild(args, self.make_sync({"c" * 64} if present else ()), closure,
+                               build_runner=lambda cmd: commands.append(cmd) or 1)
+            self.assertEqual("--force-rebuild" in commands[0], forced)
+            self.assertIn("--legacy-links-store", commands[0])
+            self.assertIn("https://example/cas", commands[0])
+
 
 if __name__ == "__main__":
     unittest.main()
