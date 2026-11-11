@@ -66,6 +66,17 @@ def add_parser(subparsers, detected_arch, work_dir_default):
                  help="With --verify --rebuild: treat a non-identical rebuilt tarball as a failure "
                       "(default: soft, since legacy pre-normalisation tarballs are not "
                       "bit-reproducible).")
+  p.add_argument("--docker-image", dest="dockerImage", default=None, metavar="IMAGE",
+                 help="Rebuild in IMAGE instead of the build container recorded in the AC "
+                      "entry, e.g. when that image is gone from the registry. The container "
+                      "is not an input to the action hash; --rebaseline --apply records "
+                      "IMAGE as the entry's action.container.")
+  p.add_argument("--docker-extra-args", dest="dockerExtraArgs", default="", metavar="ARGLIST",
+                 help="As for 'aliBuild build': passed to the rebuild's 'docker run', e.g. "
+                      "--docker-extra-args='--cpus=8 --memory=32g' (with '=').")
+  p.add_argument("-j", "--jobs", dest="jobs", type=int, default=None, metavar="N",
+                 help="Parallel compilation processes for the rebuild ('aliBuild build -j'). "
+                      "Default: build's, all the cores of the machine.")
   p.add_argument("--alidist", dest="alidist", default=None, metavar="DIR",
                  help="alidist checkout used to supply the defaults config file "
                       "(defaults-<name>.sh) when it is not archived in the ledger (it is a config, "
@@ -468,6 +479,11 @@ def verify_rebuild(args, sync, closure, build_runner=None):
     ac_store = ac_store[:-4]
   container = entry["action"].get("container") or {}
   image = container.get("digest") or container.get("image")
+  if getattr(args, "dockerImage", None):
+    warning("NOT rebuilding %s in its recorded build container:\n"
+            "    recorded: %s\n    using   : %s",
+            args.package, image or "none (native build)", args.dockerImage)
+    image = args.dockerImage
   # Rebuild with the defaults this build actually used (they feed the action
   # hash), not a hardcoded guess: prefer the recorded field, else recover the
   # flavour from the archived defaults recipe (migrated entries lack the field).
@@ -510,8 +526,12 @@ def verify_rebuild(args, sync, closure, build_runner=None):
     cmd += ["--insecure"]
   if os.path.isdir(reference_dir):
     cmd += ["--reference-sources", reference_dir]
+  if getattr(args, "jobs", None):
+    cmd += ["-j", str(args.jobs)]
   if image:
     cmd += ["--docker", "--docker-image", image]
+    if getattr(args, "dockerExtraArgs", ""):
+      cmd.append("--docker-extra-args=" + args.dockerExtraArgs)
 
   # The materialised recipes are a plain directory, not an SCM checkout; pass the
   # alidist provenance explicitly so the build doesn't require a git repo (the
@@ -574,6 +594,17 @@ def do_rebaseline(args, sync, closure, result):
        result.algo, result.rebuilt)
   info("  orphaned old CAS blob: %s%s", old_cas,
        " (will delete)" if getattr(args, "delete_old", False) else " (left in place)")
+  if getattr(args, "dockerImage", None):
+    # Rebuilt in another image: record the one actually used, as `aliBuild build`
+    # does. Not in the action hash nor in the signed payload, so the entry keeps
+    # its key and is re-signed below like any re-baseline.
+    from argparse import Namespace
+    from alibuild_helpers.build import resolve_container_provenance
+    container = resolve_container_provenance(Namespace(docker=True,
+                                                       dockerImage=args.dockerImage))
+    info("  rewrite action.container: %s -> %s", entry["action"].get("container"),
+         container)
+    entry = dict(entry, action=dict(entry["action"], container=container))
 
   if not getattr(args, "apply", False):
     warning("DRY RUN: nothing written. Re-run with --apply to perform the "
