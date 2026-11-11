@@ -1,4 +1,5 @@
 import hashlib
+import json
 import os
 import os.path
 import shutil
@@ -610,6 +611,80 @@ class ReconstructTestCase(unittest.TestCase):
             self.assertEqual("--force-rebuild" in commands[0], forced)
             self.assertIn("--legacy-links-store", commands[0])
             self.assertIn("https://example/cas", commands[0])
+
+    def test_verify_rebuild_docker_image_override_and_jobs(self):
+        """--docker-image replaces the recorded container; -j and
+        --docker-extra-args reach the isolated build."""
+        closure = [self.entries["hash-zlib"]]   # recorded alisw/slc7-builder@sha256:abc
+        for override, jobs, image in ((None, None, "alisw/slc7-builder@sha256:abc"),
+                                      ("reg/new@sha256:def", 8, "reg/new@sha256:def")):
+            args = self._rebuild_args()
+            args.dockerImage, args.jobs, args.dockerExtraArgs = override, jobs, "--cpus=8"
+            commands = []
+            with patch("alibuild_helpers.reconstruct.materialize_recipes"), \
+                 patch("alibuild_helpers.reconstruct.restore_sources", return_value=([], [])), \
+                 patch("alibuild_helpers.reconstruct.GitSourceStore"):
+                verify_rebuild(args, self.make_sync(()), closure,
+                               build_runner=lambda cmd: commands.append(cmd) or 1)
+            cmd = commands[0]
+            self.assertEqual(cmd[cmd.index("--docker-image") + 1], image)
+            self.assertIn("--docker-extra-args=--cpus=8", cmd)
+            if jobs:
+                self.assertEqual(cmd[cmd.index("-j") + 1], "8")
+            else:
+                self.assertNotIn("-j", cmd)
+
+    @patch("alibuild_helpers.signing.sign_via_proxy")
+    @patch("alibuild_helpers.sync_reapi.REAPIRemoteSync._s3_init", new=MagicMock())
+    def test_do_rebaseline_records_the_override_container_and_stays_signed(self, sign_via_proxy):
+        from alibuild_helpers import signing
+        seed = bytes(range(32))
+        keyid, pub = signing.public_key(seed)
+        sign_via_proxy.side_effect = lambda entry, url, tok, signer, **kw: \
+            signing.sign(entry, seed, signer)
+        s = sync_reapi.REAPIRemoteSync(
+            "reapi://proxy/cas", "reapi://proxy/cas", ARCH, "/sw",
+            legacyStore="reapi://proxy/repo", casPublicUrl="https://example/cas",
+            sign_url="https://proxy/sign", sign_token="tok")
+        s.s3 = MagicMock()
+        tarball = os.path.join(self.tmp, "zlib.tar.gz")
+        with open(tarball, "wb") as handle:
+            handle.write(b"rebuilt")
+        rebuilt = hashlib.sha256(b"rebuilt").hexdigest()
+        result = RebuildResult(True, kind="differ", algo="sha256", recorded="a" * 64,
+                               rebuilt=rebuilt, tarball=tarball)
+        used = {"runtime": "docker", "image": "reg/new@sha256:def",
+                "digest": "reg/new@sha256:def"}
+        entry = make_entry("zlib", "v1", "1", "a" * 64, "rz",
+                           container={"image": "reg/gone", "digest": "reg/gone@sha256:abc"})
+        with patch("alibuild_helpers.build.resolve_container_provenance",
+                   return_value=used) as resolve:
+            self.assertTrue(do_rebaseline(
+                Namespace(package="zlib", version="v1", apply=True, delete_old=False,
+                          dockerImage="reg/new@sha256:def"), s, [entry], result))
+        self.assertEqual(resolve.call_args.args[0].dockerImage, "reg/new@sha256:def")
+        written = [json.loads(c.kwargs["Body"]) for c in s.s3.put_object.call_args_list
+                   if c.kwargs["Key"].startswith("ac/")]
+        self.assertEqual(len(written), 1)
+        self.assertEqual(written[0]["action"]["container"], used)
+        self.assertEqual(written[0]["result"]["outputDigest"], "sha256:" + rebuilt)
+        ring = signing.load_keyring({"keys": {keyid: {"publicKey": pub, "signer": "ci"}},
+                                     "revoked": []})
+        self.assertTrue(signing.verify(written[0], ring)[0])
+        # The closure's own entry is not mutated.
+        self.assertEqual(entry["action"]["container"]["image"], "reg/gone")
+
+    def test_do_persist_with_override_leaves_the_ac_entry_alone(self):
+        result = RebuildResult(True, kind="match", algo="sha256",
+                               recorded="a" * 64, rebuilt="a" * 64, tarball="/x")
+        sync_mock = MagicMock()
+        sync_mock.artifact_blob_exists.return_value = False
+        sync_mock.put_artifact_blob.return_value = "a" * 64
+        args = self._persist_args(apply=True)
+        args.dockerImage = "reg/new@sha256:def"
+        self.assertTrue(do_persist(args, sync_mock, [self._rebaseline_entry()], result))
+        self.assertEqual({call[0] for call in sync_mock.method_calls},
+                         {"artifact_blob_exists", "put_artifact_blob"})
 
 
 if __name__ == "__main__":

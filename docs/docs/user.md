@@ -404,6 +404,14 @@ aliBuild reconstruct O2 --version nightly-20261015 \
   store redirect to the rebuilt hash, so later verifications are byte-identical.
   A dry run unless `--apply`; `--delete-old` additionally removes the blob the
   re-baseline orphans.
+- `--docker-image IMAGE`: rebuild in `IMAGE` instead of the recorded build
+  container, e.g. when that has been deleted from the registry. The container is
+  not part of the action hash; `--rebaseline --apply` records `IMAGE` as the
+  entry's `action.container`. Expect `--persist` to reproduce only packages whose
+  output does not depend on the image.
+- `-j N`, `--docker-extra-args ARGS`: passed to the rebuild's `aliBuild build`,
+  e.g. `-j 8 --docker-extra-args='--cpus=8 --memory=32g'` to keep it within a
+  batch slot.
 - `--output-config DIR`: where to materialise the recipes. Defaults to
   `WORKDIR/reconstruct-PACKAGE`.
 - `--alidist DIR`: an alidist checkout to take the defaults file
