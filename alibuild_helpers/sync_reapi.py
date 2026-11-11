@@ -861,7 +861,7 @@ class REAPIRemoteSync(Boto3RemoteSync):
     match = re.search(r"store/[0-9a-f]{2}/([0-9a-f]+)/", target)
     return match.group(1) if match else None
 
-  def migrate_put(self, ac_entry, tarball_path, recipe_text):
+  def migrate_put(self, ac_entry, tarball_path, recipe_text, sign=False):
     """Write a migrated legacy release into the reapi store: the tarball as a
     CAS blob, the recovered recipe blob, the Action Cache entry, plus the legacy
     store redirect and per-package link so it stays installable and
@@ -870,7 +870,8 @@ class REAPIRemoteSync(Boto3RemoteSync):
     Migrated entries are intentionally left *unsigned*: their provenance is
     reconstructed after the fact, so a signature would falsely assert a trusted
     signer built them. They are consumed as legacy (tolerated under
-    --require-signature=warn, refused under require). Do not sign here."""
+    --require-signature=warn, refused under require). Only a re-baseline, which
+    rebuilt the tarball itself, passes sign=True."""
     action = ac_entry["action"]
     arch, pkg = action["architecture"], action["package"]
     action_hash = action["actionHash"]
@@ -892,6 +893,8 @@ class REAPIRemoteSync(Boto3RemoteSync):
       "outputDigest": "%s:%s" % (self.CAS_ALGO, content_hash),
       "size": os.path.getsize(tarball_path),
     })
+    if sign:
+      entry = self._sign_ac_entry(entry)
     ac_path = resolve_ac_path(arch, action_hash)
     debug("S3 put_object %s/%s (AC entry)", self.acWriteStore, ac_path)
     self.s3.put_object(Bucket=self.acWriteStore, Key=ac_path,
@@ -899,14 +902,14 @@ class REAPIRemoteSync(Boto3RemoteSync):
                        ContentType="application/json")
 
     store_key = os.path.join(resolve_store_path(arch, action_hash), tarball)
-    debug("S3 put_object %s/%s (store redirect)", self.writeStore, store_key)
+    debug("S3 put_object %s/%s (store redirect)", self.legacyWriteStore, store_key)
     self.s3.put_object(Bucket=self.legacyWriteStore, Key=store_key,
                        Body=os.fsencode(cas_path),
                        WebsiteRedirectLocation=self._cas_redirect(cas_path))
 
     link_target = "../../%s/store/%s/%s/%s" % (arch, action_hash[:2], action_hash, tarball)
     link_key = os.path.join(resolve_links_path(arch, pkg), tarball)
-    debug("S3 put_object %s/%s (link)", self.writeStore, link_key)
+    debug("S3 put_object %s/%s (link)", self.legacyWriteStore, link_key)
     # The link stays RELATIVE: it points at the store object beside it in the
     # same tree, and the client reads its body rather than following the header.
     self.s3.put_object(Bucket=self.legacyWriteStore, Key=link_key,
@@ -971,7 +974,9 @@ class REAPIRemoteSync(Boto3RemoteSync):
     is an in-place pointer swap. The new blob is stored *before* the AC entry is
     repointed, so a failure never leaves the entry dangling; the old blob is left
     orphaned (delete it separately via delete_artifact_blob). The retention of the
-    blob being replaced is preserved (untagged == keep-forever == permanent).
+    blob being replaced is preserved (untagged == keep-forever == permanent). The
+    old signatures covered the old digest: they are dropped, and the entry is
+    signed afresh when signing is configured.
     Returns (old_hash, new_hash, old_cas_path)."""
     old_digest = (entry.get("result") or {}).get("outputDigest", "")
     old_hash = old_digest.split(":", 1)[-1]
@@ -982,7 +987,8 @@ class REAPIRemoteSync(Boto3RemoteSync):
       self.storage = self._retention_of(self.writeStore, old_cas_path) or "permanent"
     try:
       new_hash = self.migrate_put(
-        {k: v for k, v in entry.items() if k != "result"}, tarball_path, recipe_text)
+        {k: v for k, v in entry.items() if k not in ("result", "signatures")},
+        tarball_path, recipe_text, sign=True)
     finally:
       self.storage = prev_storage
     return old_hash, new_hash, old_cas_path

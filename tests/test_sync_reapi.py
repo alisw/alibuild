@@ -572,6 +572,51 @@ class REAPIRemoteSyncTestCase(unittest.TestCase):
         # storage restored to its original value afterwards (no leak).
         self.assertEqual(reapi.storage, "ephemeral")
 
+    @patch("alibuild_helpers.signing.sign_via_proxy")
+    @patch("os.path.getsize", new=MagicMock(return_value=4096))
+    def test_rebaseline_resigns_and_publishes_to_the_legacy_store(self, sign_via_proxy) -> None:
+        """A re-baselined entry carries a fresh signature over the NEW digest, and
+        its store object and link go to the legacy bucket with an absolute redirect."""
+        sign_via_proxy.return_value = {"keyid": "new", "signer": "ci", "sig": "fresh"}
+        old_hash, new_hash = "a" * 64, "b" * 64
+        client = self.make_client()
+        reapi = sync_reapi.REAPIRemoteSync(
+            remoteStore="reapi://localhost/bucket", writeStore="reapi://localhost/bucket",
+            architecture=ARCHITECTURE, workdir="/sw", legacyStore="reapi://localhost/legacy",
+            casPublicUrl="https://example/cas", sign_url="https://proxy/sign",
+            sign_token="tok")
+        reapi.s3 = client
+        entry = {
+            "schemaVersion": 3,
+            "action": {"package": "zlib", "version": "v1", "revision": "1",
+                       "architecture": ARCHITECTURE, "actionHash": REAPI_HASH,
+                       "recipeDigest": "sha256:" + REAPI_RECIPE_DIGEST},
+            "result": {"tarball": "zlib-v1-1.%s.tar.gz" % ARCHITECTURE,
+                       "outputDigest": "sha256:" + old_hash, "size": 1},
+            "signatures": [{"keyid": "old", "signer": "ci", "sig": "stale"}],
+        }
+        with patch("alibuild_helpers.sync_reapi.file_digest", return_value=new_hash):
+            reapi.rebaseline_ac_entry(entry, "/tmp/zlib.tar.gz", "recipe")
+        # Signed over the new digest, with the stale signature gone.
+        signed = sign_via_proxy.call_args.args[0]
+        self.assertEqual(signed["result"]["outputDigest"], "sha256:" + new_hash)
+        self.assertNotIn("signatures", signed)
+        puts = {c.kwargs["Key"]: c.kwargs for c in client.put_object.call_args_list}
+        ac = json.loads(puts[resolve_ac_path(ARCHITECTURE, REAPI_HASH)]["Body"].decode())
+        self.assertEqual(ac["signatures"], [sign_via_proxy.return_value])
+        self.assertEqual(ac["result"]["outputDigest"], "sha256:" + new_hash)
+        # Store object and link: legacy bucket, absolute redirect to the new blob.
+        tarball = "zlib-v1-1.%s.tar.gz" % ARCHITECTURE
+        stub = puts[resolve_store_path(ARCHITECTURE, REAPI_HASH) + "/" + tarball]
+        link = puts[resolve_links_path(ARCHITECTURE, "zlib") + "/" + tarball]
+        self.assertEqual(stub["Bucket"], "legacy")
+        self.assertEqual(stub["WebsiteRedirectLocation"],
+                         "https://example/cas/" + resolve_cas_path(new_hash))
+        self.assertEqual(link["Bucket"], "legacy")
+        # The bytes and the ledger stay where they were.
+        self.assertEqual(client.upload_file.call_args.kwargs["Bucket"], "bucket")
+        self.assertEqual(puts[resolve_ac_path(ARCHITECTURE, REAPI_HASH)]["Bucket"], "bucket")
+
     @patch("alibuild_helpers.sync_reapi.file_digest", new=MagicMock(return_value="e" * 64))
     @patch("os.path.getsize", new=MagicMock(return_value=4096))
     def test_put_legacy_artifact(self) -> None:
