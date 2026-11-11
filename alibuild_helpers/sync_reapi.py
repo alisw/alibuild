@@ -520,7 +520,7 @@ class REAPIRemoteSync(Boto3RemoteSync):
       return None
     return json.loads(obj["Body"].read())
 
-  def is_published(self, action_hash):
+  def is_published(self, action_hash, keep_alive=False):
     """Whether an action is fully published: its Action Cache entry exists *and* the
     CAS blob that entry names is present.
 
@@ -531,7 +531,12 @@ class REAPIRemoteSync(Boto3RemoteSync):
     entry and bytes) is not something a dependent can be published against either.
 
     Two HEAD-class requests, no download -- the blob is checked by presence, since it
-    is content-addressed and its key is its own digest."""
+    is content-addressed and its key is its own digest.
+
+    keep_alive also promotes or LRU-refreshes the blob (see _maybe_promote). The
+    build asks this for every package it reuses, rebuilt, fetched or installed
+    already: a fetched one never reaches the upload, which is the only other
+    place a blob is kept alive."""
     entry = self.read_ac_entry(action_hash)
     if entry is None:
       return False
@@ -539,7 +544,12 @@ class REAPIRemoteSync(Boto3RemoteSync):
     if not content_hash:
       # validate-system nodes produce no tarball: the entry alone is the artifact.
       return (entry.get("action") or {}).get("kind") == "validate-system"
-    return self._exists(self.remoteStore, resolve_cas_path(content_hash, algo))
+    cas_path = resolve_cas_path(content_hash, algo)
+    if not self._exists(self.remoteStore, cas_path):
+      return False
+    if keep_alive:
+      self._maybe_promote(cas_path)
+    return True
 
   def download_blob(self, content_hash, dest, algo="sha256"):
     """Download a ledger (input) blob -- e.g. a source bundle -- to dest."""
@@ -601,8 +611,10 @@ class REAPIRemoteSync(Boto3RemoteSync):
 
   def _maybe_promote(self, cas_path):
     """When uploading as 'permanent' and the blob already exists tagged
-    ephemeral, promote it to permanent so it is no longer LRU-expired."""
+    ephemeral, promote it to permanent so it is no longer LRU-expired.
+    Otherwise LRU-refresh it: reusing a blob must keep it alive."""
     if self.storage != "permanent":
+      self._touch_if_expiring(cas_path)
       return
     if self._retention_of(self.writeStore, cas_path) == "ephemeral":
       self.s3.put_object_tagging(
@@ -628,21 +640,25 @@ class REAPIRemoteSync(Boto3RemoteSync):
   def _touch_if_expiring(self, cas_path):
     """LRU-refresh: if the blob is ephemeral and within REFRESH_WITHIN_DAYS of
     its EPHEMERAL_TTL_DAYS expiry, copy it onto itself (preserving the tag) to
-    reset last-modified. Best-effort and only when we can write the same bucket."""
+    reset last-modified. Best-effort, in the bucket we write: an upload that
+    dedups needs its blob there to stay, wherever it reads from."""
     from botocore.exceptions import ClientError
-    if not self.writeStore or self.writeStore != self.remoteStore:
+    if not self.writeStore:
       return
     try:
-      if self._retention_of(self.remoteStore, cas_path) != "ephemeral":
-        return
-      head = self.s3.head_object(Bucket=self.remoteStore, Key=cas_path)
+      head = self.s3.head_object(Bucket=self.writeStore, Key=cas_path)
       age_days = (datetime.now(timezone.utc) - head["LastModified"]).days
-      if age_days < self.EPHEMERAL_TTL_DAYS - self.REFRESH_WITHIN_DAYS:
+      if age_days < self.EPHEMERAL_TTL_DAYS - self.REFRESH_WITHIN_DAYS or \
+         self._retention_of(self.writeStore, cas_path) != "ephemeral":
         return
       debug("Refreshing ephemeral %s (%d days old)", cas_path, age_days)
+      # REPLACE, with the same metadata: S3 and Ceph RGW refuse to copy an
+      # object onto itself with MetadataDirective=COPY (InvalidRequest).
       self.s3.copy_object(Bucket=self.writeStore, Key=cas_path,
-                          CopySource={"Bucket": self.remoteStore, "Key": cas_path},
-                          MetadataDirective="COPY", TaggingDirective="COPY")
+                          CopySource={"Bucket": self.writeStore, "Key": cas_path},
+                          MetadataDirective="REPLACE", Metadata=head.get("Metadata", {}),
+                          ContentType=head.get("ContentType", "binary/octet-stream"),
+                          TaggingDirective="COPY")
     except ClientError as exc:
       debug("Could not refresh %s: %s", cas_path, exc)
 
