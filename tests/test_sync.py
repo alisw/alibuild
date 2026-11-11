@@ -1,6 +1,8 @@
+import hashlib
 import os
 import os.path
 import sys
+import tempfile
 import unittest
 from io import BytesIO
 
@@ -218,6 +220,51 @@ class SyncTestCase(unittest.TestCase):
                       "the absolute redirect was not followed as-is: %s" % requested)
         self.assertFalse([u for u in requested if u.startswith(store + "/https")],
                          "the absolute target was joined onto the store: %s" % requested)
+
+    def fetch_through_stub(self, cas_response):
+        """Fetch GOOD_SPEC from a store whose object redirects to a CAS blob, which
+        answers with cas_response. Returns (requested URLs, files left behind)."""
+        store = "https://localhost/legacy"
+        blob = "https://localhost/cas/cas/sha256/%s/%s" % (self.digest[:2], self.digest)
+        requested = []
+
+        def get(url, *args, **kw):
+            requested.append(url)
+            if url.endswith(tarball_name(GOOD_SPEC)) and "/store/" in url:
+                return MockRequest([{"name": tarball_name(GOOD_SPEC)}], redirect=blob)
+            if url == blob:
+                return cas_response
+            return self.mock_get(url, *args, **kw)
+
+        with tempfile.TemporaryDirectory() as workdir, \
+             patch("requests.Session.get", side_effect=get):
+            syncer = sync.HttpRemoteSync(remoteStore=store, architecture=ARCHITECTURE,
+                                         workdir=workdir, insecure=False)
+            syncer.httpBackoff = 0
+            syncer.fetch_tarball(GOOD_SPEC)
+            left = [f for _, _, files in os.walk(workdir) for f in files]
+        return [u for u in requested if u == blob], left
+
+    @patch("alibuild_helpers.sync.warning", new=MagicMock())
+    def test_http_missing_cas_blob_is_not_a_tarball(self):
+        """A stub whose CAS blob is gone (expired) gives no tarball, no retries and
+        no exception, so the package is rebuilt. Writing the 404 body as the
+        tarball is what made a build fail with "gzip: not in gzip format"."""
+        self.digest = "fa" * 32
+        gone = MockRequest(None)
+        gone.iter_content = lambda chunk_size=10: iter([b"NoSuchKey"])
+        gone.headers["content-length"] = "9"
+        requested, left = self.fetch_through_stub(gone)
+        self.assertEqual(len(requested), 1)
+        self.assertEqual(left, [])
+
+    @patch("alibuild_helpers.sync.warning", new=MagicMock())
+    def test_http_cas_blob_checked_against_its_digest(self):
+        """Bytes behind a cas/sha256/<digest> redirect must hash to <digest>."""
+        good = hashlib.sha256(b"x" * 123456).hexdigest()
+        for self.digest, kept in ((good, [tarball_name(GOOD_SPEC)]), ("ab" * 32, [])):
+            _, left = self.fetch_through_stub(MockRequest([{"name": "blob"}]))
+            self.assertEqual(left, kept)
 
     def test_s3cmd_follows_store_redirect(self):
         """s3cmd cannot see the redirect header, so the stub is spotted by content."""

@@ -1382,7 +1382,7 @@ def doBuild(args, parser):
     published = True
     if fileHash == spec["hash"] and not spec["is_devel_pkg"] and \
        isinstance(syncHelper, REAPIRemoteSync) and getattr(syncHelper, "writeStore", ""):
-      published = syncHelper.is_published(spec["remote_revision_hash"])
+      published = syncHelper.is_published(spec["remote_revision_hash"], keep_alive=True)
       if not published:
         bound_unpublished_rebuild(p, rebuilt_unpublished, syncHelper.acWriteStore)
         info("%s is built locally but not published to %s; rebuilding it so it can "

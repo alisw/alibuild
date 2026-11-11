@@ -1,6 +1,7 @@
 """Sync backends for alibuild."""
 
 import glob
+import hashlib
 import os
 import os.path
 import re
@@ -93,6 +94,7 @@ class HttpRemoteSync:
           # Destination specified -- file (dest) or buffer (returnResult).
           # Use requests in stream mode
           resp = get(url, stream=True, verify=not self.insecure, timeout=self.httpTimeoutSec)
+          cas_digest = None
           if redirect_base:
             # S3 only turns x-amz-website-redirect-location into a 301 when the
             # bucket is served as a website; on the REST endpoint the object is
@@ -115,6 +117,16 @@ class HttpRemoteSync:
               debug("Following store redirect to %s", url)
               resp = get(url, stream=True, verify=not self.insecure,
                          timeout=self.httpTimeoutSec)
+              # A content-addressed target names its own digest: check against it.
+              cas_digest = re.search(r"(?:^|/)cas/sha256/[0-9a-f]{2}/([0-9a-f]{64})$", target)
+          if resp.status_code == 404:
+            # Retrying will not bring it back. After a store redirect this is a
+            # stub whose CAS blob is gone (an expired ephemeral artifact): not
+            # available, so the package is rebuilt, as the reapi backend does.
+            (warning if redirect_base else debug)("GET %s: not found", url)
+            return None
+          resp.raise_for_status()
+          sha256 = hashlib.sha256()
           size = int(resp.headers.get("content-length", "-1"))
           downloaded = 0
           reportTime = time.time()
@@ -125,6 +137,8 @@ class HttpRemoteSync:
             for chunk in filter(bool, resp.iter_content(chunk_size=32768)):
               if destFp:
                 destFp.write(chunk)
+              if cas_digest:
+                sha256.update(chunk)
               if returnResult:
                 result.append(chunk)
               downloaded += len(chunk)
@@ -141,6 +155,11 @@ class HttpRemoteSync:
 
           if size not in (downloaded, -1):
             raise PartialDownloadError(downloaded, size)
+          if cas_digest and sha256.hexdigest() != cas_digest.group(1):
+            warning("GET %s: content does not match its sha256, ignoring it", url)
+            if dest:
+              os.unlink(dest+".tmp")
+            return None
           if dest:
             os.rename(dest+".tmp", dest)  # we should not have errors here
           return b''.join(result) if returnResult else True
@@ -240,7 +259,7 @@ class HttpRemoteSync:
       # Fetch manifest file with initial symlinks. This file is updated
       # regularly; we use it to avoid many small network requests.
       manifest = self.getRetry(f"{self.remoteStore}/{links_path}.manifest",
-                               returnResult=True, session=session)
+                               returnResult=True, session=session) or b""
       symlinks = {
         linkname.decode("utf-8"): target.decode("utf-8")
         for linkname, sep, target in (line.partition(b"\t")
