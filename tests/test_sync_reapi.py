@@ -227,6 +227,31 @@ class REAPIRemoteSyncTestCase(unittest.TestCase):
            new=lambda path: [tarball_name(REAPI_SPEC)] if path.endswith("-1") else [])
     @patch("os.readlink", new=MagicMock(return_value="../../store/de/dead/x.tar.gz"))
     @patch("os.path.islink", new=MagicMock(return_value=True))
+    def test_upload_read_only_store_is_a_noop_with_deps(self) -> None:
+        # A read-only store (e.g. the isolated rebuild of `aliBuild reconstruct`)
+        # must not run the ledger check: it has no AC write bucket, and looking a
+        # dependency up in "" raised ParamValidationError for every package with
+        # dependencies.
+        client = self.make_client()
+        reapi = sync_reapi.REAPIRemoteSync(
+            remoteStore="reapi://localhost/bucket", writeStore="",
+            architecture=ARCHITECTURE, workdir="/sw")
+        reapi.s3 = client
+        spec = json.loads(json.dumps(REAPI_SPEC))
+        spec["ac_entry"]["action"]["deps"] = [
+            {"actionHash": "0" * 40, "package": "dep"}]
+        reapi.upload_symlinks_and_tarball(spec)
+        client.head_object.assert_not_called()
+        client.put_object.assert_not_called()
+        client.upload_file.assert_not_called()
+
+    @patch("alibuild_helpers.sync_reapi.file_digest",
+           new=MagicMock(return_value=REAPI_CONTENT_HASH))
+    @patch("os.path.getsize", new=MagicMock(return_value=4096))
+    @patch("os.listdir",
+           new=lambda path: [tarball_name(REAPI_SPEC)] if path.endswith("-1") else [])
+    @patch("os.readlink", new=MagicMock(return_value="../../store/de/dead/x.tar.gz"))
+    @patch("os.path.islink", new=MagicMock(return_value=True))
     def test_upload_dedups_existing_cas_blob(self) -> None:
         # The CAS already has the tarball bytes (e.g. from an equivalent hash).
         client = self.make_client(existing={resolve_cas_path(REAPI_CONTENT_HASH)})
