@@ -363,7 +363,13 @@ class REAPIRemoteSync(Boto3RemoteSync):
     The check has to happen before the base implementation writes anything: it
     claims the per-package link and uploads the legacy symlinks *before* calling
     _upload_tarball, so aborting from in there leaves a claimed link with no
-    artifact behind it for a later build to clean up."""
+    artifact behind it for a later build to clean up.
+
+    A read-only store publishes nothing, so there is nothing to check either:
+    return before the ledger lookup, which needs the AC *write* bucket and would
+    otherwise fail on an empty bucket name (the base class returns early too)."""
+    if not self.writeStore:
+      return
     ac_entry = spec.get("ac_entry")
     if ac_entry:
       self.assert_deps_in_ledger(ac_entry["action"])
