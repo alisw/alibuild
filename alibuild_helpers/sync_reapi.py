@@ -610,7 +610,9 @@ class REAPIRemoteSync(Boto3RemoteSync):
     """Return the retention tag value of an object, or None if untagged/absent."""
     from botocore.exceptions import ClientError
     try:
-      tags = self.s3.get_object_tagging(Bucket=bucket, Key=key)["TagSet"]
+      # An untagged object (e.g. uploaded before retention tags existed)
+      # comes back from Ceph RGW without a TagSet at all, not an empty one.
+      tags = self.s3.get_object_tagging(Bucket=bucket, Key=key).get("TagSet", [])
     except ClientError:
       return None
     return next((t["Value"] for t in tags if t["Key"] == self.RETENTION_TAG_KEY), None)

@@ -696,6 +696,25 @@ class REAPIRemoteSyncTestCase(unittest.TestCase):
         reapi.download_artifact(REAPI_CONTENT_HASH, "/tmp/x")
         client.copy_object.assert_not_called()        # fresh (10d < 60d), no refresh
 
+    @patch("os.path.exists", new=MagicMock(return_value=False))
+    def test_download_old_untagged_blob(self) -> None:
+        # A blob from before retention tags: Ceph RGW answers GetObjectTagging
+        # with no TagSet at all. That must read as "untagged" (no refresh),
+        # not crash the build with KeyError.
+        from datetime import datetime, timezone, timedelta
+        client = self.make_client()
+        client.get_object_tagging = MagicMock(return_value={"ResponseMetadata": {}})
+        client.head_object = MagicMock(
+            return_value={"LastModified": datetime.now(timezone.utc) - timedelta(days=400)})
+        client.copy_object = MagicMock()
+        reapi = sync_reapi.REAPIRemoteSync("reapi://localhost/bucket", "reapi://localhost/bucket",
+                                     architecture=ARCHITECTURE, workdir="/sw",
+                                     storage="ephemeral")
+        reapi.s3 = client
+        self.assertIsNone(reapi._retention_of("bucket", "key"))
+        reapi.download_artifact(REAPI_CONTENT_HASH, "/tmp/x")
+        client.copy_object.assert_not_called()
+
     @patch("glob.glob", new=MagicMock(return_value=[]))
     @patch("os.makedirs", new=MagicMock())
     def test_fetch_via_action_cache(self) -> None:
