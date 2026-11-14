@@ -1,4 +1,5 @@
 from argparse import Namespace
+import json
 import os
 import os.path
 import platform
@@ -13,6 +14,8 @@ from collections import OrderedDict
 from alibuild_helpers.utilities import parseRecipe, resolve_tag
 from alibuild_helpers import sync_reapi
 from alibuild_helpers.build import doBuild, storeHashes, generate_initdotsh, build_ac_entry, select_cached_tarball, bound_unpublished_rebuild
+from alibuild_helpers.build import worktree_packages, devel_label, plan_entry, report_plan
+from alibuild_helpers.log import dieOnError
 
 # Determine architecture based on platform
 def get_test_architecture():
@@ -689,6 +692,109 @@ class AlidistHashFallbackTestCase(unittest.TestCase):
         os.environ.pop("ALIBUILD_ALIDIST_HASH", None)
         with self.assertRaises(SystemExit):
             self._run_reaching_scm_block()
+
+
+class WorktreeTestCase(unittest.TestCase):
+    """-z LABEL picks up PKG@LABEL directories as development checkouts."""
+
+    def test_worktree_packages(self) -> None:
+        dirs = {"O2@fix", "O2Physics@fix", "ROOT@other"}
+        isdir = dirs.__contains__
+        self.assertEqual(worktree_packages(["ROOT", "O2", "O2Physics"], "fix", isdir),
+                         {"O2", "O2Physics"})
+        self.assertEqual(worktree_packages(["ROOT", "O2"], "other", isdir), {"ROOT"})
+        # Only packages in the build count, and without a label nothing does.
+        self.assertEqual(worktree_packages(["ROOT"], "fix", isdir), set())
+        self.assertEqual(worktree_packages(["O2"], None, isdir), set())
+        self.assertEqual(worktree_packages(["O2"], "", isdir), set())
+
+    def test_devel_label(self) -> None:
+        # Without -z, no package has a label.
+        self.assertIsNone(devel_label("O2", None, set()))
+        # Without worktrees, -z applies to every package, as it always did...
+        self.assertEqual(devel_label("O2", "fix", set()), "fix")
+        self.assertEqual(devel_label("ROOT", "fix", set()), "fix")
+        # ...while with worktrees it only applies to theirs, so that the other
+        # development packages keep their version, hence their hash and build.
+        self.assertEqual(devel_label("O2", "fix", {"O2"}), "fix")
+        self.assertIsNone(devel_label("O2Physics", "fix", {"O2"}))
+
+
+class PlanTestCase(unittest.TestCase):
+    """--plan prints one line per package, or with --json one JSON object."""
+
+    def setUp(self) -> None:
+        base = {"version": "v1", "revision": "1", "build_family": "fix-o2", "devel_label": None}
+        self.plan = [
+            plan_entry(dict(base, package="ROOT", hash="aaaa", is_devel_pkg=False), True),
+            plan_entry(dict(base, package="O2", hash="bbbb", is_devel_pkg=True, version="fix",
+                            revision="local1", source="/src/O2@fix", devel_label="fix"), False),
+        ]
+
+    def report(self, as_json):
+        with patch("sys.stdout", new=StringIO()) as out, patch("alibuild_helpers.build.banner"):
+            report_plan(self.plan, as_json)
+        return out.getvalue()
+
+    def test_text(self) -> None:
+        self.assertEqual(self.report(False),
+                         "reuse ROOT/v1-1 aaaa\nbuild O2/fix-local1 bbbb\n")
+
+    def test_json(self) -> None:
+        plan = json.loads(self.report(True))
+        self.assertEqual(plan["summary"], {"packages": 2, "reuse": 1, "build": 1})
+        root, o2 = plan["packages"]
+        self.assertEqual((root["action"], root["devel"], root["source"]), ("reuse", False, None))
+        self.assertEqual((o2["package"], o2["version"], o2["revision"], o2["hash"], o2["action"]),
+                         ("O2", "fix", "local1", "bbbb", "build"))
+        self.assertEqual((o2["devel"], o2["source"], o2["devel_label"], o2["build_family"]),
+                         (True, "/src/O2@fix", "fix", "fix-o2"))
+
+
+class BuildResultTestCase(unittest.TestCase):
+    """With --json, a build always ends with one JSON object on stdout."""
+
+    def build(self, body, **args):
+        with patch("alibuild_helpers.build._doBuild", side_effect=body), \
+             patch("sys.stdout", new=StringIO()) as out, \
+             patch("sys.stderr", new=StringIO()):
+            try:
+                doBuild(Namespace(json=True, plan=False, **args), None)
+            except SystemExit as exc:
+                self.assertEqual(exc.code, 1)
+        return json.loads(out.getvalue())
+
+    def test_success(self) -> None:
+        def body(args, parser, result):
+            result["packages"].append({"package": "zlib", "action": "built"})
+            result["status"] = "success"
+        self.assertEqual(self.build(body), {"status": "success",
+                                            "packages": [{"package": "zlib", "action": "built"}]})
+
+    def test_error(self) -> None:
+        def body(args, parser, result):
+            dieOnError(True, "Package nosuchpkg not found, JALIEN_TOKEN=secret")
+        result = self.build(body)
+        self.assertEqual((result["status"], result["exit_code"]), ("error", 1))
+        self.assertIn("nosuchpkg", result["message"])
+        self.assertNotIn("secret", result["message"])
+
+    def test_failure(self) -> None:
+        def body(args, parser, result):
+            result["status"] = "failure"
+            result["failed"] = {"package": "zlib", "log": "/sw/BUILD/zlib-latest/log"}
+            dieOnError(True, "BUILD FAILED: zlib")
+        result = self.build(body)
+        self.assertEqual(result["failed"]["package"], "zlib")
+        self.assertNotIn("message", result)
+
+    def test_without_json(self) -> None:
+        with patch("alibuild_helpers.build._doBuild") as body, \
+             patch("sys.stdout", new=StringIO()) as out:
+            doBuild(Namespace(json=True, plan=True), None)
+            doBuild(Namespace(), None)
+        self.assertEqual(body.call_count, 2)
+        self.assertEqual(out.getvalue(), "")
 
 
 class CheckEnvironmentTestCase(unittest.TestCase):

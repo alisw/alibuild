@@ -22,7 +22,7 @@ aliBuild build [-h] [--defaults DEFAULT]
                [--sign-url URL] [--sign-token TOKEN] [--sign-token-file FILE]
                [--signer NAME] [--no-sign]
                [--require-signature {off,warn,require}] [--trusted-keys KEYRING]
-               [--plan]
+               [--plan] [--json]
                [-C DIR] [-w WORKDIR] [-c CONFIGDIR] [--reference-sources MIRRORDIR]
                [--aggressive-cleanup] [--no-auto-cleanup]
                PACKAGE [PACKAGE ...]
@@ -38,7 +38,9 @@ aliBuild build [-h] [--defaults DEFAULT]
 - `--force-unknown-architecture`: Build on this system, even if it doesn't have
   a supported architecture.
 - `-z [DEVELPREFIX]`, `--devel-prefix [DEVELPREFIX]`: Version name to use for
-  development packages. Defaults to branch name.
+  development packages. Defaults to branch name. If a `PKG@DEVELPREFIX`
+  directory exists, it is used as the checkout of `PKG`, and only such
+  packages get this version (see [Worktrees](#worktrees)).
 - `-e ENVIRONMENT`: KEY=VALUE binding to add to the build environment. May be
   specified multiple times.
 - `-j JOBS`, `--jobs JOBS`: The number of parallel compilation processes to run.
@@ -65,6 +67,22 @@ aliBuild build [-h] [--defaults DEFAULT]
   and therefore reads the remote store. Its `reuse` lines are
   `PACKAGE/VERSION-REVISION` specs, which is the form
   [`aliBuild migrate`](#migrating-legacy-tarballs) consumes.
+- `--json`: With `--plan`, print the plan as one JSON object instead: a
+  `packages` list in build order, with each package's `version`, `revision`,
+  `hash`, `action` (`reuse` or `build`), whether it is a development package
+  (`devel`) and from which directory (`source`), its `devel_label` and
+  `build_family`; and a `summary` with the counts.
+
+  Without `--plan`, the build ends by printing its result as one JSON object,
+  however it ends. Its `status` is `success`, `failure` when a package failed
+  to build, or `error` when aliBuild stopped for another reason, with the
+  error in `message`. `packages` has the same fields as in the plan, with an
+  `action` which is `built`, `unpacked` (from a tarball), `unchanged` or
+  `failed`, plus each development package's `build_dir`. On `failure`,
+  `failed` gives the package, its `log` (`null` if the build stopped before
+  writing one), its `build_dir`, the development packages it uses, and the
+  `sandbox_profile` if it was built with `--sandbox`. On `success`, there are
+  `install_dir` and the `alienv` name to enter.
 - `--plugin PLUGIN`: Plugin to use for the build. Default is `legacy`.
 - `--always-prefer-system`: Always use system packages when compatible.
 - `--no-system`: Never use system packages, even if compatible.
@@ -522,6 +540,59 @@ tgz will be empty.
 
 If you wish to temporary compile with the package as specified by
 alidist, you can use the `--no-local <PACKAGE>` option.
+
+### Worktrees
+
+To build a variant of a development package next to the one you are working
+on, e.g. to test a pull request, put a second checkout of it in a directory
+called `PKG@LABEL` and build with `-z LABEL`. A `git worktree` or a
+`sl share` of the main checkout is the cheapest way to get one:
+
+    cd O2 && git worktree add ../O2@fix-tracks some-branch && cd ..
+    aliBuild build O2Physics -z fix-tracks
+
+When any such directory exists, `LABEL` only applies to the packages which have
+one. Here O2 is built from `O2@fix-tracks` with version `fix-tracks`, while
+the other development packages, e.g. a `ROOT` checkout, keep the version they
+get without `-z`. Their hash does not change, so their existing builds are
+reused rather than rebuilt; only O2 and what depends on it are built again.
+
+A build from a worktree does not move the `latest` links of the main checkout:
+it gets `sw/BUILD/O2-latest-fix-tracks` and `sw/<arch>/O2/latest-fix-tracks-<defaults>`,
+so you can enter it with:
+
+    alienv enter O2Physics/latest-fix-tracks-o2
+
+Worktrees are not supported together with `--docker`; they are ignored, with a
+warning, in that case.
+
+### Sessions
+
+A session gives a set of worktrees a name which stays the same as you merge
+pull requests into them, together with a record of what was merged. Keeping
+the merged pull requests out of the `-z` label means merging one more only
+rebuilds the package it touches, and what depends on it.
+
+    aliBuild session create fix-tracks O2 O2Physics   # O2@fix-tracks, O2Physics@fix-tracks
+    cd O2@fix-tracks && gh pr checkout 1234 && cd ..  # or merge it, ...
+    aliBuild session add fix-tracks O2 alisw/AliceO2#1234
+    aliBuild build O2Physics -z fix-tracks
+
+`session create` makes a `git worktree` (or an `sl share`) of each package's
+checkout, at the commit it has checked out. `session add PKG REF` and
+`session remove PKG REF` record that `REF` was merged into, or removed from,
+`PKG@NAME`, and at which commit the worktree was afterwards; they do not
+change the worktree themselves. The record is kept in
+`sw/SESSIONS/NAME.json`.
+
+`aliBuild session list` lists the sessions, and `aliBuild session show NAME`
+shows a session's worktrees, the commit each has checked out, the build its
+`latest-NAME` link points to, and what is merged into it. Both take `--json`.
+
+When you are done with a session, `aliBuild session drop NAME` removes its
+`latest-NAME` links and its record, so that the next `aliBuild clean` deletes
+its builds. With `--worktrees`, it removes its worktrees as well, unless one of
+them has uncommitted changes. `-n` shows what it would remove.
 
 ### Incremental builds
 

@@ -3,7 +3,7 @@ from os import makedirs, unlink, readlink, rmdir
 from pathlib import Path
 from alibuild_helpers import __version__
 from alibuild_helpers.analytics import report_event
-from alibuild_helpers.log import debug, info, banner, warning
+from alibuild_helpers.log import debug, info, banner, warning, logger, redact_secrets
 from alibuild_helpers.log import dieOnError
 from alibuild_helpers.cmd import execute, ContainerRunner, container_run_string, BASH, install_wrapper_script, getstatusoutput
 from alibuild_helpers.utilities import pruneWorkdirFromPaths, pruneVersionEnvVars, symlink, call_ignoring_oserrors, topological_sort, detectArch
@@ -21,7 +21,7 @@ from alibuild_helpers.sync_reapi import REAPIRemoteSync, signature_checker
 from alibuild_helpers.source import GitSourceStore, store_refs
 from alibuild_helpers.workarea import logged_scm, updateReferenceRepoSpec, checkout_sources
 from alibuild_helpers.log import ProgressPrint, log_current_package
-from glob import glob
+from glob import glob, escape as glob_escape
 from alibuild_helpers.sandbox import write_sandbox_profile, sandboxed_command, sandbox_failure_hint
 from collections import OrderedDict
 from shlex import quote
@@ -31,6 +31,7 @@ import concurrent.futures
 import hashlib
 import importlib
 import json
+import logging
 import socket
 import os
 import re
@@ -361,7 +362,25 @@ def createDistLinks(spec, specs, args, syncHelper, repoType, requiresType):
     symlink(dep_tarball, target_dir)
 
 
-def report_plan(plan):
+def plan_entry(spec, reuse):
+  """What --plan reports for a package whose version, revision and hash are settled."""
+  return {
+    "package": spec["package"],
+    "version": spec["version"],
+    "revision": spec["revision"],
+    "hash": spec["hash"],
+    # "reuse" means a tarball for this hash exists, locally ("local" revisions)
+    # or in the remote store. A development package with an incremental_recipe
+    # still runs it on top of that.
+    "action": "reuse" if reuse else "build",
+    "devel": spec["is_devel_pkg"],
+    "source": spec.get("source") if spec["is_devel_pkg"] else None,
+    "devel_label": spec.get("devel_label"),
+    "build_family": spec["build_family"],
+  }
+
+
+def report_plan(plan, as_json=False):
   """Print what a build would do, one line per package, then a count.
 
   The per-package lines go to STDOUT with print(), not through the logger, which
@@ -373,10 +392,18 @@ def report_plan(plan):
   is the list of things to migrate before a build can publish against a store
   that does not have them yet. The summary stays on stderr so it cannot land in
   the middle of that data.
+
+  With as_json, STDOUT is instead one JSON object, with an entry per package
+  in build order, for programs which need more than these four fields.
   """
-  for package, version_revision, pkg_hash, action in plan:
-    print("%s %s/%s %s" % (action, package, version_revision, pkg_hash))
-  reused = sum(1 for entry in plan if entry[3] == "reuse")
+  reused = sum(1 for entry in plan if entry["action"] == "reuse")
+  if as_json:
+    print(json.dumps({"packages": plan,
+                      "summary": {"packages": len(plan), "reuse": reused,
+                                  "build": len(plan) - reused}}, indent=2))
+  else:
+    for entry in plan:
+      print("{action} {package}/{version}-{revision} {hash}".format(**entry))
   banner("plan: %d package(s): %d reused from the remote store, %d to build.",
          len(plan), reused, len(plan) - reused)
 
@@ -784,7 +811,66 @@ def create_provenance_info(package, specs, args):
   })
 
 
+def worktree_packages(packages, label, isdir=os.path.isdir):
+  """Return the packages which have a PKG@LABEL worktree in the current directory.
+
+  With -z LABEL, such a directory (e.g. a "sl share" or a "git worktree" of
+  PKG) is used as the development checkout of PKG.
+  """
+  if not label:
+    return set()
+  return {p for p in packages if isdir(f"{p}@{label}")}
+
+
+def devel_label(package, label, worktrees):
+  """Return the -z label which applies to package, or None if none does.
+
+  Without worktrees, the label applies to every package, as it always has. If
+  there are worktrees, it only applies to their packages: the other development
+  packages keep the version they have without -z, so that their existing builds
+  are reused rather than rebuilt under a new name.
+  """
+  if label is None or (worktrees and package not in worktrees):
+    return None
+  return label
+
+
+class _LastError(logging.Handler):
+  """Remember the last error logged, which is why a build stopped."""
+  def __init__(self):
+    super().__init__(logging.ERROR)
+    self.message = None
+
+  def emit(self, record):
+    self.message = redact_secrets(record.getMessage())
+
+
 def doBuild(args, parser):
+  """Build, and with --json (but not --plan) end with a JSON result on STDOUT.
+
+  The result is printed however the build ends, so that a program driving
+  aliBuild always gets one. Its "status" is "success", "failure" when a
+  package's build failed (see "failed"), or "error" when aliBuild stopped for
+  another reason (see "message").
+  """
+  if not getattr(args, "json", False) or getattr(args, "plan", False):
+    return _doBuild(args, parser, {})
+  result = {"status": "error", "packages": []}
+  last_error = _LastError()
+  logger.addHandler(last_error)
+  try:
+    _doBuild(args, parser, result)
+  except SystemExit as exc:
+    result["exit_code"] = exc.code
+    raise
+  finally:
+    logger.removeHandler(last_error)
+    if result["status"] == "error":
+      result["message"] = last_error.message
+    print(json.dumps(result, indent=2))
+
+
+def _doBuild(args, parser, result):
   # Always sign reapi:// uploads: refuse to upload unsigned unless --no-sign, so
   # nothing lands in a reapi ledger without a signature by accident.
   if args.writeStore.startswith("reapi://") and not getattr(args, "noSign", False):
@@ -945,6 +1031,20 @@ def doBuild(args, parser):
                ", ".join(develPkgsUpper - develPkgs))
     del develCandidates, develCandidatesUpper, develPkgsUpper
 
+  # Worktrees: with -z LABEL, a directory PKG@LABEL is the development checkout
+  # of PKG, and LABEL then only applies to those packages.
+  worktreePkgs = set()
+  if not args.forceTracked and args.docker:
+    # The container mounts $PWD/PKG, and --docker rewrites the -z label, so a
+    # worktree would silently not be what gets built.
+    ignored = sorted(d for p in buildOrder for d in glob(glob_escape(p) + "@*") if os.path.isdir(d))
+    if ignored:
+      warning("Ignoring worktrees, which are not supported with --docker: %s", ", ".join(ignored))
+  elif not args.forceTracked:
+    worktreePkgs = worktree_packages([p for p in buildOrder if p not in args.noDevel],
+                                     getattr(args, "develPrefix", None))
+    develPkgs = frozenset(develPkgs) | worktreePkgs
+
   if buildOrder:
     if args.onlyDeps:
       builtPackages = buildOrder[:-1]
@@ -961,17 +1061,21 @@ def doBuild(args, parser):
   if develPkgs:
     banner("You have packages in development mode (%s).\n"
            "This means their source code can be freely modified under:\n\n"
-           "  %s/<package_name>\n\n"
+           "  %s\n\n"
            "aliBuild does not automatically update such packages to avoid work loss.\n"
            "In most cases this is achieved by doing in the package source directory:\n\n"
            "  git pull --rebase\n",
            ", ".join(develPkgs),
-           os.getcwd())
+           "\n  ".join(join(os.getcwd(), f"{p}@{args.develPrefix}" if p in worktreePkgs else p)
+                       for p in sorted(develPkgs)))
 
   for pkg, spec in specs.items():
     spec["is_devel_pkg"] = pkg in develPkgs
-    if spec["is_devel_pkg"]:
+    if pkg in worktreePkgs:
+      spec["source"] = str(Path.cwd() / f"{pkg}@{args.develPrefix}")
+    elif spec["is_devel_pkg"]:
       spec["source"] = str(Path.cwd() / pkg)
+    spec["devel_label"] = devel_label(pkg, getattr(args, "develPrefix", None), worktreePkgs)
 
     # Only initialize Sapling if it's in PATH and the repo uses it
     use_sapling = False
@@ -1034,15 +1138,16 @@ def doBuild(args, parser):
         spec["devel_hash"] = spec["commit_hash"] + local_hash
         out = spec["scm"].branchOrRef(directory=spec["source"])
         develPackageBranch = out.replace("/", "-")
-        spec["tag"] = args.develPrefix if "develPrefix" in args else develPackageBranch
+        spec["devel_branch"] = develPackageBranch
+        spec["tag"] = spec["devel_label"] if spec["devel_label"] is not None else develPackageBranch
         spec["commit_hash"] = "0"
 
     # Version may contain date params like tag, plus %(commit_hash)s,
     # %(short_hash)s and %(tag)s.
     spec["version"] = resolve_version(spec, args.defaults, branch_basename, branch_stream)
 
-    if spec["is_devel_pkg"] and "develPrefix" in args and args.develPrefix != "ali-master":
-      spec["version"] = args.develPrefix
+    if spec["is_devel_pkg"] and spec["devel_label"] is not None and spec["devel_label"] != "ali-master":
+      spec["version"] = spec["devel_label"]
 
   # Decide what is the main package we are building and at what commit.
   #
@@ -1124,8 +1229,19 @@ def doBuild(args, parser):
   # bound_unpublished_rebuild. Per run, not per package: the loop revisits the
   # same entry, so the state has to outlive one iteration.
   rebuilt_unpublished = set()
-  # (package, version-revision, hash, "reuse"|"build") for --plan.
+  # What each package would get, for --plan; see plan_entry.
   plan = []
+  # What each package got, for --json: the first outcome sticks, as the loop
+  # comes back to a package it has just built and finds it up to date.
+  outcomes = {}
+  def record(spec, outcome):
+    if spec["package"] not in outcomes:
+      outcomes[spec["package"]] = dict(plan_entry(spec, False), action=outcome)
+      if spec["is_devel_pkg"]:
+        label = "-" + spec["devel_label"] if spec["devel_label"] is not None else ""
+        outcomes[spec["package"]]["build_dir"] = abspath(join(
+          buildWorkDir, "BUILD", spec["package"] + "-latest" + label, spec["package"]))
+      result.setdefault("packages", []).append(outcomes[spec["package"]])
   gutted = set()
   while buildOrder:
     p = buildOrder[0]
@@ -1212,6 +1328,9 @@ def doBuild(args, parser):
     possibleDevelPrefix = getattr(args, "develPrefix", develPackageBranch)
     if spec["is_devel_pkg"]:
       develPrefix = possibleDevelPrefix
+      if worktreePkgs and spec["devel_label"] is None:
+        # Development packages outside the worktrees keep their branch name.
+        develPrefix = spec["devel_branch"]
 
     if possibleDevelPrefix:
       spec["build_family"] = f"{possibleDevelPrefix}-{args.defaults}"
@@ -1285,8 +1404,9 @@ def doBuild(args, parser):
         # through, the path should have been created by the build process.
         call_ignoring_oserrors(symlink, "{version}-{revision}".format(**spec),
                                "{wd}/{arch}/{package}/latest-{build_family}".format(wd=workDir, arch=args.architecture, **spec))
-        call_ignoring_oserrors(symlink, "{version}-{revision}".format(**spec),
-                               "{wd}/{arch}/{package}/latest".format(wd=workDir, arch=args.architecture, **spec))
+        if p not in worktreePkgs:
+          call_ignoring_oserrors(symlink, "{version}-{revision}".format(**spec),
+                                 "{wd}/{arch}/{package}/latest".format(wd=workDir, arch=args.architecture, **spec))
 
     # Now we know whether we're using a local or remote package, so we can set
     # the proper hash and tarball directory.
@@ -1300,8 +1420,7 @@ def doBuild(args, parser):
     # without perturbing the packages that follow. Popping and continuing is the
     # same shape the "already built" path uses further down.
     if getattr(args, "plan", False):
-      plan.append((spec["package"], "%s-%s" % (spec["version"], spec["revision"]),
-                   spec["hash"], "build" if candidate is None else "reuse"))
+      plan.append(plan_entry(spec, candidate is not None))
       buildOrder.pop(0)
       continue
 
@@ -1323,12 +1442,16 @@ def doBuild(args, parser):
       # Ignore errors here, because the path we're linking to might not exist
       # (if this is the first run through the loop). On the second run
       # through, the path should have been created by the build process.
-      call_ignoring_oserrors(symlink, spec["hash"], join(buildWorkDir, "BUILD", spec["package"] + "-latest"))
+      # Builds from a PKG@LABEL worktree only get the -latest-LABEL marks, so
+      # that they do not replace the ones of the main checkout.
+      if spec["package"] not in worktreePkgs:
+        call_ignoring_oserrors(symlink, spec["hash"], join(buildWorkDir, "BUILD", spec["package"] + "-latest"))
       if develPrefix:
         call_ignoring_oserrors(symlink, spec["hash"], join(buildWorkDir, "BUILD", spec["package"] + "-latest-" + develPrefix))
       # Last package built gets a "latest" mark.
-      call_ignoring_oserrors(symlink, "{version}-{revision}".format(**spec),
-                             join(workDir, args.architecture, spec["package"], "latest"))
+      if spec["package"] not in worktreePkgs:
+        call_ignoring_oserrors(symlink, "{version}-{revision}".format(**spec),
+                               join(workDir, args.architecture, spec["package"], "latest"))
       # Latest package built for a given devel prefix gets a "latest-<family>" mark.
       if spec["build_family"]:
         call_ignoring_oserrors(symlink, "{version}-{revision}".format(**spec),
@@ -1339,6 +1462,7 @@ def doBuild(args, parser):
       debug("Checking if devel package %s needs rebuild", spec["package"])
       if spec["devel_hash"]+spec["deps_hash"] == spec["old_devel_hash"]:
         info("Development package %s does not need rebuild", spec["package"])
+        record(spec, "unchanged")
         buildOrder.pop(0)
         continue
 
@@ -1393,6 +1517,7 @@ def doBuild(args, parser):
       # We can therefore create a directory which contains all the packages which
       # were used to compile this one.
       debug("Package %s was correctly compiled. Moving to next one.", spec["package"])
+      record(spec, "unchanged")
       # If using incremental builds, next time we execute the script we need to remove
       # the placeholders which avoid rebuilds.
       if spec["is_devel_pkg"] and "incremental_recipe" in spec:
@@ -1415,8 +1540,8 @@ def doBuild(args, parser):
           shutil.rmtree(d.encode("utf8"), True)
         try:
           unlink(join(buildWorkDir, "BUILD", spec["package"] + "-latest"))
-          if "develPrefix" in args:
-            unlink(join(buildWorkDir, "BUILD", spec["package"] + "-latest-" + args.develPrefix))
+          if spec["devel_label"] is not None:
+            unlink(join(buildWorkDir, "BUILD", spec["package"] + "-latest-" + spec["devel_label"]))
         except Exception:
           pass
         try:
@@ -1504,6 +1629,8 @@ def doBuild(args, parser):
       ("DEPS_HASH", spec.get("deps_hash", "")),
       ("DEVEL_HASH", spec.get("devel_hash", "")),
       ("DEVEL_PREFIX", develPrefix),
+      # The PKG@LABEL directory this package is built from, if any.
+      ("DEVEL_WORKTREE", basename(spec["source"]) if spec["package"] in worktreePkgs else ""),
       ("BUILD_FAMILY", spec["build_family"]),
       ("GIT_COMMITTER_NAME", "unknown"),
       ("GIT_COMMITTER_EMAIL", "unknown"),
@@ -1555,8 +1682,9 @@ def doBuild(args, parser):
     progress = ProgressPrint(
       progress_msg %
       (spec["package"],
-       args.develPrefix if "develPrefix" in args and spec["is_devel_pkg"] else spec["version"])
+       spec["devel_label"] if spec["devel_label"] is not None and spec["is_devel_pkg"] else spec["version"])
     )
+    record(spec, "unpacked" if cachedTarball else "built")
     # 8 hour timeout per package to prevent builds from hanging forever
     err = execute(build_command, printer=progress, timeout=8*60*60)
     progress.end("failed" if err else "done", err)
@@ -1572,7 +1700,7 @@ def doBuild(args, parser):
       updatablePkgs.append(spec["package"])
 
     # Determine paths
-    devSuffix = "-" + args.develPrefix if "develPrefix" in args and spec["is_devel_pkg"] else ""
+    devSuffix = "-" + spec["devel_label"] if spec["devel_label"] is not None and spec["is_devel_pkg"] else ""
     log_path = f"{buildWorkDir}/BUILD/{spec['package']}-latest{devSuffix}/log"
     build_dir = f"{buildWorkDir}/BUILD/{spec['package']}-latest{devSuffix}/{spec['package']}"
 
@@ -1688,6 +1816,16 @@ def doBuild(args, parser):
     buildErrMsg += f"  • Please upload the full log to CERNBox/Dropbox if you intend to request support.\n"
 
 
+    if err:
+      result["status"] = "failure"
+      outcomes[spec["package"]]["action"] = "failed"
+      result["failed"] = {
+        "package": spec["package"],
+        "log": abspath(log_path) if os.path.exists(log_path) else None,
+        "build_dir": abspath(build_dir),
+        "development_packages": updatablePkgs,
+        "sandbox_profile": join(abspath(scriptDir), "sandbox.sb") if getattr(args, "sandbox", False) else None,
+      }
     dieOnError(err, buildErrMsg.strip())
 
     # We need to create 2 sets of links, once with the full requires,
@@ -1717,9 +1855,17 @@ def doBuild(args, parser):
       syncHelper.upload_symlinks_and_tarball(spec)
 
   if getattr(args, "plan", False):
-    report_plan(plan)
+    report_plan(plan, as_json=getattr(args, "json", False))
     return
 
+  result.update({
+    "status": "success",
+    "package": mainPackage,
+    "build_family": mainBuildFamily if not args.onlyDeps else None,
+    "install_dir": abspath(join(args.workDir, args.architecture)),
+    "alienv": None if args.onlyDeps else f"{mainPackage}/latest-{mainBuildFamily}",
+    "untracked": untrackedFilesDirectories,
+  })
   if not args.onlyDeps:
       banner("Build of %s successfully completed on `%s'.\n"
              "Your software installation is at:"
@@ -1737,7 +1883,7 @@ def doBuild(args, parser):
     if spec["is_devel_pkg"]:
       banner("Build directory for devel package %s:\n%s/BUILD/%s-latest%s/%s",
              spec["package"], abspath(buildWorkDir), spec["package"],
-             ("-" + args.develPrefix) if "develPrefix" in args else "",
+             ("-" + spec["devel_label"]) if spec["devel_label"] is not None else "",
              spec["package"])
   if untrackedFilesDirectories:
     banner("Untracked files in the following directories resulted in a rebuild of "
