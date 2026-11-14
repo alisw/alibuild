@@ -56,13 +56,15 @@ def doParseArgs():
                                         description="Verify the status of your system.")
   init_parser = subparsers.add_parser("init", help="initialise local packages",
                                       description="Initialise development packages.")
-  # The reapi:// subcommands register their own parsers from their implementation
+  # The reapi:// subcommands and session register their own parsers from their implementation
   # modules (args live with the command), so this shared parser stays free of their
   # options. Order is preserved for --help listing.
-  from alibuild_helpers import install, reconstruct, migrate
+  from alibuild_helpers import install, reconstruct, migrate, session, mcp_server
   install.add_parser(subparsers, detectedArch, DEFAULT_WORK_DIR)
   reconstruct.add_parser(subparsers, detectedArch, DEFAULT_WORK_DIR)
   migrate.add_parser(subparsers, detectedArch, DEFAULT_WORK_DIR)
+  session.add_parser(subparsers, DEFAULT_WORK_DIR, DEFAULT_CHDIR)
+  mcp_server.add_parser(subparsers, DEFAULT_WORK_DIR, DEFAULT_CHDIR)
   version_parser = subparsers.add_parser("version", help="display %(prog)s version",
                                          description="Display %(prog)s and architecture.")
   completion_parser = subparsers.add_parser("completion", help="output shell completion code",
@@ -86,7 +88,9 @@ def doParseArgs():
   build_parser.add_argument("--force-unknown-architecture", dest="forceUnknownArch", action="store_true",
                             help="Build on this system, even if it doesn't have a supported architecture.")
   build_parser.add_argument("-z", "--devel-prefix", nargs="?", dest="develPrefix", default=argparse.SUPPRESS,
-                            help="Version name to use for development packages. Defaults to branch name.")
+                            help=("Version name to use for development packages. Defaults to branch name. "
+                                  "If a PKG@DEVELPREFIX directory exists, it is used as the checkout of PKG, "
+                                  "and only such packages get this version."))
   build_parser.add_argument("-e", dest="environment", action="append", default=[],
                             help="KEY=VALUE binding to add to the build environment. May be specified multiple times.")
   build_parser.add_argument("-j", "--jobs", dest="jobs", type=int, default=multiprocessing.cpu_count(),
@@ -173,6 +177,10 @@ def doParseArgs():
                                   "is known, this runs the real resolution and so reads the "
                                   "remote store. The 'reuse' lines are PACKAGE/VERSION-REVISION "
                                   "specs, which is what `aliBuild migrate` consumes."))
+  build_parser.add_argument("--json", dest="json", action="store_true",
+                            help=("Print the result of the build as one JSON object on stdout: "
+                                  "what happened to each package and, if one failed, which one, "
+                                  "with its log. With --plan, print the plan as JSON instead."))
   build_remote.add_argument("--no-remote-store", action="store_true",
                             help="Disable the use of the remote store, even if it is enabled by default.")
   build_remote.add_argument("--remote-store", dest="remoteStore", metavar="STORE", default="",
@@ -452,7 +460,7 @@ def doParseArgs():
   def optionOrder(x):
     if x in ["--debug", "-d", "-n", "--dry-run"]:
       return 0
-    if x in ["build", "init", "clean", "analytics", "doctor", "deps", "completion", "install", "reconstruct", "migrate"]:
+    if x in ["build", "init", "clean", "analytics", "doctor", "deps", "completion", "install", "reconstruct", "migrate", "session", "mcp"]:
       return 1
     return 2
   rest.sort(key=optionOrder)
