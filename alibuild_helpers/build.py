@@ -361,7 +361,25 @@ def createDistLinks(spec, specs, args, syncHelper, repoType, requiresType):
     symlink(dep_tarball, target_dir)
 
 
-def report_plan(plan):
+def plan_entry(spec, reuse):
+  """What --plan reports for a package whose version, revision and hash are settled."""
+  return {
+    "package": spec["package"],
+    "version": spec["version"],
+    "revision": spec["revision"],
+    "hash": spec["hash"],
+    # "reuse" means a tarball for this hash exists, locally ("local" revisions)
+    # or in the remote store. A development package with an incremental_recipe
+    # still runs it on top of that.
+    "action": "reuse" if reuse else "build",
+    "devel": spec["is_devel_pkg"],
+    "source": spec.get("source") if spec["is_devel_pkg"] else None,
+    "devel_label": spec.get("devel_label"),
+    "build_family": spec["build_family"],
+  }
+
+
+def report_plan(plan, as_json=False):
   """Print what a build would do, one line per package, then a count.
 
   The per-package lines go to STDOUT with print(), not through the logger, which
@@ -373,10 +391,18 @@ def report_plan(plan):
   is the list of things to migrate before a build can publish against a store
   that does not have them yet. The summary stays on stderr so it cannot land in
   the middle of that data.
+
+  With as_json, STDOUT is instead one JSON object, with an entry per package
+  in build order, for programs which need more than these four fields.
   """
-  for package, version_revision, pkg_hash, action in plan:
-    print("%s %s/%s %s" % (action, package, version_revision, pkg_hash))
-  reused = sum(1 for entry in plan if entry[3] == "reuse")
+  reused = sum(1 for entry in plan if entry["action"] == "reuse")
+  if as_json:
+    print(json.dumps({"packages": plan,
+                      "summary": {"packages": len(plan), "reuse": reused,
+                                  "build": len(plan) - reused}}, indent=2))
+  else:
+    for entry in plan:
+      print("{action} {package}/{version}-{revision} {hash}".format(**entry))
   banner("plan: %d package(s): %d reused from the remote store, %d to build.",
          len(plan), reused, len(plan) - reused)
 
@@ -1167,7 +1193,7 @@ def doBuild(args, parser):
   # bound_unpublished_rebuild. Per run, not per package: the loop revisits the
   # same entry, so the state has to outlive one iteration.
   rebuilt_unpublished = set()
-  # (package, version-revision, hash, "reuse"|"build") for --plan.
+  # What each package would get, for --plan; see plan_entry.
   plan = []
   gutted = set()
   while buildOrder:
@@ -1347,8 +1373,7 @@ def doBuild(args, parser):
     # without perturbing the packages that follow. Popping and continuing is the
     # same shape the "already built" path uses further down.
     if getattr(args, "plan", False):
-      plan.append((spec["package"], "%s-%s" % (spec["version"], spec["revision"]),
-                   spec["hash"], "build" if candidate is None else "reuse"))
+      plan.append(plan_entry(spec, candidate is not None))
       buildOrder.pop(0)
       continue
 
@@ -1770,7 +1795,7 @@ def doBuild(args, parser):
       syncHelper.upload_symlinks_and_tarball(spec)
 
   if getattr(args, "plan", False):
-    report_plan(plan)
+    report_plan(plan, as_json=getattr(args, "json", False))
     return
 
   if not args.onlyDeps:
