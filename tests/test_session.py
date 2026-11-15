@@ -98,6 +98,40 @@ class SessionTestCase(unittest.TestCase):
     self.assertEqual(describe("sw", "s1")["merged"], [])
     self.assertFalse(self.run_session("show", "nothing")[0])
 
+  def test_drop(self) -> None:
+    os.mkdir("O2")
+    self.git("init", "-q")
+    self.git("commit", "-q", "--allow-empty", "-m", "init")
+    self.assertTrue(self.run_session("create", "s1", "O2")[0])
+    os.makedirs("sw/BUILD")
+    os.makedirs("sw/osx_arm64/O2")
+    links = {"sw/BUILD/O2-latest-s1": "0123",
+             "sw/osx_arm64/O2/latest-s1-o2": "s1-local1",
+             # These belong to other sessions, or to none.
+             "sw/BUILD/O2-latest-s1-x": "4567",
+             "sw/BUILD/O2-latest": "89ab",
+             "sw/osx_arm64/O2/latest-s1-x-o2": "s1-x-local1",
+             "sw/osx_arm64/O2/latest": "s1-local1"}
+    for link, target in links.items():
+      os.symlink(target, link)
+    dropped = ["sw/BUILD/O2-latest-s1", "sw/osx_arm64/O2/latest-s1-o2"]
+
+    # Uncommitted changes keep the worktrees, and everything else, in place.
+    with open("O2@s1/file", "w") as f:
+      f.write("work")
+    self.assertFalse(self.run_session("drop", "s1", "--worktrees")[0])
+    self.assertTrue(all(os.path.islink(l) for l in links))
+    os.unlink("O2@s1/file")
+
+    # Without --worktrees, only the links and the record go.
+    self.assertTrue(self.run_session("drop", "s1")[0])
+    self.assertEqual([l for l in links if not os.path.islink(l)], dropped)
+    self.assertFalse(os.path.exists("sw/SESSIONS/s1.json"))
+    self.assertTrue(os.path.isdir("O2@s1"))
+    self.assertTrue(self.run_session("drop", "s1", "--worktrees")[0])
+    self.assertFalse(os.path.exists("O2@s1"))
+    self.assertFalse(self.run_session("drop", "s1")[0])
+
   def test_invalid_name(self) -> None:
     with patch.object(self.parser, "error", side_effect=SystemExit) as error, \
          self.assertRaises(SystemExit):
