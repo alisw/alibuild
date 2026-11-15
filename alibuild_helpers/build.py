@@ -3,7 +3,7 @@ from os import makedirs, unlink, readlink, rmdir
 from pathlib import Path
 from alibuild_helpers import __version__
 from alibuild_helpers.analytics import report_event
-from alibuild_helpers.log import debug, info, banner, warning
+from alibuild_helpers.log import debug, info, banner, warning, logger, redact_secrets
 from alibuild_helpers.log import dieOnError
 from alibuild_helpers.cmd import execute, ContainerRunner, container_run_string, BASH, install_wrapper_script, getstatusoutput
 from alibuild_helpers.utilities import pruneWorkdirFromPaths, pruneVersionEnvVars, symlink, call_ignoring_oserrors, topological_sort, detectArch
@@ -31,6 +31,7 @@ import concurrent.futures
 import hashlib
 import importlib
 import json
+import logging
 import socket
 import os
 import re
@@ -834,7 +835,42 @@ def devel_label(package, label, worktrees):
   return label
 
 
+class _LastError(logging.Handler):
+  """Remember the last error logged, which is why a build stopped."""
+  def __init__(self):
+    super().__init__(logging.ERROR)
+    self.message = None
+
+  def emit(self, record):
+    self.message = redact_secrets(record.getMessage())
+
+
 def doBuild(args, parser):
+  """Build, and with --json (but not --plan) end with a JSON result on STDOUT.
+
+  The result is printed however the build ends, so that a program driving
+  aliBuild always gets one. Its "status" is "success", "failure" when a
+  package's build failed (see "failed"), or "error" when aliBuild stopped for
+  another reason (see "message").
+  """
+  if not getattr(args, "json", False) or getattr(args, "plan", False):
+    return _doBuild(args, parser, {})
+  result = {"status": "error", "packages": []}
+  last_error = _LastError()
+  logger.addHandler(last_error)
+  try:
+    _doBuild(args, parser, result)
+  except SystemExit as exc:
+    result["exit_code"] = exc.code
+    raise
+  finally:
+    logger.removeHandler(last_error)
+    if result["status"] == "error":
+      result["message"] = last_error.message
+    print(json.dumps(result, indent=2))
+
+
+def _doBuild(args, parser, result):
   # Always sign reapi:// uploads: refuse to upload unsigned unless --no-sign, so
   # nothing lands in a reapi ledger without a signature by accident.
   if args.writeStore.startswith("reapi://") and not getattr(args, "noSign", False):
@@ -1195,6 +1231,17 @@ def doBuild(args, parser):
   rebuilt_unpublished = set()
   # What each package would get, for --plan; see plan_entry.
   plan = []
+  # What each package got, for --json: the first outcome sticks, as the loop
+  # comes back to a package it has just built and finds it up to date.
+  outcomes = {}
+  def record(spec, outcome):
+    if spec["package"] not in outcomes:
+      outcomes[spec["package"]] = dict(plan_entry(spec, False), action=outcome)
+      if spec["is_devel_pkg"]:
+        label = "-" + spec["devel_label"] if spec["devel_label"] is not None else ""
+        outcomes[spec["package"]]["build_dir"] = abspath(join(
+          buildWorkDir, "BUILD", spec["package"] + "-latest" + label, spec["package"]))
+      result.setdefault("packages", []).append(outcomes[spec["package"]])
   gutted = set()
   while buildOrder:
     p = buildOrder[0]
@@ -1415,6 +1462,7 @@ def doBuild(args, parser):
       debug("Checking if devel package %s needs rebuild", spec["package"])
       if spec["devel_hash"]+spec["deps_hash"] == spec["old_devel_hash"]:
         info("Development package %s does not need rebuild", spec["package"])
+        record(spec, "unchanged")
         buildOrder.pop(0)
         continue
 
@@ -1469,6 +1517,7 @@ def doBuild(args, parser):
       # We can therefore create a directory which contains all the packages which
       # were used to compile this one.
       debug("Package %s was correctly compiled. Moving to next one.", spec["package"])
+      record(spec, "unchanged")
       # If using incremental builds, next time we execute the script we need to remove
       # the placeholders which avoid rebuilds.
       if spec["is_devel_pkg"] and "incremental_recipe" in spec:
@@ -1635,6 +1684,7 @@ def doBuild(args, parser):
       (spec["package"],
        spec["devel_label"] if spec["devel_label"] is not None and spec["is_devel_pkg"] else spec["version"])
     )
+    record(spec, "unpacked" if cachedTarball else "built")
     # 8 hour timeout per package to prevent builds from hanging forever
     err = execute(build_command, printer=progress, timeout=8*60*60)
     progress.end("failed" if err else "done", err)
@@ -1766,6 +1816,16 @@ def doBuild(args, parser):
     buildErrMsg += f"  • Please upload the full log to CERNBox/Dropbox if you intend to request support.\n"
 
 
+    if err:
+      result["status"] = "failure"
+      outcomes[spec["package"]]["action"] = "failed"
+      result["failed"] = {
+        "package": spec["package"],
+        "log": abspath(log_path) if os.path.exists(log_path) else None,
+        "build_dir": abspath(build_dir),
+        "development_packages": updatablePkgs,
+        "sandbox_profile": join(abspath(scriptDir), "sandbox.sb") if getattr(args, "sandbox", False) else None,
+      }
     dieOnError(err, buildErrMsg.strip())
 
     # We need to create 2 sets of links, once with the full requires,
@@ -1798,6 +1858,14 @@ def doBuild(args, parser):
     report_plan(plan, as_json=getattr(args, "json", False))
     return
 
+  result.update({
+    "status": "success",
+    "package": mainPackage,
+    "build_family": mainBuildFamily if not args.onlyDeps else None,
+    "install_dir": abspath(join(args.workDir, args.architecture)),
+    "alienv": None if args.onlyDeps else f"{mainPackage}/latest-{mainBuildFamily}",
+    "untracked": untrackedFilesDirectories,
+  })
   if not args.onlyDeps:
       banner("Build of %s successfully completed on `%s'.\n"
              "Your software installation is at:"

@@ -15,6 +15,7 @@ from alibuild_helpers.utilities import parseRecipe, resolve_tag
 from alibuild_helpers import sync_reapi
 from alibuild_helpers.build import doBuild, storeHashes, generate_initdotsh, build_ac_entry, select_cached_tarball, bound_unpublished_rebuild
 from alibuild_helpers.build import worktree_packages, devel_label, plan_entry, report_plan
+from alibuild_helpers.log import dieOnError
 
 # Determine architecture based on platform
 def get_test_architecture():
@@ -748,6 +749,52 @@ class PlanTestCase(unittest.TestCase):
                          ("O2", "fix", "local1", "bbbb", "build"))
         self.assertEqual((o2["devel"], o2["source"], o2["devel_label"], o2["build_family"]),
                          (True, "/src/O2@fix", "fix", "fix-o2"))
+
+
+class BuildResultTestCase(unittest.TestCase):
+    """With --json, a build always ends with one JSON object on stdout."""
+
+    def build(self, body, **args):
+        with patch("alibuild_helpers.build._doBuild", side_effect=body), \
+             patch("sys.stdout", new=StringIO()) as out, \
+             patch("sys.stderr", new=StringIO()):
+            try:
+                doBuild(Namespace(json=True, plan=False, **args), None)
+            except SystemExit as exc:
+                self.assertEqual(exc.code, 1)
+        return json.loads(out.getvalue())
+
+    def test_success(self) -> None:
+        def body(args, parser, result):
+            result["packages"].append({"package": "zlib", "action": "built"})
+            result["status"] = "success"
+        self.assertEqual(self.build(body), {"status": "success",
+                                            "packages": [{"package": "zlib", "action": "built"}]})
+
+    def test_error(self) -> None:
+        def body(args, parser, result):
+            dieOnError(True, "Package nosuchpkg not found, JALIEN_TOKEN=secret")
+        result = self.build(body)
+        self.assertEqual((result["status"], result["exit_code"]), ("error", 1))
+        self.assertIn("nosuchpkg", result["message"])
+        self.assertNotIn("secret", result["message"])
+
+    def test_failure(self) -> None:
+        def body(args, parser, result):
+            result["status"] = "failure"
+            result["failed"] = {"package": "zlib", "log": "/sw/BUILD/zlib-latest/log"}
+            dieOnError(True, "BUILD FAILED: zlib")
+        result = self.build(body)
+        self.assertEqual(result["failed"]["package"], "zlib")
+        self.assertNotIn("message", result)
+
+    def test_without_json(self) -> None:
+        with patch("alibuild_helpers.build._doBuild") as body, \
+             patch("sys.stdout", new=StringIO()) as out:
+            doBuild(Namespace(json=True, plan=True), None)
+            doBuild(Namespace(), None)
+        self.assertEqual(body.call_count, 2)
+        self.assertEqual(out.getvalue(), "")
 
 
 class CheckEnvironmentTestCase(unittest.TestCase):

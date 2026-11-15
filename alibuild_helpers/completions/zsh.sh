@@ -67,7 +67,7 @@ _aliBuild_cmd_build() {
     '--docker-extra-args[Arguments to pass to docker run]:args: ' \
     '*-v[Additional volume to mount inside Docker container]:volume: ' \
     '--plan[Resolve the build and print what it would do, then stop]' \
-    '--json[With --plan, print the plan as JSON]' \
+    '--json[Print the result, or the plan, as JSON]' \
     '--no-remote-store[Disable the use of the remote store]' \
     '--remote-store[Where to find prebuilt tarballs to reuse]:store: ' \
     '--write-store[Where to upload newly built packages]:store: ' \
