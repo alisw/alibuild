@@ -39,6 +39,7 @@ export PATH=$WORK_DIR/wrapper-scripts:$PATH
 # - DEPS_HASH
 # - DEVEL_HASH
 # - DEVEL_PREFIX
+# - DEVEL_WORKTREE
 # - INCREMENTAL_BUILD_HASH
 # - JOBS
 # - NORMALIZE_TARBALL
@@ -125,7 +126,11 @@ unset DYLD_LIBRARY_PATH
 EOF
 
 cd "$BUILDROOT"
-ln -snf "$PKGHASH" "$ALIBUILD_BUILD_WORK_DIR/BUILD/$PKGNAME-latest"
+# A build from a PKG@LABEL worktree only gets the -latest-LABEL mark, so that it
+# does not replace the one of the main checkout.
+if [[ -z $DEVEL_WORKTREE ]]; then
+  ln -snf "$PKGHASH" "$ALIBUILD_BUILD_WORK_DIR/BUILD/$PKGNAME-latest"
+fi
 if [[ $DEVEL_PREFIX ]]; then
   ln -snf "$PKGHASH" "$ALIBUILD_BUILD_WORK_DIR/BUILD/$PKGNAME-latest-$DEVEL_PREFIX"
 fi
@@ -358,8 +363,10 @@ cd "$WORK_DIR"
 if [ -w "$WORK_DIR/$ARCHITECTURE/$PKGNAME/$PKGVERSION-$PKGREVISION" ]; then
   bash -ex "$ARCHITECTURE/$PKGNAME/$PKGVERSION-$PKGREVISION/relocate-me.sh"
 fi
-# Last package built gets a "latest" mark.
-ln -snf $PKGVERSION-$PKGREVISION $ARCHITECTURE/$PKGNAME/latest
+# Last package built gets a "latest" mark, unless it comes from a worktree.
+if [[ -z $DEVEL_WORKTREE ]]; then
+  ln -snf $PKGVERSION-$PKGREVISION $ARCHITECTURE/$PKGNAME/latest
+fi
 
 # Latest package built for a given devel prefix gets latest-$BUILD_FAMILY
 if [[ $BUILD_FAMILY ]]; then

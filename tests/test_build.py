@@ -13,6 +13,7 @@ from collections import OrderedDict
 from alibuild_helpers.utilities import parseRecipe, resolve_tag
 from alibuild_helpers import sync_reapi
 from alibuild_helpers.build import doBuild, storeHashes, generate_initdotsh, build_ac_entry, select_cached_tarball, bound_unpublished_rebuild
+from alibuild_helpers.build import worktree_packages, devel_label
 
 # Determine architecture based on platform
 def get_test_architecture():
@@ -689,6 +690,32 @@ class AlidistHashFallbackTestCase(unittest.TestCase):
         os.environ.pop("ALIBUILD_ALIDIST_HASH", None)
         with self.assertRaises(SystemExit):
             self._run_reaching_scm_block()
+
+
+class WorktreeTestCase(unittest.TestCase):
+    """-z LABEL picks up PKG@LABEL directories as development checkouts."""
+
+    def test_worktree_packages(self) -> None:
+        dirs = {"O2@fix", "O2Physics@fix", "ROOT@other"}
+        isdir = dirs.__contains__
+        self.assertEqual(worktree_packages(["ROOT", "O2", "O2Physics"], "fix", isdir),
+                         {"O2", "O2Physics"})
+        self.assertEqual(worktree_packages(["ROOT", "O2"], "other", isdir), {"ROOT"})
+        # Only packages in the build count, and without a label nothing does.
+        self.assertEqual(worktree_packages(["ROOT"], "fix", isdir), set())
+        self.assertEqual(worktree_packages(["O2"], None, isdir), set())
+        self.assertEqual(worktree_packages(["O2"], "", isdir), set())
+
+    def test_devel_label(self) -> None:
+        # Without -z, no package has a label.
+        self.assertIsNone(devel_label("O2", None, set()))
+        # Without worktrees, -z applies to every package, as it always did...
+        self.assertEqual(devel_label("O2", "fix", set()), "fix")
+        self.assertEqual(devel_label("ROOT", "fix", set()), "fix")
+        # ...while with worktrees it only applies to theirs, so that the other
+        # development packages keep their version, hence their hash and build.
+        self.assertEqual(devel_label("O2", "fix", {"O2"}), "fix")
+        self.assertIsNone(devel_label("O2Physics", "fix", {"O2"}))
 
 
 class CheckEnvironmentTestCase(unittest.TestCase):
