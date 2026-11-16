@@ -260,6 +260,8 @@ class BuildTestCase(unittest.TestCase):
     @patch("alibuild_helpers.workarea.is_writeable", new=MagicMock(return_value=True))
     @patch("alibuild_helpers.build.basename", new=MagicMock(return_value="aliBuild"))
     @patch("alibuild_helpers.build.install_wrapper_script", new=MagicMock())
+    @patch("alibuild_helpers.build.lock_package", new=MagicMock(return_value=-1))
+    @patch("alibuild_helpers.build.unlock", new=MagicMock())
     def test_coverDoBuild(self, mock_debug, mock_listdir, mock_warning, mock_git_git,
                           mock_build_ac_entry, mock_snapshot_source) -> None:
         mock_git_git.side_effect = dummy_git

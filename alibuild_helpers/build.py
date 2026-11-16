@@ -22,6 +22,7 @@ from alibuild_helpers.source import GitSourceStore, store_refs
 from alibuild_helpers.workarea import logged_scm, updateReferenceRepoSpec, checkout_sources
 from alibuild_helpers.log import ProgressPrint, log_current_package
 from glob import glob, escape as glob_escape
+from alibuild_helpers.locks import lock_package, build_slots, take_build_slot, unlock
 from alibuild_helpers.sandbox import write_sandbox_profile, sandboxed_command, sandbox_failure_hint
 from collections import OrderedDict
 from shlex import quote
@@ -1255,9 +1256,15 @@ def _doBuild(args, parser, result):
           buildWorkDir, "BUILD", spec["package"] + "-latest" + label, spec["package"]))
       result.setdefault("packages", []).append(outcomes[spec["package"]])
   gutted = set()
+  # {package: (hash, lock)}: held from deciding whether to build a package
+  # until it is done, so that concurrent aliBuilds do not build it twice.
+  packageLocks = {}
+  slots = build_slots()
   while buildOrder:
     p = buildOrder[0]
     spec = specs[p]
+    for done in [q for q in packageLocks if q != p]:
+      unlock(packageLocks.pop(done)[1])
     log_current_package(p, mainPackage, specs, getattr(args, "develPrefix", None))
 
     # Calculate the hashes. We do this in build order so that we can guarantee
@@ -1435,6 +1442,13 @@ def _doBuild(args, parser, result):
       plan.append(plan_entry(spec, candidate is not None))
       buildOrder.pop(0)
       continue
+
+    # Whether it is installed, and the installation, are only read from here
+    # on, under the lock: a process waiting for it finds the package built.
+    if packageLocks.get(p, (None,))[0] != spec["hash"]:
+      if p in packageLocks:
+        unlock(packageLocks.pop(p)[1])
+      packageLocks[p] = (spec["hash"], lock_package(workDir, spec["hash"], p))
 
     # We do not use the override for devel packages, because we
     # want to avoid having to rebuild things when the /tmp gets cleaned.
@@ -1688,6 +1702,7 @@ def _doBuild(args, parser, result):
         build_command = sandboxed_command(sandbox_profile, build_command)
 
     debug("Build command: %s", build_command)
+    slot = take_build_slot(workDir, slots, p) if slots and not cachedTarball else None
     progress_msg = "Unpacking %s@%s" if cachedTarball else "Compiling %s@%s"
     if not cachedTarball and not args.debug:
       progress_msg += " (use --debug for full output)"
@@ -1698,7 +1713,11 @@ def _doBuild(args, parser, result):
     )
     record(spec, "unpacked" if cachedTarball else "built")
     # 8 hour timeout per package to prevent builds from hanging forever
-    err = execute(build_command, printer=progress, timeout=8*60*60)
+    try:
+      err = execute(build_command, printer=progress, timeout=8*60*60)
+    finally:
+      if slot is not None:
+        unlock(slot)
     progress.end("failed" if err else "done", err)
     report_event("BuildError" if err else "BuildSuccess", spec["package"], " ".join((
       args.architecture,
