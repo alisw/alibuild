@@ -365,10 +365,24 @@ class BuildTestCase(unittest.TestCase):
             return dummy_exists(path)
 
         mock_debug.reset_mock()
+        # With build slots, the stale install of a package being rebuilt must
+        # only go once the slot is held: the wait can be long, and removing it
+        # earlier left the work area without the package for the whole wait.
+        order = MagicMock()
         with patch("alibuild_helpers.build.exists",
                    new=MagicMock(side_effect=exists_without_zlib_initdotsh)), \
-             patch("alibuild_helpers.build.warning") as mock_build_warning:
+             patch("alibuild_helpers.build.warning") as mock_build_warning, \
+             patch("alibuild_helpers.build.build_slots", new=MagicMock(return_value=1)), \
+             patch("alibuild_helpers.build.take_build_slot", new=order.take_build_slot), \
+             patch("alibuild_helpers.build.remove_stale_install", new=order.remove_stale_install):
+            order.take_build_slot.return_value = -1
             doBuild(args, mock_parser)
+        calls = [c for c in order.mock_calls if c[0] in ("take_build_slot", "remove_stale_install")]
+        # zlib is compiled, so it needs a slot; its install goes right after.
+        i = calls.index(call.remove_stale_install(zlib_dir))
+        self.assertGreater(i, 0, calls)
+        self.assertEqual(calls[i - 1][0], "take_build_slot", calls)
+        self.assertEqual(calls[i - 1].args[2], "zlib", calls)
         mock_build_warning.assert_any_call(
             "%s in %s claims to be built, but its environment script is "
             "missing. Rebuilding it.", "zlib", zlib_dir)
