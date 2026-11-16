@@ -2,14 +2,31 @@ import argparse
 import io
 import json
 import os
+import shutil
 import subprocess
 import tempfile
 import unittest
 from contextlib import redirect_stdout
+from os.path import isdir, islink, join
 from unittest.mock import patch
 
+from alibuild_helpers import cow
 from alibuild_helpers.session import (add_parser, doSession, describe, list_sessions,
                                       merged_refs, seed_from, worktrees)
+
+
+class CopyBackend(cow.CloneBackend):
+  """Stands in for a copy-on-write backend: copies, keeping mtimes."""
+  name = "test-copy"
+
+  def unavailable_reason(self, src, dst):
+    return None
+
+  def clone_tree(self, src, dst):
+    if isdir(src) and not islink(src):
+      shutil.copytree(src, dst, symlinks=True)
+    else:
+      shutil.copy2(src, dst, follow_symlinks=False)
 
 
 def event(action, package, ref):
@@ -170,6 +187,69 @@ class SessionTestCase(unittest.TestCase):
         ["git", "rev-parse", "HEAD"], cwd=directory, text=True).strip()
       self.assertTrue(self.run_session("create", "s1", "O2")[0])
     self.assertTrue(os.path.isfile("O2@s1/.git"))  # a git worktree's .git is a file
+
+  def make_checkout(self, init, commit):
+    """O2, committed, with a file changed since, one untracked and one ignored."""
+    os.makedirs("O2/src")
+    for name, data in (("src/same", "same"), ("src/changed", "committed"), (".gitignore", "*.log\n")):
+      with open(join("O2", name), "w") as f:
+        f.write(data)
+    os.symlink("src/same", "O2/link")
+    init()
+    commit()
+    with open("O2/src/changed", "w") as f:
+      f.write("changed")
+    for name in ("untracked", "ignored.log"):
+      open(join("O2", name), "w").close()
+    for name in ("src/same", "src/changed"):
+      os.utime(join("O2", name), ns=(1, 1000000000))
+
+  def check_worktree(self, cloned):
+    self.assertEqual(sorted(set(os.listdir("O2@s1")) - {".git", ".sl"}), [".gitignore", "link", "src"])
+    self.assertEqual(os.readlink("O2@s1/link"), "src/same")
+    with open("O2@s1/src/changed") as f:
+      self.assertEqual(f.read(), "committed")
+    self.assertEqual(os.stat("O2@s1/src/same").st_mtime_ns == 1000000000, cloned)
+    self.assertNotEqual(os.stat("O2@s1/src/changed").st_mtime_ns, 1000000000)
+
+  def git_checkout(self):
+    self.make_checkout(lambda: self.git("init", "-q"),
+                       lambda: (self.git("add", "-A"), self.git("commit", "-q", "-m", "init")))
+
+  def test_cloned_git_worktree(self) -> None:
+    self.git_checkout()
+    with patch.object(cow, "BACKENDS", [CopyBackend()]):
+      self.assertTrue(self.run_session("create", "s1", "O2")[0])
+    self.check_worktree(cloned=True)
+    self.assertEqual(subprocess.check_output(["git", "status", "--porcelain"], cwd="O2@s1"), b"")
+    self.assertIn(b"O2@s1", subprocess.check_output(["git", "worktree", "list"], cwd="O2"))
+
+  def test_git_worktree_not_cloned(self) -> None:
+    self.git_checkout()
+    with patch.object(cow, "BACKENDS", [cow.NoClone()]):
+      self.assertTrue(self.run_session("create", "s1", "O2")[0])
+    self.check_worktree(cloned=False)
+    self.assertEqual(subprocess.check_output(["git", "status", "--porcelain"], cwd="O2@s1"), b"")
+    # Nor is a checkout in the middle of an operation.
+    open("O2/.git/MERGE_HEAD", "w").close()
+    with patch.object(cow, "BACKENDS", [CopyBackend()]):
+      self.assertTrue(self.run_session("create", "s2", "O2")[0])
+    self.assertNotEqual(os.stat("O2@s2/src/same").st_mtime_ns, 1000000000)
+
+  @unittest.skipUnless(shutil.which("sl"), "needs Sapling")
+  def test_cloned_sapling_share(self) -> None:
+    def sl(*args, cwd="O2"):
+      return subprocess.check_output(["sl", "--config", "ui.username=t <t@t>", *args], cwd=cwd)
+    self.make_checkout(lambda: sl("init", "-q", "O2", cwd="."),
+                       lambda: (sl("add", "-q"), sl("commit", "-q", "-m", "init")))
+    with patch.object(cow, "BACKENDS", [CopyBackend()]):
+      self.assertTrue(self.run_session("create", "s1", "O2")[0])
+    self.check_worktree(cloned=True)
+    self.assertEqual(sl("status", cwd="O2@s1"), b"")
+    self.assertEqual(sl("log", "-r", ".", "-T", "{node}", cwd="O2@s1"), sl("log", "-r", ".", "-T", "{node}"))
+    # It is a share: what is committed in it is in O2.
+    sl("commit", "-q", "-m", "in s1", "--config", "ui.allowemptycommit=true", cwd="O2@s1")
+    self.assertIn(b"in s1", sl("log", "-r", "all()", "-T", "{desc}\\n"))
 
   def test_invalid_name(self) -> None:
     with patch.object(self.parser, "error", side_effect=SystemExit) as error, \

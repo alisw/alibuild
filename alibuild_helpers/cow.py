@@ -35,7 +35,9 @@ class CloneBackend:
     return self.unavailable_reason(src, dst) is None
 
   def clone_tree(self, src, dst):
-    """Clone directory src to dst, which must not exist. Raise CloneError if it fails."""
+    """Clone src, a directory tree or a file, to dst, which must not exist.
+
+    Symbolic links are cloned as links. Raise CloneError if it fails."""
     raise NotImplementedError
 
 
@@ -72,6 +74,9 @@ def macos_fstype(path):
   return buf.f_fstypename.decode()
 
 
+CLONE_NOFOLLOW = 0x0001
+
+
 class ApfsClonefile(CloneBackend):
   """clonefile(2) of macOS, which clones a whole tree at once on APFS."""
   name = "apfs-clonefile"
@@ -89,7 +94,7 @@ class ApfsClonefile(CloneBackend):
 
   def clone_tree(self, src, dst):
     clonefile = _libsystem().clonefile
-    if clonefile(os.fsencode(src), os.fsencode(dst), 0) != 0:
+    if clonefile(os.fsencode(src), os.fsencode(dst), CLONE_NOFOLLOW) != 0:
       err = ctypes.get_errno()
       raise CloneError(f"clonefile({src}, {dst}): {os.strerror(err)}")
 
@@ -165,7 +170,7 @@ def select_backends(environ=os.environ, backends=None):
 
 
 def clone_tree(src, dst, backends=None, environ=os.environ):
-  """Clone src to dst with the first backend which can, and return its name.
+  """Clone src, a tree or a file, to dst with the first backend which can; return its name.
 
   Raise CloneError, saying why for each backend, if none can. dst is left
   absent then.
