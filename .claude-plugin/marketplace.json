@@ -1,0 +1,15 @@
+{
+  "name": "alibuild",
+  "description": "Claude Code plugins for aliBuild, the ALICE build tool",
+  "owner": {
+    "name": "alisw",
+    "url": "https://github.com/alisw"
+  },
+  "plugins": [
+    {
+      "name": "alibuild",
+      "source": "./plugins/alibuild",
+      "description": "Run agents on aliBuild packages in parallel: sessions, concurrent builds and the aliBuild MCP server"
+    }
+  ]
+}

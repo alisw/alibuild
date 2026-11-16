@@ -1,0 +1,12 @@
+{
+  "name": "alibuild",
+  "description": "Run agents on aliBuild packages in parallel: sessions, concurrent builds and the aliBuild MCP server",
+  "author": {
+    "name": "alisw",
+    "url": "https://github.com/alisw"
+  },
+  "homepage": "https://alisw.github.io/alibuild",
+  "repository": "https://github.com/alisw/alibuild",
+  "license": "GPL-3.0-only",
+  "keywords": ["alibuild", "alice", "hep", "build", "mcp"]
+}

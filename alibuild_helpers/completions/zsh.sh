@@ -67,6 +67,7 @@ _aliBuild_cmd_build() {
     '--docker-extra-args[Arguments to pass to docker run]:args: ' \
     '*-v[Additional volume to mount inside Docker container]:volume: ' \
     '--plan[Resolve the build and print what it would do, then stop]' \
+    '--json[Print the result, or the plan, as JSON]' \
     '--no-remote-store[Disable the use of the remote store]' \
     '--remote-store[Where to find prebuilt tarballs to reuse]:store: ' \
     '--write-store[Where to upload newly built packages]:store: ' \
@@ -202,6 +203,23 @@ _aliBuild_cmd_migrate() {
     '*:tarball:_files'
 }
 
+_aliBuild_cmd_mcp() {
+  _arguments -s -S \
+    '(-C --chdir)'{-C,--chdir}'[Directory to build in]:directory:_directories' \
+    '(-w --work-dir)'{-w,--work-dir}'[Work directory]:directory:_directories'
+}
+
+_aliBuild_cmd_session() {
+  _arguments -s -S \
+    '(-C --chdir)'{-C,--chdir}'[Directory with the worktrees]:directory:_directories' \
+    '(-w --work-dir)'{-w,--work-dir}'[Work directory]:directory:_directories' \
+    '--json[Print JSON]' \
+    '--worktrees[With drop, also remove the worktrees]' \
+    '--seed-from[With create, seed the build directories from another session]:session:' \
+    ':action:(create list show add remove drop)' \
+    '*::argument: '
+}
+
 _aliBuild_cmd_analytics() {
   _arguments -s -S \
     ':state:(on off)'
@@ -245,6 +263,8 @@ _aliBuild() {
         'install:Install a prebuilt package from a reapi:// store'
         'reconstruct:Reconstruct missing CAS tarballs from the Action Cache'
         'migrate:Migrate legacy tarballs into a reapi:// store'
+        'session:Manage development sessions'
+        'mcp:Run a Model Context Protocol server'
         'analytics:Turn analysis data reporting on or off'
         'architecture:Display detected architecture'
         'version:Display aliBuild version'

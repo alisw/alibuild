@@ -1,4 +1,5 @@
 from argparse import Namespace
+import json
 import os
 import os.path
 import platform
@@ -13,6 +14,9 @@ from collections import OrderedDict
 from alibuild_helpers.utilities import parseRecipe, resolve_tag
 from alibuild_helpers import sync_reapi
 from alibuild_helpers.build import doBuild, storeHashes, generate_initdotsh, build_ac_entry, select_cached_tarball, bound_unpublished_rebuild
+from alibuild_helpers.build import update_git_repos
+from alibuild_helpers.build import worktree_packages, devel_label, plan_entry, report_plan, worktree_config_dir, build_link
+from alibuild_helpers.log import dieOnError
 
 # Determine architecture based on platform
 def get_test_architecture():
@@ -257,6 +261,8 @@ class BuildTestCase(unittest.TestCase):
     @patch("alibuild_helpers.workarea.is_writeable", new=MagicMock(return_value=True))
     @patch("alibuild_helpers.build.basename", new=MagicMock(return_value="aliBuild"))
     @patch("alibuild_helpers.build.install_wrapper_script", new=MagicMock())
+    @patch("alibuild_helpers.build.lock_package", new=MagicMock(return_value=-1))
+    @patch("alibuild_helpers.build.unlock", new=MagicMock())
     def test_coverDoBuild(self, mock_debug, mock_listdir, mock_warning, mock_git_git,
                           mock_build_ac_entry, mock_snapshot_source) -> None:
         mock_git_git.side_effect = dummy_git
@@ -359,10 +365,24 @@ class BuildTestCase(unittest.TestCase):
             return dummy_exists(path)
 
         mock_debug.reset_mock()
+        # With build slots, the stale install of a package being rebuilt must
+        # only go once the slot is held: the wait can be long, and removing it
+        # earlier left the work area without the package for the whole wait.
+        order = MagicMock()
         with patch("alibuild_helpers.build.exists",
                    new=MagicMock(side_effect=exists_without_zlib_initdotsh)), \
-             patch("alibuild_helpers.build.warning") as mock_build_warning:
+             patch("alibuild_helpers.build.warning") as mock_build_warning, \
+             patch("alibuild_helpers.build.build_slots", new=MagicMock(return_value=1)), \
+             patch("alibuild_helpers.build.take_build_slot", new=order.take_build_slot), \
+             patch("alibuild_helpers.build.remove_stale_install", new=order.remove_stale_install):
+            order.take_build_slot.return_value = -1
             doBuild(args, mock_parser)
+        calls = [c for c in order.mock_calls if c[0] in ("take_build_slot", "remove_stale_install")]
+        # zlib is compiled, so it needs a slot; its install goes right after.
+        i = calls.index(call.remove_stale_install(zlib_dir))
+        self.assertGreater(i, 0, calls)
+        self.assertEqual(calls[i - 1][0], "take_build_slot", calls)
+        self.assertEqual(calls[i - 1].args[2], "zlib", calls)
         mock_build_warning.assert_any_call(
             "%s in %s claims to be built, but its environment script is "
             "missing. Rebuilding it.", "zlib", zlib_dir)
@@ -689,6 +709,166 @@ class AlidistHashFallbackTestCase(unittest.TestCase):
         os.environ.pop("ALIBUILD_ALIDIST_HASH", None)
         with self.assertRaises(SystemExit):
             self._run_reaching_scm_block()
+
+
+class WorktreeTestCase(unittest.TestCase):
+    """-z LABEL picks up PKG@LABEL directories as development checkouts."""
+
+    def test_worktree_packages(self) -> None:
+        dirs = {"O2@fix", "O2Physics@fix", "ROOT@other"}
+        isdir = dirs.__contains__
+        self.assertEqual(worktree_packages(["ROOT", "O2", "O2Physics"], "fix", isdir),
+                         {"O2", "O2Physics"})
+        self.assertEqual(worktree_packages(["ROOT", "O2"], "other", isdir), {"ROOT"})
+        # Only packages in the build count, and without a label nothing does.
+        self.assertEqual(worktree_packages(["ROOT"], "fix", isdir), set())
+        self.assertEqual(worktree_packages(["O2"], None, isdir), set())
+        self.assertEqual(worktree_packages(["O2"], "", isdir), set())
+
+    def test_config_dir(self) -> None:
+        isdir = {"alidist@fix"}.__contains__
+        self.assertEqual(worktree_config_dir("alidist", "fix", isdir), "alidist@fix")
+        # Without the worktree, without -z, or with an explicit -c, nothing changes.
+        self.assertEqual(worktree_config_dir("alidist", "other", isdir), "alidist")
+        self.assertEqual(worktree_config_dir("alidist", None, isdir), "alidist")
+        self.assertEqual(worktree_config_dir("../alidist", "fix", isdir), "../alidist")
+
+    def test_build_link(self) -> None:
+        o2 = {"package": "O2", "hash": "aaaa", "is_devel_pkg": True, "devel_label": "fix"}
+        mon = {"package": "Monitoring", "hash": "bbbb", "is_devel_pkg": True, "devel_label": None}
+        zlib = {"package": "zlib", "hash": "cccc", "is_devel_pkg": False, "devel_label": None}
+        # Outside a session, packages have the main tree's links...
+        self.assertEqual(build_link(mon, None), "Monitoring-latest")
+        self.assertEqual(build_link(zlib, None), "zlib-latest")
+        # ...while in a session they only have the session's, or none.
+        self.assertEqual(build_link(o2, "fix"), "O2-latest-fix")
+        self.assertEqual(build_link(mon, "fix"), "Monitoring-latest-fix")
+        self.assertEqual(build_link(zlib, "fix"), "cccc")
+
+    def test_devel_label(self) -> None:
+        # Without -z, no package has a label.
+        self.assertIsNone(devel_label("O2", None, set()))
+        # Without worktrees, -z applies to every package, as it always did...
+        self.assertEqual(devel_label("O2", "fix", set()), "fix")
+        self.assertEqual(devel_label("ROOT", "fix", set()), "fix")
+        # ...while with worktrees it only applies to theirs, so that the other
+        # development packages keep their version, hence their hash and build.
+        self.assertEqual(devel_label("O2", "fix", {"O2"}), "fix")
+        self.assertIsNone(devel_label("O2Physics", "fix", {"O2"}))
+        # An alidist@LABEL worktree alone makes it a session too.
+        self.assertIsNone(devel_label("O2", "fix", set(), session=True))
+
+
+class PlanTestCase(unittest.TestCase):
+    """--plan prints one line per package, or with --json one JSON object."""
+
+    def setUp(self) -> None:
+        base = {"version": "v1", "revision": "1", "build_family": "fix-o2", "devel_label": None}
+        self.plan = [
+            plan_entry(dict(base, package="ROOT", hash="aaaa", is_devel_pkg=False), True),
+            plan_entry(dict(base, package="O2", hash="bbbb", is_devel_pkg=True, version="fix",
+                            revision="local1", source="/src/O2@fix", devel_label="fix"), False),
+        ]
+
+    def report(self, as_json):
+        with patch("sys.stdout", new=StringIO()) as out, patch("alibuild_helpers.build.banner"):
+            report_plan(self.plan, as_json)
+        return out.getvalue()
+
+    def test_text(self) -> None:
+        self.assertEqual(self.report(False),
+                         "reuse ROOT/v1-1 aaaa\nbuild O2/fix-local1 bbbb\n")
+
+    def test_json(self) -> None:
+        plan = json.loads(self.report(True))
+        self.assertEqual(plan["summary"], {"packages": 2, "reuse": 1, "build": 1})
+        root, o2 = plan["packages"]
+        self.assertEqual((root["action"], root["devel"], root["source"]), ("reuse", False, None))
+        self.assertEqual((o2["package"], o2["version"], o2["revision"], o2["hash"], o2["action"]),
+                         ("O2", "fix", "local1", "bbbb", "build"))
+        self.assertEqual((o2["devel"], o2["source"], o2["devel_label"], o2["build_family"]),
+                         (True, "/src/O2@fix", "fix", "fix-o2"))
+
+
+class BuildResultTestCase(unittest.TestCase):
+    """With --json, a build always ends with one JSON object on stdout."""
+
+    def build(self, body, plan=False, **args):
+        with patch("alibuild_helpers.build._doBuild", side_effect=body), \
+             patch("sys.stdout", new=StringIO()) as out, \
+             patch("sys.stderr", new=StringIO()):
+            try:
+                doBuild(Namespace(json=True, plan=plan, **args), None)
+            except SystemExit as exc:
+                self.assertEqual(exc.code, 1)
+        return json.loads(out.getvalue())
+
+    def test_success(self) -> None:
+        def body(args, parser, result):
+            result["packages"].append({"package": "zlib", "action": "built"})
+            result["status"] = "success"
+        self.assertEqual(self.build(body), {"status": "success",
+                                            "packages": [{"package": "zlib", "action": "built"}]})
+
+    def test_error(self) -> None:
+        def body(args, parser, result):
+            dieOnError(True, "Package nosuchpkg not found, JALIEN_TOKEN=secret")
+        result = self.build(body)
+        self.assertEqual((result["status"], result["exit_code"]), ("error", 1))
+        self.assertIn("nosuchpkg", result["message"])
+        self.assertNotIn("secret", result["message"])
+
+    def test_failure(self) -> None:
+        def body(args, parser, result):
+            result["status"] = "failure"
+            result["failed"] = {"package": "zlib", "log": "/sw/BUILD/zlib-latest/log"}
+            dieOnError(True, "BUILD FAILED: zlib")
+        result = self.build(body)
+        self.assertEqual(result["failed"]["package"], "zlib")
+        self.assertNotIn("message", result)
+
+    def test_plan(self) -> None:
+        # A plan prints itself; only an error stopping it is printed by doBuild.
+        def body(args, parser, result):
+            print("the plan")
+            result["status"] = "planned"
+        with patch("alibuild_helpers.build._doBuild", side_effect=body), \
+             patch("sys.stdout", new=StringIO()) as out:
+            doBuild(Namespace(json=True, plan=True), None)
+        self.assertEqual(out.getvalue(), "the plan\n")
+        def failing(args, parser, result):
+            dieOnError(True, "Package nosuchpkg not found")
+        self.assertEqual(self.build(failing, plan=True)["status"], "error")
+
+    def test_without_json(self) -> None:
+        with patch("alibuild_helpers.build._doBuild") as body, \
+             patch("sys.stdout", new=StringIO()) as out:
+            doBuild(Namespace(), None)
+        self.assertEqual(body.call_count, 1)
+        self.assertEqual(out.getvalue(), "")
+
+
+class UpdateGitReposTestCase(unittest.TestCase):
+    """Listing remote refs only stops the build for packages which need them."""
+
+    def test_devel_refs(self) -> None:
+        scm = MagicMock()
+        scm.listRefsCmd.return_value = ["bookmark", "--list", "--remote"]
+        scm.exec.return_value = (255, "abort: remote url default does not have a name")
+        scm.parseRefs.side_effect = lambda output: {"refs/heads/main": "abc"} if output else {}
+        specs = {"FairMQ": {"package": "FairMQ", "source": "/src/FairMQ", "is_devel_pkg": True, "scm": scm},
+                 "zlib": {"package": "zlib", "source": "https://x/zlib", "is_devel_pkg": False, "scm": scm}}
+        args = Namespace(referenceSources="/sw/MIRROR", fetchRepos=False)
+        with patch("alibuild_helpers.build.updateReferenceRepoSpec"), \
+             patch("alibuild_helpers.build.logged_scm", return_value="refs") as logged, \
+             patch("alibuild_helpers.build.warning") as warning, \
+             patch("alibuild_helpers.build.ProgressPrint"):
+            update_git_repos(args, specs, ["FairMQ", "zlib"])
+        self.assertEqual(specs["FairMQ"]["scm_refs"], {})
+        self.assertIn("FairMQ", warning.call_args[0])
+        # Other packages still go through logged_scm, which stops the build on errors.
+        self.assertEqual([c.args[1] for c in logged.call_args_list], ["zlib"])
+        self.assertEqual(specs["zlib"]["scm_refs"], {"refs/heads/main": "abc"})
 
 
 class CheckEnvironmentTestCase(unittest.TestCase):

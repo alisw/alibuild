@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "alibuild": {
+      "command": "aliBuild",
+      "args": ["mcp"]
+    }
+  }
+}
