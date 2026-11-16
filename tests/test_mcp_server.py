@@ -395,13 +395,90 @@ class GatedMcpServerTestCase(McpServerTestCase):
     dropped, err = self.tool("session_drop", name="s1")
     self.assertFalse(err)
 
+  def test_files(self) -> None:
+    t = self.tmp.name
+    outside = tempfile.mkdtemp()
+    self.addCleanup(lambda: subprocess.run(["rm", "-rf", outside]))
+    with open(join(outside, "secret"), "w") as f:
+      f.write("secret\n")
+    os.symlink(outside, join(t, "O2", "out"))
+    os.makedirs(join(t, "notarepo"))
+    read, err = self.tool("read_file", path="O2/README")
+    self.assertEqual((read["text"], read["lines"], err), ("O2\n", 1, False))
+    listed, _ = self.tool("list_files")
+    self.assertTrue({"O2/", "alidist/", "notarepo/"} <= set(listed["files"]))
+    listed, _ = self.tool("list_files", path="O2", pattern="**/README")
+    self.assertEqual(listed["files"], ["README"])
+    listed, _ = self.tool("list_files", pattern="../*")
+    self.assertEqual(listed["files"], [])
+    for path in ("../k", "/etc/hosts", "O2/out/secret", "O2/../../k"):
+      _, err = self.tool("read_file", path=path)
+      self.assertTrue(err, path)
+
+    # Edits void approvals.
+    approval = self.approved("build", packages=["O2"])
+    done, err = self.tool("edit_file", path="O2/README", old="O2", new="O2 changed")
+    self.assertEqual((done["replaced"], err), (1, False))
+    self.assertEqual(self.error("build", packages=["O2"], approval=approval), "stale")
+    for path in ("alidist/README", "O2/.git/config", "O2/out/secret", "notarepo/x", "k.pub",
+                 "../k", "/etc/hosts", "O2"):
+      _, err = self.tool("edit_file", path=path, old="", new="x")
+      self.assertTrue(err, path)
+    for old in ("nonsense", "", "O2"):
+      with open(join(t, "O2", "twice"), "w") as f:
+        f.write("O2 O2\n")
+      _, err = self.tool("edit_file", path="O2/twice", old=old, new="x")
+      self.assertTrue(err, old)
+    done, err = self.tool("edit_file", path="O2/twice", old="O2", new="x", all=True)
+    self.assertEqual(done["replaced"], 2)
+
+    patch = ("--- a/O2/README\n+++ b/O2/README\n@@ -1 +1 @@\n-O2 changed\n+O2 patched\n"
+             "diff --git a/O2/new.cxx b/O2/new.cxx\nnew file mode 100644\n--- /dev/null\n"
+             "+++ b/O2/new.cxx\n@@ -0,0 +1 @@\n+int x;\n")
+    done, err = self.tool("apply_patch", patch=patch)
+    self.assertFalse(err, done)
+    self.assertEqual(done["files"], ["O2/README", "O2/new.cxx"])
+    self.assertEqual(self.tool("read_file", path="O2/new.cxx")[0]["text"], "int x;\n")
+    self.assertEqual(self.tool("read_file", path="O2/README")[0]["text"], "O2 patched\n")
+    for path in ("alidist/README", "O2/.git/hooks/pre-commit", "O2/out/secret", "../k",
+                 "notarepo/x"):
+      bad = "--- /dev/null\n+++ b/%s\n@@ -0,0 +1 @@\n+x\n" % path
+      _, err = self.tool("apply_patch", patch=bad)
+      self.assertTrue(err, path)
+    link = ("diff --git a/O2/link b/O2/link\nnew file mode 120000\n--- /dev/null\n"
+            "+++ b/O2/link\n@@ -0,0 +1 @@\n+/etc\n\\ No newline at end of file\n")
+    _, err = self.tool("apply_patch", patch=link)
+    self.assertTrue(err)
+    _, err = self.tool("apply_patch", patch="not a patch")
+    self.assertTrue(err)
+    self.assertFalse(os.path.exists(join(outside, "x")) or os.path.exists(join(t, "O2", "link")))
+    with open(join(outside, "secret")) as f:
+      self.assertEqual(f.read(), "secret\n")
+
+  def test_fetch_result(self) -> None:
+    os.makedirs(join(self.server.work_dir, "out"))
+    with open(join(self.server.work_dir, "out", "result.txt"), "w") as f:
+      f.write("result\n")
+    with open(join(self.server.work_dir, "out", "result.bin"), "wb") as f:
+      f.write(b"\xff\x00")
+    got, err = self.tool("fetch_result", path="out/result.txt")
+    self.assertEqual((got["text"], err), ("result\n", False))
+    got, err = self.tool("fetch_result", path=join(self.server.work_dir, "out", "result.bin"))
+    self.assertEqual(got["base64"], "/wA=")
+    got, err = self.tool("fetch_result", path=join(self.tmp.name, "O2", "README"))
+    self.assertEqual(got["text"], "O2\n")
+    for path in ("/etc/hosts", "../../k", "/"):
+      _, err = self.tool("fetch_result", path=path)
+      self.assertTrue(err, path)
+
 
 class NotGatedTestCase(unittest.TestCase):
   def test_tools(self) -> None:
     server = Server("sw")
     self.assertFalse(server.gated)
     self.assertIs(mcp_server.tool_list(False), TOOLS)
-    for name in ("approve", "build_dir", "run"):
+    for name in ("approve", "build_dir", "run", "read_file", "edit_file", "apply_patch",
+                 "fetch_result"):
       reply = server.handle({"jsonrpc": "2.0", "id": 1, "method": "tools/call",
                              "params": {"name": name}})
       self.assertIn("unknown tool", reply["result"]["content"][0]["text"])
