@@ -197,11 +197,12 @@ def create_worktree(package, name):
   source, dest = package, f"{package}@{name}"
   if not isdir(source):
     raise SCMError(f"no {source} checkout to create {dest} from")
-  scm = scm_for(source)
-  commit = scm.checkedOutCommitName(directory=source)
+  commit = scm_for(source).checkedOutCommitName(directory=source)
   # Not through git() and sapling(): checking out a large repository, e.g. O2,
-  # can take longer than their timeouts.
-  if isinstance(scm, Sapling):
+  # can take longer than their timeouts. sl share only works for Sapling's own
+  # repositories: one in git format (.git, with or without .git/sl) needs a
+  # git worktree.
+  if exists(join(source, ".sl")):
     commands = [["sl", "share", "-U", abspath(source), abspath(dest)],
                 ["sl", "-R", abspath(dest), "goto", commit]]
   else:
