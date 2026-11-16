@@ -126,8 +126,8 @@ unset DYLD_LIBRARY_PATH
 EOF
 
 cd "$BUILDROOT"
-# A build from a PKG@LABEL worktree only gets the -latest-LABEL mark, so that it
-# does not replace the one of the main checkout.
+# A session build (from PKG@LABEL or alidist@LABEL) only gets the -latest-LABEL
+# mark, so that it does not replace the one of the main tree.
 if [[ -z $DEVEL_WORKTREE ]]; then
   ln -snf "$PKGHASH" "$ALIBUILD_BUILD_WORK_DIR/BUILD/$PKGNAME-latest"
 fi
@@ -363,7 +363,7 @@ cd "$WORK_DIR"
 if [ -w "$WORK_DIR/$ARCHITECTURE/$PKGNAME/$PKGVERSION-$PKGREVISION" ]; then
   bash -ex "$ARCHITECTURE/$PKGNAME/$PKGVERSION-$PKGREVISION/relocate-me.sh"
 fi
-# Last package built gets a "latest" mark, unless it comes from a worktree.
+# Last package built gets a "latest" mark, unless it is a session build.
 if [[ -z $DEVEL_WORKTREE ]]; then
   ln -snf $PKGVERSION-$PKGREVISION $ARCHITECTURE/$PKGNAME/latest
 fi

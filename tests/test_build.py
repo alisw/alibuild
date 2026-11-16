@@ -15,7 +15,7 @@ from alibuild_helpers.utilities import parseRecipe, resolve_tag
 from alibuild_helpers import sync_reapi
 from alibuild_helpers.build import doBuild, storeHashes, generate_initdotsh, build_ac_entry, select_cached_tarball, bound_unpublished_rebuild
 from alibuild_helpers.build import update_git_repos
-from alibuild_helpers.build import worktree_packages, devel_label, plan_entry, report_plan, worktree_config_dir
+from alibuild_helpers.build import worktree_packages, devel_label, plan_entry, report_plan, worktree_config_dir, build_link
 from alibuild_helpers.log import dieOnError
 
 # Determine architecture based on platform
@@ -719,6 +719,18 @@ class WorktreeTestCase(unittest.TestCase):
         self.assertEqual(worktree_config_dir("alidist", None, isdir), "alidist")
         self.assertEqual(worktree_config_dir("../alidist", "fix", isdir), "../alidist")
 
+    def test_build_link(self) -> None:
+        o2 = {"package": "O2", "hash": "aaaa", "is_devel_pkg": True, "devel_label": "fix"}
+        mon = {"package": "Monitoring", "hash": "bbbb", "is_devel_pkg": True, "devel_label": None}
+        zlib = {"package": "zlib", "hash": "cccc", "is_devel_pkg": False, "devel_label": None}
+        # Outside a session, packages have the main tree's links...
+        self.assertEqual(build_link(mon, None), "Monitoring-latest")
+        self.assertEqual(build_link(zlib, None), "zlib-latest")
+        # ...while in a session they only have the session's, or none.
+        self.assertEqual(build_link(o2, "fix"), "O2-latest-fix")
+        self.assertEqual(build_link(mon, "fix"), "Monitoring-latest-fix")
+        self.assertEqual(build_link(zlib, "fix"), "cccc")
+
     def test_devel_label(self) -> None:
         # Without -z, no package has a label.
         self.assertIsNone(devel_label("O2", None, set()))
@@ -729,6 +741,8 @@ class WorktreeTestCase(unittest.TestCase):
         # development packages keep their version, hence their hash and build.
         self.assertEqual(devel_label("O2", "fix", {"O2"}), "fix")
         self.assertIsNone(devel_label("O2Physics", "fix", {"O2"}))
+        # An alidist@LABEL worktree alone makes it a session too.
+        self.assertIsNone(devel_label("O2", "fix", set(), session=True))
 
 
 class PlanTestCase(unittest.TestCase):

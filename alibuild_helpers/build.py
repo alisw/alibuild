@@ -834,15 +834,16 @@ def worktree_packages(packages, label, isdir=os.path.isdir):
   return {p for p in packages if isdir(f"{p}@{label}")}
 
 
-def devel_label(package, label, worktrees):
+def devel_label(package, label, worktrees, session=False):
   """Return the -z label which applies to package, or None if none does.
 
-  Without worktrees, the label applies to every package, as it always has. If
-  there are worktrees, it only applies to their packages: the other development
-  packages keep the version they have without -z, so that their existing builds
-  are reused rather than rebuilt under a new name.
+  Without worktrees, the label applies to every package, as it always has. In
+  a session, i.e. with PKG@LABEL worktrees or with the recipes of
+  alidist@LABEL, it only applies to the worktrees' packages: the other
+  development packages keep the version they have without -z, so that their
+  existing builds are reused rather than rebuilt under a new name.
   """
-  if label is None or (worktrees and package not in worktrees):
+  if label is None or ((worktrees or session) and package not in worktrees):
     return None
   return label
 
@@ -852,6 +853,23 @@ def worktree_config_dir(config_dir, label, isdir=os.path.isdir):
   if label and config_dir == "alidist" and isdir(f"alidist@{label}"):
     return f"alidist@{label}"
   return config_dir
+
+
+def build_link(spec, session):
+  """The entry in BUILD/ which names the build directory of spec in this run.
+
+  session is the -z label of a session build, i.e. one with worktrees or with
+  the recipes of alidist@LABEL, or None. A session build never writes the main
+  tree's BUILD/PKG-latest(-BRANCH) links, so a package without a session link
+  is only named by its hash.
+  """
+  if spec["is_devel_pkg"] and spec["devel_label"] is not None:
+    return "%s-latest-%s" % (spec["package"], spec["devel_label"])
+  if session is None:
+    return spec["package"] + "-latest"
+  if spec["is_devel_pkg"]:
+    return "%s-latest-%s" % (spec["package"], session)
+  return spec["hash"]
 
 
 class _LastError(logging.Handler):
@@ -890,11 +908,13 @@ def doBuild(args, parser):
 
 
 def _doBuild(args, parser, result):
+  sessionRecipes = False
   if not getattr(args, "docker", False):
     configDir = worktree_config_dir(args.configDir, getattr(args, "develPrefix", None))
     if configDir != args.configDir:
       info("Using the recipes in %s", configDir)
       args.configDir = configDir
+      sessionRecipes = True
   # Always sign reapi:// uploads: refuse to upload unsigned unless --no-sign, so
   # nothing lands in a reapi ledger without a signature by accident.
   if args.writeStore.startswith("reapi://") and not getattr(args, "noSign", False):
@@ -1068,6 +1088,9 @@ def _doBuild(args, parser, result):
     worktreePkgs = worktree_packages([p for p in buildOrder if p not in args.noDevel],
                                      getattr(args, "develPrefix", None))
     develPkgs = frozenset(develPkgs) | worktreePkgs
+  # A session build only gets the session's links: the latest ones are the
+  # main tree's, whatever the session builds.
+  session = args.develPrefix if worktreePkgs or sessionRecipes else None
 
   if buildOrder:
     if args.onlyDeps:
@@ -1099,7 +1122,8 @@ def _doBuild(args, parser, result):
       spec["source"] = str(Path.cwd() / f"{pkg}@{args.develPrefix}")
     elif spec["is_devel_pkg"]:
       spec["source"] = str(Path.cwd() / pkg)
-    spec["devel_label"] = devel_label(pkg, getattr(args, "develPrefix", None), worktreePkgs)
+    spec["devel_label"] = devel_label(pkg, getattr(args, "develPrefix", None), worktreePkgs,
+                                      session is not None)
 
     # Only initialize Sapling if it's in PATH and the repo uses it
     use_sapling = False
@@ -1262,9 +1286,8 @@ def _doBuild(args, parser, result):
     if spec["package"] not in outcomes:
       outcomes[spec["package"]] = dict(plan_entry(spec, False), action=outcome)
       if spec["is_devel_pkg"]:
-        label = "-" + spec["devel_label"] if spec["devel_label"] is not None else ""
         outcomes[spec["package"]]["build_dir"] = abspath(join(
-          buildWorkDir, "BUILD", spec["package"] + "-latest" + label, spec["package"]))
+          buildWorkDir, "BUILD", build_link(spec, session), spec["package"]))
       result.setdefault("packages", []).append(outcomes[spec["package"]])
   gutted = set()
   # {package: (hash, lock)}: held from deciding whether to build a package
@@ -1358,9 +1381,13 @@ def _doBuild(args, parser, result):
     possibleDevelPrefix = getattr(args, "develPrefix", develPackageBranch)
     if spec["is_devel_pkg"]:
       develPrefix = possibleDevelPrefix
-      if worktreePkgs and spec["devel_label"] is None:
-        # Development packages outside the worktrees keep their branch name.
+      if session is not None and spec["devel_label"] is None:
+        # Development packages outside the worktrees keep their branch name...
         develPrefix = spec["devel_branch"]
+      if session is not None and spec["devel_label"] is None:
+        # ...but in a session build only for their version: -latest-BRANCH is
+        # the main tree's link.
+        develPrefix = session
 
     if possibleDevelPrefix:
       spec["build_family"] = f"{possibleDevelPrefix}-{args.defaults}"
@@ -1434,7 +1461,7 @@ def _doBuild(args, parser, result):
         # through, the path should have been created by the build process.
         call_ignoring_oserrors(symlink, "{version}-{revision}".format(**spec),
                                "{wd}/{arch}/{package}/latest-{build_family}".format(wd=workDir, arch=args.architecture, **spec))
-        if p not in worktreePkgs:
+        if session is None:
           call_ignoring_oserrors(symlink, "{version}-{revision}".format(**spec),
                                  "{wd}/{arch}/{package}/latest".format(wd=workDir, arch=args.architecture, **spec))
 
@@ -1479,14 +1506,14 @@ def _doBuild(args, parser, result):
       # Ignore errors here, because the path we're linking to might not exist
       # (if this is the first run through the loop). On the second run
       # through, the path should have been created by the build process.
-      # Builds from a PKG@LABEL worktree only get the -latest-LABEL marks, so
-      # that they do not replace the ones of the main checkout.
-      if spec["package"] not in worktreePkgs:
+      # Session builds only get the -latest-LABEL marks, so that they do not
+      # replace the ones of the main tree.
+      if session is None:
         call_ignoring_oserrors(symlink, spec["hash"], join(buildWorkDir, "BUILD", spec["package"] + "-latest"))
       if develPrefix:
         call_ignoring_oserrors(symlink, spec["hash"], join(buildWorkDir, "BUILD", spec["package"] + "-latest-" + develPrefix))
       # Last package built gets a "latest" mark.
-      if spec["package"] not in worktreePkgs:
+      if session is None:
         call_ignoring_oserrors(symlink, "{version}-{revision}".format(**spec),
                                join(workDir, args.architecture, spec["package"], "latest"))
       # Latest package built for a given devel prefix gets a "latest-<family>" mark.
@@ -1576,7 +1603,8 @@ def _doBuild(args, parser, result):
         for d in cleanupDirs:
           shutil.rmtree(d.encode("utf8"), True)
         try:
-          unlink(join(buildWorkDir, "BUILD", spec["package"] + "-latest"))
+          if session is None:
+            unlink(join(buildWorkDir, "BUILD", spec["package"] + "-latest"))
           if spec["devel_label"] is not None:
             unlink(join(buildWorkDir, "BUILD", spec["package"] + "-latest-" + spec["devel_label"]))
         except Exception:
@@ -1666,8 +1694,11 @@ def _doBuild(args, parser, result):
       ("DEPS_HASH", spec.get("deps_hash", "")),
       ("DEVEL_HASH", spec.get("devel_hash", "")),
       ("DEVEL_PREFIX", develPrefix),
-      # The PKG@LABEL directory this package is built from, if any.
-      ("DEVEL_WORKTREE", basename(spec["source"]) if spec["package"] in worktreePkgs else ""),
+      # The worktree this is built from, PKG@LABEL or alidist@LABEL, if any:
+      # the build script then leaves the main tree's latest links alone.
+      ("DEVEL_WORKTREE", "" if session is None else
+                         basename(spec["source"]) if spec["package"] in worktreePkgs else
+                         basename(abspath(args.configDir))),
       ("BUILD_FAMILY", spec["build_family"]),
       ("GIT_COMMITTER_NAME", "unknown"),
       ("GIT_COMMITTER_EMAIL", "unknown"),
@@ -1742,9 +1773,9 @@ def _doBuild(args, parser, result):
       updatablePkgs.append(spec["package"])
 
     # Determine paths
-    devSuffix = "-" + spec["devel_label"] if spec["devel_label"] is not None and spec["is_devel_pkg"] else ""
-    log_path = f"{buildWorkDir}/BUILD/{spec['package']}-latest{devSuffix}/log"
-    build_dir = f"{buildWorkDir}/BUILD/{spec['package']}-latest{devSuffix}/{spec['package']}"
+    link = build_link(spec, session)
+    log_path = f"{buildWorkDir}/BUILD/{link}/log"
+    build_dir = f"{buildWorkDir}/BUILD/{link}/{spec['package']}"
 
     # Use relative paths if we're inside the work directory
     try:
@@ -1923,9 +1954,8 @@ def _doBuild(args, parser, result):
             )
   for spec in specs.values():
     if spec["is_devel_pkg"]:
-      banner("Build directory for devel package %s:\n%s/BUILD/%s-latest%s/%s",
-             spec["package"], abspath(buildWorkDir), spec["package"],
-             ("-" + spec["devel_label"]) if spec["devel_label"] is not None else "",
+      banner("Build directory for devel package %s:\n%s/BUILD/%s/%s",
+             spec["package"], abspath(buildWorkDir), build_link(spec, session),
              spec["package"])
   if untrackedFilesDirectories:
     banner("Untracked files in the following directories resulted in a rebuild of "
