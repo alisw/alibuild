@@ -24,6 +24,8 @@ from alibuild_helpers.log import ProgressPrint, log_current_package
 from glob import glob, escape as glob_escape
 from alibuild_helpers import buildstatus
 from alibuild_helpers.locks import lock_package, build_slots, take_build_slot, unlock
+from alibuild_helpers.seed import seed_build_dir
+from alibuild_helpers.session import seed_from
 from alibuild_helpers.sandbox import write_sandbox_profile, sandboxed_command, sandbox_failure_hint
 from collections import OrderedDict
 from shlex import quote
@@ -1114,6 +1116,7 @@ def _doBuild(args, parser, result):
   # A session build only gets the session's links: the latest ones are the
   # main tree's, whatever the session builds.
   session = args.develPrefix if worktreePkgs or sessionRecipes else None
+  seedFrom = seed_from(args.workDir, session)
 
   if buildOrder:
     if args.onlyDeps:
@@ -1655,6 +1658,11 @@ def _doBuild(args, parser, result):
         uploading=bool(getattr(syncHelper, "writeStore", "")))
       debug("Found tarball in %s" % spec["cachedTarball"]
             if spec["cachedTarball"] else "No cache tarballs found")
+
+    # A worktree package's first build in a session seeded from another one
+    # starts from a clone of the other's build directory.
+    if seedFrom and spec["is_devel_pkg"] and spec["devel_label"] is not None:
+      seed_build_dir(buildWorkDir, args.architecture, args.defaults, spec, specs, seedFrom)
 
     # The actual build script.
     debug("spec = %r", spec)

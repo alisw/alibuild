@@ -77,6 +77,11 @@ def lock_package(work_dir, pkg_hash, package):
   return fd
 
 
+def try_lock_package(work_dir, pkg_hash):
+  """Take the lock on pkg_hash if nobody holds it, else return None. unlock() the result."""
+  return _lock_current(join(work_dir, "LOCKS", pkg_hash), blocking=False)
+
+
 def build_slots(environ=os.environ):
   """How many builds may run at the same time in a work directory, or None for no limit."""
   value = environ.get("ALIBUILD_BUILD_SLOTS", "")

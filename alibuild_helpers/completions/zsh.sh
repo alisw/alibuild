@@ -215,6 +215,7 @@ _aliBuild_cmd_session() {
     '(-w --work-dir)'{-w,--work-dir}'[Work directory]:directory:_directories' \
     '--json[Print JSON]' \
     '--worktrees[With drop, also remove the worktrees]' \
+    '--seed-from[With create, seed the build directories from another session]:session:' \
     ':action:(create list show add remove drop)' \
     '*::argument: '
 }
