@@ -69,9 +69,20 @@ def update_git_repos(args, specs, buildOrder):
                                 fetch=args.fetchRepos, allowGitPrompt=git_prompt)
 
         # Retrieve git heads
-        output = logged_scm(specs[package]["scm"], package, args.referenceSources,
-                            specs[package]["scm"].listRefsCmd(specs[package].get("reference", specs[package]["source"])),
-                            ".", prompt=git_prompt, logOutput=False)
+        scm = specs[package]["scm"]
+        refs_cmd = scm.listRefsCmd(specs[package].get("reference", specs[package]["source"]))
+        if specs[package]["is_devel_pkg"]:
+          # A development package is built from the commit checked out, so its
+          # remote refs only add aliases to its hash: not worth failing over,
+          # e.g. when sl cannot name the remote of a checkout.
+          err, output = scm.exec(refs_cmd, directory=".", check=False, prompt=git_prompt)
+          if err:
+            warning("Cannot list the remote refs of development package %s, which it can be "
+                    "built without: %s", package, output.strip().splitlines()[0] if output.strip() else err)
+            output = ""
+        else:
+          output = logged_scm(scm, package, args.referenceSources, refs_cmd,
+                              ".", prompt=git_prompt, logOutput=False)
         specs[package]["scm_refs"] = specs[package]["scm"].parseRefs(output)
 
     progress = ProgressPrint("Updating repositories")
