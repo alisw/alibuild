@@ -203,6 +203,12 @@ _aliBuild_cmd_migrate() {
     '*:tarball:_files'
 }
 
+_aliBuild_cmd_mcp() {
+  _arguments -s -S \
+    '(-C --chdir)'{-C,--chdir}'[Directory to build in]:directory:_directories' \
+    '(-w --work-dir)'{-w,--work-dir}'[Work directory]:directory:_directories'
+}
+
 _aliBuild_cmd_session() {
   _arguments -s -S \
     '(-C --chdir)'{-C,--chdir}'[Directory with the worktrees]:directory:_directories' \
@@ -257,6 +263,7 @@ _aliBuild() {
         'reconstruct:Reconstruct missing CAS tarballs from the Action Cache'
         'migrate:Migrate legacy tarballs into a reapi:// store'
         'session:Manage development sessions'
+        'mcp:Run a Model Context Protocol server'
         'analytics:Turn analysis data reporting on or off'
         'architecture:Display detected architecture'
         'version:Display aliBuild version'

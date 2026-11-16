@@ -22,6 +22,7 @@ from alibuild_helpers.source import GitSourceStore, store_refs
 from alibuild_helpers.workarea import logged_scm, updateReferenceRepoSpec, checkout_sources
 from alibuild_helpers.log import ProgressPrint, log_current_package
 from glob import glob, escape as glob_escape
+from alibuild_helpers import buildstatus
 from alibuild_helpers.locks import lock_package, build_slots, take_build_slot, unlock
 from alibuild_helpers.sandbox import write_sandbox_profile, sandboxed_command, sandbox_failure_hint
 from collections import OrderedDict
@@ -890,7 +891,7 @@ def doBuild(args, parser):
   package's build failed (see "failed"), or "error" when aliBuild stopped for
   another reason (see "message").
   """
-  if not getattr(args, "json", False) or getattr(args, "plan", False):
+  if not getattr(args, "json", False):
     return _doBuild(args, parser, {})
   result = {"status": "error", "packages": []}
   last_error = _LastError()
@@ -904,7 +905,9 @@ def doBuild(args, parser):
     logger.removeHandler(last_error)
     if result["status"] == "error":
       result["message"] = last_error.message
-    print(json.dumps(result, indent=2))
+    # A plan prints itself; only an error stopping it is printed here.
+    if not (getattr(args, "plan", False) and result["status"] == "planned"):
+      print(json.dumps(result, indent=2))
 
 
 def _doBuild(args, parser, result):
@@ -1754,6 +1757,8 @@ def _doBuild(args, parser, result):
        spec["devel_label"] if spec["devel_label"] is not None and spec["is_devel_pkg"] else spec["version"])
     )
     record(spec, "unpacked" if cachedTarball else "built")
+    buildstatus.update(state="unpacking" if cachedTarball else "building", package=p,
+                       log=abspath(join(buildWorkDir, "BUILD", build_link(spec, session), "log")))
     # 8 hour timeout per package to prevent builds from hanging forever
     try:
       err = execute(build_command, printer=progress, timeout=8*60*60)
@@ -1929,6 +1934,7 @@ def _doBuild(args, parser, result):
 
   if getattr(args, "plan", False):
     report_plan(plan, as_json=getattr(args, "json", False))
+    result["status"] = "planned"
     return
 
   result.update({

@@ -16,6 +16,7 @@ import os
 import time
 from os.path import join
 
+from alibuild_helpers import buildstatus
 from alibuild_helpers.log import info
 
 SLOT_POLL_SEC = 2
@@ -43,6 +44,7 @@ def lock_package(work_dir, pkg_hash, package):
   fd = _open(join(work_dir, "LOCKS", pkg_hash))
   if not _try_lock(fd):
     info("Waiting for another aliBuild, which is building %s", package)
+    buildstatus.update(state="waiting for another aliBuild", package=package)
     fcntl.flock(fd, fcntl.LOCK_EX)
   return fd
 
@@ -66,5 +68,6 @@ def take_build_slot(work_dir, slots, package, poll=SLOT_POLL_SEC):
     if not waiting:
       info("Waiting for a build slot for %s: %d build(s) already running "
            "(ALIBUILD_BUILD_SLOTS=%d)", package, slots, slots)
+      buildstatus.update(state="waiting for a build slot", package=package)
       waiting = True
     time.sleep(poll)
