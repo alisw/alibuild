@@ -835,6 +835,13 @@ def devel_label(package, label, worktrees):
   return label
 
 
+def worktree_config_dir(config_dir, label, isdir=os.path.isdir):
+  """The recipes to use: an alidist@LABEL worktree with -z LABEL, unless -c says otherwise."""
+  if label and config_dir == "alidist" and isdir(f"alidist@{label}"):
+    return f"alidist@{label}"
+  return config_dir
+
+
 class _LastError(logging.Handler):
   """Remember the last error logged, which is why a build stopped."""
   def __init__(self):
@@ -871,6 +878,11 @@ def doBuild(args, parser):
 
 
 def _doBuild(args, parser, result):
+  if not getattr(args, "docker", False):
+    configDir = worktree_config_dir(args.configDir, getattr(args, "develPrefix", None))
+    if configDir != args.configDir:
+      info("Using the recipes in %s", configDir)
+      args.configDir = configDir
   # Always sign reapi:// uploads: refuse to upload unsigned unless --no-sign, so
   # nothing lands in a reapi ledger without a signature by accident.
   if args.writeStore.startswith("reapi://") and not getattr(args, "noSign", False):
