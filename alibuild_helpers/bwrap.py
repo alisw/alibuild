@@ -393,21 +393,34 @@ class Image:
 
 # Running commands
 
+HOST_PROC_OPT_IN = ("--container-allow-host-proc (or ALIBUILD_CONTAINER_ALLOW_HOST_PROC=1) "
+                    "binds the host's /proc instead, which shows the build every process "
+                    "of the host's PID namespace")
+
+
 @functools.lru_cache(maxsize=None)
-def proc_args():
-  """Mount a new /proc if allowed, else bind the existing one. The kernel
-  refuses a new procfs in a user namespace when the visible /proc has parts
-  masked by bind mounts, as Docker, runc and Apple's container do; there the
-  sandbox's /proc shows the outer PID namespace."""
+def fresh_proc():
+  """Return (works, error) for mounting a new /proc in a sandbox. The kernel
+  refuses it in a user namespace when the visible /proc has parts masked by
+  bind mounts, as inside Docker, runc or Apple's container."""
   err, out = getstatusoutput(["bwrap", "--unshare-user", "--unshare-pid", "--ro-bind", "/", "/",
                               "--proc", "/proc", "true"])
-  if not err:
-    return ["--proc", "/proc"]
-  warning("bwrap cannot mount a new /proc here (%s); binding the host's instead", out.strip())
-  return ["--ro-bind", "/proc", "/proc"]
+  return not err, out.strip()
 
 
-def bwrap_check():
+@functools.lru_cache(maxsize=None)
+def proc_args(host_proc=False):
+  """Mount a new /proc, or bind the host's if HOST_PROC allows it."""
+  works, out = fresh_proc()
+  if works:
+    return ("--proc", "/proc")
+  dieOnError(not host_proc, "bwrap cannot mount a new /proc here (%s). %s." % (out, HOST_PROC_OPT_IN))
+  warning("bwrap cannot mount a new /proc here (%s); binding the host's, as "
+          "--container-allow-host-proc asks", out)
+  return ("--ro-bind", "/proc", "/proc")
+
+
+def bwrap_check(host_proc=False):
   """Return why bwrap cannot run sandboxes here, or None if it can."""
   if not shutil.which("bwrap"):
     return "bwrap (bubblewrap) is not installed"
@@ -416,6 +429,9 @@ def bwrap_check():
     return ("bwrap cannot create an unprivileged user namespace: %s (check "
             "user.max_user_namespaces and, on Ubuntu, "
             "kernel.apparmor_restrict_unprivileged_userns)" % out.strip())
+  works, out = fresh_proc()
+  if not works and not host_proc:
+    return "it cannot mount a new /proc here (%s); %s" % (out, HOST_PROC_OPT_IN)
   return None
 
 
@@ -428,7 +444,7 @@ def parse_volume(volume):
   return parts[0], dest, len(parts) > 2 and "ro" in parts[2].split(",")
 
 
-def bwrap_command(image, binds=(), env=(), network=True, extra_args=()):
+def bwrap_command(image, binds=(), env=(), network=True, extra_args=(), host_proc=False):
   """Return the bwrap argument list running in IMAGE with the BINDS (source,
   destination, read_only) and environment ENV on top of the image's. The
   rootfs is read-only to the command: it is bound writable only so bwrap can
@@ -442,7 +458,7 @@ def bwrap_command(image, binds=(), env=(), network=True, extra_args=()):
     # To keep them, they would have to listen on Unix sockets bound into the
     # sandbox, with a forwarder inside it if the client wants TCP.
     cmd.append("--unshare-net")
-  cmd += ["--bind", image.rootfs, "/"] + proc_args() + ["--dev", "/dev", "--tmpfs", "/tmp"]
+  cmd += ["--bind", image.rootfs, "/"] + list(proc_args(host_proc)) + ["--dev", "/dev", "--tmpfs", "/tmp"]
   if network:
     for f in ("/etc/resolv.conf", "/etc/hosts"):
       cmd += ["--ro-bind-try", f, f]
@@ -458,15 +474,17 @@ def bwrap_command(image, binds=(), env=(), network=True, extra_args=()):
 class BwrapRunner:
   """Run commands in IMAGE under bwrap; same interface as DockerRunner."""
 
-  def __init__(self, image, docker_image, docker_run_args=(), extra_env={}, extra_volumes=[]) -> None:
+  def __init__(self, image, docker_image, docker_run_args=(), extra_env={}, extra_volumes=[],
+               host_proc=False) -> None:
     self._image = image
     self._run_args = docker_run_args
     self._extra_env = extra_env
     self._extra_volumes = extra_volumes
+    self._host_proc = host_proc
 
   def __enter__(self):
     cmd = bwrap_command(self._image, [parse_volume(v) for v in self._extra_volumes],
-                        self._extra_env.items(), extra_args=self._run_args)
+                        self._extra_env.items(), extra_args=self._run_args, host_proc=self._host_proc)
 
     def getstatusoutput_bwrap(command, cwd=None):
       debug("bwrap exec: %s", command)
@@ -477,14 +495,15 @@ class BwrapRunner:
     return False
 
 
-def bwrap_run_string(image, network, dockerImage, workDir, configDir, scriptDir, docker_extra_args,
+def bwrap_run_string(image, args, dockerImage, workDir, configDir, scriptDir, docker_extra_args,
                      spec, specs, volumes, buildEnvironment):
   """The bwrap counterpart of _docker_run_string: build.sh with the same
   mounts and environment as docker gives it."""
+  workDir = os.path.abspath(workDir)
   # The image cache is under the work dir: keep it read-only, or a build could
   # change the image for all later ones.
-  binds = [(os.path.abspath(workDir), "/sw", False),
-           (os.path.join(os.path.abspath(workDir), "CONTAINERS"), "/sw/CONTAINERS", True),
+  binds = [(workDir, "/sw", False),
+           (os.path.join(workDir, "CONTAINERS"), "/sw/CONTAINERS", True),
            (os.path.abspath(configDir), "/alidist", True),
            (os.path.join(scriptDir, "build.sh"), "/build.sh", True)]
   if "reference" in spec:
@@ -496,8 +515,14 @@ def bwrap_run_string(image, network, dockerImage, workDir, configDir, scriptDir,
                     "/" + pkg, False))
   binds += [parse_volume(v) for v in volumes]
   env = list(buildEnvironment) + [("WORK_DIR_OVERRIDE", "/sw"), ("ALIBUILD_CONFIG_DIR_OVERRIDE", "/alidist")]
-  cmd = bwrap_command(image, binds, env, network=network, extra_args=docker_extra_args)
+  cmd = bwrap_command(image, binds, env, network=getattr(args, "containerNetwork", "host") != "none",
+                      extra_args=docker_extra_args, host_proc=allow_host_proc(args))
   return " ".join(map(quote, cmd + ["bash", "-ex", "/build.sh"]))
+
+
+def allow_host_proc(args):
+  return bool(getattr(args, "containerAllowHostProc", False) or
+              os.environ.get("ALIBUILD_CONTAINER_ALLOW_HOST_PROC", "") not in ("", "0"))
 
 
 _images = {}
@@ -519,11 +544,10 @@ def runtime(args):
   extra = list(args.docker_extra_args)
   if "--platform" in extra[:-1]:   # added for docker by args.py; it selects the image here
     del extra[extra.index("--platform"):extra.index("--platform") + 2]
-  network = getattr(args, "containerNetwork", "host") != "none"
 
   def runner(docker_image, docker_run_args=(), extra_env={}, extra_volumes=[]):
-    return BwrapRunner(image, docker_image, extra, extra_env, extra_volumes)
+    return BwrapRunner(image, docker_image, extra, extra_env, extra_volumes, allow_host_proc(args))
 
   def run_string(dockerImage, workDir, configDir, scriptDir, docker_extra_args, *rest):
-    return bwrap_run_string(image, network, dockerImage, workDir, configDir, scriptDir, extra, *rest)
+    return bwrap_run_string(image, args, dockerImage, workDir, configDir, scriptDir, extra, *rest)
   return runner, run_string

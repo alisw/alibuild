@@ -189,7 +189,7 @@ class FakeImage:
   config = {"Env": ["PATH=/opt/bin:/usr/bin", "FOO=image"], "WorkingDir": "/work"}
 
 
-@mock.patch("alibuild_helpers.bwrap.proc_args", new=lambda: ["--proc", "/proc"])
+@mock.patch("alibuild_helpers.bwrap.proc_args", new=lambda host_proc=False: ("--proc", "/proc"))
 class CommandTestCase(unittest.TestCase):
   def test_bwrap_command(self):
     cmd = bwrap_command(FakeImage(), [("/w", "/sw", False), ("/c", "/alidist", True)], [("FOO", "env")])
@@ -207,7 +207,8 @@ class CommandTestCase(unittest.TestCase):
 
   def test_run_string(self):
     spec = {"package": "zlib", "reference": "/mirror/zlib", "is_devel_pkg": False}
-    run = bwrap_run_string(FakeImage(), True, "img", "/sw-host", "/alidist-host", "/sw-host/SPECS/x",
+    args = mock.MagicMock(containerNetwork="host", containerAllowHostProc=False)
+    run = bwrap_run_string(FakeImage(), args, "img", "/sw-host", "/alidist-host", "/sw-host/SPECS/x",
                            [], spec, {"zlib": spec}, ["/data:/data:ro"],
                            [("PKGNAME", "zlib"), ("WEIRD", "a b'c")])
     args = shlex.split(run)
@@ -229,6 +230,28 @@ class CommandTestCase(unittest.TestCase):
     self.assertEqual(bwrap.get_image(args).cache_dir, "/w/CONTAINERS")
     self.assertEqual(runner("img", [])._run_args, ["--x"])
     bwrap._images.clear()
+
+
+class ProcTestCase(unittest.TestCase):
+  def setUp(self):
+    bwrap.proc_args.cache_clear()
+    self.addCleanup(bwrap.proc_args.cache_clear)
+
+  def test_fresh_proc_by_default(self):
+    with mock.patch("alibuild_helpers.bwrap.fresh_proc", new=lambda: (True, "")):
+      self.assertEqual(bwrap.proc_args(), ("--proc", "/proc"))
+
+  def test_host_proc_needs_opt_in(self):
+    with mock.patch("alibuild_helpers.bwrap.fresh_proc", new=lambda: (False, "EPERM")), \
+         mock.patch("alibuild_helpers.bwrap.shutil.which", new=lambda _: "/usr/bin/bwrap"), \
+         mock.patch("alibuild_helpers.bwrap.getstatusoutput", new=lambda _: (0, "")), \
+         mock.patch("alibuild_helpers.bwrap.warning") as warn:
+      self.assertIn("--container-allow-host-proc", bwrap.bwrap_check())
+      self.assertIsNone(bwrap.bwrap_check(host_proc=True))
+      with self.assertRaises(SystemExit):
+        bwrap.proc_args()
+      self.assertEqual(bwrap.proc_args(True), ("--ro-bind", "/proc", "/proc"))
+      warn.assert_called_once()
 
 
 if __name__ == '__main__':

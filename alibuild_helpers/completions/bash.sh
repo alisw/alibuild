@@ -97,6 +97,7 @@ _aliBuild_complete() {
           --no-local --force-tracked --plugin --disable --force-rebuild
           --annotate --only-deps --plan
           --docker --docker-image --docker-extra-args -v --container-runtime --container-network
+          --container-allow-host-proc
           --no-remote-store --remote-store --write-store --ac-store --storage --insecure
           --legacy-links-store --cas-public-url
           --no-snapshot-sources --sign-url --sign-token --sign-token-file --signer --no-sign
@@ -158,7 +159,7 @@ _aliBuild_complete() {
       if [[ "$cur" == -* ]]; then
         COMPREPLY=( $(compgen -W "
           -a --architecture --defaults --disable -e
-          --docker --docker-image --docker-extra-args --container-runtime
+          --docker --docker-image --docker-extra-args --container-runtime --container-allow-host-proc
           --no-remote-store --remote-store --write-store --insecure
           -C --chdir -w --work-dir -c --config
           --always-prefer-system --no-system

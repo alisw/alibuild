@@ -153,6 +153,11 @@ def doParseArgs():
                             default="host",
                             help=("With bwrap, 'none' runs build.sh without network access; this "
                                   "also cuts off services on the host's localhost. Default: host."))
+  build_docker.add_argument("--container-allow-host-proc", dest="containerAllowHostProc",
+                            action="store_true", default=False,
+                            help=("With bwrap, bind the host's /proc where a new one cannot be "
+                                  "mounted (e.g. inside another container), which shows the build "
+                                  "all the host's processes. Also $ALIBUILD_CONTAINER_ALLOW_HOST_PROC=1."))
 
   build_sandbox = build_parser.add_argument_group(title="Build inside a sandbox (macOS)", description="""\
   On macOS, recipes can be run under a seatbelt sandbox (sandbox-exec) which
@@ -388,6 +393,9 @@ def doParseArgs():
   doctor_docker.add_argument("--container-runtime", dest="containerRuntime", metavar="RUNTIME",
                              choices=("docker", "container", "bwrap"), default=None,
                              help="Run the container with RUNTIME, as for aliBuild build. Implies --docker.")
+  doctor_docker.add_argument("--container-allow-host-proc", dest="containerAllowHostProc",
+                             action="store_true", default=False,
+                             help="With bwrap, bind the host's /proc, as for aliBuild build.")
 
   doctor_remote = doctor_parser.add_argument_group(title="Re-use prebuilt tarballs", description="""\
   Reusing prebuilt tarballs saves compilation time, as common packages need not
@@ -545,6 +553,9 @@ def finaliseArgs(args, parser):
     if "containerRuntime" in args and not args.containerRuntime:
       args.containerRuntime = os.environ.get("ALIBUILD_CONTAINER_RUNTIME") or None
     bwrap = getattr(args, "containerRuntime", None) == "bwrap"
+    if "containerAllowHostProc" in args:
+      args.containerAllowHostProc = args.containerAllowHostProc or \
+        os.environ.get("ALIBUILD_CONTAINER_ALLOW_HOST_PROC", "") not in ("", "0")
     # In case we build with docker / containers, we add a special
     # devel prefix (if not already present) so that we do not pollute
     # the namespace of the current architecture
@@ -566,7 +577,8 @@ def finaliseArgs(args, parser):
       parser.error("cannot use `-a %s` and --docker" % args.architecture)
 
     if args.docker and bwrap:
-      problem = bwrap_check() if sys.platform.startswith("linux") else "it needs Linux"
+      problem = bwrap_check(args.containerAllowHostProc) if sys.platform.startswith("linux") \
+        else "it needs Linux"
       if problem:
         parser.error("cannot use --container-runtime=bwrap: " + problem)
     elif args.docker and commands.getstatusoutput("which docker")[0] and commands.getstatusoutput("which container")[0]:
