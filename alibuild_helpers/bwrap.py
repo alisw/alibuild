@@ -481,7 +481,10 @@ def bwrap_run_string(image, network, dockerImage, workDir, configDir, scriptDir,
                      spec, specs, volumes, buildEnvironment):
   """The bwrap counterpart of _docker_run_string: build.sh with the same
   mounts and environment as docker gives it."""
+  # The image cache is under the work dir: keep it read-only, or a build could
+  # change the image for all later ones.
   binds = [(os.path.abspath(workDir), "/sw", False),
+           (os.path.join(os.path.abspath(workDir), "CONTAINERS"), "/sw/CONTAINERS", True),
            (os.path.abspath(configDir), "/alidist", True),
            (os.path.join(scriptDir, "build.sh"), "/build.sh", True)]
   if "reference" in spec:

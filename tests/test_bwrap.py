@@ -213,7 +213,8 @@ class CommandTestCase(unittest.TestCase):
     args = shlex.split(run)
     self.assertEqual(args[-3:], ["bash", "-ex", "/build.sh"])
     joined = " ".join(args)
-    for expected in ("--bind /sw-host /sw", "--ro-bind /alidist-host /alidist",
+    for expected in ("--bind /sw-host /sw --ro-bind /sw-host/CONTAINERS /sw/CONTAINERS",
+                     "--ro-bind /alidist-host /alidist",
                      "--ro-bind /sw-host/SPECS/x/build.sh /build.sh", "--bind /mirror /mirror",
                      "--ro-bind /data /data", "--setenv PKGNAME zlib", "--setenv WEIRD a b'c",
                      "--setenv WORK_DIR_OVERRIDE /sw", "--setenv ALIBUILD_CONFIG_DIR_OVERRIDE /alidist"):
