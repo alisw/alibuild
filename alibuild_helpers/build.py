@@ -1564,6 +1564,9 @@ def doBuild(args, parser):
     )
     # 8 hour timeout per package to prevent builds from hanging forever
     err = execute(build_command, printer=progress, timeout=8*60*60)
+    if not err and args.docker and getattr(args, "sandbox", False):
+      from alibuild_helpers.bwrap import set_links
+      set_links(spec, args, done=True)
     progress.end("failed" if err else "done", err)
     report_event("BuildError" if err else "BuildSuccess", spec["package"], " ".join((
       args.architecture,

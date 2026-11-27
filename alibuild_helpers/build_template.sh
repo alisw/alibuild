@@ -364,12 +364,13 @@ cd "$WORK_DIR"
 if [ -w "$WORK_DIR/$ARCHITECTURE/$PKGNAME/$PKGVERSION-$PKGREVISION" ]; then
   bash -ex "$ARCHITECTURE/$PKGNAME/$PKGVERSION-$PKGREVISION/relocate-me.sh"
 fi
-# Last package built gets a "latest" mark.
-ln -snf $PKGVERSION-$PKGREVISION $ARCHITECTURE/$PKGNAME/latest
+# Last package built gets a "latest" mark. With bwrap --sandbox, this directory
+# is read-only, and aliBuild sets these links once the build has succeeded.
+[ ! -w $ARCHITECTURE/$PKGNAME ] || ln -snf $PKGVERSION-$PKGREVISION $ARCHITECTURE/$PKGNAME/latest
 
 # Latest package built for a given devel prefix gets latest-$BUILD_FAMILY
 if [[ $BUILD_FAMILY ]]; then
-  ln -snf $PKGVERSION-$PKGREVISION $ARCHITECTURE/$PKGNAME/latest-$BUILD_FAMILY
+  [ ! -w $ARCHITECTURE/$PKGNAME ] || ln -snf $PKGVERSION-$PKGREVISION $ARCHITECTURE/$PKGNAME/latest-$BUILD_FAMILY
 fi
 
 # When the package is definitely fully installed, install the file that marks

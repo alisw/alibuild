@@ -502,19 +502,34 @@ def confined_paths(spec, work_dir, architecture, devel_prefix):
   """Under --sandbox, what build.sh may write in the read-only work dir: the
   areas the macOS sandbox allows (package_write_paths), as bind mounts.
   Returns (trees, symlinks): host directories to bind writable, and the
-  -latest symlinks in BUILD, which aliBuild creates itself, as a bind mount
-  cannot make a single symlink writable. The symlinks in ARCH/PKG come with
-  the whole of that directory instead, which only holds this package's
-  versions (as TARS/ARCH/PKG holds its tarballs)."""
+  -latest symlinks, which aliBuild sets itself, as a bind mount cannot make
+  a single symlink writable (see set_links). ARCH/PKG stays read-only, so the
+  build can change no other version of the package."""
   work_dir = os.path.abspath(work_dir)
   subpaths, literals = package_write_paths(spec, work_dir, work_dir, architecture, devel_prefix)
-  pkg_dir = os.path.join(work_dir, architecture, spec["package"])
   sources = os.path.join(work_dir, "SOURCES") + os.sep
   # SOURCEDIR only if checked out: a development package's is a symlink to its
   # checkout, bound writable at /PKG already.
-  trees = [p for p in subpaths if os.path.dirname(p) != pkg_dir and
-           not (p.startswith(sources) and (os.path.islink(p) or not os.path.isdir(p)))]
-  return trees + [pkg_dir], [p for p in literals if os.path.dirname(p) != pkg_dir]
+  trees = [p for p in subpaths
+           if not (p.startswith(sources) and (os.path.islink(p) or not os.path.isdir(p)))]
+  return trees, literals
+
+
+def set_links(spec, args, done):
+  """Point the -latest symlinks of a confined build where build.sh would: those
+  in BUILD at its start (DONE false), those in ARCH/PKG once it has succeeded
+  (DONE true), which build.sh skips as it cannot write there."""
+  _, links = confined_paths(spec, args.workDir, args.architecture, _devel_prefix(spec, args))
+  build_dir = os.path.join(os.path.abspath(args.workDir), "BUILD")
+  for link in links:
+    in_build = os.path.dirname(link) == build_dir
+    if in_build == done:
+      continue
+    target = spec["hash"] if in_build else "%s-%s" % (spec["version"], spec["revision"])
+    os.makedirs(os.path.dirname(link), exist_ok=True)
+    if not (os.path.islink(link) and os.readlink(link) == target):
+      os.symlink(target, link + ".tmp%d" % os.getpid())
+      os.replace(link + ".tmp%d" % os.getpid(), link)
 
 
 def _in_sandbox(path, work_dir):
@@ -545,15 +560,11 @@ def bwrap_run_string(image, args, dockerImage, workDir, configDir, scriptDir, do
   if "reference" in spec:
     binds.append((os.path.dirname(spec["reference"]), "/mirror", confine))
   if confine:
-    trees, symlinks = confined_paths(spec, workDir, args.architecture, _devel_prefix(spec, args))
+    trees, _ = confined_paths(spec, workDir, args.architecture, _devel_prefix(spec, args))
     # build.sh creates these, which it cannot do in the read-only work dir.
     for path in trees + [os.path.join(workDir, d) for d in ("BUILD", "SOURCES", "TARS", "SPECS")]:
       os.makedirs(path, exist_ok=True)
-    for link in symlinks:   # what build.sh would point them at
-      os.makedirs(os.path.dirname(link), exist_ok=True)
-      if not (os.path.islink(link) and os.readlink(link) == spec["hash"]):
-        os.symlink(spec["hash"], link + ".tmp%d" % os.getpid())
-        os.replace(link + ".tmp%d" % os.getpid(), link)
+    set_links(spec, args, done=False)
     for path in getattr(args, "sandboxAllowWrite", []):
       if os.path.exists(path):
         trees.append(os.path.abspath(path))

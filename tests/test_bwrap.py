@@ -253,13 +253,21 @@ class CommandTestCase(unittest.TestCase):
     writable = [(args[i + 1], args[i + 2]) for i, a in enumerate(args) if a == "--bind"]
     rel = ["BUILD/abcdef1234", "INSTALLROOT/abcdef1234", "TMP/abcdef1234",
            "TARS/slc9_aarch64/store/ab/abcdef1234", "TARS/slc9_aarch64/zlib",
-           "SOURCES/zlib/v1.3.1/v1.3.1", "slc9_aarch64/zlib"]
+           "slc9_aarch64/zlib/v1.3.1-1", "SOURCES/zlib/v1.3.1/v1.3.1"]
     self.assertEqual(writable, [("/cache/rootfs", "/"), (w + "/TMP/abcdef1234", "/tmp")] +
                      [(os.path.join(w, r), "/sw/" + r) for r in rel])
     # The sources and directories exist, as bwrap needs; the BUILD link is made.
     for r in rel + ["SOURCES", "SPECS"]:
       self.assertTrue(os.path.isdir(os.path.join(w, r)), r)
     self.assertEqual(os.readlink(os.path.join(w, "BUILD", "zlib-latest")), "abcdef1234")
+    # The package's other versions stay read-only; the links there are set
+    # only once the build has succeeded.
+    self.assertNotIn(" /sw/slc9_aarch64/zlib ", " %s " % joined)
+    self.assertFalse(os.path.lexists(os.path.join(w, "slc9_aarch64", "zlib", "latest")))
+    args = mock.MagicMock(workDir=w, architecture="slc9_aarch64", develPrefix=None)
+    bwrap.set_links(self.spec, args, done=True)
+    for link in ("latest", "latest-fam"):
+      self.assertEqual(os.readlink(os.path.join(w, "slc9_aarch64", "zlib", link)), "v1.3.1-1")
     # Not checked out (e.g. unpacking a tarball): no SOURCEDIR bind.
     os.rmdir(os.path.join(w, "SOURCES", "zlib", "v1.3.1", "v1.3.1"))
     self.assertNotIn("SOURCES", self.run_string(sandbox=True)[0])
