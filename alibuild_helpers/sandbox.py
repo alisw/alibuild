@@ -68,14 +68,9 @@ def _variants(path):
   return list(dict.fromkeys([path, realpath(path)]))
 
 
-def sandbox_paths(spec, work_dir, build_work_dir, architecture, devel_prefix,
-                  extra_writable=(), environ=os.environ):
-  """Compute what the build of spec may write to.
-
-  Returns (subpaths, literals, directories): trees which are fully writable,
-  single paths (the -latest symlinks) which are, and parent directories which may
-  be created and have their metadata updated, but not be written into.
-  """
+def package_write_paths(spec, work_dir, build_work_dir, architecture, devel_prefix):
+  """The areas the build of spec owns, on any platform: (subpaths, literals),
+  trees which it may write to and single paths (the -latest symlinks)."""
   pkg, version, revision, pkghash = spec["package"], spec["version"], spec["revision"], spec["hash"]
   pkgpath = join(architecture, pkg, "%s-%s" % (version, revision))
   # Must match SOURCEDIR in build_template.sh. For development packages, this
@@ -91,15 +86,6 @@ def sandbox_paths(spec, work_dir, build_work_dir, architecture, devel_prefix,
     join(work_dir, pkgpath),
     sourcedir,
   ]
-  subpaths += [p for p in extra_writable if p]
-  if environ.get("CCACHE_DIR"):
-    subpaths.append(environ["CCACHE_DIR"])
-  for name in ("DARWIN_USER_TEMP_DIR", "DARWIN_USER_CACHE_DIR"):
-    user_dir = _darwin_user_dir(name)
-    if user_dir:
-      subpaths.append(user_dir)
-  subpaths.append(expanduser("~/Library/Caches"))
-
   literals = [
     join(build_work_dir, "BUILD", pkg + "-latest"),
     join(work_dir, architecture, pkg, "latest"),
@@ -108,6 +94,26 @@ def sandbox_paths(spec, work_dir, build_work_dir, architecture, devel_prefix,
     literals.append(join(build_work_dir, "BUILD", "%s-latest-%s" % (pkg, devel_prefix)))
   if spec.get("build_family"):
     literals.append(join(work_dir, architecture, pkg, "latest-" + spec["build_family"]))
+  return subpaths, literals
+
+
+def sandbox_paths(spec, work_dir, build_work_dir, architecture, devel_prefix,
+                  extra_writable=(), environ=os.environ):
+  """Compute what the build of spec may write to.
+
+  Returns (subpaths, literals, directories): trees which are fully writable,
+  single paths (the -latest symlinks) which are, and parent directories which may
+  be created and have their metadata updated, but not be written into.
+  """
+  subpaths, literals = package_write_paths(spec, work_dir, build_work_dir, architecture, devel_prefix)
+  subpaths += [p for p in extra_writable if p]
+  if environ.get("CCACHE_DIR"):
+    subpaths.append(environ["CCACHE_DIR"])
+  for name in ("DARWIN_USER_TEMP_DIR", "DARWIN_USER_CACHE_DIR"):
+    user_dir = _darwin_user_dir(name)
+    if user_dir:
+      subpaths.append(user_dir)
+  subpaths.append(expanduser("~/Library/Caches"))
 
   # Every directory between the work directory and what we write to, as the
   # build script creates them with mkdir -p and rsync updates their metadata.
