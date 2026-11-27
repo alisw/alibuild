@@ -205,21 +205,44 @@ class CommandTestCase(unittest.TestCase):
     self.assertEqual(cmd[-2:], ["--chdir", "/work"])
     self.assertIn("--unshare-net", bwrap_command(FakeImage(), network=False))
 
-  def test_run_string(self):
-    spec = {"package": "zlib", "reference": "/mirror/zlib", "is_devel_pkg": False}
-    args = mock.MagicMock(containerNetwork="host", containerAllowHostProc=False)
-    run = bwrap_run_string(FakeImage(), args, "img", "/sw-host", "/alidist-host", "/sw-host/SPECS/x",
-                           [], spec, {"zlib": spec}, ["/data:/data:ro"],
+  def setUp(self):
+    self.tmp = tempfile.TemporaryDirectory()
+    self.addCleanup(self.tmp.cleanup)
+    self.work = os.path.join(self.tmp.name, "sw")
+    self.spec = {"package": "zlib", "version": "v1.3.1", "revision": "1", "hash": "abcdef1234",
+                 "tag": "v1.3.1", "commit_hash": "v1.3.1", "build_family": "fam",
+                 "reference": "/mirror/zlib", "is_devel_pkg": False}
+
+  def run_string(self, sandbox=False, **kwargs):
+    args = mock.MagicMock(sandbox=sandbox, architecture="slc9_aarch64", develPrefix=None,
+                          containerNetwork="host", containerAllowHostProc=False, workDir=self.work,
+                          sandboxAllowWrite=[])
+    for k, v in kwargs.items():
+      setattr(args, k, v)
+    run = bwrap_run_string(FakeImage(), args, "img", self.work, "/alidist-host", self.work + "/SPECS/x",
+                           [], self.spec, {"zlib": self.spec}, ["/data:/data:ro"],
                            [("PKGNAME", "zlib"), ("WEIRD", "a b'c")])
     args = shlex.split(run)
     self.assertEqual(args[-3:], ["bash", "-ex", "/build.sh"])
-    joined = " ".join(args)
-    for expected in ("--bind /sw-host /sw --ro-bind /sw-host/CONTAINERS /sw/CONTAINERS",
+    return " ".join(args), args
+
+  def test_run_string(self):
+    w = self.work
+    with open(os.path.join(self.tmp.name, "stale"), "w"):
+      pass
+    joined, _ = self.run_string()
+    for expected in ("--bind %s /sw --ro-bind %s/CONTAINERS /sw/CONTAINERS" % (w, w),
                      "--ro-bind /alidist-host /alidist",
-                     "--ro-bind /sw-host/SPECS/x/build.sh /build.sh", "--bind /mirror /mirror",
+                     "--ro-bind %s/SPECS/x/build.sh /build.sh --bind /mirror /mirror" % w,
+                     # /tmp is on disk, and TMP/<hash> is a mount point build.sh cannot remove
+                     "--dev /dev --bind %s/TMP/abcdef1234 /tmp" % w,
+                     "--bind %s/TMP/abcdef1234 /sw/TMP/abcdef1234" % w,
                      "--ro-bind /data /data", "--setenv PKGNAME zlib", "--setenv WEIRD a b'c",
-                     "--setenv WORK_DIR_OVERRIDE /sw", "--setenv ALIBUILD_CONFIG_DIR_OVERRIDE /alidist"):
+                     "--setenv WORK_DIR_OVERRIDE /sw", "--setenv ALIBUILD_CONFIG_DIR_OVERRIDE /alidist",
+                     "--setenv TMPDIR /tmp"):
       self.assertIn(expected, joined)
+    self.assertNotIn("--tmpfs", joined)
+    self.assertEqual(os.listdir(os.path.join(w, "TMP", "abcdef1234")), [])
 
   def test_runtime_takes_platform_from_docker_extra_args(self):
     args = mock.MagicMock(workDir="/w", dockerImage="img", docker_extra_args=["--platform", "linux/arm64", "--x"],

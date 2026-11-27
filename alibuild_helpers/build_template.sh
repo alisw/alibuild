@@ -170,7 +170,8 @@ else
     fi
   popd
   find $INSTALLROOT -name "*.unrelocated" -delete
-  rm -rf $WORK_DIR/TMP/$PKGHASH
+  # Under bwrap, TMP/<hash> is a mount point, which rm can empty but not remove.
+  rm -rf $WORK_DIR/TMP/$PKGHASH || [ -z "$(ls -A $WORK_DIR/TMP/$PKGHASH)" ]
 fi
 
 # Regenerate init.sh, in case the package build clobbered it. This

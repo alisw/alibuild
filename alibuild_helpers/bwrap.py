@@ -444,11 +444,12 @@ def parse_volume(volume):
   return parts[0], dest, len(parts) > 2 and "ro" in parts[2].split(",")
 
 
-def bwrap_command(image, binds=(), env=(), network=True, extra_args=(), host_proc=False):
+def bwrap_command(image, binds=(), env=(), network=True, extra_args=(), host_proc=False, tmp=None):
   """Return the bwrap argument list running in IMAGE with the BINDS (source,
-  destination, read_only) and environment ENV on top of the image's. The
-  rootfs is read-only to the command: it is bound writable only so bwrap can
-  create the mount points, then remounted read-only before the command runs."""
+  destination, read_only) and environment ENV on top of the image's. /tmp is
+  the host directory TMP, or a tmpfs. The rootfs is read-only to the command:
+  it is bound writable only so bwrap can create the mount points, then
+  remounted read-only before the command runs."""
   config = image.config
   cmd = ["bwrap", "--unshare-user", "--unshare-pid", "--unshare-ipc", "--unshare-uts",
          "--die-with-parent", "--new-session"]
@@ -458,7 +459,8 @@ def bwrap_command(image, binds=(), env=(), network=True, extra_args=(), host_pro
     # To keep them, they would have to listen on Unix sockets bound into the
     # sandbox, with a forwarder inside it if the client wants TCP.
     cmd.append("--unshare-net")
-  cmd += ["--bind", image.rootfs, "/"] + list(proc_args(host_proc)) + ["--dev", "/dev", "--tmpfs", "/tmp"]
+  cmd += ["--bind", image.rootfs, "/"] + list(proc_args(host_proc)) + ["--dev", "/dev"]
+  cmd += ["--bind", tmp, "/tmp"] if tmp else ["--tmpfs", "/tmp"]
   if network:
     for f in ("/etc/resolv.conf", "/etc/hosts"):
       cmd += ["--ro-bind-try", f, f]
@@ -495,11 +497,23 @@ class BwrapRunner:
     return False
 
 
+def _in_sandbox(path, work_dir):
+  work_dir = os.path.abspath(work_dir)
+  if path == work_dir or path.startswith(work_dir + os.sep):
+    return "/sw" + path[len(work_dir):]
+  return path
+
+
 def bwrap_run_string(image, args, dockerImage, workDir, configDir, scriptDir, docker_extra_args,
                      spec, specs, volumes, buildEnvironment):
   """The bwrap counterpart of _docker_run_string: build.sh with the same
-  mounts and environment as docker gives it."""
+  mounts and environment as docker gives it. /tmp is TMP/<hash> in the work
+  dir, emptied first, so that temporary files count against the disk, not the
+  memory, of the task."""
   workDir = os.path.abspath(workDir)
+  tmp = os.path.join(workDir, "TMP", spec["hash"])
+  shutil.rmtree(tmp, ignore_errors=True)
+  os.makedirs(tmp)
   # The image cache is under the work dir: keep it read-only, or a build could
   # change the image for all later ones.
   binds = [(workDir, "/sw", False),
@@ -508,15 +522,19 @@ def bwrap_run_string(image, args, dockerImage, workDir, configDir, scriptDir, do
            (os.path.join(scriptDir, "build.sh"), "/build.sh", True)]
   if "reference" in spec:
     binds.append((os.path.dirname(spec["reference"]), "/mirror", False))
+  # Make TMP/<hash> a mount point, so build.sh can empty it but not remove it
+  # from under /tmp.
+  binds.append((tmp, _in_sandbox(tmp, workDir), False))
   for s in specs.values():
     if s["is_devel_pkg"]:
       pkg = s["package"]
       binds.append((os.path.join(os.getcwd(), os.readlink(pkg) if os.path.islink(pkg) else pkg),
                     "/" + pkg, False))
   binds += [parse_volume(v) for v in volumes]
-  env = list(buildEnvironment) + [("WORK_DIR_OVERRIDE", "/sw"), ("ALIBUILD_CONFIG_DIR_OVERRIDE", "/alidist")]
+  env = list(buildEnvironment) + [("WORK_DIR_OVERRIDE", "/sw"), ("ALIBUILD_CONFIG_DIR_OVERRIDE", "/alidist"),
+                                  ("TMPDIR", "/tmp")]
   cmd = bwrap_command(image, binds, env, network=getattr(args, "containerNetwork", "host") != "none",
-                      extra_args=docker_extra_args, host_proc=allow_host_proc(args))
+                      extra_args=docker_extra_args, host_proc=allow_host_proc(args), tmp=tmp)
   return " ".join(map(quote, cmd + ["bash", "-ex", "/build.sh"]))
 
 
