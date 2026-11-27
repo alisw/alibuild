@@ -2,6 +2,7 @@ import argparse
 from alibuild_helpers.utilities import detectArch, normalise_multiple_options, default_builder_image, docker_platform_for
 from alibuild_helpers.workarea import cleanup_git_log
 from alibuild_helpers.sandbox import sandbox_check
+from alibuild_helpers.bwrap import bwrap_check
 import multiprocessing
 
 import re
@@ -140,12 +141,36 @@ def doParseArgs():
   build_docker.add_argument("-v", dest="volumes", action="append", default=[],
                             help=("Additional volume to be mounted inside the Docker container, if one is used. "
                                   "May be specified multiple times. Passed verbatim to 'docker run'."))
+  build_docker.add_argument("--container-runtime", dest="containerRuntime", metavar="RUNTIME",
+                            choices=("docker", "container", "bwrap"),
+                            default=None,
+                            help=("Run the container with RUNTIME: docker, container (Apple's) or "
+                                  "bwrap (bubblewrap: no daemon or privileges, the build stays a "
+                                  "child of aliBuild). Implies --docker if given on the command line. "
+                                  "Default: $ALIBUILD_CONTAINER_RUNTIME, else container on macOS 26+ "
+                                  "and docker elsewhere."))
+  build_docker.add_argument("--container-network", dest="containerNetwork", choices=("host", "none"),
+                            default="host",
+                            help=("With bwrap, 'none' runs build.sh without network access; this "
+                                  "also cuts off services on the host's localhost. Default: host."))
+  build_docker.add_argument("--container-allow-host-proc", dest="containerAllowHostProc",
+                            action="store_true", default=False,
+                            help=("With bwrap, bind the host's /proc where a new one cannot be "
+                                  "mounted (e.g. inside another container), which shows the build "
+                                  "all the host's processes. Also $ALIBUILD_CONTAINER_ALLOW_HOST_PROC=1."))
+  build_docker.add_argument("--container-no-seccomp", dest="containerNoSeccomp",
+                            action="store_true", default=False,
+                            help=("With bwrap, run builds without the seccomp filter equivalent to "
+                                  "docker's default profile, for debugging. Also "
+                                  "$ALIBUILD_CONTAINER_NO_SECCOMP=1."))
 
-  build_sandbox = build_parser.add_argument_group(title="Build inside a sandbox (macOS)", description="""\
+  build_sandbox = build_parser.add_argument_group(title="Build inside a sandbox (macOS, bwrap)", description="""\
   On macOS, recipes can be run under a seatbelt sandbox (sandbox-exec) which
   only lets them write to the directories of the package being built, plus
   temporary and cache directories. Reads and network access are not
-  restricted. Set ALIBUILD_SANDBOX=1 to enable it by default.
+  restricted. With --container-runtime=bwrap, the same directories are the
+  only writable ones in the work directory. Set ALIBUILD_SANDBOX=1 to enable
+  it by default.
   """)
   build_sandbox.add_argument("--sandbox", dest="sandbox", action="store_true", default=None,
                              help="Run each recipe in a macOS sandbox.")
@@ -372,6 +397,15 @@ def doParseArgs():
                              help=("Command-line arguments to pass to 'docker run'. "
                                    "Passed through verbatim -- separate multiple arguments "
                                    "with spaces, and make sure quoting is correct! Implies --docker."))
+  doctor_docker.add_argument("--container-runtime", dest="containerRuntime", metavar="RUNTIME",
+                             choices=("docker", "container", "bwrap"), default=None,
+                             help="Run the container with RUNTIME, as for aliBuild build. Implies --docker.")
+  doctor_docker.add_argument("--container-allow-host-proc", dest="containerAllowHostProc",
+                             action="store_true", default=False,
+                             help="With bwrap, bind the host's /proc, as for aliBuild build.")
+  doctor_docker.add_argument("--container-no-seccomp", dest="containerNoSeccomp",
+                             action="store_true", default=False,
+                             help="With bwrap, run without the seccomp filter, as for aliBuild build.")
 
   doctor_remote = doctor_parser.add_argument_group(title="Re-use prebuilt tarballs", description="""\
   Reusing prebuilt tarballs saves compilation time, as common packages need not
@@ -524,8 +558,14 @@ def finaliseArgs(args, parser):
     cleanup_git_log(args.referenceSources)
 
   if args.action in ("build", "doctor", "deps"):
-    if args.dockerImage or args.docker_extra_args:
+    if args.dockerImage or args.docker_extra_args or getattr(args, "containerRuntime", None):
       args.docker = True
+    if "containerRuntime" in args and not args.containerRuntime:
+      args.containerRuntime = os.environ.get("ALIBUILD_CONTAINER_RUNTIME") or None
+    bwrap = getattr(args, "containerRuntime", None) == "bwrap"
+    if "containerAllowHostProc" in args:
+      args.containerAllowHostProc = args.containerAllowHostProc or \
+        os.environ.get("ALIBUILD_CONTAINER_ALLOW_HOST_PROC", "") not in ("", "0")
     # In case we build with docker / containers, we add a special
     # devel prefix (if not already present) so that we do not pollute
     # the namespace of the current architecture
@@ -546,7 +586,12 @@ def finaliseArgs(args, parser):
     if args.docker and args.architecture.startswith("osx"):
       parser.error("cannot use `-a %s` and --docker" % args.architecture)
 
-    if args.docker and commands.getstatusoutput("which docker")[0] and commands.getstatusoutput("which container")[0]:
+    if args.docker and bwrap:
+      problem = bwrap_check(args.containerAllowHostProc) if sys.platform.startswith("linux") \
+        else "it needs Linux"
+      if problem:
+        parser.error("cannot use --container-runtime=bwrap: " + problem)
+    elif args.docker and commands.getstatusoutput("which docker")[0] and commands.getstatusoutput("which container")[0]:
       parser.error("cannot use --docker as no container runtime (docker or container) was found")
 
     # If specified, used the docker image requested, otherwise, if running
@@ -558,12 +603,15 @@ def finaliseArgs(args, parser):
   if args.action == "build":
     # ALIBUILD_SANDBOX only applies where sandboxing is possible, so it can be
     # set in a shared environment; an explicit --sandbox must work, or fail.
+    bwrap = args.docker and args.containerRuntime == "bwrap"
     if args.sandbox is None:
-      args.sandbox = (sys.platform == "darwin" and not args.docker and
+      args.sandbox = ((sys.platform == "darwin" and not args.docker or bwrap) and
                       os.environ.get("ALIBUILD_SANDBOX", "") not in ("", "0"))
-    if args.sandbox and args.docker:
-      parser.error("cannot use --sandbox and --docker together")
-    if args.sandbox:
+    if args.containerNetwork != "host" and not (args.docker and args.containerRuntime == "bwrap"):
+      parser.error("--container-network needs --container-runtime=bwrap")
+    if args.sandbox and args.docker and not bwrap:
+      parser.error("cannot use --sandbox and --docker together, except with --container-runtime=bwrap")
+    if args.sandbox and not bwrap:
       problem = sandbox_check()
       if problem:
         parser.error("cannot use --sandbox: " + problem)

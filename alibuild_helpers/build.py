@@ -5,7 +5,7 @@ from alibuild_helpers import __version__
 from alibuild_helpers.analytics import report_event
 from alibuild_helpers.log import debug, info, banner, warning
 from alibuild_helpers.log import dieOnError
-from alibuild_helpers.cmd import execute, ContainerRunner, container_run_string, BASH, install_wrapper_script, getstatusoutput
+from alibuild_helpers.cmd import execute, container_runtime, BASH, install_wrapper_script, getstatusoutput
 from alibuild_helpers.utilities import pruneWorkdirFromPaths, pruneVersionEnvVars, symlink, call_ignoring_oserrors, topological_sort, detectArch
 from alibuild_helpers.utilities import resolve_store_path
 from alibuild_helpers.utilities import parseDefaults, readDefaults
@@ -332,6 +332,10 @@ def resolve_container_provenance(args):
     return None
   image = args.dockerImage
   provenance = {"runtime": None, "image": image, "digest": None}
+  if getattr(args, "containerRuntime", None) == "bwrap":
+    from alibuild_helpers.bwrap import get_image
+    provenance.update(runtime="bwrap", digest=get_image(args).resolve())
+    return provenance
   # Prefer docker; fall back to Apple's "container" runtime.
   for runtime in ("docker", "container"):
     if getstatusoutput("command -v " + runtime)[0]:
@@ -816,6 +820,7 @@ def doBuild(args, parser):
   # Capture the build container (if any) once: it is constant for the run and
   # recorded in every Action Cache entry for reproducibility.
   container_provenance = resolve_container_provenance(args)
+  ContainerRunner, container_run_string = container_runtime(args)
 
   packages = args.pkgname
   specs = {}
@@ -1559,6 +1564,9 @@ def doBuild(args, parser):
     )
     # 8 hour timeout per package to prevent builds from hanging forever
     err = execute(build_command, printer=progress, timeout=8*60*60)
+    if not err and args.docker and getattr(args, "sandbox", False):
+      from alibuild_helpers.bwrap import set_links
+      set_links(spec, args, done=True)
     progress.end("failed" if err else "done", err)
     report_event("BuildError" if err else "BuildSuccess", spec["package"], " ".join((
       args.architecture,
@@ -1616,7 +1624,10 @@ def doBuild(args, parser):
     buildErrMsg += f"{bold}Build Directory:{reset}\n"
     buildErrMsg += f"  {build_dir}\n"
 
-    if getattr(args, "sandbox", False):
+    if getattr(args, "sandbox", False) and args.docker:
+      from alibuild_helpers.bwrap import bwrap_failure_hint
+      buildErrMsg += "\n" + bwrap_failure_hint(spec, args, log_path)
+    elif getattr(args, "sandbox", False):
       buildErrMsg += "\n" + sandbox_failure_hint(scriptDir, log_path)
 
     # Gather build info for the error message

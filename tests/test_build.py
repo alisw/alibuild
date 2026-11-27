@@ -722,8 +722,8 @@ class CheckEnvironmentTestCase(unittest.TestCase):
                    new=MagicMock(return_value=(None, {}, {}))), \
              patch.object(Git, "checkedOutCommitName",
                           new=MagicMock(return_value="deadbeef")), \
-             patch("alibuild_helpers.build.ContainerRunner",
-                   new=fake_container_runner), \
+             patch("alibuild_helpers.build.container_runtime",
+                   new=lambda args: (fake_container_runner, None)), \
              patch("alibuild_helpers.build.getPackageList",
                    side_effect=self._Bound()):
             with self.assertRaises(self._Bound):

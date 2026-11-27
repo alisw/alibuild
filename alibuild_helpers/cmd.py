@@ -321,3 +321,17 @@ if to_int(platform.mac_ver()[0].split(".")[0]) >= 26:
 else:
     ContainerRunner = DockerRunner
     container_run_string = _docker_run_string
+
+
+def container_runtime(args):
+  """Return the (ContainerRunner, container_run_string) pair for
+  --container-runtime, or for the platform if it is not given."""
+  runtime = getattr(args, "containerRuntime", None)
+  if runtime == "bwrap" and getattr(args, "docker", False):
+    from alibuild_helpers import bwrap
+    return bwrap.runtime(args)
+  if runtime == "docker":
+    return DockerRunner, _docker_run_string
+  if runtime == "container":
+    return AppleContainerRunner, _apple_run_string
+  return ContainerRunner, container_run_string
