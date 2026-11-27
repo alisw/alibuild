@@ -17,6 +17,7 @@ aliBuild build [-h] [--defaults DEFAULT]
                [--always-prefer-system | --no-system]
                [--docker] [--docker-image IMAGE] [--docker-extra-args ARGLIST] [-v VOLUMES]
                [--container-runtime RUNTIME] [--container-network {host,none}]
+               [--container-allow-host-proc]
                [--no-remote-store] [--remote-store STORE] [--write-store STORE] [--insecure]
                [--ac-store STORE] [--legacy-links-store STORE] [--cas-public-url URL]
                [--storage {ephemeral,permanent}] [--no-snapshot-sources]
@@ -90,6 +91,8 @@ e.g. `alisw/slc8-builder:latest`. They will be fetched if unavailable.
   `container` on macOS 26 and later and `docker` elsewhere.
 - `--container-network host|none`: with `bwrap`, `none` runs each `build.sh`
   without network access. Default: `host`.
+- `--container-allow-host-proc`: with `bwrap`, bind the host's `/proc` where a
+  new one cannot be mounted.
 
 With `--container-runtime=bwrap` (Linux only), aliBuild needs neither a daemon
 nor privileges: it pulls the same builder image anonymously from its registry,
@@ -97,7 +100,14 @@ unpacks it once under `WORK_DIR/CONTAINERS/<digest>/rootfs`, and runs the
 commands docker would run in it with [bubblewrap](https://github.com/containers/bubblewrap),
 in unprivileged user namespaces. The build stays a child of aliBuild: it is in
 the same process group and cgroup, and dies with it. The image is read-only to
-the build, files it writes belong to you, and `/tmp` is a fresh tmpfs. Only
+the build, files it writes belong to you, and `/tmp` is the package's own
+`TMP/<hash>` in the work directory, emptied first, so that temporary files take
+disk rather than memory. With `--sandbox` (or `ALIBUILD_SANDBOX=1`), the work
+directory is read-only to `build.sh`, except for the directories the package
+owns, the same ones as for the macOS sandbox; `--sandbox-allow-write` adds more.
+A new `/proc` is mounted for the build; where the kernel refuses that, as inside
+another container, aliBuild stops, unless `--container-allow-host-proc` (or
+`ALIBUILD_CONTAINER_ALLOW_HOST_PROC=1`) lets the build see the host's. Only
 `build.sh` runs in the sandbox: checkouts, the store and uploads stay in
 aliBuild, so `--container-network none` cuts off the build only. That includes
 services on the host's localhost, such as a `recc` cache or proxy on
