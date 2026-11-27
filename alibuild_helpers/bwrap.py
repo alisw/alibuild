@@ -25,6 +25,7 @@ from shlex import quote
 from alibuild_helpers.log import debug, info, warning, dieOnError
 from alibuild_helpers.cmd import getstatusoutput
 from alibuild_helpers.sandbox import package_write_paths
+from alibuild_helpers import seccomp as seccomp_filter
 
 MANIFEST_TYPES = (
   "application/vnd.oci.image.index.v1+json",
@@ -445,15 +446,37 @@ def parse_volume(volume):
   return parts[0], dest, len(parts) > 2 and "ro" in parts[2].split(",")
 
 
-def bwrap_command(image, binds=(), env=(), network=True, extra_args=(), host_proc=False, tmp=None):
+@functools.lru_cache(maxsize=None)
+def bwrap_version():
+  """bwrap's version as a tuple of ints, e.g. (0, 6, 3); (0,) if unknown."""
+  try:
+    err, out = getstatusoutput(["bwrap", "--version"])
+  except OSError:
+    return (0,)
+  match = re.search(r"(\d+(?:\.\d+)+)", out) if not err else None
+  return tuple(int(x) for x in match.group(1).split(".")) if match else (0,)
+
+
+SECCOMP_FD = 9   # bwrap --seccomp reads the filter from it; one digit for POSIX sh
+
+
+def bwrap_command(image, binds=(), env=(), network=True, extra_args=(), host_proc=False, tmp=None,
+                  seccomp=None):
   """Return the bwrap argument list running in IMAGE with the BINDS (source,
   destination, read_only) and environment ENV on top of the image's. /tmp is
-  the host directory TMP, or a tmpfs. The rootfs is read-only to the command:
-  it is bound writable only so bwrap can create the mount points, then
-  remounted read-only before the command runs."""
+  the host directory TMP, or a tmpfs. SECCOMP is the filter file, which the
+  command must get on SECCOMP_FD (see shell_command). The rootfs is read-only
+  to the command: it is bound writable only so bwrap can create the mount
+  points, then remounted read-only before the command runs."""
   config = image.config
   cmd = ["bwrap", "--unshare-user", "--unshare-pid", "--unshare-ipc", "--unshare-uts",
          "--die-with-parent", "--new-session"]
+  # No nested user namespaces: since bwrap 0.8 it can forbid them itself; the
+  # seccomp filter does too, by refusing clone and unshare namespace flags.
+  if bwrap_version() >= (0, 8):
+    cmd.append("--disable-userns")
+  if seccomp:
+    cmd += ["--seccomp", str(SECCOMP_FD)]
   if not network:
     # This also hides the host's loopback, so services on its localhost (a
     # recc/bb-storage cache on :8980, proxy routes on 127.0.0.1) are gone too.
@@ -474,24 +497,42 @@ def bwrap_command(image, binds=(), env=(), network=True, extra_args=(), host_pro
   return cmd + list(extra_args)
 
 
+def shell_command(cmd, seccomp=None):
+  """CMD as a shell command line, with the seccomp filter file on SECCOMP_FD."""
+  return " ".join(map(quote, cmd)) + (" %d<%s" % (SECCOMP_FD, quote(seccomp)) if seccomp else "")
+
+
+def seccomp_file(args):
+  """The seccomp filter for this run's builds, or None with --container-no-seccomp."""
+  if getattr(args, "containerNoSeccomp", False) or \
+     os.environ.get("ALIBUILD_CONTAINER_NO_SECCOMP", "") not in ("", "0"):
+    warning("Running builds without a seccomp filter, as --container-no-seccomp asks")
+    return None
+  path = seccomp_filter.filter_file(os.path.join(os.path.abspath(args.workDir), "CONTAINERS"))
+  dieOnError(path is None, "No seccomp filter for %s; use --container-no-seccomp" % os.uname().machine)
+  return path
+
+
 class BwrapRunner:
   """Run commands in IMAGE under bwrap; same interface as DockerRunner."""
 
   def __init__(self, image, docker_image, docker_run_args=(), extra_env={}, extra_volumes=[],
-               host_proc=False) -> None:
+               host_proc=False, seccomp=None) -> None:
     self._image = image
     self._run_args = docker_run_args
     self._extra_env = extra_env
     self._extra_volumes = extra_volumes
     self._host_proc = host_proc
+    self._seccomp = seccomp
 
   def __enter__(self):
     cmd = bwrap_command(self._image, [parse_volume(v) for v in self._extra_volumes],
-                        self._extra_env.items(), extra_args=self._run_args, host_proc=self._host_proc)
+                        self._extra_env.items(), extra_args=self._run_args, host_proc=self._host_proc,
+                        seccomp=self._seccomp)
 
     def getstatusoutput_bwrap(command, cwd=None):
       debug("bwrap exec: %s", command)
-      return getstatusoutput(cmd + ["bash", "-c", command], cwd=cwd)
+      return getstatusoutput(shell_command(cmd + ["bash", "-c", command], self._seccomp), cwd=cwd)
     return getstatusoutput_bwrap
 
   def __exit__(self, exc_type, exc_value, traceback):
@@ -540,7 +581,7 @@ def _in_sandbox(path, work_dir):
 
 
 def bwrap_run_string(image, args, dockerImage, workDir, configDir, scriptDir, docker_extra_args,
-                     spec, specs, volumes, buildEnvironment):
+                     spec, specs, volumes, buildEnvironment, seccomp=None):
   """The bwrap counterpart of _docker_run_string: build.sh with the same
   mounts and environment as docker gives it. With --sandbox, the work dir is
   read-only, except for the areas the package owns (see confined_paths).
@@ -584,8 +625,9 @@ def bwrap_run_string(image, args, dockerImage, workDir, configDir, scriptDir, do
   env = list(buildEnvironment) + [("WORK_DIR_OVERRIDE", "/sw"), ("ALIBUILD_CONFIG_DIR_OVERRIDE", "/alidist"),
                                   ("TMPDIR", "/tmp")]
   cmd = bwrap_command(image, binds, env, network=getattr(args, "containerNetwork", "host") != "none",
-                      extra_args=docker_extra_args, host_proc=allow_host_proc(args), tmp=tmp)
-  return " ".join(map(quote, cmd + ["bash", "-ex", "/build.sh"]))
+                      extra_args=docker_extra_args, host_proc=allow_host_proc(args), tmp=tmp,
+                      seccomp=seccomp)
+  return shell_command(cmd + ["bash", "-ex", "/build.sh"], seccomp)
 
 
 def bwrap_failure_hint(spec, args, log_path):
@@ -627,10 +669,12 @@ def runtime(args):
   extra = list(args.docker_extra_args)
   if "--platform" in extra[:-1]:   # added for docker by args.py; it selects the image here
     del extra[extra.index("--platform"):extra.index("--platform") + 2]
+  seccomp = seccomp_file(args)
 
   def runner(docker_image, docker_run_args=(), extra_env={}, extra_volumes=[]):
-    return BwrapRunner(image, docker_image, extra, extra_env, extra_volumes, allow_host_proc(args))
+    return BwrapRunner(image, docker_image, extra, extra_env, extra_volumes, allow_host_proc(args), seccomp)
 
   def run_string(dockerImage, workDir, configDir, scriptDir, docker_extra_args, *rest):
-    return bwrap_run_string(image, args, dockerImage, workDir, configDir, scriptDir, extra, *rest)
+    return bwrap_run_string(image, args, dockerImage, workDir, configDir, scriptDir, extra, *rest,
+                            seccomp=seccomp)
   return runner, run_string

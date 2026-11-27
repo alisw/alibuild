@@ -2,12 +2,13 @@ import io
 import json
 import os
 import shlex
+import struct
 import tarfile
 import tempfile
 import unittest
 from unittest import mock
 
-from alibuild_helpers import bwrap
+from alibuild_helpers import bwrap, seccomp
 from alibuild_helpers.bwrap import (ImageError, Image, apply_layer, bwrap_command, bwrap_run_string,
                                     parse_image_reference, parse_volume, resolve_in_root, select_platform)
 
@@ -190,6 +191,7 @@ class FakeImage:
 
 
 @mock.patch("alibuild_helpers.bwrap.proc_args", new=lambda host_proc=False: ("--proc", "/proc"))
+@mock.patch("alibuild_helpers.bwrap.bwrap_version", new=lambda: (0, 6, 3))
 class CommandTestCase(unittest.TestCase):
   def test_bwrap_command(self):
     cmd = bwrap_command(FakeImage(), [("/w", "/sw", False), ("/c", "/alidist", True)], [("FOO", "env")])
@@ -204,6 +206,15 @@ class CommandTestCase(unittest.TestCase):
     self.assertIn("--setenv PATH /opt/bin:/usr/bin", joined)
     self.assertEqual(cmd[-2:], ["--chdir", "/work"])
     self.assertIn("--unshare-net", bwrap_command(FakeImage(), network=False))
+    self.assertNotIn("--disable-userns", cmd)
+    self.assertNotIn("--seccomp", cmd)
+
+  def test_seccomp_and_disable_userns(self):
+    cmd = bwrap_command(FakeImage(), seccomp="/w/CONTAINERS/f.bpf")
+    self.assertEqual(cmd[cmd.index("--seccomp") + 1], "9")
+    self.assertTrue(bwrap.shell_command(cmd + ["true"], "/w/CONTAINERS/f.bpf").endswith(" true 9</w/CONTAINERS/f.bpf"))
+    with mock.patch("alibuild_helpers.bwrap.bwrap_version", new=lambda: (0, 9, 0)):
+      self.assertIn("--disable-userns", bwrap_command(FakeImage()))
 
   def setUp(self):
     self.tmp = tempfile.TemporaryDirectory()
@@ -288,7 +299,9 @@ class CommandTestCase(unittest.TestCase):
     args = mock.MagicMock(workDir="/w", dockerImage="img", docker_extra_args=["--platform", "linux/arm64", "--x"],
                           containerNetwork="none")
     bwrap._images.clear()
-    runner, run_string = bwrap.runtime(args)
+    with mock.patch("alibuild_helpers.bwrap.seccomp_file", new=lambda args: "/w/f.bpf"):
+      runner, run_string = bwrap.runtime(args)
+    self.assertEqual(runner("img", [])._seccomp, "/w/f.bpf")
     self.assertEqual(bwrap.get_image(args).platform, "linux/arm64")
     self.assertEqual(bwrap.get_image(args).cache_dir, "/w/CONTAINERS")
     self.assertEqual(runner("img", [])._run_args, ["--x"])
@@ -315,6 +328,76 @@ class ProcTestCase(unittest.TestCase):
         bwrap.proc_args()
       self.assertEqual(bwrap.proc_args(True), ("--ro-bind", "/proc", "/proc"))
       warn.assert_called_once()
+
+
+def run_bpf(prog, nr, arch, arg0=0):
+  """A classic BPF interpreter for the instructions seccomp.program uses."""
+  data = struct.pack("<iIQ6Q", nr, arch, 0, arg0, 0, 0, 0, 0, 0)
+  pc, acc = 0, 0
+  while True:
+    code, jt, jf, k = prog[pc]
+    if code == seccomp.LD_W_ABS:
+      acc = struct.unpack_from("<I", data, k)[0]
+      pc += 1
+    elif code == seccomp.RET_K:
+      return k
+    else:
+      taken = {seccomp.JEQ_K: acc == k, seccomp.JGE_K: acc >= k, seccomp.JSET_K: bool(acc & k)}[code]
+      pc += 1 + (jt if taken else jf)
+
+
+class SeccompTestCase(unittest.TestCase):
+  ALLOW, EPERM, ENOSYS = 0x7fff0000, 0x50001, 0x50026
+
+  def check(self, machine, name_or_nr, expected, arg0=0, arch=None):
+    audit_arch, deny, args = seccomp.ARCHES[machine]
+    nr = name_or_nr if isinstance(name_or_nr, int) else {**deny, **args}.get(name_or_nr)
+    self.assertEqual(run_bpf(seccomp.program(machine), nr, arch or audit_arch, arg0), expected,
+                     (machine, name_or_nr, hex(arg0)))
+
+  def test_deny_list(self):
+    for machine in seccomp.ARCHES:
+      for name in ("keyctl", "add_key", "request_key", "bpf", "mount", "umount2", "pivot_root",
+                   "unshare", "setns", "kexec_load", "init_module", "finit_module", "delete_module",
+                   "open_by_handle_at", "perf_event_open", "userfaultfd", "io_uring_setup"):
+        self.check(machine, name, self.EPERM)
+      self.assertNotIn("ptrace", seccomp.ARCHES[machine][1])   # docker allows it on kernels >= 4.8
+
+  def test_allowed(self):
+    # read, write, openat, execve, wait4, mmap on x86_64 and aarch64
+    for machine, nrs in (("x86_64", (0, 1, 257, 59, 61, 9)), ("aarch64", (63, 64, 56, 221, 260, 222))):
+      for nr in nrs:
+        self.check(machine, nr, self.ALLOW)
+
+  def test_arguments(self):
+    for machine in seccomp.ARCHES:
+      self.check(machine, "clone", self.ALLOW, arg0=0x003d0f00)          # what pthread_create uses
+      for flag in (0x10000000, 0x20000, 0x20000000, 0x40000000):          # NEWUSER, NEWNS, NEWPID, NEWNET
+        self.check(machine, "clone", self.EPERM, arg0=0x11 | flag)
+      self.check(machine, "clone3", self.ENOSYS)
+      self.check(machine, "socket", self.ALLOW, arg0=2)                  # AF_INET
+      self.check(machine, "socket", self.ALLOW, arg0=16)                 # AF_NETLINK
+      self.check(machine, "socket", self.EPERM, arg0=40)                 # AF_VSOCK
+      self.check(machine, "socketpair", self.ALLOW, arg0=1)
+      self.check(machine, "personality", self.ALLOW, arg0=0xffffffff)
+      self.check(machine, "personality", self.EPERM, arg0=0x0040000)     # ADDR_NO_RANDOMIZE
+      self.check(machine, 463, self.ENOSYS)                              # newer than Linux 6.12
+
+  def test_other_abis_are_killed(self):
+    kill = 0x80000000
+    self.check("x86_64", 0, kill, arch=0x40000003)                      # i386
+    self.check("x86_64", 0x40000000 | 1, kill)                          # x32 write
+    self.check("aarch64", 4, kill, arch=0x40000028)                     # arm32
+    self.check("aarch64", 63, kill, arch=0xc000003e)
+
+  def test_filter_file(self):
+    with tempfile.TemporaryDirectory() as tmp:
+      path = seccomp.filter_file(tmp, "aarch64")
+      with open(path, "rb") as f:
+        data = f.read()
+      self.assertEqual(len(data), 8 * len(seccomp.program("aarch64")))
+      self.assertEqual(seccomp.filter_file(tmp, "aarch64"), path)
+      self.assertIsNone(seccomp.filter_file(tmp, "ppc64le"))
 
 
 if __name__ == '__main__':

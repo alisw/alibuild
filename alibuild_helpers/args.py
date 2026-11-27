@@ -158,6 +158,11 @@ def doParseArgs():
                             help=("With bwrap, bind the host's /proc where a new one cannot be "
                                   "mounted (e.g. inside another container), which shows the build "
                                   "all the host's processes. Also $ALIBUILD_CONTAINER_ALLOW_HOST_PROC=1."))
+  build_docker.add_argument("--container-no-seccomp", dest="containerNoSeccomp",
+                            action="store_true", default=False,
+                            help=("With bwrap, run builds without the seccomp filter equivalent to "
+                                  "docker's default profile, for debugging. Also "
+                                  "$ALIBUILD_CONTAINER_NO_SECCOMP=1."))
 
   build_sandbox = build_parser.add_argument_group(title="Build inside a sandbox (macOS, bwrap)", description="""\
   On macOS, recipes can be run under a seatbelt sandbox (sandbox-exec) which
@@ -398,6 +403,9 @@ def doParseArgs():
   doctor_docker.add_argument("--container-allow-host-proc", dest="containerAllowHostProc",
                              action="store_true", default=False,
                              help="With bwrap, bind the host's /proc, as for aliBuild build.")
+  doctor_docker.add_argument("--container-no-seccomp", dest="containerNoSeccomp",
+                             action="store_true", default=False,
+                             help="With bwrap, run without the seccomp filter, as for aliBuild build.")
 
   doctor_remote = doctor_parser.add_argument_group(title="Re-use prebuilt tarballs", description="""\
   Reusing prebuilt tarballs saves compilation time, as common packages need not
