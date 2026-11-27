@@ -66,6 +66,8 @@ _aliBuild_cmd_build() {
     '--docker-image[Docker image to build inside of]:image: ' \
     '--docker-extra-args[Arguments to pass to docker run]:args: ' \
     '*-v[Additional volume to mount inside Docker container]:volume: ' \
+    '--container-runtime[Container runtime to use]:runtime:(docker container bwrap)' \
+    '--container-network[Network for build.sh under bwrap]:network:(host none)' \
     '--plan[Resolve the build and print what it would do, then stop]' \
     '--no-remote-store[Disable the use of the remote store]' \
     '--remote-store[Where to find prebuilt tarballs to reuse]:store: ' \
@@ -132,6 +134,7 @@ _aliBuild_cmd_doctor() {
     '--docker[Check system packages inside a Docker container]' \
     '--docker-image[Docker image to use]:image: ' \
     '--docker-extra-args[Arguments to pass to docker run]:args: ' \
+    '--container-runtime[Container runtime to use]:runtime:(docker container bwrap)' \
     '--no-remote-store[Disable the use of the remote store]' \
     '--remote-store[Where to find prebuilt tarballs to reuse]:store: ' \
     '--write-store[Where to upload newly built packages]:store: ' \

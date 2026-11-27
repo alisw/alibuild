@@ -7,7 +7,7 @@ import logging
 from alibuild_helpers.log import debug, error, banner, info, success, warning
 from alibuild_helpers.log import logger
 from alibuild_helpers.utilities import getPackageList, parseDefaults, readDefaults, validateDefaults
-from alibuild_helpers.cmd import getstatusoutput, ContainerRunner
+from alibuild_helpers.cmd import getstatusoutput, container_runtime
 import tempfile
 
 def prunePaths(workDir) -> None:
@@ -86,6 +86,7 @@ def doDoctor(args, parser):
   # that we do not get spurious messages on linux
   homebrew_replacement = ""
 
+  ContainerRunner, _ = container_runtime(args)
   extra_env = {"ALIBUILD_CONFIG_DIR": "/alidist" if args.docker else os.path.abspath(args.configDir)}
   extra_env.update(dict([e.partition('=')[::2] for e in args.environment]))
 
