@@ -546,7 +546,8 @@ def bwrap_run_string(image, args, dockerImage, workDir, configDir, scriptDir, do
     binds.append((os.path.dirname(spec["reference"]), "/mirror", confine))
   if confine:
     trees, symlinks = confined_paths(spec, workDir, args.architecture, _devel_prefix(spec, args))
-    for path in trees:
+    # build.sh creates these, which it cannot do in the read-only work dir.
+    for path in trees + [os.path.join(workDir, d) for d in ("BUILD", "SOURCES", "TARS", "SPECS")]:
       os.makedirs(path, exist_ok=True)
     for link in symlinks:   # what build.sh would point them at
       os.makedirs(os.path.dirname(link), exist_ok=True)

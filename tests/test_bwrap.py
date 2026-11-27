@@ -257,7 +257,7 @@ class CommandTestCase(unittest.TestCase):
     self.assertEqual(writable, [("/cache/rootfs", "/"), (w + "/TMP/abcdef1234", "/tmp")] +
                      [(os.path.join(w, r), "/sw/" + r) for r in rel])
     # The sources and directories exist, as bwrap needs; the BUILD link is made.
-    for r in rel:
+    for r in rel + ["SOURCES", "SPECS"]:
       self.assertTrue(os.path.isdir(os.path.join(w, r)), r)
     self.assertEqual(os.readlink(os.path.join(w, "BUILD", "zlib-latest")), "abcdef1234")
     # Not checked out (e.g. unpacking a tarball): no SOURCEDIR bind.
