@@ -24,6 +24,7 @@ from shlex import quote
 
 from alibuild_helpers.log import debug, info, warning, dieOnError
 from alibuild_helpers.cmd import getstatusoutput
+from alibuild_helpers.sandbox import package_write_paths
 
 MANIFEST_TYPES = (
   "application/vnd.oci.image.index.v1+json",
@@ -497,6 +498,25 @@ class BwrapRunner:
     return False
 
 
+def confined_paths(spec, work_dir, architecture, devel_prefix):
+  """Under --sandbox, what build.sh may write in the read-only work dir: the
+  areas the macOS sandbox allows (package_write_paths), as bind mounts.
+  Returns (trees, symlinks): host directories to bind writable, and the
+  -latest symlinks in BUILD, which aliBuild creates itself, as a bind mount
+  cannot make a single symlink writable. The symlinks in ARCH/PKG come with
+  the whole of that directory instead, which only holds this package's
+  versions (as TARS/ARCH/PKG holds its tarballs)."""
+  work_dir = os.path.abspath(work_dir)
+  subpaths, literals = package_write_paths(spec, work_dir, work_dir, architecture, devel_prefix)
+  pkg_dir = os.path.join(work_dir, architecture, spec["package"])
+  sources = os.path.join(work_dir, "SOURCES") + os.sep
+  # SOURCEDIR only if checked out: a development package's is a symlink to its
+  # checkout, bound writable at /PKG already.
+  trees = [p for p in subpaths if os.path.dirname(p) != pkg_dir and
+           not (p.startswith(sources) and (os.path.islink(p) or not os.path.isdir(p)))]
+  return trees + [pkg_dir], [p for p in literals if os.path.dirname(p) != pkg_dir]
+
+
 def _in_sandbox(path, work_dir):
   work_dir = os.path.abspath(work_dir)
   if path == work_dir or path.startswith(work_dir + os.sep):
@@ -507,24 +527,42 @@ def _in_sandbox(path, work_dir):
 def bwrap_run_string(image, args, dockerImage, workDir, configDir, scriptDir, docker_extra_args,
                      spec, specs, volumes, buildEnvironment):
   """The bwrap counterpart of _docker_run_string: build.sh with the same
-  mounts and environment as docker gives it. /tmp is TMP/<hash> in the work
-  dir, emptied first, so that temporary files count against the disk, not the
-  memory, of the task."""
+  mounts and environment as docker gives it. With --sandbox, the work dir is
+  read-only, except for the areas the package owns (see confined_paths).
+  /tmp is TMP/<hash> in the work dir, emptied first, so that temporary files
+  count against the disk, not the memory, of the task."""
   workDir = os.path.abspath(workDir)
+  confine = getattr(args, "sandbox", False)
   tmp = os.path.join(workDir, "TMP", spec["hash"])
   shutil.rmtree(tmp, ignore_errors=True)
   os.makedirs(tmp)
   # The image cache is under the work dir: keep it read-only, or a build could
   # change the image for all later ones.
-  binds = [(workDir, "/sw", False),
+  binds = [(workDir, "/sw", confine),
            (os.path.join(workDir, "CONTAINERS"), "/sw/CONTAINERS", True),
            (os.path.abspath(configDir), "/alidist", True),
            (os.path.join(scriptDir, "build.sh"), "/build.sh", True)]
   if "reference" in spec:
-    binds.append((os.path.dirname(spec["reference"]), "/mirror", False))
-  # Make TMP/<hash> a mount point, so build.sh can empty it but not remove it
-  # from under /tmp.
-  binds.append((tmp, _in_sandbox(tmp, workDir), False))
+    binds.append((os.path.dirname(spec["reference"]), "/mirror", confine))
+  if confine:
+    trees, symlinks = confined_paths(spec, workDir, args.architecture, _devel_prefix(spec, args))
+    for path in trees:
+      os.makedirs(path, exist_ok=True)
+    for link in symlinks:   # what build.sh would point them at
+      os.makedirs(os.path.dirname(link), exist_ok=True)
+      if not (os.path.islink(link) and os.readlink(link) == spec["hash"]):
+        os.symlink(spec["hash"], link + ".tmp%d" % os.getpid())
+        os.replace(link + ".tmp%d" % os.getpid(), link)
+    for path in getattr(args, "sandboxAllowWrite", []):
+      if os.path.exists(path):
+        trees.append(os.path.abspath(path))
+      else:
+        warning("Not allowing writes to %s, which does not exist", path)
+    binds += [(p, _in_sandbox(p, workDir), False) for p in trees]
+  else:
+    # Make TMP/<hash> a mount point, so build.sh can empty it but not remove
+    # it from under /tmp (with --sandbox, it is one of the trees).
+    binds.append((tmp, _in_sandbox(tmp, workDir), False))
   for s in specs.values():
     if s["is_devel_pkg"]:
       pkg = s["package"]
@@ -536,6 +574,21 @@ def bwrap_run_string(image, args, dockerImage, workDir, configDir, scriptDir, do
   cmd = bwrap_command(image, binds, env, network=getattr(args, "containerNetwork", "host") != "none",
                       extra_args=docker_extra_args, host_proc=allow_host_proc(args), tmp=tmp)
   return " ".join(map(quote, cmd + ["bash", "-ex", "/build.sh"]))
+
+
+def bwrap_failure_hint(spec, args, log_path):
+  trees, symlinks = confined_paths(spec, args.workDir, args.architecture, _devel_prefix(spec, args))
+  return ("This build ran in a bwrap sandbox, where the work directory is read-only except\n"
+          "for the package's own directories:\n%s\n"
+          "Writes elsewhere fail with \"Read-only file system\". To check:\n"
+          "  grep 'Read-only file system' %s\n"
+          "Allow more with --sandbox-allow-write PATH, or rebuild with --no-sandbox.\n"
+          % ("".join("  %s\n" % p for p in trees + symlinks), quote(log_path)))
+
+
+def _devel_prefix(spec, args):
+  # As DEVEL_PREFIX in build.sh: only development packages have one.
+  return getattr(args, "develPrefix", None) if spec["is_devel_pkg"] else None
 
 
 def allow_host_proc(args):

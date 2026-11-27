@@ -1621,7 +1621,10 @@ def doBuild(args, parser):
     buildErrMsg += f"{bold}Build Directory:{reset}\n"
     buildErrMsg += f"  {build_dir}\n"
 
-    if getattr(args, "sandbox", False):
+    if getattr(args, "sandbox", False) and args.docker:
+      from alibuild_helpers.bwrap import bwrap_failure_hint
+      buildErrMsg += "\n" + bwrap_failure_hint(spec, args, log_path)
+    elif getattr(args, "sandbox", False):
       buildErrMsg += "\n" + sandbox_failure_hint(scriptDir, log_path)
 
     # Gather build info for the error message

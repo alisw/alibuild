@@ -159,11 +159,13 @@ def doParseArgs():
                                   "mounted (e.g. inside another container), which shows the build "
                                   "all the host's processes. Also $ALIBUILD_CONTAINER_ALLOW_HOST_PROC=1."))
 
-  build_sandbox = build_parser.add_argument_group(title="Build inside a sandbox (macOS)", description="""\
+  build_sandbox = build_parser.add_argument_group(title="Build inside a sandbox (macOS, bwrap)", description="""\
   On macOS, recipes can be run under a seatbelt sandbox (sandbox-exec) which
   only lets them write to the directories of the package being built, plus
   temporary and cache directories. Reads and network access are not
-  restricted. Set ALIBUILD_SANDBOX=1 to enable it by default.
+  restricted. With --container-runtime=bwrap, the same directories are the
+  only writable ones in the work directory. Set ALIBUILD_SANDBOX=1 to enable
+  it by default.
   """)
   build_sandbox.add_argument("--sandbox", dest="sandbox", action="store_true", default=None,
                              help="Run each recipe in a macOS sandbox.")
@@ -593,14 +595,15 @@ def finaliseArgs(args, parser):
   if args.action == "build":
     # ALIBUILD_SANDBOX only applies where sandboxing is possible, so it can be
     # set in a shared environment; an explicit --sandbox must work, or fail.
+    bwrap = args.docker and args.containerRuntime == "bwrap"
     if args.sandbox is None:
-      args.sandbox = (sys.platform == "darwin" and not args.docker and
+      args.sandbox = ((sys.platform == "darwin" and not args.docker or bwrap) and
                       os.environ.get("ALIBUILD_SANDBOX", "") not in ("", "0"))
     if args.containerNetwork != "host" and not (args.docker and args.containerRuntime == "bwrap"):
       parser.error("--container-network needs --container-runtime=bwrap")
-    if args.sandbox and args.docker:
-      parser.error("cannot use --sandbox and --docker together")
-    if args.sandbox:
+    if args.sandbox and args.docker and not bwrap:
+      parser.error("cannot use --sandbox and --docker together, except with --container-runtime=bwrap")
+    if args.sandbox and not bwrap:
       problem = sandbox_check()
       if problem:
         parser.error("cannot use --sandbox: " + problem)

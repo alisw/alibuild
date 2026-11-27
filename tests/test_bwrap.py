@@ -244,6 +244,38 @@ class CommandTestCase(unittest.TestCase):
     self.assertNotIn("--tmpfs", joined)
     self.assertEqual(os.listdir(os.path.join(w, "TMP", "abcdef1234")), [])
 
+  def test_sandbox_binds(self):
+    w = self.work
+    os.makedirs(os.path.join(w, "SOURCES", "zlib", "v1.3.1", "v1.3.1"))   # checked out
+    joined, args = self.run_string(sandbox=True)
+    self.assertIn("--ro-bind %s /sw --ro-bind %s/CONTAINERS /sw/CONTAINERS" % (w, w), joined)
+    self.assertIn("--ro-bind /mirror /mirror", joined)
+    writable = [(args[i + 1], args[i + 2]) for i, a in enumerate(args) if a == "--bind"]
+    rel = ["BUILD/abcdef1234", "INSTALLROOT/abcdef1234", "TMP/abcdef1234",
+           "TARS/slc9_aarch64/store/ab/abcdef1234", "TARS/slc9_aarch64/zlib",
+           "SOURCES/zlib/v1.3.1/v1.3.1", "slc9_aarch64/zlib"]
+    self.assertEqual(writable, [("/cache/rootfs", "/"), (w + "/TMP/abcdef1234", "/tmp")] +
+                     [(os.path.join(w, r), "/sw/" + r) for r in rel])
+    # The sources and directories exist, as bwrap needs; the BUILD link is made.
+    for r in rel:
+      self.assertTrue(os.path.isdir(os.path.join(w, r)), r)
+    self.assertEqual(os.readlink(os.path.join(w, "BUILD", "zlib-latest")), "abcdef1234")
+    # Not checked out (e.g. unpacking a tarball): no SOURCEDIR bind.
+    os.rmdir(os.path.join(w, "SOURCES", "zlib", "v1.3.1", "v1.3.1"))
+    self.assertNotIn("SOURCES", self.run_string(sandbox=True)[0])
+
+  def test_sandbox_allow_write_and_hint(self):
+    extra = os.path.join(self.tmp.name, "extra")
+    os.mkdir(extra)
+    with mock.patch("alibuild_helpers.bwrap.warning") as warn:
+      joined, _ = self.run_string(sandbox=True, sandboxAllowWrite=[extra, "/does/not/exist"])
+    self.assertIn("--bind %s %s" % (extra, extra), joined)
+    warn.assert_called_once()
+    args = mock.MagicMock(workDir=self.work, architecture="slc9_aarch64", develPrefix=None)
+    hint = bwrap.bwrap_failure_hint(self.spec, args, "BUILD/zlib-latest/log")
+    self.assertIn(os.path.join(self.work, "INSTALLROOT", "abcdef1234"), hint)
+    self.assertIn("grep 'Read-only file system' BUILD/zlib-latest/log", hint)
+
   def test_runtime_takes_platform_from_docker_extra_args(self):
     args = mock.MagicMock(workDir="/w", dockerImage="img", docker_extra_args=["--platform", "linux/arm64", "--x"],
                           containerNetwork="none")

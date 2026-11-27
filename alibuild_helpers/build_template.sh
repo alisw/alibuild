@@ -82,13 +82,15 @@ export RECC_PREFIX_MAP=$BUILDDIR=/recc/BUILDDIR-$PKGNAME:$INSTALLROOT=/recc/INST
 # No point in mixing packages
 export RECC_ACTION_SALT="$PKGNAME"
 
-rm -fr "$WORK_DIR/INSTALLROOT/$PKGHASH"
+# Under bwrap, the package's own directories are mount points: rm can empty
+# them, but not remove them.
+rm -fr "$WORK_DIR/INSTALLROOT/$PKGHASH" || [ -z "$(ls -A "$WORK_DIR/INSTALLROOT/$PKGHASH")" ]
 # We remove the build directory only if we are not in incremental mode.
-if [[ "$INCREMENTAL_BUILD_HASH" == 0 ]] && ! rm -rf "$BUILDROOT"; then
+if [[ "$INCREMENTAL_BUILD_HASH" == 0 ]] && ! rm -rf "$BUILDROOT" && [ -n "$(ls -A "$BUILDROOT")" ]; then
   # Golang installs stuff without write permissions for ourselves sometimes.
   # This makes the `rm -rf` above fail, so give ourselves write permission.
   chmod -R o+w "$BUILDROOT" || :
-  rm -rf "$BUILDROOT"
+  rm -rf "$BUILDROOT" || [ -z "$(ls -A "$BUILDROOT")" ]
 fi
 mkdir -p "$INSTALLROOT" "$BUILDROOT" "$BUILDDIR" "$WORK_DIR/INSTALLROOT/$PKGHASH/$PKGPATH"
 
@@ -125,9 +127,12 @@ unset DYLD_LIBRARY_PATH
 EOF
 
 cd "$BUILDROOT"
-ln -snf "$PKGHASH" "$ALIBUILD_BUILD_WORK_DIR/BUILD/$PKGNAME-latest"
+# With bwrap --sandbox, BUILD is read-only and aliBuild has made the links.
+ln -snf "$PKGHASH" "$ALIBUILD_BUILD_WORK_DIR/BUILD/$PKGNAME-latest" ||
+  [ "$(readlink "$ALIBUILD_BUILD_WORK_DIR/BUILD/$PKGNAME-latest")" = "$PKGHASH" ]
 if [[ $DEVEL_PREFIX ]]; then
-  ln -snf "$PKGHASH" "$ALIBUILD_BUILD_WORK_DIR/BUILD/$PKGNAME-latest-$DEVEL_PREFIX"
+  ln -snf "$PKGHASH" "$ALIBUILD_BUILD_WORK_DIR/BUILD/$PKGNAME-latest-$DEVEL_PREFIX" ||
+    [ "$(readlink "$ALIBUILD_BUILD_WORK_DIR/BUILD/$PKGNAME-latest-$DEVEL_PREFIX")" = "$PKGHASH" ]
 fi
 
 cd "$BUILDDIR"
