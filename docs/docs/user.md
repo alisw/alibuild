@@ -16,6 +16,7 @@ aliBuild build [-h] [--defaults DEFAULT]
                [--only-deps] [--plugin PLUGIN]
                [--always-prefer-system | --no-system]
                [--docker] [--docker-image IMAGE] [--docker-extra-args ARGLIST] [-v VOLUMES]
+               [--container-runtime RUNTIME] [--container-network {host,none}]
                [--no-remote-store] [--remote-store STORE] [--write-store STORE] [--insecure]
                [--ac-store STORE] [--legacy-links-store STORE] [--cas-public-url URL]
                [--storage {ephemeral,permanent}] [--no-snapshot-sources]
@@ -84,6 +85,25 @@ e.g. `alisw/slc8-builder:latest`. They will be fetched if unavailable.
   sure quoting is correct! Implies `--docker`.
 - `-v VOLUMES`: Additional volume to be mounted inside the Docker container, if
   one is used. May be specified multiple times. Passed verbatim to `docker run`.
+- `--container-runtime RUNTIME`: `docker`, `container` (Apple's) or `bwrap`.
+  Implies `--docker`. The default is `$ALIBUILD_CONTAINER_RUNTIME`, else
+  `container` on macOS 26 and later and `docker` elsewhere.
+- `--container-network host|none`: with `bwrap`, `none` runs each `build.sh`
+  without network access. Default: `host`.
+
+With `--container-runtime=bwrap` (Linux only), aliBuild needs neither a daemon
+nor privileges: it pulls the same builder image anonymously from its registry,
+unpacks it once under `WORK_DIR/CONTAINERS/<digest>/rootfs`, and runs the
+commands docker would run in it with [bubblewrap](https://github.com/containers/bubblewrap),
+in unprivileged user namespaces. The build stays a child of aliBuild: it is in
+the same process group and cgroup, and dies with it. The image is read-only to
+the build, files it writes belong to you, and `/tmp` is a fresh tmpfs. Only
+`build.sh` runs in the sandbox: checkouts, the store and uploads stay in
+aliBuild, so `--container-network none` cuts off the build only. That includes
+services on the host's localhost, such as a `recc` cache or proxy on
+127.0.0.1. `--docker-extra-args` is passed to `bwrap`. The kernel must allow
+unprivileged user namespaces: on Ubuntu 24.04 and later, AppArmor forbids them
+to `bwrap` unless a profile allows it (`kernel.apparmor_restrict_unprivileged_userns`).
 
 ### Re-using prebuilt tarballs
 

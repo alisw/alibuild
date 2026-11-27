@@ -437,6 +437,10 @@ def bwrap_command(image, binds=(), env=(), network=True, extra_args=()):
   cmd = ["bwrap", "--unshare-user", "--unshare-pid", "--unshare-ipc", "--unshare-uts",
          "--die-with-parent", "--new-session"]
   if not network:
+    # This also hides the host's loopback, so services on its localhost (a
+    # recc/bb-storage cache on :8980, proxy routes on 127.0.0.1) are gone too.
+    # To keep them, they would have to listen on Unix sockets bound into the
+    # sandbox, with a forwarder inside it if the client wants TCP.
     cmd.append("--unshare-net")
   cmd += ["--bind", image.rootfs, "/"] + proc_args() + ["--dev", "/dev", "--tmpfs", "/tmp"]
   if network:
