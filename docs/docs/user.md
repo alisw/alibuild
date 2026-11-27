@@ -17,7 +17,7 @@ aliBuild build [-h] [--defaults DEFAULT]
                [--always-prefer-system | --no-system]
                [--docker] [--docker-image IMAGE] [--docker-extra-args ARGLIST] [-v VOLUMES]
                [--container-runtime RUNTIME] [--container-network {host,none}]
-               [--container-allow-host-proc]
+               [--container-allow-host-proc] [--container-no-seccomp]
                [--no-remote-store] [--remote-store STORE] [--write-store STORE] [--insecure]
                [--ac-store STORE] [--legacy-links-store STORE] [--cas-public-url URL]
                [--storage {ephemeral,permanent}] [--no-snapshot-sources]
@@ -93,6 +93,8 @@ e.g. `alisw/slc8-builder:latest`. They will be fetched if unavailable.
   without network access. Default: `host`.
 - `--container-allow-host-proc`: with `bwrap`, bind the host's `/proc` where a
   new one cannot be mounted.
+- `--container-no-seccomp`: with `bwrap`, run builds without the seccomp filter
+  (also `ALIBUILD_CONTAINER_NO_SECCOMP=1`), for debugging.
 
 With `--container-runtime=bwrap` (Linux only), aliBuild needs neither a daemon
 nor privileges: it pulls the same builder image anonymously from its registry,
@@ -107,7 +109,11 @@ directory is read-only to `build.sh`, except for the directories the package
 owns, the same ones as for the macOS sandbox; `--sandbox-allow-write` adds more.
 A new `/proc` is mounted for the build; where the kernel refuses that, as inside
 another container, aliBuild stops, unless `--container-allow-host-proc` (or
-`ALIBUILD_CONTAINER_ALLOW_HOST_PROC=1`) lets the build see the host's. Only
+`ALIBUILD_CONTAINER_ALLOW_HOST_PROC=1`) lets the build see the host's. As
+under docker, a seccomp filter refuses the syscalls docker's default profile
+refuses (mounts, keyrings, BPF, kernel modules, new namespaces...), so the build
+cannot create nested user namespaces; bwrap 0.8 and later also forbids them
+with `--disable-userns`. Only
 `build.sh` runs in the sandbox: checkouts, the store and uploads stay in
 aliBuild, so `--container-network none` cuts off the build only. That includes
 services on the host's localhost, such as a `recc` cache or proxy on
